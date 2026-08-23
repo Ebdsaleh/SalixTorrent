@@ -10,7 +10,19 @@
 *.userosscache
 *.sln.docstates
 *.env
-
+*.bat
+*tree.txt
+*test_cli_swarm.py
+*test_download.py
+*test_peer.py
+*test_swarm.py
+*.torrent
+*downloads/
+.salix_resume/
+*.iso
+*.zip
+*.venv
+*.env
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 

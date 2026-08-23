@@ -1,0 +1,6 @@
+# UI & Graphical Framework
+dearpygui>=2.0.0
+
+# Optional / Recommended for Async HTTP Tracker Support & Image handling
+aiohttp>=3.9.0
+pillow>=10.0.0
