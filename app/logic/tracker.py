@@ -1,18 +1,20 @@
 # app/logic/tracker.py
 
 import asyncio
+import random
 import socket
 import struct
-import random
 import urllib.parse
-from typing import List, Tuple, Optional, Any
+from typing import Any, List, Optional, Tuple
+
 import aiohttp
+
 from app.logic.bencode import Bencode
 from app.logic.torrent_file import TorrentFile
 
 
 class TrackerClient:
-    """Handles HTTP, HTTPS, and UDP announce queries to retrieve active swarm peers."""
+    """Handles HTTP, HTTPS, and UDP announces for a torrent session."""
 
     def __init__(self, torrent: TorrentFile, peer_id: bytes, port: int = 6881):
         self.torrent = torrent
@@ -23,7 +25,8 @@ class TrackerClient:
         self,
         uploaded: int = 0,
         downloaded: int = 0,
-        left: Optional[int] = None
+        left: Optional[int] = None,
+        event: Optional[str] = "started",
     ) -> List[Tuple[str, int]]:
         if left is None:
             left = self.torrent.total_length
@@ -40,6 +43,7 @@ class TrackerClient:
                         uploaded,
                         downloaded,
                         left,
+                        event,
                     )
                 elif tracker_url.startswith("udp://"):
                     peers = await self._query_udp_tracker(
@@ -47,6 +51,7 @@ class TrackerClient:
                         uploaded,
                         downloaded,
                         left,
+                        event,
                     )
 
                 if peers:
@@ -57,38 +62,52 @@ class TrackerClient:
             except asyncio.CancelledError:
                 raise
             except Exception:
-                # Silently advance to the next tracker tier.
                 continue
 
-        return list(set(all_peers))
+        # Preserve order while removing duplicate endpoints.
+        return list(dict.fromkeys(all_peers))
+
+    async def announce(
+        self,
+        uploaded: int = 0,
+        downloaded: int = 0,
+        left: Optional[int] = None,
+        event: Optional[str] = None,
+    ) -> List[Tuple[str, int]]:
+        """Alias used by the seeding lifecycle for periodic announces."""
+        return await self.fetch_peers(
+            uploaded=uploaded,
+            downloaded=downloaded,
+            left=left,
+            event=event,
+        )
 
     async def _query_http_tracker(
         self,
         tracker_url: str,
         uploaded: int,
         downloaded: int,
-        left: int
+        left: int,
+        event: Optional[str],
     ) -> List[Tuple[str, int]]:
-        params = {
-            "info_hash": self.torrent.info_hash,
-            "peer_id": self.peer_id,
-            "port": self.port,
-            "uploaded": uploaded,
-            "downloaded": downloaded,
-            "left": left,
-            "compact": 1,
-            "event": "started"
-        }
+        params = [
+            ("info_hash", urllib.parse.quote_from_bytes(self.torrent.info_hash, safe="")),
+            ("peer_id", urllib.parse.quote_from_bytes(self.peer_id, safe="")),
+            ("port", str(self.port)),
+            ("uploaded", str(max(0, int(uploaded)))),
+            ("downloaded", str(max(0, int(downloaded)))),
+            ("left", str(max(0, int(left)))),
+            ("compact", "1"),
+        ]
+        if event:
+            params.append(("event", event))
 
-        query_string = urllib.parse.urlencode(
-            {k: v for k, v in params.items() if not isinstance(v, bytes)}
-        )
-        binary_query = (
-            f"?info_hash={urllib.parse.quote(self.torrent.info_hash)}"
-            f"&peer_id={urllib.parse.quote(self.peer_id)}&{query_string}"
-        )
-
-        full_url = tracker_url + binary_query
+        # info_hash and peer_id are already percent encoded binary strings, so
+        # build the query manually rather than letting urlencode escape '%' a
+        # second time.
+        query = "&".join(f"{key}={value}" for key, value in params)
+        separator = "&" if "?" in tracker_url else "?"
+        full_url = f"{tracker_url}{separator}{query}"
 
         timeout = aiohttp.ClientTimeout(total=8)
         async with aiohttp.ClientSession(timeout=timeout) as session:
@@ -108,18 +127,18 @@ class TrackerClient:
         tracker_url: str,
         uploaded: int,
         downloaded: int,
-        left: int
+        left: int,
+        event: Optional[str],
     ) -> List[Tuple[str, int]]:
-        """
-        Run the existing BEP 0015 blocking UDP implementation in a worker
-        thread so recvfrom() can never freeze Salix_T's asyncio engine.
-        """
+        # The BEP 0015 socket calls are blocking. Keep them off the asyncio
+        # engine thread so Pause/Stop/Resume remain responsive.
         return await asyncio.to_thread(
             self._query_udp_tracker_blocking,
             tracker_url,
             uploaded,
             downloaded,
             left,
+            event,
         )
 
     def _query_udp_tracker_blocking(
@@ -127,9 +146,9 @@ class TrackerClient:
         tracker_url: str,
         uploaded: int,
         downloaded: int,
-        left: int
+        left: int,
+        event: Optional[str],
     ) -> List[Tuple[str, int]]:
-        """Blocking BEP 0015 implementation.  Never call directly on asyncio."""
         parsed = urllib.parse.urlparse(tracker_url)
         host = parsed.hostname
         port = parsed.port or 80
@@ -137,15 +156,20 @@ class TrackerClient:
         if not host:
             return []
 
+        event_code = {
+            None: 0,
+            "completed": 1,
+            "started": 2,
+            "stopped": 3,
+        }.get(event, 0)
+
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.settimeout(5.0)
 
         try:
-            # 1. Connect Action (action = 0, magic connection_id = 0x41727101980)
             conn_id = 0x41727101980
-            action = 0
             transaction_id = random.randint(0, 0x7FFFFFFF)
-            packet = struct.pack(">QII", conn_id, action, transaction_id)
+            packet = struct.pack(">QII", conn_id, 0, transaction_id)
 
             sock.sendto(packet, (host, port))
             response, _ = sock.recvfrom(2048)
@@ -154,32 +178,27 @@ class TrackerClient:
                 return []
 
             res_action, res_trans_id, connection_id = struct.unpack(
-                ">IIQ",
-                response[:16],
+                ">IIQ", response[:16]
             )
-
             if res_trans_id != transaction_id or res_action != 0:
                 return []
 
-            # 2. Announce Action (action = 1)
-            action = 1
             transaction_id = random.randint(0, 0x7FFFFFFF)
             key = random.randint(0, 0xFFFFFFFF)
             num_want = 50
-            event = 2  # started
 
             announce_packet = struct.pack(
                 ">QII20s20sQQQIIIiH",
                 connection_id,
-                action,
+                1,
                 transaction_id,
                 self.torrent.info_hash,
                 self.peer_id,
-                downloaded,
-                left,
-                uploaded,
-                event,
-                0,  # IP address default
+                max(0, int(downloaded)),
+                max(0, int(left)),
+                max(0, int(uploaded)),
+                event_code,
+                0,
                 key,
                 num_want,
                 self.port,
@@ -191,16 +210,13 @@ class TrackerClient:
             if len(response) < 20:
                 return []
 
-            res_action, res_trans_id, interval, leechers, seeders = struct.unpack(
-                ">IIIII",
-                response[:20],
+            res_action, res_trans_id, _interval, _leechers, _seeders = struct.unpack(
+                ">IIIII", response[:20]
             )
-
             if res_trans_id != transaction_id or res_action != 1:
                 return []
 
-            raw_peers = response[20:]
-            return self._parse_peers(raw_peers)
+            return self._parse_peers(response[20:])
 
         finally:
             sock.close()
@@ -210,19 +226,16 @@ class TrackerClient:
 
         if isinstance(raw_peers, (bytes, bytearray)):
             num_peers = len(raw_peers) // 6
-
             for i in range(num_peers):
                 offset = i * 6
-                ip_bytes = raw_peers[offset:offset + 4]
-                port_bytes = raw_peers[offset + 4:offset + 6]
-                ip = socket.inet_ntoa(ip_bytes)
-                port = struct.unpack(">H", port_bytes)[0]
+                ip = socket.inet_ntoa(raw_peers[offset:offset + 4])
+                port = struct.unpack(">H", raw_peers[offset + 4:offset + 6])[0]
                 peers.append((ip, port))
 
         elif isinstance(raw_peers, list):
             for peer in raw_peers:
                 if isinstance(peer, dict) and b"ip" in peer and b"port" in peer:
-                    ip = peer[b"ip"].decode("utf-8")
+                    ip = peer[b"ip"].decode("utf-8", errors="ignore")
                     port = int(peer[b"port"])
                     peers.append((ip, port))
 

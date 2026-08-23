@@ -91,6 +91,33 @@ class PeerConnection:
         self.writer.write(msg)
         await self.writer.drain()
 
+    async def send_bitfield(self, bitfield: bytes):
+        """Advertise the pieces we currently have."""
+        if not self.is_connected or not self.writer:
+            return
+        payload = bytes(bitfield)
+        msg = struct.pack(">IB", 1 + len(payload), PeerMessageID.BITFIELD) + payload
+        self.writer.write(msg)
+        await self.writer.drain()
+
+    async def send_unchoke(self):
+        """Allow a remote peer to request blocks from us."""
+        if not self.is_connected or not self.writer:
+            return
+        msg = struct.pack(">IB", 1, PeerMessageID.UNCHOKE)
+        self.writer.write(msg)
+        await self.writer.drain()
+        self.am_choking = False
+
+    async def send_piece(self, piece_index: int, block_offset: int, data: bytes):
+        """Send a requested block to a remote peer while seeding."""
+        if not self.is_connected or not self.writer:
+            return
+        payload = struct.pack(">II", piece_index, block_offset) + bytes(data)
+        msg = struct.pack(">IB", 1 + len(payload), PeerMessageID.PIECE) + payload
+        self.writer.write(msg)
+        await self.writer.drain()
+
     async def read_message(self) -> Optional[tuple]:
         """Reads and parses the next framing message from the TCP socket."""
         if not self.is_connected or not self.reader:
@@ -128,8 +155,15 @@ class PeerConnection:
             elif msg_id == PeerMessageID.BITFIELD:
                 self.bitfield = bytearray(body)
                 return ("BITFIELD", self.bitfield)
+            elif msg_id == PeerMessageID.REQUEST:
+                if len(body) != 12:
+                    return ("UNKNOWN", body)
+                index, begin, req_length = struct.unpack(">III", body)
+                return ("REQUEST", (index, begin, req_length))
             elif msg_id == PeerMessageID.PIECE:
                 # Body format: 4B piece index, 4B offset, followed by raw block data
+                if len(body) < 8:
+                    return ("UNKNOWN", body)
                 index, begin = struct.unpack(">II", body[:8])
                 block_data = body[8:]
                 return ("PIECE", (index, begin, block_data))

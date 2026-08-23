@@ -559,6 +559,38 @@ class PieceManager:
             file_handle.seek(file_offset)
             file_handle.write(piece.get_data())
 
+    def read_block(self, piece_index: int, offset: int, length: int) -> bytes:
+        """Read a verified block from disk for upload/seeding."""
+        if piece_index < 0 or piece_index >= len(self.pieces):
+            return b""
+
+        piece = self.pieces[piece_index]
+        if not piece.is_complete:
+            return b""
+
+        if offset < 0 or length <= 0:
+            return b""
+        if offset + length > piece.length:
+            return b""
+        if length > BLOCK_SIZE:
+            return b""
+        if not os.path.exists(self.output_path):
+            return b""
+
+        file_offset = piece.index * self.torrent.piece_length + offset
+
+        try:
+            with open(self.output_path, "rb") as file_handle:
+                file_handle.seek(file_offset)
+                data = file_handle.read(length)
+            return data if len(data) == length else b""
+        except OSError:
+            return b""
+
+    def completed_bitfield(self) -> bytes:
+        """Return the wire-format piece bitfield advertised to peers."""
+        return self._build_completed_bitfield()
+
     def release_requests(self, blocks: Iterable[Block]):
         """Release blocks owned by a peer that disconnected or was cancelled."""
         for block in blocks:

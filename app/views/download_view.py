@@ -55,7 +55,7 @@ class DownloadView:
                     dpg.add_table_column(label="Size", width_fixed=True, init_width_or_weight=90)
                     dpg.add_table_column(label="Progress", width_fixed=True, init_width_or_weight=120)
                     dpg.add_table_column(label="Status", width_fixed=True, init_width_or_weight=150)
-                    dpg.add_table_column(label="Speed", width_fixed=True, init_width_or_weight=90)
+                    dpg.add_table_column(label="Down / Up", width_fixed=True, init_width_or_weight=135)
 
             dpg.add_spacer(height=10)
 
@@ -72,18 +72,21 @@ class DownloadView:
 
             # Telemetry Metrics
             with dpg.group(horizontal=True):
-                with dpg.child_window(width=520, height=160, border=True):
+                with dpg.child_window(width=520, height=185, border=True):
                     dpg.add_text("TRANSFER METRICS", color=(100, 180, 255))
                     dpg.add_separator()
                     self.speed_text = dpg.add_text("Download Speed: 0.0 KB/s")
+                    self.upload_speed_text = dpg.add_text("Upload Speed: 0.0 KB/s")
                     self.downloaded_text = dpg.add_text("Downloaded: 0.0 MB / 0.0 MB")
+                    self.uploaded_text = dpg.add_text("Uploaded: 0.0 MB")
                     self.peers_text = dpg.add_text("Connected Peers: 0")
 
-                with dpg.child_window(width=-1, height=160, border=True):
+                with dpg.child_window(width=-1, height=185, border=True):
                     dpg.add_text("SWARM STATUS", color=(255, 200, 100))
                     dpg.add_separator()
                     self.state_text = dpg.add_text("Session State: Idle")
                     self.client_id_text = dpg.add_text("Client ID: Salix_T 1.0")
+                    self.listen_port_text = dpg.add_text("Listen Port: --")
                     self.health_text = dpg.add_text("Swarm Health: Active")
 
     def _open_native_file_dialog(self):
@@ -118,7 +121,9 @@ class DownloadView:
         h = msg["info_hash"]
         size_str = f"{msg['total_bytes'] / (1024 * 1024):.1f} MB"
         prog_str = f"{msg['progress'] * 100:.1f}%"
-        speed_str = f"{msg['speed_kbps']:.1f} KB/s"
+        down_kbps = msg.get("speed_kbps", 0.0)
+        up_kbps = msg.get("upload_speed_kbps", 0.0)
+        speed_str = f"{down_kbps:.1f} / {up_kbps:.1f} KB/s"
         state_label = msg.get("state_label", msg["state"])
 
         if h not in self.torrent_rows:
@@ -182,22 +187,43 @@ class DownloadView:
                     f"({checked_pieces} / {check_total_pieces} Pieces Scanned)"
                 )
             )
-        else:
+        elif state == "Fast Resume":
             prog = msg["progress"]
             dpg.set_value(self.progress_bar, prog)
             dpg.set_value(
                 self.progress_label,
                 (
+                    f"Fast resume restored — "
+                    f"{msg['completed_pieces']} / {msg['total_pieces']} Pieces Verified"
+                )
+            )
+        else:
+            prog = msg["progress"]
+            dpg.set_value(self.progress_bar, prog)
+
+            suffix = " — Seeding" if state == "Seeding" else ""
+            dpg.set_value(
+                self.progress_label,
+                (
                     f"{prog * 100:.2f}% Complete "
-                    f"({msg['completed_pieces']} / {msg['total_pieces']} Pieces)"
+                    f"({msg['completed_pieces']} / {msg['total_pieces']} Pieces){suffix}"
                 )
             )
 
-        dpg.set_value(self.speed_text, f"Download Speed: {msg['speed_kbps']:,.1f} KB/s")
+        dpg.set_value(self.speed_text, f"Download Speed: {msg.get('speed_kbps', 0.0):,.1f} KB/s")
+        dpg.set_value(self.upload_speed_text, f"Upload Speed: {msg.get('upload_speed_kbps', 0.0):,.1f} KB/s")
         dl_mb = msg["downloaded_bytes"] / (1024 * 1024)
+        up_mb = msg.get("uploaded_bytes", 0) / (1024 * 1024)
         tot_mb = msg["total_bytes"] / (1024 * 1024)
         dpg.set_value(self.downloaded_text, f"Downloaded: {dl_mb:,.1f} MB / {tot_mb:,.1f} MB")
+        dpg.set_value(self.uploaded_text, f"Uploaded: {up_mb:,.1f} MB")
         dpg.set_value(self.peers_text, f"Connected Peers: {msg['connected_peers']}")
+
+        listen_port = msg.get("listen_port", 0)
+        dpg.set_value(
+            self.listen_port_text,
+            f"Listen Port: {listen_port if listen_port else '--'}"
+        )
 
     def update(self, delta_time: float):
         while not self.ui_queue.empty():
