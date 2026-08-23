@@ -12,6 +12,7 @@ class TorrentCommand:
     PAUSE = "PAUSE"
     RESUME = "RESUME"
     STOP = "STOP"
+    SET_LIMITS = "SET_LIMITS"
 
 
 class TorrentManager:
@@ -84,7 +85,13 @@ class TorrentManager:
         self._engine_ready.set()
 
         while self._running:
-            action, info_hash = await self._cmd_queue.get()
+            command = await self._cmd_queue.get()
+
+            if len(command) == 2:
+                action, info_hash = command
+                payload = None
+            else:
+                action, info_hash, payload = command
 
             try:
                 with self._sessions_lock:
@@ -113,6 +120,15 @@ class TorrentManager:
                 elif action == TorrentCommand.STOP:
                     session.stop()
 
+                elif action == TorrentCommand.SET_LIMITS:
+                    payload = payload or {}
+                    session.set_transfer_limits(
+                        payload.get("download_value", 0.0),
+                        payload.get("download_unit", "KB/s"),
+                        payload.get("upload_value", 0.0),
+                        payload.get("upload_unit", "KB/s"),
+                    )
+
             finally:
                 self._cmd_queue.task_done()
 
@@ -140,7 +156,7 @@ class TorrentManager:
         new_session.emit_snapshot()
         return new_session
 
-    def _send_cmd(self, action: str, info_hash: str):
+    def _send_cmd(self, action: str, info_hash: str, payload=None):
         if not self._running:
             self.start_engine()
 
@@ -150,7 +166,7 @@ class TorrentManager:
         if self._loop and self._cmd_queue and not self._loop.is_closed():
             self._loop.call_soon_threadsafe(
                 self._cmd_queue.put_nowait,
-                (action, info_hash),
+                (action, info_hash, payload),
             )
 
     def start_torrent(self, info_hash: str):
@@ -164,3 +180,22 @@ class TorrentManager:
 
     def stop_torrent(self, info_hash: str):
         self._send_cmd(TorrentCommand.STOP, info_hash)
+
+    def set_transfer_limits(
+        self,
+        info_hash: str,
+        download_value: float,
+        download_unit: str,
+        upload_value: float,
+        upload_unit: str,
+    ):
+        self._send_cmd(
+            TorrentCommand.SET_LIMITS,
+            info_hash,
+            {
+                "download_value": download_value,
+                "download_unit": download_unit,
+                "upload_value": upload_value,
+                "upload_unit": upload_unit,
+            },
+        )

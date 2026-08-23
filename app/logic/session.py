@@ -13,6 +13,78 @@ from app.logic.piece_manager import BLOCK_SIZE, Block, PieceManager
 from app.logic.torrent_file import TorrentFile
 from app.logic.tracker import TrackerClient
 
+RATE_UNIT_MULTIPLIERS = {
+    "KB/s": 1024.0,
+    "MB/s": 1024.0 * 1024.0,
+    "kbps": 1000.0 / 8.0,
+    "Mbps": 1000.0 * 1000.0 / 8.0,
+}
+
+
+class AsyncBandwidthLimiter:
+    """
+    Shared aggregate rate limiter for all peers in one torrent session.
+
+    The limiter schedules byte-sized transfer slots across every peer instead
+    of sleeping independently per connection, so a 1 MB/s torrent limit is
+    approximately 1 MB/s total rather than 1 MB/s per peer. Runtime changes
+    are noticed within 100 ms. A rate of 0 means unlimited.
+    """
+
+    def __init__(self):
+        self.rate_bps: float = 0.0
+        self._next_slot: float = time.monotonic()
+        self._version: int = 0
+        self._lock = asyncio.Lock()
+
+    def set_rate(self, rate_bps: float):
+        self.rate_bps = max(0.0, float(rate_bps))
+        self._next_slot = time.monotonic()
+        self._version += 1
+
+    async def throttle(self, byte_count: int):
+        byte_count = int(byte_count)
+        if byte_count <= 0 or self.rate_bps <= 0:
+            return
+
+        while True:
+            async with self._lock:
+                rate_bps = self.rate_bps
+                version = self._version
+
+                if rate_bps <= 0:
+                    return
+
+                now = time.monotonic()
+                scheduled_start = max(now, self._next_slot)
+                self._next_slot = scheduled_start + (byte_count / rate_bps)
+
+            delay = scheduled_start - time.monotonic()
+
+            while delay > 0:
+                await asyncio.sleep(min(0.10, delay))
+
+                # A live limit change invalidates the old reservation. Re-book
+                # the transfer against the new rate instead of waiting for a
+                # stale schedule created by the previous limit.
+                if version != self._version:
+                    break
+
+                delay = scheduled_start - time.monotonic()
+
+            if version == self._version:
+                return
+
+
+def _rate_to_bps(value: float, unit: str) -> int:
+    try:
+        numeric_value = max(0.0, float(value))
+    except (TypeError, ValueError):
+        numeric_value = 0.0
+
+    multiplier = RATE_UNIT_MULTIPLIERS.get(unit, RATE_UNIT_MULTIPLIERS["KB/s"])
+    return int(numeric_value * multiplier)
+
 
 class SessionState:
     IDLE = "Idle"
@@ -57,6 +129,19 @@ class TorrentSession:
         self._seed_port: int = 6881
 
         self.uploaded_bytes: int = 0
+
+        # Per-torrent transfer limits. The user-facing value/unit pair is kept
+        # alongside canonical bytes-per-second values so the GUI can restore
+        # exactly what the user entered when switching between torrents.
+        self.download_limit_value: float = 0.0
+        self.download_limit_unit: str = "KB/s"
+        self.upload_limit_value: float = 0.0
+        self.upload_limit_unit: str = "KB/s"
+        self.download_limit_bps: int = 0
+        self.upload_limit_bps: int = 0
+        self._download_limiter = AsyncBandwidthLimiter()
+        self._upload_limiter = AsyncBandwidthLimiter()
+
         self.state = SessionState.IDLE
         self.is_running = False
 
@@ -68,6 +153,41 @@ class TorrentSession:
         self._fast_resume_notice_shown = False
 
     def emit_snapshot(self):
+        self._emit_snapshot()
+
+    def set_transfer_limits(
+        self,
+        download_value: float,
+        download_unit: str,
+        upload_value: float,
+        upload_unit: str,
+    ):
+        """Apply live per-torrent download and upload limits."""
+        if download_unit not in RATE_UNIT_MULTIPLIERS:
+            download_unit = "KB/s"
+        if upload_unit not in RATE_UNIT_MULTIPLIERS:
+            upload_unit = "KB/s"
+
+        try:
+            download_value = max(0.0, float(download_value))
+        except (TypeError, ValueError):
+            download_value = 0.0
+
+        try:
+            upload_value = max(0.0, float(upload_value))
+        except (TypeError, ValueError):
+            upload_value = 0.0
+
+        self.download_limit_value = download_value
+        self.download_limit_unit = download_unit
+        self.upload_limit_value = upload_value
+        self.upload_limit_unit = upload_unit
+
+        self.download_limit_bps = _rate_to_bps(download_value, download_unit)
+        self.upload_limit_bps = _rate_to_bps(upload_value, upload_unit)
+
+        self._download_limiter.set_rate(self.download_limit_bps)
+        self._upload_limiter.set_rate(self.upload_limit_bps)
         self._emit_snapshot()
 
     def pause(self):
@@ -211,6 +331,12 @@ class TorrentSession:
             "completed_pieces": self.piece_mgr.completed_pieces,
             "total_pieces": len(self.piece_mgr.pieces),
             "listen_port": self._seed_port if self._seed_server else 0,
+            "download_limit_value": self.download_limit_value,
+            "download_limit_unit": self.download_limit_unit,
+            "download_limit_bps": self.download_limit_bps,
+            "upload_limit_value": self.upload_limit_value,
+            "upload_limit_unit": self.upload_limit_unit,
+            "upload_limit_bps": self.upload_limit_bps,
         }
 
     def _emit_snapshot(self):
@@ -376,13 +502,28 @@ class TorrentSession:
         if not block:
             return False
 
+        # Reserve ownership before waiting on the shared limiter so cancellation
+        # or Stop cannot leave a throttled block permanently marked requested.
+        owned_requests.append(block)
+
         try:
+            await self._download_limiter.throttle(block.length)
+
+            if self.state != SessionState.DOWNLOADING or not peer.is_connected:
+                block.is_requested = False
+                if block in owned_requests:
+                    owned_requests.remove(block)
+                return False
+
             await peer.send_request(block.piece_index, block.offset, block.length)
+        except asyncio.CancelledError:
+            raise
         except Exception:
             block.is_requested = False
+            if block in owned_requests:
+                owned_requests.remove(block)
             return False
 
-        owned_requests.append(block)
         return True
 
     async def _peer_worker(self, run_token: int, ip: str, port: int):
@@ -605,8 +746,15 @@ class TorrentSession:
                         length,
                     )
                     if block_data:
-                        await peer.send_piece(piece_index, begin, block_data)
-                        self.uploaded_bytes += len(block_data)
+                        await self._upload_limiter.throttle(len(block_data))
+
+                        if (
+                            self._is_current_run(run_token)
+                            and self.state == SessionState.SEEDING
+                            and peer.is_connected
+                        ):
+                            await peer.send_piece(piece_index, begin, block_data)
+                            self.uploaded_bytes += len(block_data)
 
         except asyncio.CancelledError:
             pass
@@ -699,6 +847,11 @@ class TorrentSession:
                     length,
                 )
                 if not block_data:
+                    continue
+
+                await self._upload_limiter.throttle(len(block_data))
+
+                if not self._is_current_run(run_token) or self.state != SessionState.SEEDING:
                     continue
 
                 piece_payload = struct.pack(">II", piece_index, begin) + block_data

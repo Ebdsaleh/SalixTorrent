@@ -15,6 +15,7 @@ class DownloadView:
         self.active_info_hash: str = ""
         self.torrent_rows = {}
         self.latest_stats = {}
+        self._limit_controls_hash: str = ""
 
     def build_view(self, parent_tag: str | int = "primary_window"):
         with dpg.group(parent=parent_tag):
@@ -72,7 +73,7 @@ class DownloadView:
 
             # Telemetry Metrics
             with dpg.group(horizontal=True):
-                with dpg.child_window(width=520, height=185, border=True):
+                with dpg.child_window(width=520, height=245, border=True):
                     dpg.add_text("TRANSFER METRICS", color=(100, 180, 255))
                     dpg.add_separator()
                     self.speed_text = dpg.add_text("Download Speed: 0.0 KB/s")
@@ -81,13 +82,63 @@ class DownloadView:
                     self.uploaded_text = dpg.add_text("Uploaded: 0.0 MB")
                     self.peers_text = dpg.add_text("Connected Peers: 0")
 
-                with dpg.child_window(width=-1, height=185, border=True):
+                with dpg.child_window(width=-1, height=245, border=True):
                     dpg.add_text("SWARM STATUS", color=(255, 200, 100))
                     dpg.add_separator()
                     self.state_text = dpg.add_text("Session State: Idle")
                     self.client_id_text = dpg.add_text("Client ID: Salix_T 1.0")
                     self.listen_port_text = dpg.add_text("Listen Port: --")
                     self.health_text = dpg.add_text("Swarm Health: Active")
+
+                    dpg.add_spacer(height=5)
+                    dpg.add_separator()
+                    dpg.add_text("TRANSFER LIMITS", color=(180, 160, 255))
+                    dpg.add_text("0 = Unlimited", color=(150, 150, 150))
+
+                    with dpg.group(horizontal=True):
+                        dpg.add_text("Down")
+                        self.download_limit_input = dpg.add_input_float(
+                            default_value=0.0,
+                            min_value=0.0,
+                            min_clamped=True,
+                            format="%.2f",
+                            width=95,
+                        )
+                        self.download_limit_unit = dpg.add_combo(
+                            items=["KB/s", "MB/s", "kbps", "Mbps"],
+                            default_value="KB/s",
+                            width=80,
+                        )
+
+                    with dpg.group(horizontal=True):
+                        dpg.add_text("Up  ")
+                        self.upload_limit_input = dpg.add_input_float(
+                            default_value=0.0,
+                            min_value=0.0,
+                            min_clamped=True,
+                            format="%.2f",
+                            width=95,
+                        )
+                        self.upload_limit_unit = dpg.add_combo(
+                            items=["KB/s", "MB/s", "kbps", "Mbps"],
+                            default_value="KB/s",
+                            width=80,
+                        )
+
+                    with dpg.group(horizontal=True):
+                        dpg.add_button(
+                            label=" Apply Limits ",
+                            callback=self._on_apply_limits_clicked,
+                        )
+                        dpg.add_button(
+                            label=" Unlimited ",
+                            callback=self._on_unlimited_limits_clicked,
+                        )
+
+                    self.limit_status_text = dpg.add_text(
+                        "Limits: Down Unlimited | Up Unlimited",
+                        color=(170, 170, 170),
+                    )
 
     def _open_native_file_dialog(self):
         """Native Windows file picker (instant, zero DPG selection bugs)."""
@@ -116,6 +167,52 @@ class DownloadView:
     def _on_stop_clicked(self):
         if self.active_info_hash:
             self.manager.stop_torrent(self.active_info_hash)
+
+    def _on_apply_limits_clicked(self):
+        if not self.active_info_hash:
+            return
+
+        self.manager.set_transfer_limits(
+            self.active_info_hash,
+            dpg.get_value(self.download_limit_input),
+            dpg.get_value(self.download_limit_unit),
+            dpg.get_value(self.upload_limit_input),
+            dpg.get_value(self.upload_limit_unit),
+        )
+
+    def _on_unlimited_limits_clicked(self):
+        dpg.set_value(self.download_limit_input, 0.0)
+        dpg.set_value(self.upload_limit_input, 0.0)
+        self._on_apply_limits_clicked()
+
+    @staticmethod
+    def _format_limit(value: float, unit: str) -> str:
+        if value <= 0:
+            return "Unlimited"
+        return f"{value:g} {unit}"
+
+    def _sync_limit_controls(self, msg: dict):
+        h = msg.get("info_hash", "")
+        if h == self._limit_controls_hash:
+            return
+
+        dpg.set_value(
+            self.download_limit_input,
+            float(msg.get("download_limit_value", 0.0)),
+        )
+        dpg.set_value(
+            self.download_limit_unit,
+            msg.get("download_limit_unit", "KB/s"),
+        )
+        dpg.set_value(
+            self.upload_limit_input,
+            float(msg.get("upload_limit_value", 0.0)),
+        )
+        dpg.set_value(
+            self.upload_limit_unit,
+            msg.get("upload_limit_unit", "KB/s"),
+        )
+        self._limit_controls_hash = h
 
     def _update_table_row(self, msg: dict):
         h = msg["info_hash"]
@@ -149,6 +246,8 @@ class DownloadView:
 
     def _select_torrent(self, info_hash: str):
         self.active_info_hash = info_hash
+        self._limit_controls_hash = ""
+
         for h, (name_cell, *_) in self.torrent_rows.items():
             dpg.set_value(name_cell, (h == info_hash))
         
@@ -218,6 +317,20 @@ class DownloadView:
         dpg.set_value(self.downloaded_text, f"Downloaded: {dl_mb:,.1f} MB / {tot_mb:,.1f} MB")
         dpg.set_value(self.uploaded_text, f"Uploaded: {up_mb:,.1f} MB")
         dpg.set_value(self.peers_text, f"Connected Peers: {msg['connected_peers']}")
+
+        self._sync_limit_controls(msg)
+        download_limit_text = self._format_limit(
+            float(msg.get("download_limit_value", 0.0)),
+            msg.get("download_limit_unit", "KB/s"),
+        )
+        upload_limit_text = self._format_limit(
+            float(msg.get("upload_limit_value", 0.0)),
+            msg.get("upload_limit_unit", "KB/s"),
+        )
+        dpg.set_value(
+            self.limit_status_text,
+            f"Limits: Down {download_limit_text} | Up {upload_limit_text}",
+        )
 
         listen_port = msg.get("listen_port", 0)
         dpg.set_value(
