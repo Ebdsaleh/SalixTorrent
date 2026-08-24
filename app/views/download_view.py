@@ -24,7 +24,10 @@ class DownloadView:
     def __init__(self, ui_queue: queue.Queue):
         self.ui_queue = ui_queue
         self.manager = TorrentManager.get_instance()
-        self.active_info_hash: str = ""
+        # Restore the previously selected torrent before telemetry starts
+        # rebuilding the rows. If the saved selection is unavailable the
+        # manager returns an empty string and the first restored row wins.
+        self.active_info_hash: str = self.manager.get_selected_torrent()
 
         # Each entry is a dictionary containing the table row, its cells and
         # the context-menu widgets belonging to that torrent.
@@ -238,12 +241,20 @@ class DownloadView:
     # Torrent row context menu
     # ------------------------------------------------------------------
 
-    def _build_row_context_menu(self, info_hash: str, name_cell):
-        """Create one right-click popup menu for a transfer-table row."""
-        with dpg.popup(
-            name_cell,
-            mousebutton=dpg.mvMouseButton_Right,
-        ):
+    def _build_row_context_menu(self, info_hash: str, row_cells):
+        """Create one in-place right-click context menu for a torrent row.
+
+        Dear PyGui's dpg.popup() helper installs its own item-handler registry.
+        Binding a second registry to the same item replaces that popup binding,
+        so the menu never opens.  Build the popup window explicitly instead and
+        use one registry to both select the row and show the context menu.
+        """
+        with dpg.window(
+            popup=True,
+            show=False,
+            autosize=True,
+            no_title_bar=True,
+        ) as popup_id:
             move_up_item = dpg.add_menu_item(
                 label="Move Up",
                 user_data=info_hash,
@@ -278,17 +289,24 @@ class DownloadView:
                 callback=lambda s, a, u: self._context_stop(u),
             )
 
-        # Right-clicking a torrent should also make it the selected torrent,
-        # matching the behaviour users expect from desktop torrent clients.
+        # Use ONE handler registry for the entire row.  This is important:
+        # dpg.popup() also uses an item-handler registry internally, and an item
+        # can only have one registry bound at a time.  The previous code bound
+        # our selection registry after dpg.popup(), replacing the popup handler.
         with dpg.item_handler_registry() as right_click_registry:
             dpg.add_item_clicked_handler(
                 button=dpg.mvMouseButton_Right,
-                user_data=info_hash,
-                callback=lambda s, a, u: self._on_row_right_clicked(u),
+                user_data=(info_hash, popup_id),
+                callback=lambda s, a, u: self._on_row_right_clicked(u[0], u[1]),
             )
-        dpg.bind_item_handler_registry(name_cell, right_click_registry)
+
+        # Bind the same registry to every visible cell so right-clicking Name,
+        # Size, Progress, Status, or Down / Up opens the same torrent menu.
+        for cell in row_cells:
+            dpg.bind_item_handler_registry(cell, right_click_registry)
 
         return {
+            "popup": popup_id,
             "move_up": move_up_item,
             "move_down": move_down_item,
             "start": start_item,
@@ -298,9 +316,10 @@ class DownloadView:
             "right_click_registry": right_click_registry,
         }
 
-    def _on_row_right_clicked(self, info_hash: str):
+    def _on_row_right_clicked(self, info_hash: str, popup_id):
         self._select_torrent(info_hash)
         self._refresh_context_menu_states()
+        dpg.configure_item(popup_id, show=True)
 
     def _context_start(self, info_hash: str):
         self._select_torrent(info_hash)
@@ -340,6 +359,7 @@ class DownloadView:
             self.torrent_order[index],
             self.torrent_order[index - 1],
         )
+        self.manager.set_queue_order(self.torrent_order)
         self._refresh_context_menu_states()
 
     def _move_torrent_down(self, info_hash: str):
@@ -362,6 +382,7 @@ class DownloadView:
             self.torrent_order[index + 1],
             self.torrent_order[index],
         )
+        self.manager.set_queue_order(self.torrent_order)
         self._refresh_context_menu_states()
 
     def _refresh_context_menu_state(self, info_hash: str):
@@ -450,7 +471,10 @@ class DownloadView:
                 status_cell = dpg.add_text(state_label)
                 speed_cell = dpg.add_text(speed_str)
 
-            menu = self._build_row_context_menu(h, name_cell)
+            menu = self._build_row_context_menu(
+                h,
+                (name_cell, size_cell, prog_cell, status_cell, speed_cell),
+            )
             self.torrent_rows[h] = {
                 "row": row_id,
                 "name": name_cell,
@@ -475,6 +499,7 @@ class DownloadView:
     def _select_torrent(self, info_hash: str):
         self.active_info_hash = info_hash
         self._limit_controls_hash = ""
+        self.manager.set_selected_torrent(info_hash)
 
         for h, row in self.torrent_rows.items():
             dpg.set_value(row["name"], h == info_hash)
@@ -585,6 +610,7 @@ class DownloadView:
 
                     if not self.active_info_hash:
                         self.active_info_hash = h
+                        self.manager.set_selected_torrent(h)
 
                     self._update_table_row(msg)
 
