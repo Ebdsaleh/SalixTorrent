@@ -4,16 +4,32 @@ import os
 import queue
 import tkinter as tk
 from tkinter import filedialog
+
 import dearpygui.dearpygui as dpg
+
 from app.logic.torrent_manager import TorrentManager
 
 
 class DownloadView:
+    ACTIVE_PAUSABLE_STATES = {"Checking", "Downloading", "Seeding"}
+    STARTABLE_STATES = {"Idle", "Stopped", "Completed"}
+    STOPPABLE_STATES = {
+        "Checking",
+        "Fast Resume",
+        "Downloading",
+        "Seeding",
+        "Paused",
+    }
+
     def __init__(self, ui_queue: queue.Queue):
         self.ui_queue = ui_queue
         self.manager = TorrentManager.get_instance()
         self.active_info_hash: str = ""
+
+        # Each entry is a dictionary containing the table row, its cells and
+        # the context-menu widgets belonging to that torrent.
         self.torrent_rows = {}
+        self.torrent_order = []
         self.latest_stats = {}
         self._limit_controls_hash: str = ""
 
@@ -23,20 +39,20 @@ class DownloadView:
             with dpg.group(horizontal=True):
                 dpg.add_button(
                     label=" + Open Torrent ",
-                    callback=self._open_native_file_dialog
+                    callback=self._open_native_file_dialog,
                 )
                 dpg.add_spacer(width=10)
                 dpg.add_button(
                     label=" Start / Resume ",
-                    callback=self._on_resume_clicked
+                    callback=self._on_resume_clicked,
                 )
                 dpg.add_button(
                     label=" Pause ",
-                    callback=self._on_pause_clicked
+                    callback=self._on_pause_clicked,
                 )
                 dpg.add_button(
                     label=" Stop ",
-                    callback=self._on_stop_clicked
+                    callback=self._on_stop_clicked,
                 )
 
             dpg.add_spacer(height=5)
@@ -50,24 +66,57 @@ class DownloadView:
                     policy=dpg.mvTable_SizingStretchProp,
                     borders_outerH=True,
                     borders_innerV=True,
-                    tag="torrent_queue_table"
+                    tag="torrent_queue_table",
                 ):
-                    dpg.add_table_column(label="Name", width_stretch=True, init_width_or_weight=0.4)
-                    dpg.add_table_column(label="Size", width_fixed=True, init_width_or_weight=90)
-                    dpg.add_table_column(label="Progress", width_fixed=True, init_width_or_weight=120)
-                    dpg.add_table_column(label="Status", width_fixed=True, init_width_or_weight=150)
-                    dpg.add_table_column(label="Down / Up", width_fixed=True, init_width_or_weight=135)
+                    dpg.add_table_column(
+                        label="Name",
+                        width_stretch=True,
+                        init_width_or_weight=0.4,
+                    )
+                    dpg.add_table_column(
+                        label="Size",
+                        width_fixed=True,
+                        init_width_or_weight=90,
+                    )
+                    dpg.add_table_column(
+                        label="Progress",
+                        width_fixed=True,
+                        init_width_or_weight=120,
+                    )
+                    dpg.add_table_column(
+                        label="Status",
+                        width_fixed=True,
+                        init_width_or_weight=150,
+                    )
+                    dpg.add_table_column(
+                        label="Down / Up",
+                        width_fixed=True,
+                        init_width_or_weight=135,
+                    )
 
             dpg.add_spacer(height=10)
 
             # Inspector
             with dpg.child_window(height=115, border=True):
-                self.title_text = dpg.add_text("Torrent: Waiting for selection...", color=(0, 255, 128))
-                self.status_text = dpg.add_text("Status: Idle", color=(180, 180, 180))
+                self.title_text = dpg.add_text(
+                    "Torrent: Waiting for selection...",
+                    color=(0, 255, 128),
+                )
+                self.status_text = dpg.add_text(
+                    "Status: Idle",
+                    color=(180, 180, 180),
+                )
                 dpg.add_spacer(height=5)
-                
-                self.progress_bar = dpg.add_progress_bar(default_value=0.0, width=-1, height=22)
-                self.progress_label = dpg.add_text("0.0% Complete (0 / 0 Pieces)", color=(200, 200, 200))
+
+                self.progress_bar = dpg.add_progress_bar(
+                    default_value=0.0,
+                    width=-1,
+                    height=22,
+                )
+                self.progress_label = dpg.add_text(
+                    "0.0% Complete (0 / 0 Pieces)",
+                    color=(200, 200, 200),
+                )
 
             dpg.add_spacer(height=10)
 
@@ -147,7 +196,7 @@ class DownloadView:
         root.attributes("-topmost", True)
         file_path = filedialog.askopenfilename(
             title="Select Torrent File",
-            filetypes=[("Torrent Files", "*.torrent"), ("All Files", "*.*")]
+            filetypes=[("Torrent Files", "*.torrent"), ("All Files", "*.*")],
         )
         root.destroy()
 
@@ -184,6 +233,171 @@ class DownloadView:
         dpg.set_value(self.download_limit_input, 0.0)
         dpg.set_value(self.upload_limit_input, 0.0)
         self._on_apply_limits_clicked()
+
+    # ------------------------------------------------------------------
+    # Torrent row context menu
+    # ------------------------------------------------------------------
+
+    def _build_row_context_menu(self, info_hash: str, name_cell):
+        """Create one right-click popup menu for a transfer-table row."""
+        with dpg.popup(
+            name_cell,
+            mousebutton=dpg.mvMouseButton_Right,
+        ):
+            move_up_item = dpg.add_menu_item(
+                label="Move Up",
+                user_data=info_hash,
+                callback=lambda s, a, u: self._move_torrent_up(u),
+            )
+            move_down_item = dpg.add_menu_item(
+                label="Move Down",
+                user_data=info_hash,
+                callback=lambda s, a, u: self._move_torrent_down(u),
+            )
+
+            dpg.add_separator()
+
+            start_item = dpg.add_menu_item(
+                label="Start",
+                user_data=info_hash,
+                callback=lambda s, a, u: self._context_start(u),
+            )
+            pause_item = dpg.add_menu_item(
+                label="Pause",
+                user_data=info_hash,
+                callback=lambda s, a, u: self._context_pause(u),
+            )
+            resume_item = dpg.add_menu_item(
+                label="Resume",
+                user_data=info_hash,
+                callback=lambda s, a, u: self._context_resume(u),
+            )
+            stop_item = dpg.add_menu_item(
+                label="Stop",
+                user_data=info_hash,
+                callback=lambda s, a, u: self._context_stop(u),
+            )
+
+        # Right-clicking a torrent should also make it the selected torrent,
+        # matching the behaviour users expect from desktop torrent clients.
+        with dpg.item_handler_registry() as right_click_registry:
+            dpg.add_item_clicked_handler(
+                button=dpg.mvMouseButton_Right,
+                user_data=info_hash,
+                callback=lambda s, a, u: self._on_row_right_clicked(u),
+            )
+        dpg.bind_item_handler_registry(name_cell, right_click_registry)
+
+        return {
+            "move_up": move_up_item,
+            "move_down": move_down_item,
+            "start": start_item,
+            "pause": pause_item,
+            "resume": resume_item,
+            "stop": stop_item,
+            "right_click_registry": right_click_registry,
+        }
+
+    def _on_row_right_clicked(self, info_hash: str):
+        self._select_torrent(info_hash)
+        self._refresh_context_menu_states()
+
+    def _context_start(self, info_hash: str):
+        self._select_torrent(info_hash)
+        self.manager.start_torrent(info_hash)
+
+    def _context_pause(self, info_hash: str):
+        self._select_torrent(info_hash)
+        self.manager.pause_torrent(info_hash)
+
+    def _context_resume(self, info_hash: str):
+        self._select_torrent(info_hash)
+        self.manager.resume_torrent(info_hash)
+
+    def _context_stop(self, info_hash: str):
+        self._select_torrent(info_hash)
+        self.manager.stop_torrent(info_hash)
+
+    def _move_torrent_up(self, info_hash: str):
+        if info_hash not in self.torrent_rows:
+            return
+
+        try:
+            index = self.torrent_order.index(info_hash)
+        except ValueError:
+            return
+
+        if index <= 0:
+            return
+
+        self._select_torrent(info_hash)
+        row_id = self.torrent_rows[info_hash]["row"]
+
+        # Dear PyGui moves the actual table-row item, so subsequent telemetry
+        # updates modify the same row without undoing the user's ordering.
+        dpg.move_item_up(row_id)
+        self.torrent_order[index - 1], self.torrent_order[index] = (
+            self.torrent_order[index],
+            self.torrent_order[index - 1],
+        )
+        self._refresh_context_menu_states()
+
+    def _move_torrent_down(self, info_hash: str):
+        if info_hash not in self.torrent_rows:
+            return
+
+        try:
+            index = self.torrent_order.index(info_hash)
+        except ValueError:
+            return
+
+        if index >= len(self.torrent_order) - 1:
+            return
+
+        self._select_torrent(info_hash)
+        row_id = self.torrent_rows[info_hash]["row"]
+
+        dpg.move_item_down(row_id)
+        self.torrent_order[index], self.torrent_order[index + 1] = (
+            self.torrent_order[index + 1],
+            self.torrent_order[index],
+        )
+        self._refresh_context_menu_states()
+
+    def _refresh_context_menu_state(self, info_hash: str):
+        row = self.torrent_rows.get(info_hash)
+        if not row:
+            return
+
+        menu = row["menu"]
+        stats = self.latest_stats.get(info_hash, {})
+        state = stats.get("state", "Idle")
+
+        try:
+            index = self.torrent_order.index(info_hash)
+        except ValueError:
+            index = -1
+
+        can_move_up = index > 0
+        can_move_down = 0 <= index < len(self.torrent_order) - 1
+
+        # Keep every lifecycle action visible and disable only actions that do
+        # not make sense for the torrent's current state.
+        can_start = state in self.STARTABLE_STATES
+        can_pause = state in self.ACTIVE_PAUSABLE_STATES
+        can_resume = state == "Paused"
+        can_stop = state in self.STOPPABLE_STATES
+
+        dpg.configure_item(menu["move_up"], enabled=can_move_up)
+        dpg.configure_item(menu["move_down"], enabled=can_move_down)
+        dpg.configure_item(menu["start"], enabled=can_start)
+        dpg.configure_item(menu["pause"], enabled=can_pause)
+        dpg.configure_item(menu["resume"], enabled=can_resume)
+        dpg.configure_item(menu["stop"], enabled=can_stop)
+
+    def _refresh_context_menu_states(self):
+        for info_hash in self.torrent_order:
+            self._refresh_context_menu_state(info_hash)
 
     @staticmethod
     def _format_limit(value: float, unit: str) -> str:
@@ -229,28 +443,42 @@ class DownloadView:
                     label=msg["torrent_name"],
                     span_columns=True,
                     user_data=h,
-                    callback=lambda s, a, u: self._select_torrent(u)
+                    callback=lambda s, a, u: self._select_torrent(u),
                 )
                 size_cell = dpg.add_text(size_str)
                 prog_cell = dpg.add_text(prog_str)
                 status_cell = dpg.add_text(state_label)
                 speed_cell = dpg.add_text(speed_str)
-                self.torrent_rows[h] = (name_cell, size_cell, prog_cell, status_cell, speed_cell)
+
+            menu = self._build_row_context_menu(h, name_cell)
+            self.torrent_rows[h] = {
+                "row": row_id,
+                "name": name_cell,
+                "size": size_cell,
+                "progress": prog_cell,
+                "status": status_cell,
+                "speed": speed_cell,
+                "menu": menu,
+            }
+            self.torrent_order.append(h)
+            self._refresh_context_menu_states()
+
         else:
-            name_cell, size_cell, prog_cell, status_cell, speed_cell = self.torrent_rows[h]
-            dpg.set_value(size_cell, size_str)
-            dpg.set_value(prog_cell, prog_str)
-            dpg.set_value(status_cell, state_label)
-            dpg.set_value(speed_cell, speed_str)
-            dpg.set_value(name_cell, (self.active_info_hash == h))
+            row = self.torrent_rows[h]
+            dpg.set_value(row["size"], size_str)
+            dpg.set_value(row["progress"], prog_str)
+            dpg.set_value(row["status"], state_label)
+            dpg.set_value(row["speed"], speed_str)
+            dpg.set_value(row["name"], self.active_info_hash == h)
+            self._refresh_context_menu_state(h)
 
     def _select_torrent(self, info_hash: str):
         self.active_info_hash = info_hash
         self._limit_controls_hash = ""
 
-        for h, (name_cell, *_) in self.torrent_rows.items():
-            dpg.set_value(name_cell, (h == info_hash))
-        
+        for h, row in self.torrent_rows.items():
+            dpg.set_value(row["name"], h == info_hash)
+
         if info_hash in self.latest_stats:
             self._render_inspector(self.latest_stats[info_hash])
 
@@ -261,7 +489,7 @@ class DownloadView:
         state_label = msg.get("state_label", state)
         dpg.set_value(
             self.status_text,
-            f"Status: {state_label} ({msg['connected_peers']} peers)"
+            f"Status: {state_label} ({msg['connected_peers']} peers)",
         )
         dpg.set_value(self.state_text, f"Session State: {state_label}")
 
@@ -269,10 +497,7 @@ class DownloadView:
         # *checking operation* rather than download completion. Download
         # completion remains visible in the transfer table and byte metrics.
         checking_progress = msg.get("checking_progress", 0.0)
-        paused_while_checking = (
-            state == "Paused"
-            and "Checking" in state_label
-        )
+        paused_while_checking = state == "Paused" and "Checking" in state_label
 
         if state == "Checking" or paused_while_checking:
             dpg.set_value(self.progress_bar, checking_progress)
@@ -284,7 +509,7 @@ class DownloadView:
                 (
                     f"{checking_progress * 100:.1f}% Checked "
                     f"({checked_pieces} / {check_total_pieces} Pieces Scanned)"
-                )
+                ),
             )
         elif state == "Fast Resume":
             prog = msg["progress"]
@@ -292,9 +517,9 @@ class DownloadView:
             dpg.set_value(
                 self.progress_label,
                 (
-                    f"Fast resume restored — "
+                    "Fast resume restored — "
                     f"{msg['completed_pieces']} / {msg['total_pieces']} Pieces Verified"
-                )
+                ),
             )
         else:
             prog = msg["progress"]
@@ -306,17 +531,29 @@ class DownloadView:
                 (
                     f"{prog * 100:.2f}% Complete "
                     f"({msg['completed_pieces']} / {msg['total_pieces']} Pieces){suffix}"
-                )
+                ),
             )
 
-        dpg.set_value(self.speed_text, f"Download Speed: {msg.get('speed_kbps', 0.0):,.1f} KB/s")
-        dpg.set_value(self.upload_speed_text, f"Upload Speed: {msg.get('upload_speed_kbps', 0.0):,.1f} KB/s")
+        dpg.set_value(
+            self.speed_text,
+            f"Download Speed: {msg.get('speed_kbps', 0.0):,.1f} KB/s",
+        )
+        dpg.set_value(
+            self.upload_speed_text,
+            f"Upload Speed: {msg.get('upload_speed_kbps', 0.0):,.1f} KB/s",
+        )
         dl_mb = msg["downloaded_bytes"] / (1024 * 1024)
         up_mb = msg.get("uploaded_bytes", 0) / (1024 * 1024)
         tot_mb = msg["total_bytes"] / (1024 * 1024)
-        dpg.set_value(self.downloaded_text, f"Downloaded: {dl_mb:,.1f} MB / {tot_mb:,.1f} MB")
+        dpg.set_value(
+            self.downloaded_text,
+            f"Downloaded: {dl_mb:,.1f} MB / {tot_mb:,.1f} MB",
+        )
         dpg.set_value(self.uploaded_text, f"Uploaded: {up_mb:,.1f} MB")
-        dpg.set_value(self.peers_text, f"Connected Peers: {msg['connected_peers']}")
+        dpg.set_value(
+            self.peers_text,
+            f"Connected Peers: {msg['connected_peers']}",
+        )
 
         self._sync_limit_controls(msg)
         download_limit_text = self._format_limit(
@@ -335,7 +572,7 @@ class DownloadView:
         listen_port = msg.get("listen_port", 0)
         dpg.set_value(
             self.listen_port_text,
-            f"Listen Port: {listen_port if listen_port else '--'}"
+            f"Listen Port: {listen_port if listen_port else '--'}",
         )
 
     def update(self, delta_time: float):
