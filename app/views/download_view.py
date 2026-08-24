@@ -35,6 +35,8 @@ class DownloadView:
         self.torrent_order = []
         self.latest_stats = {}
         self._limit_controls_hash: str = ""
+        self._pending_remove_info_hash: str = ""
+        self._removed_info_hashes = set()
 
     def build_view(self, parent_tag: str | int = "primary_window"):
         with dpg.group(parent=parent_tag):
@@ -192,6 +194,56 @@ class DownloadView:
                         color=(170, 170, 170),
                     )
 
+        # Shared confirmation dialog for destructive queue actions.
+        with dpg.window(
+            label="Remove Torrent",
+            modal=True,
+            show=False,
+            no_resize=True,
+            width=520,
+            height=230,
+        ) as self.remove_torrent_modal:
+            self.remove_torrent_title = dpg.add_text(
+                "Remove torrent?",
+                color=(255, 200, 100),
+            )
+            dpg.add_spacer(height=4)
+            self.remove_torrent_message = dpg.add_text(
+                "",
+                wrap=480,
+            )
+            dpg.add_spacer(height=8)
+            dpg.add_separator()
+            dpg.add_spacer(height=8)
+            with dpg.group(horizontal=True):
+                dpg.add_button(
+                    label=" Remove from SalixTorrent ",
+                    callback=lambda: self._confirm_remove_torrent(False),
+                )
+                dpg.add_button(
+                    label=" Remove + Delete Data ",
+                    callback=lambda: self._confirm_remove_torrent(True),
+                )
+                dpg.add_button(
+                    label=" Cancel ",
+                    callback=lambda: dpg.hide_item(self.remove_torrent_modal),
+                )
+
+        with dpg.window(
+            label="Removal Notice",
+            modal=True,
+            show=False,
+            no_resize=True,
+            width=520,
+            height=170,
+        ) as self.remove_notice_modal:
+            self.remove_notice_text = dpg.add_text("", wrap=480)
+            dpg.add_spacer(height=10)
+            dpg.add_button(
+                label=" OK ",
+                callback=lambda: dpg.hide_item(self.remove_notice_modal),
+            )
+
     def _open_native_file_dialog(self):
         """Native Windows file picker (instant, zero DPG selection bugs)."""
         root = tk.Tk()
@@ -205,6 +257,7 @@ class DownloadView:
 
         if file_path and os.path.exists(file_path):
             session = self.manager.add_torrent(file_path)
+            self._removed_info_hashes.discard(session.torrent.hex_info_hash)
             self._select_torrent(session.torrent.hex_info_hash)
             self.manager.start_torrent(session.torrent.hex_info_hash)
 
@@ -289,6 +342,14 @@ class DownloadView:
                 callback=lambda s, a, u: self._context_stop(u),
             )
 
+            dpg.add_separator()
+
+            remove_item = dpg.add_menu_item(
+                label="Remove Torrent...",
+                user_data=info_hash,
+                callback=lambda s, a, u: self._context_remove(u),
+            )
+
         # Use ONE handler registry for the entire row.  This is important:
         # dpg.popup() also uses an item-handler registry internally, and an item
         # can only have one registry bound at a time.  The previous code bound
@@ -313,6 +374,7 @@ class DownloadView:
             "pause": pause_item,
             "resume": resume_item,
             "stop": stop_item,
+            "remove": remove_item,
             "right_click_registry": right_click_registry,
         }
 
@@ -336,6 +398,55 @@ class DownloadView:
     def _context_stop(self, info_hash: str):
         self._select_torrent(info_hash)
         self.manager.stop_torrent(info_hash)
+
+    def _context_remove(self, info_hash: str):
+        if info_hash not in self.torrent_rows:
+            return
+
+        self._select_torrent(info_hash)
+        self._pending_remove_info_hash = info_hash
+
+        row = self.torrent_rows[info_hash]
+        popup_id = row["menu"].get("popup")
+        if popup_id and dpg.does_item_exist(popup_id):
+            dpg.hide_item(popup_id)
+
+        name = self.latest_stats.get(info_hash, {}).get("torrent_name", "this torrent")
+        dpg.set_value(
+            self.remove_torrent_title,
+            f"Remove: {name}",
+        )
+        dpg.set_value(
+            self.remove_torrent_message,
+            (
+                "Remove from SalixTorrent removes the transfer from the queue but keeps "
+                "downloaded data on disk.\n\n"
+                "Remove + Delete Data permanently deletes the downloaded payload and its "
+                "SalixTorrent resume metadata. Your original .torrent file is NOT deleted."
+            ),
+        )
+
+        dpg.show_item(self.remove_torrent_modal)
+        try:
+            width = 520
+            height = 230
+            x = max(0, (dpg.get_viewport_client_width() - width) // 2)
+            y = max(0, (dpg.get_viewport_client_height() - height) // 2)
+            dpg.set_item_pos(self.remove_torrent_modal, [x, y])
+        except Exception:
+            pass
+
+    def _confirm_remove_torrent(self, delete_data: bool):
+        info_hash = self._pending_remove_info_hash
+        self._pending_remove_info_hash = ""
+        dpg.hide_item(self.remove_torrent_modal)
+
+        if not info_hash or info_hash not in self.torrent_rows:
+            return
+
+        row = self.torrent_rows[info_hash]
+        dpg.set_value(row["status"], "Removing...")
+        self.manager.remove_torrent(info_hash, delete_data=delete_data)
 
     def _move_torrent_up(self, info_hash: str):
         if info_hash not in self.torrent_rows:
@@ -415,10 +526,74 @@ class DownloadView:
         dpg.configure_item(menu["pause"], enabled=can_pause)
         dpg.configure_item(menu["resume"], enabled=can_resume)
         dpg.configure_item(menu["stop"], enabled=can_stop)
+        dpg.configure_item(menu["remove"], enabled=True)
 
     def _refresh_context_menu_states(self):
         for info_hash in self.torrent_order:
             self._refresh_context_menu_state(info_hash)
+
+    def _reset_inspector(self):
+        dpg.set_value(self.title_text, "Torrent: Waiting for selection...")
+        dpg.set_value(self.status_text, "Status: Idle")
+        dpg.set_value(self.progress_bar, 0.0)
+        dpg.set_value(self.progress_label, "0.0% Complete (0 / 0 Pieces)")
+        dpg.set_value(self.speed_text, "Download Speed: 0.0 KB/s")
+        dpg.set_value(self.upload_speed_text, "Upload Speed: 0.0 KB/s")
+        dpg.set_value(self.downloaded_text, "Downloaded: 0.0 MB / 0.0 MB")
+        dpg.set_value(self.uploaded_text, "Uploaded: 0.0 MB")
+        dpg.set_value(self.peers_text, "Connected Peers: 0")
+        dpg.set_value(self.state_text, "Session State: Idle")
+        dpg.set_value(self.listen_port_text, "Listen Port: --")
+        dpg.set_value(self.limit_status_text, "Limits: Down Unlimited | Up Unlimited")
+        dpg.set_value(self.download_limit_input, 0.0)
+        dpg.set_value(self.upload_limit_input, 0.0)
+        self._limit_controls_hash = ""
+
+    def _handle_torrent_removed(self, msg: dict):
+        info_hash = msg.get("info_hash", "")
+        if not info_hash:
+            return
+
+        self._removed_info_hashes.add(info_hash)
+        self.latest_stats.pop(info_hash, None)
+
+        row = self.torrent_rows.pop(info_hash, None)
+        if row:
+            menu = row.get("menu", {})
+            for item_key in ("popup", "right_click_registry"):
+                item = menu.get(item_key)
+                if item and dpg.does_item_exist(item):
+                    dpg.delete_item(item)
+
+            row_id = row.get("row")
+            if row_id and dpg.does_item_exist(row_id):
+                dpg.delete_item(row_id)
+
+        if info_hash in self.torrent_order:
+            self.torrent_order.remove(info_hash)
+
+        selected = msg.get("selected_info_hash", "")
+        if self.active_info_hash == info_hash:
+            self.active_info_hash = selected if selected in self.torrent_rows else ""
+            self._limit_controls_hash = ""
+
+            if self.active_info_hash and self.active_info_hash in self.latest_stats:
+                self._select_torrent(self.active_info_hash)
+            else:
+                self._reset_inspector()
+
+        self._refresh_context_menu_states()
+
+        cleanup_error = str(msg.get("cleanup_error") or "")
+        if cleanup_error:
+            dpg.set_value(
+                self.remove_notice_text,
+                (
+                    "The torrent was removed from SalixTorrent, but downloaded-data "
+                    f"cleanup was not fully completed:\n\n{cleanup_error}"
+                ),
+            )
+            dpg.show_item(self.remove_notice_modal)
 
     @staticmethod
     def _format_limit(value: float, unit: str) -> str:
@@ -606,6 +781,9 @@ class DownloadView:
                 msg = self.ui_queue.get_nowait()
                 if msg.get("type") == "TRANSFER_STATS":
                     h = msg["info_hash"]
+                    if h in self._removed_info_hashes:
+                        continue
+
                     self.latest_stats[h] = msg
 
                     if not self.active_info_hash:
@@ -616,5 +794,8 @@ class DownloadView:
 
                     if self.active_info_hash == h:
                         self._render_inspector(msg)
+
+                elif msg.get("type") == "TORRENT_REMOVED":
+                    self._handle_torrent_removed(msg)
             except queue.Empty:
                 break

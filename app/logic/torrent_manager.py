@@ -18,6 +18,7 @@ class TorrentCommand:
     PAUSE = "PAUSE"
     RESUME = "RESUME"
     STOP = "STOP"
+    REMOVE = "REMOVE"
     SET_LIMITS = "SET_LIMITS"
     SHUTDOWN = "SHUTDOWN"
 
@@ -410,6 +411,118 @@ class TorrentManager:
         return True
 
     # ------------------------------------------------------------------
+    # Torrent removal / downloaded-data cleanup
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _safe_payload_path(session: TorrentSession) -> Path:
+        """Return the payload path only when it is safely inside downloads/.
+
+        Torrent names come from untrusted metainfo, so deletion must never be
+        allowed to escape the configured download directory.
+        """
+        download_root = Path(session.piece_mgr.download_dir).expanduser().resolve()
+        payload_path = Path(session.piece_mgr.output_path).expanduser().resolve()
+
+        try:
+            payload_path.relative_to(download_root)
+        except ValueError as exc:
+            raise RuntimeError(
+                "Refusing to delete payload outside the SalixTorrent download directory."
+            ) from exc
+
+        if payload_path == download_root:
+            raise RuntimeError("Refusing to delete the download directory itself.")
+        if payload_path.name == ".salix_resume":
+            raise RuntimeError("Refusing to delete SalixTorrent's resume-state directory.")
+
+        return payload_path
+
+    @staticmethod
+    def _remove_path_with_retries(path: Path, timeout: float = 4.0):
+        """Delete a file/directory, briefly retrying Windows sharing violations."""
+        import time
+
+        deadline = time.monotonic() + max(0.0, timeout)
+        last_error: Optional[OSError] = None
+
+        while True:
+            try:
+                if not path.exists() and not path.is_symlink():
+                    return
+
+                if path.is_dir() and not path.is_symlink():
+                    shutil.rmtree(path)
+                else:
+                    path.unlink()
+                return
+
+            except OSError as exc:
+                last_error = exc
+                if time.monotonic() >= deadline:
+                    raise last_error
+                time.sleep(0.1)
+
+    def _delete_downloaded_data(self, session: TorrentSession) -> str:
+        """Delete this torrent's payload and resume sidecar.
+
+        Returns an empty string on success, otherwise a human-readable error.
+        The user's original .torrent file is never deleted here.
+        """
+        try:
+            payload_path = self._safe_payload_path(session)
+            self._remove_path_with_retries(payload_path)
+
+            resume_path = Path(session.piece_mgr.resume_path).expanduser()
+            try:
+                if resume_path.exists() or resume_path.is_symlink():
+                    resume_path.unlink()
+            except OSError as exc:
+                # Payload deletion succeeded.  A stale resume sidecar is small,
+                # but report it so the user knows cleanup was not perfect.
+                return f"Downloaded data was deleted, but resume metadata could not be removed: {exc}"
+
+            return ""
+
+        except (OSError, RuntimeError) as exc:
+            return str(exc)
+
+    def _delete_cached_torrent(self, info_hash: str):
+        """Remove SalixTorrent's private cached metainfo copy only."""
+        cache_path = self._torrent_cache_dir / f"{info_hash}.torrent"
+        try:
+            if cache_path.exists() or cache_path.is_symlink():
+                cache_path.unlink()
+        except OSError as exc:
+            print(f"[Salix_T Notice] Could not remove cached torrent metadata: {exc}")
+
+    def _finalize_torrent_removal(self, info_hash: str) -> str:
+        """Remove manager/session persistence records and choose a new selection."""
+        with self._sessions_lock:
+            try:
+                old_index = self._queue_order.index(info_hash)
+            except ValueError:
+                old_index = 0
+
+            self.sessions.pop(info_hash, None)
+            self._desired_states.pop(info_hash, None)
+            self._source_paths.pop(info_hash, None)
+            self._queue_order = [h for h in self._queue_order if h != info_hash]
+
+            if self._selected_info_hash == info_hash:
+                if self._queue_order:
+                    new_index = min(old_index, len(self._queue_order) - 1)
+                    self._selected_info_hash = self._queue_order[new_index]
+                else:
+                    self._selected_info_hash = ""
+
+            selected = self._selected_info_hash
+
+        self._delete_cached_torrent(info_hash)
+        self.save_session_state()
+        return selected
+
+    # ------------------------------------------------------------------
     # Background asyncio engine
     # ------------------------------------------------------------------
 
@@ -511,6 +624,45 @@ class TorrentManager:
 
                 elif action == TorrentCommand.STOP:
                     session.stop()
+
+                elif action == TorrentCommand.REMOVE:
+                    payload = payload or {}
+                    delete_data = bool(payload.get("delete_data", False))
+
+                    # Stop the live session first so sockets, peer tasks and
+                    # disk-check cancellation are triggered before cleanup.
+                    session.stop()
+                    await asyncio.sleep(0)
+
+                    # Give the cancelled session coroutine a chance to execute
+                    # its finally block and close file/network resources.
+                    main_task = getattr(session, "_main_task", None)
+                    if main_task and main_task is not asyncio.current_task() and not main_task.done():
+                        try:
+                            await asyncio.wait_for(
+                                asyncio.shield(main_task),
+                                timeout=2.0,
+                            )
+                        except (asyncio.TimeoutError, asyncio.CancelledError):
+                            pass
+
+                    cleanup_error = ""
+                    if delete_data:
+                        cleanup_error = await asyncio.to_thread(
+                            self._delete_downloaded_data,
+                            session,
+                        )
+
+                    selected = self._finalize_torrent_removal(info_hash)
+                    self.ui_queue.put(
+                        {
+                            "type": "TORRENT_REMOVED",
+                            "info_hash": info_hash,
+                            "delete_data": delete_data,
+                            "cleanup_error": cleanup_error,
+                            "selected_info_hash": selected,
+                        }
+                    )
 
                 elif action == TorrentCommand.SET_LIMITS:
                     payload = payload or {}
@@ -618,6 +770,23 @@ class TorrentManager:
     def stop_torrent(self, info_hash: str):
         if self._set_intent(info_hash, SessionIntent.STOPPED):
             self._send_cmd(TorrentCommand.STOP, info_hash)
+
+    def remove_torrent(self, info_hash: str, delete_data: bool = False):
+        """Remove a torrent from SalixTorrent, optionally deleting its payload.
+
+        The original .torrent selected by the user is deliberately never
+        deleted.  Only SalixTorrent's private cache/session metadata is cleaned.
+        """
+        with self._sessions_lock:
+            if info_hash not in self.sessions:
+                return False
+
+        self._send_cmd(
+            TorrentCommand.REMOVE,
+            info_hash,
+            {"delete_data": bool(delete_data)},
+        )
+        return True
 
     def set_transfer_limits(
         self,
