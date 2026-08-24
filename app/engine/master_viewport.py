@@ -1,8 +1,11 @@
 # app/engine/master_viewport.py
 
 import queue
+
 import dearpygui.dearpygui as dpg
+
 from app.engine.gui_engine import GuiEngine
+from app.views.create_torrent_view import CreateTorrentView
 from app.views.download_view import DownloadView
 
 
@@ -22,15 +25,26 @@ class MasterViewport:
                     label=" Active Transfers ",
                     callback=lambda: self.gui.switch_scene("DownloadView"),
                 )
+                dpg.add_button(
+                    label=" Create Torrent ",
+                    callback=lambda: self.gui.switch_scene("CreateTorrentView"),
+                )
 
             dpg.add_separator()
             dpg.add_spacer(height=5)
 
-            # Scene Container: DownloadView
             with dpg.group(tag="view_container_DownloadView"):
                 download_view = DownloadView(ui_queue=self.ui_queue)
                 download_view.build_view(parent_tag="view_container_DownloadView")
                 self.gui.scene_mgr.register_scene("DownloadView", download_view)
+
+            with dpg.group(tag="view_container_CreateTorrentView"):
+                create_torrent_view = CreateTorrentView()
+                create_torrent_view.build_view(parent_tag="view_container_CreateTorrentView")
+                self.gui.scene_mgr.register_scene(
+                    "CreateTorrentView",
+                    create_torrent_view,
+                )
 
         dpg.set_primary_window("primary_window", True)
         self.gui.switch_scene("DownloadView")

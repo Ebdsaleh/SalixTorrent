@@ -2,7 +2,8 @@
 
 import hashlib
 import os
-from typing import List, Dict, Any
+from typing import Any, Dict, List
+
 from app.logic.bencode import Bencode
 
 
@@ -30,51 +31,76 @@ class TorrentFile:
         self.files: List[Dict[str, Any]] = []
         self.comment: str = ""
         self.created_by: str = ""
+        self.private: bool = False
 
         self._load_and_parse()
+
+    @staticmethod
+    def _decode_text(value: object, default: str = "") -> str:
+        if isinstance(value, bytes):
+            return value.decode("utf-8", errors="replace")
+        if value is None:
+            return default
+        return str(value)
+
+    @staticmethod
+    def _validate_component(component: str, label: str) -> str:
+        """Reject metainfo path traversal before it reaches the filesystem."""
+        if not component:
+            raise ValueError(f"Torrent contains an empty {label} path component.")
+        if component in (".", ".."):
+            raise ValueError(f"Torrent contains unsafe {label} path component: {component!r}")
+        if "\x00" in component:
+            raise ValueError(f"Torrent contains a NUL byte in {label} metadata.")
+        if "/" in component or "\\" in component:
+            raise ValueError(
+                f"Torrent {label} path components must not contain path separators."
+            )
+        # Windows drive-relative forms such as C: can escape normal join
+        # expectations on that platform. Reject them cross-platform so one
+        # .torrent has consistent storage semantics everywhere Salix_T runs.
+        if len(component) >= 2 and component[1] == ":":
+            raise ValueError(f"Torrent contains an unsafe drive-qualified {label} component.")
+        return component
 
     def _load_and_parse(self):
         if not os.path.exists(self.file_path):
             raise FileNotFoundError(f"Metainfo file not found: {self.file_path}")
 
-        with open(self.file_path, "rb") as f:
-            raw_bytes = f.read()
+        with open(self.file_path, "rb") as file_handle:
+            raw_bytes = file_handle.read()
 
         raw_dict = Bencode.decode(raw_bytes)
         if not isinstance(raw_dict, dict):
             raise ValueError("Root bencoded element must be a dictionary.")
 
-        # Capture primary announce URL
         if b"announce" in raw_dict and raw_dict[b"announce"]:
-            self.announce = raw_dict[b"announce"].decode("utf-8", errors="ignore")
-            if self.announce not in self.announce_list:
+            self.announce = self._decode_text(raw_dict[b"announce"])
+            if self.announce and self.announce not in self.announce_list:
                 self.announce_list.append(self.announce)
 
-        # Capture announce-list
         if b"announce-list" in raw_dict and raw_dict[b"announce-list"]:
             for tier in raw_dict[b"announce-list"]:
                 if isinstance(tier, list):
-                    for tracker in tier:
-                        url = tracker.decode("utf-8", errors="ignore") if isinstance(tracker, bytes) else str(tracker)
-                        if url and url not in self.announce_list:
-                            self.announce_list.append(url)
-                elif isinstance(tier, bytes):
-                    url = tier.decode("utf-8", errors="ignore")
+                    candidates = tier
+                else:
+                    candidates = [tier]
+
+                for tracker in candidates:
+                    url = self._decode_text(tracker).strip()
                     if url and url not in self.announce_list:
                         self.announce_list.append(url)
 
-        # If torrent is trackerless, inject fallback public trackers
+        # Preserve Salix_T's existing convenience for trackerless torrents.
         if not self.announce_list:
-            for fallback in FALLBACK_TRACKERS:
-                self.announce_list.append(fallback)
+            self.announce_list.extend(FALLBACK_TRACKERS)
             self.announce = self.announce_list[0]
 
         if b"comment" in raw_dict:
-            self.comment = raw_dict[b"comment"].decode("utf-8", errors="ignore")
+            self.comment = self._decode_text(raw_dict[b"comment"])
         if b"created by" in raw_dict:
-            self.created_by = raw_dict[b"created by"].decode("utf-8", errors="ignore")
+            self.created_by = self._decode_text(raw_dict[b"created by"])
 
-        # Info Dictionary Processing
         info_dict = raw_dict.get(b"info")
         if not info_dict or not isinstance(info_dict, dict):
             raise ValueError("Torrent missing valid 'info' dictionary.")
@@ -82,26 +108,95 @@ class TorrentFile:
         raw_info = Bencode.encode(info_dict)
         self.info_hash = hashlib.sha1(raw_info).digest()
 
-        self.piece_length = info_dict[b"piece length"]
-        self.name = info_dict.get(b"name", b"unnamed_download").decode("utf-8", errors="ignore")
+        try:
+            self.piece_length = int(info_dict[b"piece length"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError("Torrent missing a valid 'piece length'.") from exc
+        if self.piece_length <= 0:
+            raise ValueError("Torrent piece length must be greater than zero.")
 
-        raw_pieces = info_dict[b"pieces"]
+        raw_name = self._decode_text(info_dict.get(b"name", b"unnamed_download"))
+        self.name = self._validate_component(raw_name, "root")
+
+        raw_pieces = info_dict.get(b"pieces")
+        if not isinstance(raw_pieces, bytes):
+            raise ValueError("Torrent missing valid 'pieces' SHA-1 data.")
         if len(raw_pieces) % 20 != 0:
             raise ValueError("Corrupt 'pieces' binary string: not a multiple of 20 bytes.")
-        self.pieces = [raw_pieces[i:i + 20] for i in range(0, len(raw_pieces), 20)]
+        self.pieces = [
+            raw_pieces[index:index + 20]
+            for index in range(0, len(raw_pieces), 20)
+        ]
+
+        self.private = bool(int(info_dict.get(b"private", 0) or 0))
 
         if b"files" in info_dict:
             self.is_multi_file = True
-            for file_entry in info_dict[b"files"]:
-                length = file_entry[b"length"]
-                path_parts = [p.decode("utf-8", errors="ignore") for p in file_entry[b"path"]]
+            raw_files = info_dict[b"files"]
+            if not isinstance(raw_files, list):
+                raise ValueError("Multi-file torrent has an invalid 'files' list.")
+
+            seen_paths = set()
+            for file_entry in raw_files:
+                if not isinstance(file_entry, dict):
+                    raise ValueError("Multi-file torrent contains an invalid file entry.")
+
+                try:
+                    length = int(file_entry[b"length"])
+                    raw_path = file_entry[b"path"]
+                except (KeyError, TypeError, ValueError) as exc:
+                    raise ValueError("Multi-file torrent contains malformed file metadata.") from exc
+
+                if length < 0:
+                    raise ValueError("Torrent file lengths cannot be negative.")
+                if not isinstance(raw_path, list) or not raw_path:
+                    raise ValueError("Multi-file torrent contains an empty file path.")
+
+                path_parts = [
+                    self._validate_component(self._decode_text(part), "file")
+                    for part in raw_path
+                ]
                 relative_path = os.path.join(*path_parts)
-                self.files.append({"length": length, "path": relative_path})
+                canonical_key = tuple(path_parts)
+                if canonical_key in seen_paths:
+                    raise ValueError("Multi-file torrent contains duplicate file paths.")
+                seen_paths.add(canonical_key)
+
+                self.files.append(
+                    {
+                        "length": length,
+                        "path": relative_path,
+                        "path_parts": path_parts,
+                    }
+                )
                 self.total_length += length
         else:
             self.is_multi_file = False
-            self.total_length = info_dict[b"length"]
-            self.files.append({"length": self.total_length, "path": self.name})
+            try:
+                self.total_length = int(info_dict[b"length"])
+            except (KeyError, TypeError, ValueError) as exc:
+                raise ValueError("Single-file torrent missing a valid 'length'.") from exc
+            if self.total_length < 0:
+                raise ValueError("Torrent length cannot be negative.")
+            self.files.append(
+                {
+                    "length": self.total_length,
+                    "path": self.name,
+                    "path_parts": [self.name],
+                }
+            )
+
+        # A non-empty torrent must have enough piece hashes to cover its byte
+        # stream. The final piece may be shorter than piece_length.
+        expected_piece_count = (
+            (self.total_length + self.piece_length - 1) // self.piece_length
+            if self.total_length > 0
+            else 0
+        )
+        if len(self.pieces) != expected_piece_count:
+            raise ValueError(
+                "Torrent piece hash count does not match its declared payload size."
+            )
 
     @property
     def num_pieces(self) -> int:

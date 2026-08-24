@@ -283,7 +283,7 @@ class TorrentSession:
                     pass
 
         self.piece_mgr.reset_inflight_requests()
-        self.piece_mgr.save_resume_state()
+        self.piece_mgr.save_resume_state(force=True)
         self._emit_snapshot()
 
     def _is_current_run(self, run_token: int) -> bool:
@@ -482,7 +482,7 @@ class TorrentSession:
                     self.state = SessionState.STOPPED
 
                 self.piece_mgr.reset_inflight_requests()
-                self.piece_mgr.save_resume_state()
+                self.piece_mgr.save_resume_state(force=True)
                 self._emit_snapshot()
 
             if self._main_task is asyncio.current_task():

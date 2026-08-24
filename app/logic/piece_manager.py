@@ -1,18 +1,23 @@
 # app/logic/piece_manager.py
 
+from __future__ import annotations
+
 import base64
+import bisect
 import hashlib
 import json
 import math
 import os
 import threading
 import time
+from dataclasses import dataclass
 from typing import Callable, Iterable, List, Optional
 
 from app.logic.torrent_file import TorrentFile
 
 BLOCK_SIZE = 16384
 RESUME_STATE_VERSION = 1
+MULTI_FILE_RESUME_INTERVAL = 5.0
 
 
 class Block:
@@ -39,8 +44,8 @@ class Piece:
             self._blocks = []
             num_blocks = math.ceil(self.length / BLOCK_SIZE)
 
-            for i in range(num_blocks):
-                offset = i * BLOCK_SIZE
+            for index in range(num_blocks):
+                offset = index * BLOCK_SIZE
                 block_len = min(BLOCK_SIZE, self.length - offset)
                 self._blocks.append(Block(self.index, offset, block_len))
 
@@ -61,7 +66,6 @@ class Piece:
             block.is_requested = False
 
     def reset_requests(self):
-        """Release in-flight requests without allocating any new block objects."""
         if self._blocks is None:
             return
 
@@ -93,14 +97,24 @@ class Piece:
         )
 
     def verify_hash(self) -> bool:
-        piece_bytes = self.get_data()
-        return hashlib.sha1(piece_bytes).digest() == self.expected_hash
+        return hashlib.sha1(self.get_data()).digest() == self.expected_hash
+
+
+@dataclass(frozen=True)
+class StorageFile:
+    path: str
+    relative_path: str
+    length: int
+    start: int
+    end: int
 
 
 class PieceManager:
-    """
-    Coordinates block dispatching, SHA-1 verification, disk writes, and
-    persistent fast-resume state.
+    """Coordinates pieces, disk storage, verification and fast resume.
+
+    Single-file torrents use downloads/<torrent name> as before. Multi-file
+    torrents now use downloads/<torrent name>/... and are treated as one
+    contiguous BitTorrent byte stream when pieces cross file boundaries.
     """
 
     def __init__(self, torrent: TorrentFile, download_dir: str = "downloads"):
@@ -120,24 +134,60 @@ class PieceManager:
         self._storage_prepared = False
         self._prepare_lock = threading.Lock()
         self._resume_lock = threading.Lock()
+        self._last_resume_save_time = 0.0
 
-        # Progress for the *checking operation*, separate from download progress.
         self.check_progress: float = 0.0
         self.check_checked_pieces: int = 0
         self.check_total_pieces: int = 0
         self.fast_resume_used: bool = False
 
-        # Keep construction cheap. Do NOT allocate every 16 KiB block and do
-        # NOT scan/hash an existing multi-gigabyte file on the GUI thread.
+        self._storage_files: List[StorageFile] = []
+        self._storage_starts: List[int] = []
+
         self._initialize_pieces()
+        self._initialize_storage_files()
 
     def _initialize_pieces(self):
         total_remaining = self.torrent.total_length
 
-        for idx, expected_hash in enumerate(self.torrent.pieces):
+        for index, expected_hash in enumerate(self.torrent.pieces):
             piece_len = min(self.torrent.piece_length, total_remaining)
-            self.pieces.append(Piece(idx, piece_len, expected_hash))
+            self.pieces.append(Piece(index, piece_len, expected_hash))
             total_remaining -= piece_len
+
+    def _initialize_storage_files(self):
+        current_offset = 0
+
+        if not self.torrent.is_multi_file:
+            self._storage_files = [
+                StorageFile(
+                    path=self.output_path,
+                    relative_path=self.torrent.name,
+                    length=self.torrent.total_length,
+                    start=0,
+                    end=self.torrent.total_length,
+                )
+            ]
+            self._storage_starts = [0]
+            return
+
+        root = self.output_path
+        for file_entry in self.torrent.files:
+            length = int(file_entry["length"])
+            relative_path = str(file_entry["path"])
+            full_path = os.path.join(root, relative_path)
+            self._storage_files.append(
+                StorageFile(
+                    path=full_path,
+                    relative_path=relative_path,
+                    length=length,
+                    start=current_offset,
+                    end=current_offset + length,
+                )
+            )
+            current_offset += length
+
+        self._storage_starts = [item.start for item in self._storage_files]
 
     @property
     def storage_prepared(self) -> bool:
@@ -149,22 +199,13 @@ class PieceManager:
 
         self.check_checked_pieces = checked
         self.check_total_pieces = total
-
-        if total == 0:
-            self.check_progress = 1.0
-        else:
-            self.check_progress = max(0.0, min(1.0, checked / total))
+        self.check_progress = 1.0 if total == 0 else max(0.0, min(1.0, checked / total))
 
     def _wait_if_paused(
         self,
         cancel_event: Optional[threading.Event],
         pause_event: Optional[threading.Event],
     ) -> bool:
-        """
-        Wait while checking is paused.
-
-        Returns False if cancellation is requested while paused.
-        """
         if pause_event is None:
             return not (cancel_event and cancel_event.is_set())
 
@@ -175,71 +216,241 @@ class PieceManager:
 
         return not (cancel_event and cancel_event.is_set())
 
+    def _payload_exists(self) -> bool:
+        if not self.torrent.is_multi_file:
+            return os.path.exists(self.output_path)
+
+        if not os.path.isdir(self.output_path):
+            return False
+
+        return any(os.path.exists(item.path) for item in self._storage_files)
+
+    def _create_empty_storage(self):
+        os.makedirs(self.download_dir, exist_ok=True)
+
+        if not self.torrent.is_multi_file:
+            with open(self.output_path, "wb"):
+                pass
+            return
+
+        os.makedirs(self.output_path, exist_ok=True)
+        # Materialize zero-length files now. Non-empty files are created lazily
+        # when their first verified piece segment is written.
+        for item in self._storage_files:
+            if item.length != 0:
+                continue
+            os.makedirs(os.path.dirname(item.path), exist_ok=True)
+            with open(item.path, "ab"):
+                pass
+
+    def _storage_index_for_offset(self, offset: int) -> int:
+        if not self._storage_files:
+            return -1
+
+        index = bisect.bisect_right(self._storage_starts, offset) - 1
+        index = max(0, index)
+
+        while index < len(self._storage_files) and self._storage_files[index].end <= offset:
+            index += 1
+        return index if index < len(self._storage_files) else -1
+
+    def _read_range(self, offset: int, length: int) -> bytes:
+        if offset < 0 or length < 0 or offset + length > self.torrent.total_length:
+            return b""
+        if length == 0:
+            return b""
+
+        if not self.torrent.is_multi_file:
+            if not os.path.exists(self.output_path):
+                return b""
+            try:
+                with open(self.output_path, "rb") as file_handle:
+                    file_handle.seek(offset)
+                    data = file_handle.read(length)
+                return data if len(data) == length else b""
+            except OSError:
+                return b""
+
+        result = bytearray()
+        current = offset
+        end = offset + length
+        index = self._storage_index_for_offset(current)
+
+        while current < end and index >= 0 and index < len(self._storage_files):
+            item = self._storage_files[index]
+            if item.length == 0 or current >= item.end:
+                index += 1
+                continue
+            if current < item.start:
+                return b""
+
+            segment_end = min(end, item.end)
+            segment_length = segment_end - current
+            local_offset = current - item.start
+
+            if not os.path.exists(item.path):
+                return b""
+
+            try:
+                with open(item.path, "rb") as file_handle:
+                    file_handle.seek(local_offset)
+                    chunk = file_handle.read(segment_length)
+            except OSError:
+                return b""
+
+            if len(chunk) != segment_length:
+                return b""
+
+            result.extend(chunk)
+            current = segment_end
+            index += 1
+
+        return bytes(result) if len(result) == length else b""
+
+    def _write_range(self, offset: int, data: bytes):
+        if offset < 0 or offset + len(data) > self.torrent.total_length:
+            raise ValueError("Attempted to write outside the torrent payload range.")
+        if not data:
+            return
+
+        if not self.torrent.is_multi_file:
+            os.makedirs(self.download_dir, exist_ok=True)
+            if not os.path.exists(self.output_path):
+                with open(self.output_path, "wb"):
+                    pass
+            with open(self.output_path, "r+b") as file_handle:
+                file_handle.seek(offset)
+                file_handle.write(data)
+            return
+
+        os.makedirs(self.output_path, exist_ok=True)
+        current = offset
+        data_offset = 0
+        end = offset + len(data)
+        index = self._storage_index_for_offset(current)
+
+        while current < end and index >= 0 and index < len(self._storage_files):
+            item = self._storage_files[index]
+            if item.length == 0 or current >= item.end:
+                index += 1
+                continue
+            if current < item.start:
+                raise OSError("Torrent storage mapping contains a gap.")
+
+            segment_end = min(end, item.end)
+            segment_length = segment_end - current
+            local_offset = current - item.start
+            chunk = data[data_offset:data_offset + segment_length]
+
+            os.makedirs(os.path.dirname(item.path), exist_ok=True)
+            mode = "r+b" if os.path.exists(item.path) else "w+b"
+            with open(item.path, mode) as file_handle:
+                file_handle.seek(local_offset)
+                file_handle.write(chunk)
+
+            current = segment_end
+            data_offset += segment_length
+            index += 1
+
+        if data_offset != len(data):
+            raise OSError("Could not map the complete piece into torrent storage.")
+
+    def _candidate_piece_indices(self) -> List[int]:
+        if not self.pieces:
+            return []
+
+        if not self.torrent.is_multi_file:
+            if not os.path.exists(self.output_path):
+                return []
+            file_size = os.path.getsize(self.output_path)
+            if file_size <= 0:
+                return []
+            capped = min(file_size, self.torrent.total_length)
+            count = (capped + self.torrent.piece_length - 1) // self.torrent.piece_length
+            return list(range(min(len(self.pieces), count)))
+
+        candidates = set()
+        for item in self._storage_files:
+            if item.length <= 0 or not os.path.exists(item.path):
+                continue
+            try:
+                actual = min(os.path.getsize(item.path), item.length)
+            except OSError:
+                continue
+            if actual <= 0:
+                continue
+
+            first = item.start // self.torrent.piece_length
+            last_byte = item.start + actual - 1
+            last = last_byte // self.torrent.piece_length
+            for piece_index in range(first, min(last + 1, len(self.pieces))):
+                candidates.add(piece_index)
+
+        return sorted(candidates)
+
+    def _multi_payload_signature(self) -> str:
+        hasher = hashlib.sha256()
+
+        for item in self._storage_files:
+            relative = item.relative_path.replace("\\", "/").encode("utf-8", errors="surrogatepass")
+            hasher.update(len(relative).to_bytes(4, "big"))
+            hasher.update(relative)
+            hasher.update(int(item.length).to_bytes(8, "big", signed=False))
+
+            try:
+                stat = os.stat(item.path)
+                hasher.update(b"1")
+                hasher.update(int(stat.st_size).to_bytes(8, "big", signed=False))
+                hasher.update(int(stat.st_mtime_ns).to_bytes(8, "big", signed=False))
+            except OSError:
+                hasher.update(b"0")
+
+        return hasher.hexdigest()
+
+    def _multi_physical_bytes(self) -> int:
+        total = 0
+        for item in self._storage_files:
+            try:
+                total += min(os.path.getsize(item.path), item.length)
+            except OSError:
+                pass
+        return total
+
     def prepare_storage(
         self,
         cancel_event: Optional[threading.Event] = None,
         progress_callback: Optional[Callable[[], None]] = None,
         pause_event: Optional[threading.Event] = None,
     ) -> bool:
-        """
-        Prepare the output file and verify any existing pieces.
-
-        TorrentSession runs this method with asyncio.to_thread(), keeping disk
-        I/O and SHA-1 hashing off both the Dear PyGui thread and the asyncio
-        engine thread.
-
-        Fast-resume behavior:
-        - If a valid Salix resume sidecar exists and the payload file has not
-          changed since that sidecar was written, verified piece state is
-          restored immediately without hashing the entire payload again.
-        - Otherwise a normal SHA-1 check runs and a fresh resume sidecar is
-          saved when it completes.
-
-        Returns True when preparation completed, or False when cancelled.
-        """
         with self._prepare_lock:
             if self._storage_prepared:
-                self._set_check_progress(
-                    self.check_total_pieces,
-                    self.check_total_pieces,
-                )
+                self._set_check_progress(self.check_total_pieces, self.check_total_pieces)
                 if progress_callback:
                     progress_callback()
                 return True
 
             if cancel_event and cancel_event.is_set():
                 return False
-
             if not self._wait_if_paused(cancel_event, pause_event):
                 return False
 
             os.makedirs(self.download_dir, exist_ok=True)
 
-            if not os.path.exists(self.output_path):
-                # A stale sidecar without its payload is never valid.
+            if not self._payload_exists():
                 self._delete_resume_state()
-
-                # Create an empty file only. Pieces extend it as they are
-                # written, avoiding a synchronous multi-gigabyte preallocation.
-                with open(self.output_path, "wb"):
-                    pass
-
+                self._create_empty_storage()
                 self.downloaded_bytes = 0
                 self.fast_resume_used = False
                 self._set_check_progress(0, 0)
                 self._storage_prepared = True
-
                 if progress_callback:
                     progress_callback()
                 return True
 
-            # Fast path: trust only a resume sidecar whose torrent metadata and
-            # payload file identity (size + nanosecond mtime) still match.
             if self._load_resume_state():
                 self.fast_resume_used = True
                 self._set_check_progress(len(self.pieces), len(self.pieces))
                 self._storage_prepared = True
-
                 if progress_callback:
                     progress_callback()
                 return True
@@ -253,20 +464,9 @@ class PieceManager:
 
             if completed:
                 self._storage_prepared = True
-                self.save_resume_state()
+                self.save_resume_state(force=True)
 
             return completed
-
-    def _pieces_physically_present(self, file_size: int) -> int:
-        if file_size <= 0 or not self.pieces:
-            return 0
-
-        capped_size = min(file_size, self.torrent.total_length)
-        pieces_present = (
-            capped_size + self.torrent.piece_length - 1
-        ) // self.torrent.piece_length
-
-        return min(len(self.pieces), pieces_present)
 
     def _check_existing_pieces(
         self,
@@ -274,73 +474,58 @@ class PieceManager:
         progress_callback: Optional[Callable[[], None]] = None,
         pause_event: Optional[threading.Event] = None,
     ) -> bool:
-        """Scan an existing output file and mark SHA-1 verified pieces."""
-        if not os.path.exists(self.output_path):
+        if not self._payload_exists():
             self._set_check_progress(0, 0)
             return True
 
-        # A cancelled/partial previous check may have marked some pieces. A
-        # fresh check starts from a known state so counters cannot double.
         self.downloaded_bytes = 0
         for piece in self.pieces:
             piece.is_complete = False
 
-        file_size = os.path.getsize(self.output_path)
-        pieces_to_check = self._pieces_physically_present(file_size)
-        self._set_check_progress(0, pieces_to_check)
+        candidates = self._candidate_piece_indices()
+        self._set_check_progress(0, len(candidates))
 
         if progress_callback:
             progress_callback()
-
-        if pieces_to_check == 0:
+        if not candidates:
             return True
 
-        # Throttle UI snapshots to roughly 10 Hz while still reporting integer
-        # percentage changes immediately. This feels real-time without flooding
-        # Dear PyGui with thousands of queued messages.
         last_callback_time = time.monotonic()
         last_reported_percent = -1
 
-        with open(self.output_path, "rb") as file_handle:
-            for scan_index in range(pieces_to_check):
-                if cancel_event and cancel_event.is_set():
-                    return False
+        for scan_index, piece_index in enumerate(candidates):
+            if cancel_event and cancel_event.is_set():
+                return False
+            if not self._wait_if_paused(cancel_event, pause_event):
+                return False
 
-                if not self._wait_if_paused(cancel_event, pause_event):
-                    return False
+            piece = self.pieces[piece_index]
+            file_offset = piece.index * self.torrent.piece_length
+            data = self._read_range(file_offset, piece.length)
 
-                piece = self.pieces[scan_index]
-                file_offset = piece.index * self.torrent.piece_length
+            if (
+                len(data) == piece.length
+                and hashlib.sha1(data).digest() == piece.expected_hash
+            ):
+                piece.is_complete = True
+                self.downloaded_bytes += piece.length
 
-                file_handle.seek(file_offset)
-                data = file_handle.read(piece.length)
+            checked = scan_index + 1
+            self._set_check_progress(checked, len(candidates))
+            percent = int(self.check_progress * 100)
+            now = time.monotonic()
 
-                if (
-                    len(data) == piece.length
-                    and hashlib.sha1(data).digest() == piece.expected_hash
-                ):
-                    piece.is_complete = True
-                    self.downloaded_bytes += piece.length
+            if progress_callback and (
+                percent != last_reported_percent
+                or now - last_callback_time >= 0.10
+            ):
+                progress_callback()
+                last_callback_time = now
+                last_reported_percent = percent
 
-                checked = scan_index + 1
-                self._set_check_progress(checked, pieces_to_check)
-
-                percent = int(self.check_progress * 100)
-                now = time.monotonic()
-
-                if progress_callback and (
-                    percent != last_reported_percent
-                    or now - last_callback_time >= 0.10
-                ):
-                    progress_callback()
-                    last_callback_time = now
-                    last_reported_percent = percent
-
-        self._set_check_progress(pieces_to_check, pieces_to_check)
-
+        self._set_check_progress(len(candidates), len(candidates))
         if progress_callback:
             progress_callback()
-
         return True
 
     def _build_completed_bitfield(self) -> bytes:
@@ -349,10 +534,9 @@ class PieceManager:
         for piece in self.pieces:
             if not piece.is_complete:
                 continue
-
-            byte_idx = piece.index // 8
-            bit_idx = 7 - (piece.index % 8)
-            bitfield[byte_idx] |= 1 << bit_idx
+            byte_index = piece.index // 8
+            bit_index = 7 - (piece.index % 8)
+            bitfield[byte_index] |= 1 << bit_index
 
         return bytes(bitfield)
 
@@ -362,87 +546,80 @@ class PieceManager:
             return False
 
         downloaded_bytes = 0
-
         for piece in self.pieces:
-            byte_idx = piece.index // 8
-            bit_idx = 7 - (piece.index % 8)
-            is_complete = bool(raw_bitfield[byte_idx] & (1 << bit_idx))
+            byte_index = piece.index // 8
+            bit_index = 7 - (piece.index % 8)
+            is_complete = bool(raw_bitfield[byte_index] & (1 << bit_index))
             piece.is_complete = is_complete
-
             if is_complete:
                 downloaded_bytes += piece.length
 
         self.downloaded_bytes = downloaded_bytes
         return True
 
-    def _resume_metadata_matches(self, state: dict, file_stat: os.stat_result) -> bool:
+    def _resume_metadata_matches(self, state: dict) -> bool:
         try:
-            return (
+            common = (
                 state.get("version") == RESUME_STATE_VERSION
                 and state.get("info_hash") == self.torrent.hex_info_hash
                 and state.get("torrent_name") == self.torrent.name
                 and int(state.get("total_length", -1)) == self.torrent.total_length
                 and int(state.get("piece_length", -1)) == self.torrent.piece_length
                 and int(state.get("piece_count", -1)) == len(self.pieces)
-                and int(state.get("file_size", -1)) == file_stat.st_size
-                and int(state.get("file_mtime_ns", -1)) == file_stat.st_mtime_ns
             )
-        except (TypeError, ValueError):
+            if not common:
+                return False
+
+            if self.torrent.is_multi_file:
+                return (
+                    bool(state.get("multi_file"))
+                    and state.get("payload_signature") == self._multi_payload_signature()
+                )
+
+            if state.get("multi_file"):
+                return False
+            stat = os.stat(self.output_path)
+            return (
+                int(state.get("file_size", -1)) == stat.st_size
+                and int(state.get("file_mtime_ns", -1)) == stat.st_mtime_ns
+            )
+        except (OSError, TypeError, ValueError):
             return False
 
     def _load_resume_state(self) -> bool:
-        if not os.path.exists(self.output_path):
-            return False
-        if not os.path.exists(self.resume_path):
+        if not self._payload_exists() or not os.path.exists(self.resume_path):
             return False
 
         try:
             with open(self.resume_path, "r", encoding="utf-8") as file_handle:
                 state = json.load(file_handle)
-
-            if not isinstance(state, dict):
-                return False
-
-            file_stat = os.stat(self.output_path)
-            if not self._resume_metadata_matches(state, file_stat):
+            if not isinstance(state, dict) or not self._resume_metadata_matches(state):
                 return False
 
             encoded_bitfield = state.get("completed_bitfield")
             if not isinstance(encoded_bitfield, str):
                 return False
 
-            raw_bitfield = base64.b64decode(
-                encoded_bitfield.encode("ascii"),
-                validate=True,
-            )
-
-            if not self._apply_completed_bitfield(raw_bitfield):
-                return False
-
-            return True
-
+            raw_bitfield = base64.b64decode(encoded_bitfield.encode("ascii"), validate=True)
+            return self._apply_completed_bitfield(raw_bitfield)
         except (OSError, ValueError, TypeError, json.JSONDecodeError):
             return False
 
-    def save_resume_state(self) -> bool:
-        """
-        Persist verified piece state atomically.
-
-        This file is deliberately small: completed pieces are encoded as a
-        compact bitfield instead of a large JSON list of piece numbers.
-
-        A partially completed *checking* pass is intentionally not persisted:
-        unchecked pieces must never be mistaken for verified resume state.
-        """
-        if not self._storage_prepared:
+    def save_resume_state(self, force: bool = False) -> bool:
+        if not self._storage_prepared or not self._payload_exists():
             return False
-        if not os.path.exists(self.output_path):
-            return False
+
+        now = time.monotonic()
+        if (
+            self.torrent.is_multi_file
+            and not force
+            and now - self._last_resume_save_time < MULTI_FILE_RESUME_INTERVAL
+        ):
+            return True
 
         with self._resume_lock:
             try:
                 os.makedirs(self.resume_dir, exist_ok=True)
-                file_stat = os.stat(self.output_path)
                 bitfield = self._build_completed_bitfield()
 
                 state = {
@@ -452,12 +629,28 @@ class PieceManager:
                     "total_length": self.torrent.total_length,
                     "piece_length": self.torrent.piece_length,
                     "piece_count": len(self.pieces),
-                    "file_size": file_stat.st_size,
-                    "file_mtime_ns": file_stat.st_mtime_ns,
                     "completed_bitfield": base64.b64encode(bitfield).decode("ascii"),
                     "completed_pieces": self.completed_pieces,
                     "downloaded_bytes": self.downloaded_bytes,
                 }
+
+                if self.torrent.is_multi_file:
+                    state.update(
+                        {
+                            "multi_file": True,
+                            "payload_signature": self._multi_payload_signature(),
+                            "physical_bytes": self._multi_physical_bytes(),
+                            "file_count": len(self._storage_files),
+                        }
+                    )
+                else:
+                    stat = os.stat(self.output_path)
+                    state.update(
+                        {
+                            "file_size": stat.st_size,
+                            "file_mtime_ns": stat.st_mtime_ns,
+                        }
+                    )
 
                 temp_path = f"{self.resume_path}.tmp"
                 with open(temp_path, "w", encoding="utf-8") as file_handle:
@@ -466,8 +659,8 @@ class PieceManager:
                     os.fsync(file_handle.fileno())
 
                 os.replace(temp_path, self.resume_path)
+                self._last_resume_save_time = now
                 return True
-
             except OSError:
                 return False
 
@@ -483,16 +676,13 @@ class PieceManager:
             if piece.is_complete:
                 continue
 
-            byte_idx = piece.index // 8
-            bit_idx = 7 - (piece.index % 8)
-
-            if byte_idx >= len(peer_bitfield):
+            byte_index = piece.index // 8
+            bit_index = 7 - (piece.index % 8)
+            if byte_index >= len(peer_bitfield):
                 continue
-            if not (peer_bitfield[byte_idx] & (1 << bit_idx)):
+            if not (peer_bitfield[byte_index] & (1 << bit_index)):
                 continue
 
-            # Accessing piece.blocks here lazily creates blocks only for pieces
-            # that a connected peer can actually provide.
             for block in piece.blocks:
                 if not block.is_requested and block.data is None:
                     block.is_requested = True
@@ -514,8 +704,6 @@ class PieceManager:
 
         if matched_block is None:
             return False
-
-        # Reject malformed block sizes and make the block available for retry.
         if len(data) != matched_block.length:
             matched_block.is_requested = False
             return False
@@ -531,74 +719,41 @@ class PieceManager:
         if piece.verify_hash():
             self._write_piece_to_disk(piece)
             piece.is_complete = True
-
-            # Keep fast-resume state current after every verified piece. The
-            # sidecar is tiny and atomically replaced, so a normal restart can
-            # skip an expensive full-file rehash.
             self.save_resume_state()
             return True
 
-        # Bad piece: remove its received bytes from the counter and allow all
-        # blocks in that piece to be requested again.
-        self.downloaded_bytes = max(
-            0,
-            self.downloaded_bytes - piece.received_byte_count(),
-        )
+        self.downloaded_bytes = max(0, self.downloaded_bytes - piece.received_byte_count())
         piece.reset()
         return False
 
     def _write_piece_to_disk(self, piece: Piece):
-        os.makedirs(self.download_dir, exist_ok=True)
-
-        if not os.path.exists(self.output_path):
-            with open(self.output_path, "wb"):
-                pass
-
         file_offset = piece.index * self.torrent.piece_length
-        with open(self.output_path, "r+b") as file_handle:
-            file_handle.seek(file_offset)
-            file_handle.write(piece.get_data())
+        self._write_range(file_offset, piece.get_data())
 
     def read_block(self, piece_index: int, offset: int, length: int) -> bytes:
-        """Read a verified block from disk for upload/seeding."""
         if piece_index < 0 or piece_index >= len(self.pieces):
             return b""
 
         piece = self.pieces[piece_index]
         if not piece.is_complete:
             return b""
-
         if offset < 0 or length <= 0:
             return b""
-        if offset + length > piece.length:
-            return b""
-        if length > BLOCK_SIZE:
-            return b""
-        if not os.path.exists(self.output_path):
+        if offset + length > piece.length or length > BLOCK_SIZE:
             return b""
 
         file_offset = piece.index * self.torrent.piece_length + offset
-
-        try:
-            with open(self.output_path, "rb") as file_handle:
-                file_handle.seek(file_offset)
-                data = file_handle.read(length)
-            return data if len(data) == length else b""
-        except OSError:
-            return b""
+        return self._read_range(file_offset, length)
 
     def completed_bitfield(self) -> bytes:
-        """Return the wire-format piece bitfield advertised to peers."""
         return self._build_completed_bitfield()
 
     def release_requests(self, blocks: Iterable[Block]):
-        """Release blocks owned by a peer that disconnected or was cancelled."""
         for block in blocks:
             if block.data is None:
                 block.is_requested = False
 
     def reset_inflight_requests(self):
-        """Release every outstanding request without defeating lazy blocks."""
         for piece in self.pieces:
             piece.reset_requests()
 
@@ -608,8 +763,12 @@ class PieceManager:
 
     @property
     def progress(self) -> float:
-        return self.completed_pieces / len(self.pieces) if self.pieces else 0.0
+        if not self.pieces:
+            return 1.0 if self.torrent.total_length == 0 else 0.0
+        return self.completed_pieces / len(self.pieces)
 
     @property
     def is_finished(self) -> bool:
-        return bool(self.pieces) and all(piece.is_complete for piece in self.pieces)
+        if not self.pieces:
+            return self.torrent.total_length == 0
+        return all(piece.is_complete for piece in self.pieces)
