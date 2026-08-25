@@ -33,8 +33,8 @@ class SourceView:
                 color=(100, 180, 255),
             )
             self.note_text = dpg.add_text(
-                "Active = valid response | No Peers = valid tracker response with zero peers | "
-                "Waiting = not queried yet",
+                "Tracker / DHT / PEX / LAN discovery telemetry. "
+                "Waiting = source available but no result yet.",
                 color=(150, 150, 150),
             )
             dpg.add_separator()
@@ -193,13 +193,16 @@ class SourceView:
         active_count = int(sources_view.get("active_count", 0) or 0)
         problem_count = int(sources_view.get("problem_count", 0) or 0)
         tracker_peers = int(sources_view.get("tracker_peers_last_seen", 0) or 0)
+        dht_peers = int(sources_view.get("dht_peers_seen", 0) or 0)
+        pex_peers = int(sources_view.get("pex_peers_seen", 0) or 0)
         lan_peers = int(sources_view.get("lan_peers_seen", 0) or 0)
 
         if sources:
             summary = (
-                f"Sources: {tracker_count} tracker(s) + LAN | "
+                f"Sources: {tracker_count} tracker(s) + DHT + PEX + LAN | "
                 f"Responding: {active_count} | Problems: {problem_count} | "
-                f"Tracker peers last reported: {tracker_peers} | LAN peers seen: {lan_peers}"
+                f"Peers seen — Tracker {tracker_peers} | DHT {dht_peers} | "
+                f"PEX {pex_peers} | LAN {lan_peers}"
             )
         else:
             summary = "Sources: no peer-discovery telemetry available"

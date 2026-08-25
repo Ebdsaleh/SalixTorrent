@@ -1,9 +1,14 @@
 # app/logic/peer.py
 
+from __future__ import annotations
+
 import asyncio
+import socket
 import struct
 import time
-from typing import Optional
+from typing import Dict, Iterable, List, Optional, Tuple
+
+from app.logic.bencode import Bencode
 
 
 class PeerMessageID:
@@ -16,6 +21,18 @@ class PeerMessageID:
     REQUEST = 6
     PIECE = 7
     CANCEL = 8
+    PORT = 9
+    EXTENDED = 20
+
+
+# BEP-10 uses bit 0x10 in reserved byte 5 to advertise the extension protocol.
+# BEP-5 uses bit 0x01 in the final reserved byte to advertise DHT support.
+# SalixTorrent supports both, so every normal peer handshake can advertise both.
+EXTENSION_RESERVED_BYTES = b"\x00\x00\x00\x00\x00\x10\x00\x01"
+UT_PEX_EXTENSION_NAME = b"ut_pex"
+LOCAL_UT_PEX_ID = 1
+PEX_SEND_INTERVAL = 60.0
+PEX_MAX_PEERS_PER_MESSAGE = 50
 
 
 _AZUREUS_CLIENTS = {
@@ -33,11 +50,11 @@ _AZUREUS_CLIENTS = {
 
 
 def identify_peer_client(peer_id: bytes) -> str:
-    """Return a friendly client name for common Azureus-style peer IDs.
+    """Return a friendly client name for common peer-ID conventions.
 
-    BitTorrent does not require clients to identify themselves in a human-readable
-    way, so this is intentionally best-effort. Unknown IDs remain perfectly
-    valid peers and are reported as ``Unknown`` rather than rejected.
+    BitTorrent peer IDs are self-reported. This decoder is intentionally
+    conservative: if an ID does not match a known convention, SalixTorrent
+    reports ``Unknown`` instead of guessing.
     """
     if not peer_id:
         return "Unknown"
@@ -61,9 +78,6 @@ def identify_peer_client(peer_id: bytes) -> str:
             if code == "ST":
                 return "Salix_T 1.0"
 
-            # Most Azureus-style clients encode four compact version digits.
-            # Keep the presentation conservative rather than pretending every
-            # client uses exactly the same version convention.
             if version_raw and version_raw.isdigit():
                 parts = list(version_raw)
                 while len(parts) > 2 and parts[-1] == "0":
@@ -73,7 +87,6 @@ def identify_peer_client(peer_id: bytes) -> str:
 
             return name
 
-    # Some old/mainline clients use textual prefixes instead of Azureus style.
     try:
         printable = raw.decode("ascii", errors="ignore").strip("\x00 -_")
     except Exception:
@@ -85,6 +98,152 @@ def identify_peer_client(peer_id: bytes) -> str:
         return "Shadow"
 
     return "Unknown"
+
+
+# ---------------------------------------------------------------------------
+# BEP-10 / BEP-11 helpers
+# ---------------------------------------------------------------------------
+
+
+def reserved_supports_extensions(reserved: bytes) -> bool:
+    try:
+        raw = bytes(reserved)
+    except Exception:
+        return False
+    return len(raw) >= 6 and bool(raw[5] & 0x10)
+
+
+def reserved_supports_dht(reserved: bytes) -> bool:
+    try:
+        raw = bytes(reserved)
+    except Exception:
+        return False
+    return len(raw) >= 8 and bool(raw[7] & 0x01)
+
+
+def build_extended_message(extension_id: int, payload: bytes) -> bytes:
+    body = bytes([int(extension_id) & 0xFF]) + bytes(payload)
+    return struct.pack(">IB", 1 + len(body), PeerMessageID.EXTENDED) + body
+
+
+def build_extended_handshake_payload(listen_port: int = 0) -> bytes:
+    payload = {
+        b"m": {UT_PEX_EXTENSION_NAME: LOCAL_UT_PEX_ID},
+        b"v": b"Salix_T 1.0",
+        b"reqq": 64,
+    }
+    try:
+        port = int(listen_port or 0)
+    except (TypeError, ValueError):
+        port = 0
+    if 0 < port <= 65535:
+        payload[b"p"] = port
+    return Bencode.encode(payload)
+
+
+def parse_extended_handshake(payload: bytes) -> dict:
+    try:
+        decoded = Bencode.decode(bytes(payload))
+    except Exception:
+        return {}
+    if not isinstance(decoded, dict):
+        return {}
+    return decoded
+
+
+def _compact_ipv4(endpoint: Tuple[str, int]) -> bytes:
+    ip, port = endpoint
+    try:
+        packed_ip = socket.inet_aton(str(ip))
+        packed_port = struct.pack(">H", int(port))
+    except (OSError, TypeError, ValueError, struct.error):
+        return b""
+    if int(port) <= 0 or int(port) > 65535:
+        return b""
+    return packed_ip + packed_port
+
+
+def encode_pex_payload(endpoints: Iterable[Tuple[str, int]]) -> bytes:
+    compact_parts: List[bytes] = []
+    seen = set()
+    for endpoint in endpoints:
+        if len(compact_parts) >= PEX_MAX_PEERS_PER_MESSAGE:
+            break
+        try:
+            normalized = (str(endpoint[0]), int(endpoint[1]))
+        except (TypeError, ValueError, IndexError):
+            continue
+        if normalized in seen:
+            continue
+        raw = _compact_ipv4(normalized)
+        if not raw:
+            continue
+        seen.add(normalized)
+        compact_parts.append(raw)
+
+    added = b"".join(compact_parts)
+    # ``added.f`` has one flag byte per compact peer. SalixTorrent currently
+    # sends zero flags rather than claiming encryption/seed status it cannot
+    # prove for arbitrary peers.
+    payload = {
+        b"added": added,
+        b"added.f": b"\x00" * len(compact_parts),
+        b"dropped": b"",
+    }
+    return Bencode.encode(payload)
+
+
+def _parse_compact_ipv4(raw: object) -> List[Tuple[str, int]]:
+    if not isinstance(raw, (bytes, bytearray)):
+        return []
+    data = bytes(raw)
+    peers: List[Tuple[str, int]] = []
+    for offset in range(0, len(data) - 5, 6):
+        chunk = data[offset:offset + 6]
+        try:
+            ip = socket.inet_ntoa(chunk[:4])
+            port = struct.unpack(">H", chunk[4:])[0]
+        except (OSError, struct.error):
+            continue
+        if port:
+            peers.append((ip, port))
+    return peers
+
+
+def _parse_compact_ipv6(raw: object) -> List[Tuple[str, int]]:
+    if not isinstance(raw, (bytes, bytearray)):
+        return []
+    data = bytes(raw)
+    peers: List[Tuple[str, int]] = []
+    for offset in range(0, len(data) - 17, 18):
+        chunk = data[offset:offset + 18]
+        try:
+            ip = socket.inet_ntop(socket.AF_INET6, chunk[:16])
+            port = struct.unpack(">H", chunk[16:18])[0]
+        except (OSError, struct.error):
+            continue
+        if port:
+            peers.append((ip, port))
+    return peers
+
+
+def parse_pex_payload(payload: bytes) -> dict:
+    try:
+        decoded = Bencode.decode(bytes(payload))
+    except Exception:
+        return {"added": [], "dropped": []}
+    if not isinstance(decoded, dict):
+        return {"added": [], "dropped": []}
+
+    added = _parse_compact_ipv4(decoded.get(b"added"))
+    added.extend(_parse_compact_ipv6(decoded.get(b"added6")))
+    dropped = _parse_compact_ipv4(decoded.get(b"dropped"))
+    dropped.extend(_parse_compact_ipv6(decoded.get(b"dropped6")))
+
+    return {
+        "added": added,
+        "dropped": dropped,
+    }
 
 
 class PeerConnection:
@@ -119,6 +278,20 @@ class PeerConnection:
         self.bitfield: bytearray = bytearray()
         self.is_connected: bool = False
 
+        # BEP-10 / BEP-11 extension state.
+        self.remote_reserved: bytes = b"\x00" * 8
+        self.supports_extensions: bool = False
+        self.supports_dht: bool = False
+        self.remote_extensions: Dict[bytes, int] = {}
+        self.remote_client_version: str = ""
+        self.remote_listen_port: int = 0
+        self.extended_handshake_sent: bool = False
+        self.extended_handshake_received: bool = False
+        self.pex_messages_received: int = 0
+        self.pex_messages_sent: int = 0
+        self.last_pex_sent_at: float = 0.0
+        self.last_pex_received_at: float = 0.0
+
         # Per-peer telemetry used by the Peers view.
         self.connected_at: float = 0.0
         self.last_activity_at: float = time.monotonic()
@@ -133,8 +306,45 @@ class PeerConnection:
     def client_name(self) -> str:
         return identify_peer_client(self.remote_peer_id)
 
+    @property
+    def pex_supported(self) -> bool:
+        try:
+            return int(self.remote_extensions.get(UT_PEX_EXTENSION_NAME, 0)) > 0
+        except (TypeError, ValueError):
+            return False
+
     def _mark_activity(self):
         self.last_activity_at = time.monotonic()
+
+    async def _write_and_drain(self, payload: bytes) -> bool:
+        """Write one peer-wire frame without leaking normal disconnects.
+
+        Public BitTorrent peers routinely disappear between handshake and the
+        first protocol message.  On Windows that commonly arrives as
+        ``ConnectionResetError(10054)`` from ``StreamWriter.drain()``.  A peer
+        disconnect is ordinary swarm churn, not an application error, so mark
+        the connection closed and let the worker retire quietly.
+        """
+        if not self.is_connected or not self.writer:
+            return False
+
+        try:
+            self.writer.write(bytes(payload))
+            await self.writer.drain()
+            self._mark_activity()
+            return True
+        except asyncio.CancelledError:
+            raise
+        except (ConnectionError, OSError):
+            await self.close()
+            return False
+        except Exception:
+            # StreamWriter implementations can surface transport failures as
+            # RuntimeError or another transport-specific exception.  Treat the
+            # failed peer as disconnected rather than leaking an unobserved task
+            # exception into the console.
+            await self.close()
+            return False
 
     async def connect(self, timeout: float = 8.0) -> bool:
         """Establish TCP connection and perform the BitTorrent handshake."""
@@ -148,7 +358,7 @@ class PeerConnection:
             handshake = (
                 bytes([len(pstr)])
                 + pstr
-                + (b"\x00" * 8)
+                + EXTENSION_RESERVED_BYTES
                 + self.info_hash
                 + self.peer_id
             )
@@ -165,6 +375,9 @@ class PeerConnection:
                 await self.close()
                 return False
 
+            self.remote_reserved = bytes(response[20:28])
+            self.supports_extensions = reserved_supports_extensions(self.remote_reserved)
+            self.supports_dht = reserved_supports_dht(self.remote_reserved)
             self.remote_peer_id = bytes(response[48:68])
             self.is_connected = True
             self.connected_at = time.monotonic()
@@ -175,25 +388,25 @@ class PeerConnection:
             await self.close()
             return False
 
-    async def send_interested(self):
-        """Notify the peer that we want to download pieces from them."""
+    async def send_interested(self) -> bool:
         if not self.is_connected or not self.writer:
-            return
-        self.writer.write(struct.pack(">IB", 1, PeerMessageID.INTERESTED))
-        await self.writer.drain()
-        self.am_interested = True
-        self._mark_activity()
+            return False
+        sent = await self._write_and_drain(
+            struct.pack(">IB", 1, PeerMessageID.INTERESTED)
+        )
+        if sent:
+            self.am_interested = True
+        return sent
 
     async def send_request(
         self,
         piece_index: int,
         block_offset: int,
         length: int = 16384,
-    ):
-        """Request a block from a piece."""
+    ) -> bool:
         if not self.is_connected or not self.writer or self.peer_choking:
-            return
-        self.writer.write(
+            return False
+        return await self._write_and_drain(
             struct.pack(
                 ">IBIII",
                 13,
@@ -203,41 +416,137 @@ class PeerConnection:
                 length,
             )
         )
-        await self.writer.drain()
-        self._mark_activity()
 
-    async def send_bitfield(self, bitfield: bytes):
-        """Advertise the pieces we currently have."""
+    async def send_bitfield(self, bitfield: bytes) -> bool:
         if not self.is_connected or not self.writer:
-            return
+            return False
         payload = bytes(bitfield)
-        self.writer.write(
+        return await self._write_and_drain(
             struct.pack(">IB", 1 + len(payload), PeerMessageID.BITFIELD) + payload
         )
-        await self.writer.drain()
-        self._mark_activity()
 
-    async def send_unchoke(self):
-        """Allow a remote peer to request blocks from us."""
+    async def send_unchoke(self) -> bool:
         if not self.is_connected or not self.writer:
-            return
-        self.writer.write(struct.pack(">IB", 1, PeerMessageID.UNCHOKE))
-        await self.writer.drain()
-        self.am_choking = False
-        self._mark_activity()
+            return False
+        sent = await self._write_and_drain(
+            struct.pack(">IB", 1, PeerMessageID.UNCHOKE)
+        )
+        if sent:
+            self.am_choking = False
+        return sent
 
-    async def send_piece(self, piece_index: int, block_offset: int, data: bytes):
-        """Send a requested block to a remote peer while seeding."""
+    async def send_piece(
+        self,
+        piece_index: int,
+        block_offset: int,
+        data: bytes,
+    ) -> bool:
         if not self.is_connected or not self.writer:
-            return
+            return False
         block_data = bytes(data)
         payload = struct.pack(">II", piece_index, block_offset) + block_data
-        self.writer.write(
+        sent = await self._write_and_drain(
             struct.pack(">IB", 1 + len(payload), PeerMessageID.PIECE) + payload
         )
-        await self.writer.drain()
-        self.uploaded_bytes += len(block_data)
-        self._mark_activity()
+        if sent:
+            self.uploaded_bytes += len(block_data)
+        return sent
+
+    async def send_port(self, dht_port: int) -> bool:
+        if not self.is_connected or not self.writer or not self.supports_dht:
+            return False
+        try:
+            port = int(dht_port or 0)
+        except (TypeError, ValueError):
+            return False
+        if port <= 0 or port > 65535:
+            return False
+        return await self._write_and_drain(
+            struct.pack(">IBH", 3, PeerMessageID.PORT, port)
+        )
+
+    async def send_extended_handshake(self, listen_port: int = 0) -> bool:
+        if (
+            not self.is_connected
+            or not self.writer
+            or not self.supports_extensions
+        ):
+            return False
+        sent = await self._write_and_drain(
+            build_extended_message(
+                0,
+                build_extended_handshake_payload(listen_port=listen_port),
+            )
+        )
+        if sent:
+            self.extended_handshake_sent = True
+        return sent
+
+    async def send_pex(self, endpoints: Iterable[Tuple[str, int]]) -> bool:
+        if not self.is_connected or not self.writer or not self.pex_supported:
+            return False
+        try:
+            remote_id = int(self.remote_extensions.get(UT_PEX_EXTENSION_NAME, 0))
+        except (TypeError, ValueError):
+            return False
+        if remote_id <= 0 or remote_id > 255:
+            return False
+
+        payload = encode_pex_payload(endpoints)
+        sent = await self._write_and_drain(
+            build_extended_message(remote_id, payload)
+        )
+        if sent:
+            self.pex_messages_sent += 1
+            self.last_pex_sent_at = time.monotonic()
+        return sent
+
+    def _handle_extended_message(self, body: bytes) -> tuple:
+        if not body:
+            return ("UNKNOWN", body)
+
+        extension_id = int(body[0])
+        extension_payload = bytes(body[1:])
+
+        if extension_id == 0:
+            handshake = parse_extended_handshake(extension_payload)
+            mapping = handshake.get(b"m")
+            if isinstance(mapping, dict):
+                extensions: Dict[bytes, int] = {}
+                for name, value in mapping.items():
+                    if not isinstance(name, bytes):
+                        continue
+                    try:
+                        extension_number = int(value)
+                    except (TypeError, ValueError):
+                        continue
+                    if 0 <= extension_number <= 255:
+                        extensions[name] = extension_number
+                self.remote_extensions = extensions
+
+            version = handshake.get(b"v")
+            if isinstance(version, bytes):
+                self.remote_client_version = version.decode("utf-8", errors="replace")
+            elif version is not None:
+                self.remote_client_version = str(version)
+
+            try:
+                listen_port = int(handshake.get(b"p", 0) or 0)
+            except (TypeError, ValueError):
+                listen_port = 0
+            self.remote_listen_port = listen_port if 0 < listen_port <= 65535 else 0
+            self.extended_handshake_received = True
+            return ("EXTENDED_HANDSHAKE", handshake)
+
+        # Incoming extension IDs are interpreted using the mapping *we*
+        # advertised. SalixTorrent advertises ut_pex as local extension ID 1.
+        if extension_id == LOCAL_UT_PEX_ID:
+            parsed = parse_pex_payload(extension_payload)
+            self.pex_messages_received += 1
+            self.last_pex_received_at = time.monotonic()
+            return ("PEX", parsed)
+
+        return ("EXTENDED", (extension_id, extension_payload))
 
     async def read_message(self) -> Optional[tuple]:
         """Read and parse the next framed BitTorrent peer message."""
@@ -251,6 +560,13 @@ class PeerConnection:
             if length == 0:
                 self._mark_activity()
                 return ("KEEP_ALIVE", None)
+
+            # Protect the client from a nonsensical peer-wire allocation. Large
+            # piece messages are never needed because SalixTorrent requests at
+            # most 16 KiB blocks.
+            if length > 2 * 1024 * 1024:
+                await self.close()
+                return None
 
             payload = await self.reader.readexactly(length)
             msg_id = payload[0]
@@ -289,6 +605,13 @@ class PeerConnection:
                 block_data = body[8:]
                 self.downloaded_bytes += len(block_data)
                 return ("PIECE", (index, begin, block_data))
+            if msg_id == PeerMessageID.PORT:
+                if len(body) != 2:
+                    return ("UNKNOWN", body)
+                (dht_port,) = struct.unpack(">H", body)
+                return ("PORT", dht_port)
+            if msg_id == PeerMessageID.EXTENDED:
+                return self._handle_extended_message(body)
 
             return ("UNKNOWN", body)
 
@@ -297,7 +620,6 @@ class PeerConnection:
             return None
 
     async def close(self):
-        """Terminate the TCP connection."""
         self.is_connected = False
         if self.writer:
             try:
