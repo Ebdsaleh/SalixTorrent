@@ -16,7 +16,7 @@ def main():
         "torrent",
         nargs="?",
         default=None,
-        help="Optional path to a .torrent file to open at launch",
+        help="Optional .torrent path or magnet URI to open at launch",
     )
     parser.add_argument(
         "--cli",
@@ -40,6 +40,11 @@ def main():
         # desktop application's persistent transfer queue.
         torrent_path = args.torrent or "test.torrent"
         print("Launching Salix_T in Headless CLI Mode...")
+        if str(torrent_path).strip().lower().startswith("magnet:?"):
+            raise SystemExit(
+                "Headless magnet resolution is not enabled yet; open this magnet in "
+                "the desktop interface so BEP-9 progress can be shown."
+            )
         session = manager.add_torrent(
             torrent_path,
             max_peers=args.max_peers,
@@ -60,12 +65,16 @@ def main():
         # addition to the restored session and marks it active.
         if args.torrent:
             try:
-                session = manager.add_torrent(
-                    args.torrent,
-                    max_peers=args.max_peers,
-                )
-                manager.set_selected_torrent(session.torrent.hex_info_hash)
-                manager.start_torrent(session.torrent.hex_info_hash)
+                startup_target = str(args.torrent).strip()
+                if startup_target.lower().startswith("magnet:?"):
+                    manager.add_magnet(startup_target, start=True)
+                else:
+                    session = manager.add_torrent(
+                        startup_target,
+                        max_peers=args.max_peers,
+                    )
+                    manager.set_selected_torrent(session.torrent.hex_info_hash)
+                    manager.start_torrent(session.torrent.hex_info_hash)
             except Exception as exc:
                 print(f"[Salix_T Notice] Could not load torrent: {exc}")
 

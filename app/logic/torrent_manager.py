@@ -4,12 +4,20 @@ import asyncio
 import json
 import os
 import queue
+import secrets
 import shutil
 import sys
 import threading
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from app.logic.magnet import (
+    MagnetCancelled,
+    MagnetError,
+    MagnetLink,
+    MagnetMetadataFetcher,
+    build_torrent_bytes,
+)
 from app.logic.session import (
     TorrentSession,
     SessionState,
@@ -33,6 +41,8 @@ class TorrentCommand:
     REBALANCE_QUEUE = "REBALANCE_QUEUE"
     FORCE_RECHECK = "FORCE_RECHECK"
     ANNOUNCE = "ANNOUNCE"
+    ADD_MAGNET = "ADD_MAGNET"
+    CANCEL_MAGNET = "CANCEL_MAGNET"
     SHUTDOWN = "SHUTDOWN"
 
 
@@ -85,6 +95,8 @@ class TorrentManager:
             cls._instance._max_active_downloads: int = cls.DEFAULT_MAX_ACTIVE_DOWNLOADS
             cls._instance._explicit_start_requests = set()
             cls._instance._maintenance_tasks: Dict[str, asyncio.Task] = {}
+            cls._instance._magnet_tasks: Dict[str, asyncio.Task] = {}
+            cls._instance._magnet_fetchers: Dict[str, MagnetMetadataFetcher] = {}
 
             cls._instance._state_dir = cls._instance._get_state_directory()
             cls._instance._state_file = cls._instance._state_dir / "session.json"
@@ -929,6 +941,142 @@ class TorrentManager:
         finally:
             self._maintenance_tasks.pop(info_hash, None)
 
+    def _emit_magnet_event(
+        self,
+        event_type: str,
+        magnet: MagnetLink,
+        *,
+        stage: str = "",
+        progress: float = 0.0,
+        message: str = "",
+        duplicate: bool = False,
+    ):
+        self.ui_queue.put(
+            {
+                "type": event_type,
+                "info_hash": magnet.hex_info_hash,
+                "magnet_uri": magnet.uri,
+                "display_name": magnet.display_name or magnet.hex_info_hash,
+                "stage": str(stage or ""),
+                "progress": max(0.0, min(1.0, float(progress))),
+                "message": str(message or ""),
+                "duplicate": bool(duplicate),
+            }
+        )
+
+    async def _resolve_magnet(self, magnet_uri: str, start_requested: bool):
+        magnet = MagnetLink.parse(magnet_uri)
+        info_hash = magnet.hex_info_hash
+        fetcher = None
+
+        try:
+            with self._sessions_lock:
+                existing = self.sessions.get(info_hash)
+            if existing is not None:
+                if start_requested:
+                    self._set_intent(info_hash, SessionIntent.ACTIVE)
+                    self._explicit_start_requests.add(info_hash)
+                    self._rebalance_queue()
+                self._emit_magnet_event(
+                    "MAGNET_READY",
+                    magnet,
+                    stage="Already Added",
+                    progress=1.0,
+                    message="This magnet is already present in the transfer queue.",
+                    duplicate=True,
+                )
+                return
+
+            peer_id = b"-ST0001-" + secrets.token_hex(6).encode("ascii")
+
+            def on_progress(stage: str, progress: float, message: str):
+                self._emit_magnet_event(
+                    "MAGNET_PROGRESS",
+                    magnet,
+                    stage=stage,
+                    progress=progress,
+                    message=message,
+                )
+
+            fetcher = MagnetMetadataFetcher(
+                magnet,
+                peer_id,
+                max_peers=int(self._settings.get("default_max_peers", 25)),
+                progress_callback=on_progress,
+            )
+            self._magnet_fetchers[info_hash] = fetcher
+            self._emit_magnet_event(
+                "MAGNET_PROGRESS",
+                magnet,
+                stage="Starting",
+                progress=0.01,
+                message="Starting magnet metadata discovery...",
+            )
+
+            raw_info = await fetcher.resolve()
+            torrent_bytes = build_torrent_bytes(magnet, raw_info)
+
+            self._ensure_state_directories()
+            destination = self._torrent_cache_dir / f"{info_hash}.torrent"
+            temp_path = destination.with_suffix(".torrent.tmp")
+            await asyncio.to_thread(temp_path.write_bytes, torrent_bytes)
+            os.replace(temp_path, destination)
+
+            # Parse through the ordinary TorrentSession/TorrentFile path. This
+            # verifies the exact raw info hash again and means resolved magnets
+            # use the same storage, checking, queueing and persistence code as
+            # normal .torrent files.
+            session = self.add_torrent(str(destination), persist=True)
+            if session.torrent.hex_info_hash != info_hash:
+                raise MagnetError("Resolved metadata did not reproduce the magnet info hash.")
+
+            with self._sessions_lock:
+                self._selected_info_hash = info_hash
+
+            if start_requested:
+                self._set_intent(info_hash, SessionIntent.ACTIVE)
+                self._explicit_start_requests.add(info_hash)
+                self._rebalance_queue()
+            self.save_session_state()
+
+            self._emit_magnet_event(
+                "MAGNET_READY",
+                magnet,
+                stage="Ready",
+                progress=1.0,
+                message=f"Metadata received: {session.torrent.name}",
+            )
+
+        except MagnetCancelled:
+            self._emit_magnet_event(
+                "MAGNET_CANCELLED",
+                magnet,
+                stage="Cancelled",
+                progress=0.0,
+                message="Magnet metadata retrieval was cancelled.",
+            )
+        except asyncio.CancelledError:
+            if fetcher is not None:
+                fetcher.cancel()
+            self._emit_magnet_event(
+                "MAGNET_CANCELLED",
+                magnet,
+                stage="Cancelled",
+                progress=0.0,
+                message="Magnet metadata retrieval was cancelled.",
+            )
+        except Exception as exc:
+            self._emit_magnet_event(
+                "MAGNET_ERROR",
+                magnet,
+                stage="Error",
+                progress=0.0,
+                message=str(exc) or exc.__class__.__name__,
+            )
+        finally:
+            self._magnet_fetchers.pop(info_hash, None)
+            self._magnet_tasks.pop(info_hash, None)
+
     async def _engine_main(self):
         self._cmd_queue = asyncio.Queue()
         self._engine_ready.set()
@@ -957,6 +1105,21 @@ class TorrentManager:
                     # save_session_state() is called before this command. Stop
                     # only tears down live work; it must not alter persisted
                     # ACTIVE/PAUSED/STOPPED intent.
+                    for fetcher in list(self._magnet_fetchers.values()):
+                        try:
+                            fetcher.cancel()
+                        except Exception:
+                            pass
+                    magnet_tasks = [
+                        task for task in self._magnet_tasks.values() if not task.done()
+                    ]
+                    for task in magnet_tasks:
+                        task.cancel()
+                    if magnet_tasks:
+                        await asyncio.gather(*magnet_tasks, return_exceptions=True)
+                    self._magnet_tasks.clear()
+                    self._magnet_fetchers.clear()
+
                     with self._sessions_lock:
                         sessions = list(self.sessions.values())
 
@@ -985,6 +1148,52 @@ class TorrentManager:
 
                 if action == TorrentCommand.REBALANCE_QUEUE:
                     self._rebalance_queue()
+                    continue
+
+                if action == TorrentCommand.ADD_MAGNET:
+                    payload = payload or {}
+                    magnet_uri = str(payload.get("magnet_uri") or "")
+                    start_requested = bool(payload.get("start", True))
+                    try:
+                        magnet = MagnetLink.parse(magnet_uri)
+                    except Exception as exc:
+                        self.ui_queue.put(
+                            {
+                                "type": "MAGNET_ERROR",
+                                "info_hash": str(info_hash or ""),
+                                "display_name": "Magnet",
+                                "stage": "Error",
+                                "progress": 0.0,
+                                "message": str(exc),
+                            }
+                        )
+                        continue
+
+                    actual_hash = magnet.hex_info_hash
+                    existing_task = self._magnet_tasks.get(actual_hash)
+                    if existing_task and not existing_task.done():
+                        self._emit_magnet_event(
+                            "MAGNET_PROGRESS",
+                            magnet,
+                            stage="Resolving",
+                            progress=0.05,
+                            message="This magnet is already being resolved.",
+                        )
+                        continue
+
+                    task = asyncio.create_task(
+                        self._resolve_magnet(magnet.uri, start_requested)
+                    )
+                    self._magnet_tasks[actual_hash] = task
+                    continue
+
+                if action == TorrentCommand.CANCEL_MAGNET:
+                    fetcher = self._magnet_fetchers.get(str(info_hash or ""))
+                    if fetcher is not None:
+                        fetcher.cancel()
+                    task = self._magnet_tasks.get(str(info_hash or ""))
+                    if task and not task.done():
+                        task.cancel()
                     continue
 
                 with self._sessions_lock:
@@ -1097,6 +1306,35 @@ class TorrentManager:
     # ------------------------------------------------------------------
     # Torrent lifecycle API
     # ------------------------------------------------------------------
+
+    def add_magnet(self, magnet_uri: str, start: bool = True) -> str:
+        """Begin non-blocking BEP-9 metadata retrieval for a magnet URI.
+
+        Returns the normalized hexadecimal info hash immediately so the UI can
+        associate progress/cancel events with the request.
+        """
+        magnet = MagnetLink.parse(magnet_uri)
+        if not self._running:
+            self.start_engine()
+        if not self._engine_ready.wait(timeout=5.0):
+            raise RuntimeError("SalixTorrent network engine is not ready.")
+        if not self._loop or not self._cmd_queue or self._loop.is_closed():
+            raise RuntimeError("SalixTorrent network engine is unavailable.")
+        self._loop.call_soon_threadsafe(
+            self._cmd_queue.put_nowait,
+            (
+                TorrentCommand.ADD_MAGNET,
+                magnet.hex_info_hash,
+                {"magnet_uri": magnet.uri, "start": bool(start)},
+            ),
+        )
+        return magnet.hex_info_hash
+
+    def cancel_magnet(self, info_hash: str):
+        info_hash = str(info_hash or "").strip().lower()
+        if not info_hash:
+            return
+        self._send_cmd(TorrentCommand.CANCEL_MAGNET, info_hash)
 
     def add_torrent(
         self,
@@ -1393,5 +1631,3 @@ class TorrentManager:
 
         if thread and thread.is_alive():
             print("[Salix_T Notice] Async engine did not finish shutdown before timeout.")
-
-

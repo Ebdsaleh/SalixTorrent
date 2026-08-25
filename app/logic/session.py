@@ -14,7 +14,9 @@ from app.logic.dht import DHTClient, DHT_REFRESH_INTERVAL
 from app.logic.local_peer_discovery import LocalPeerDiscovery
 from app.logic.peer import (
     EXTENSION_RESERVED_BYTES,
+    LOCAL_UT_METADATA_ID,
     LOCAL_UT_PEX_ID,
+    METADATA_BLOCK_SIZE,
     PEX_SEND_INTERVAL,
     PeerConnection,
     PeerMessageID,
@@ -23,6 +25,7 @@ from app.logic.peer import (
     encode_pex_payload,
     identify_peer_client,
     parse_extended_handshake,
+    parse_metadata_payload,
     parse_pex_payload,
     reserved_supports_dht,
     reserved_supports_extensions,
@@ -1539,6 +1542,26 @@ class TorrentSession:
 
         return True
 
+    async def _handle_metadata_message(
+        self,
+        peer: PeerConnection,
+        data: object,
+    ):
+        """Serve BEP-9 metadata requests from connected peers when possible."""
+        if self.torrent.private or not isinstance(data, dict):
+            return
+        header = data.get("header", {})
+        if not isinstance(header, dict):
+            return
+        try:
+            msg_type = int(header.get(b"msg_type", -1))
+            piece_index = int(header.get(b"piece", -1))
+        except (TypeError, ValueError):
+            return
+        if msg_type != 0 or piece_index < 0:
+            return
+        await peer.send_metadata_piece(piece_index, self.torrent.raw_info_bytes)
+
     async def _peer_worker(
         self,
         run_token: int,
@@ -1567,7 +1590,10 @@ class TorrentSession:
 
         try:
             if not self.torrent.private:
-                await peer.send_extended_handshake(listen_port=0)
+                await peer.send_extended_handshake(
+                    listen_port=0,
+                    metadata_size=len(self.torrent.raw_info_bytes),
+                )
                 if not peer.is_connected:
                     return
                 await peer.send_port(self._dht.local_udp_port)
@@ -1627,6 +1653,9 @@ class TorrentSession:
                             break
                         if not await self._request_one_block(peer, owned_requests):
                             break
+
+                elif msg_type == "METADATA":
+                    await self._handle_metadata_message(peer, data)
 
                 elif msg_type == "PEX":
                     pex_peers = self._record_pex_payload(data)
@@ -1847,7 +1876,8 @@ class TorrentSession:
             self.active_peers.append(peer)
             if not self.torrent.private:
                 await peer.send_extended_handshake(
-                    listen_port=self._seed_port if self._seed_server else 0
+                    listen_port=self._seed_port if self._seed_server else 0,
+                    metadata_size=len(self.torrent.raw_info_bytes),
                 )
                 if not peer.is_connected:
                     return
@@ -1878,6 +1908,10 @@ class TorrentSession:
                 msg_type, data = message
                 if msg_type == "HAVE":
                     self._apply_have_to_peer(peer, int(data))
+                    continue
+
+                if msg_type == "METADATA":
+                    await self._handle_metadata_message(peer, data)
                     continue
 
                 if msg_type == "PEX":
@@ -1987,7 +2021,10 @@ class TorrentSession:
                 writer.write(
                     build_extended_message(
                         0,
-                        build_extended_handshake_payload(listen_port=self._seed_port),
+                        build_extended_handshake_payload(
+                            listen_port=self._seed_port,
+                            metadata_size=len(self.torrent.raw_info_bytes),
+                        ),
                     )
                 )
             if (
@@ -2130,6 +2167,13 @@ class TorrentSession:
                         except (TypeError, ValueError):
                             remote_pex_id = 0
                         inbound_record["pex_supported"] = remote_pex_id > 0
+                        try:
+                            remote_metadata_id = int(
+                                remote_extensions.get(b"ut_metadata", 0)
+                            )
+                        except (TypeError, ValueError):
+                            remote_metadata_id = 0
+                        inbound_record["metadata_extension_id"] = remote_metadata_id
 
                         if remote_pex_id > 0:
                             pex_payload = encode_pex_payload(
@@ -2160,6 +2204,53 @@ class TorrentSession:
                                 source="PEX",
                             )
                         self._emit_snapshot()
+                        continue
+
+                    if extension_id == LOCAL_UT_METADATA_ID:
+                        metadata_message = parse_metadata_payload(extension_payload)
+                        header = metadata_message.get("header", {})
+                        try:
+                            metadata_msg_type = int(header.get(b"msg_type", -1))
+                            metadata_piece = int(header.get(b"piece", -1))
+                        except (TypeError, ValueError):
+                            metadata_msg_type = -1
+                            metadata_piece = -1
+
+                        remote_metadata_id = int(
+                            inbound_record.get("metadata_extension_id", 0) or 0
+                        )
+                        if (
+                            metadata_msg_type == 0
+                            and metadata_piece >= 0
+                            and remote_metadata_id > 0
+                        ):
+                            raw_metadata = self.torrent.raw_info_bytes
+                            start = metadata_piece * METADATA_BLOCK_SIZE
+                            if start < len(raw_metadata):
+                                block = raw_metadata[start:start + METADATA_BLOCK_SIZE]
+                                header_bytes = Bencode.encode(
+                                    {
+                                        b"msg_type": 1,
+                                        b"piece": metadata_piece,
+                                        b"total_size": len(raw_metadata),
+                                    }
+                                )
+                                writer.write(
+                                    build_extended_message(
+                                        remote_metadata_id,
+                                        header_bytes + block,
+                                    )
+                                )
+                            else:
+                                writer.write(
+                                    build_extended_message(
+                                        remote_metadata_id,
+                                        Bencode.encode(
+                                            {b"msg_type": 2, b"piece": metadata_piece}
+                                        ),
+                                    )
+                                )
+                            await writer.drain()
                         continue
 
                 if msg_id != PeerMessageID.REQUEST or len(body) != 12:
@@ -2257,5 +2348,3 @@ class TorrentSession:
 
         except asyncio.CancelledError:
             pass
-
-

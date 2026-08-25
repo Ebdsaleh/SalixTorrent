@@ -65,6 +65,8 @@ class DownloadView:
         self._state_filter: str = "All"
         self._completion_notified = set()
         self._completion_notice_info_hash: str = ""
+        self._magnet_info_hash: str = ""
+        self._magnet_close_at: float = 0.0
         self.peer_view = PeerView()
         self.piece_view = PieceView()
         self.file_view = FileView()
@@ -86,6 +88,10 @@ class DownloadView:
                 dpg.add_button(
                     label=" + Open Torrent ",
                     callback=self._open_native_file_dialog,
+                )
+                dpg.add_button(
+                    label=" + Open Magnet ",
+                    callback=self._show_magnet_dialog,
                 )
                 dpg.add_spacer(width=10)
                 dpg.add_button(
@@ -329,6 +335,53 @@ class DownloadView:
                 speed_tab: "Speed",
             }
 
+        with dpg.window(
+            label="Open Magnet Link",
+            modal=True,
+            show=False,
+            no_resize=True,
+            width=680,
+            height=285,
+        ) as self.magnet_modal:
+            dpg.add_text("MAGNET LINK", color=(0, 255, 128))
+            dpg.add_text(
+                "Paste a BitTorrent v1 magnet link. SalixTorrent will discover peers "
+                "through its trackers, DHT and LAN, then retrieve BEP-9 metadata.",
+                color=(160, 160, 165),
+                wrap=630,
+            )
+            dpg.add_spacer(height=5)
+            self.magnet_input = dpg.add_input_text(
+                multiline=True,
+                height=70,
+                width=-1,
+                hint="magnet:?xt=urn:btih:...",
+            )
+            with dpg.group(horizontal=True):
+                self.magnet_add_button = dpg.add_button(
+                    label=" Add Magnet ",
+                    callback=self._submit_magnet,
+                )
+                dpg.add_button(label=" Paste ", callback=self._paste_magnet)
+                self.magnet_cancel_button = dpg.add_button(
+                    label=" Cancel Lookup ",
+                    enabled=False,
+                    callback=self._cancel_magnet,
+                )
+                dpg.add_button(
+                    label=" Close ",
+                    callback=self._close_magnet_dialog,
+                )
+            self.magnet_progress = dpg.add_progress_bar(
+                default_value=0.0,
+                width=-1,
+                overlay="Idle",
+            )
+            self.magnet_status_text = dpg.add_text(
+                "Paste a magnet link to begin.",
+                wrap=630,
+            )
+
         # Shared confirmation dialog for destructive queue actions.
         with dpg.window(
             label="Remove Torrent",
@@ -493,6 +546,97 @@ class DownloadView:
             return
 
         self._detail_last_render_at[key] = now
+
+    def _show_magnet_dialog(self):
+        self._magnet_close_at = 0.0
+        dpg.set_value(self.magnet_progress, 0.0)
+        dpg.configure_item(self.magnet_progress, overlay="Idle")
+        dpg.set_value(self.magnet_status_text, "Paste a magnet link to begin.")
+        dpg.configure_item(self.magnet_add_button, enabled=True)
+        dpg.configure_item(self.magnet_cancel_button, enabled=False)
+        dpg.show_item(self.magnet_modal)
+        try:
+            width = 680
+            height = 285
+            x = max(0, (dpg.get_viewport_client_width() - width) // 2)
+            y = max(0, (dpg.get_viewport_client_height() - height) // 2)
+            dpg.set_item_pos(self.magnet_modal, [x, y])
+        except Exception:
+            pass
+
+    def _paste_magnet(self):
+        try:
+            value = dpg.get_clipboard_text() or ""
+        except Exception:
+            value = ""
+        if value:
+            dpg.set_value(self.magnet_input, value.strip())
+
+    def _submit_magnet(self):
+        magnet_uri = str(dpg.get_value(self.magnet_input) or "").strip()
+        try:
+            info_hash = self.manager.add_magnet(magnet_uri, start=True)
+        except Exception as exc:
+            dpg.set_value(self.magnet_status_text, f"Error: {exc}")
+            dpg.set_value(self.magnet_progress, 0.0)
+            dpg.configure_item(self.magnet_progress, overlay="Error")
+            return
+
+        self._magnet_info_hash = info_hash
+        self._magnet_close_at = 0.0
+        dpg.configure_item(self.magnet_add_button, enabled=False)
+        dpg.configure_item(self.magnet_cancel_button, enabled=True)
+        dpg.set_value(self.magnet_progress, 0.01)
+        dpg.configure_item(self.magnet_progress, overlay="Starting")
+        dpg.set_value(
+            self.magnet_status_text,
+            f"Resolving metadata for {info_hash[:12]}...",
+        )
+
+    def _cancel_magnet(self):
+        if self._magnet_info_hash:
+            self.manager.cancel_magnet(self._magnet_info_hash)
+        dpg.configure_item(self.magnet_cancel_button, enabled=False)
+        dpg.set_value(self.magnet_status_text, "Cancelling magnet lookup...")
+
+    def _close_magnet_dialog(self):
+        if self._magnet_info_hash:
+            self.manager.cancel_magnet(self._magnet_info_hash)
+        self._magnet_info_hash = ""
+        self._magnet_close_at = 0.0
+        dpg.hide_item(self.magnet_modal)
+
+    def _handle_magnet_event(self, msg: dict):
+        event_type = str(msg.get("type") or "")
+        info_hash = str(msg.get("info_hash") or "")
+        if info_hash:
+            self._magnet_info_hash = info_hash
+
+        progress = max(0.0, min(1.0, float(msg.get("progress", 0.0) or 0.0)))
+        stage = str(msg.get("stage") or "Magnet")
+        message = str(msg.get("message") or "")
+
+        if hasattr(self, "magnet_progress") and dpg.does_item_exist(self.magnet_progress):
+            dpg.set_value(self.magnet_progress, progress)
+            dpg.configure_item(
+                self.magnet_progress,
+                overlay=f"{stage} {progress * 100:.0f}%" if 0.0 < progress < 1.0 else stage,
+            )
+            dpg.set_value(self.magnet_status_text, message or stage)
+
+        if event_type == "MAGNET_READY":
+            dpg.configure_item(self.magnet_add_button, enabled=True)
+            dpg.configure_item(self.magnet_cancel_button, enabled=False)
+            self._magnet_close_at = time.monotonic() + 1.25
+            if info_hash:
+                self._removed_info_hashes.discard(info_hash)
+                self._select_torrent(info_hash)
+        elif event_type in {"MAGNET_ERROR", "MAGNET_CANCELLED"}:
+            dpg.configure_item(self.magnet_add_button, enabled=True)
+            dpg.configure_item(self.magnet_cancel_button, enabled=False)
+            self._magnet_close_at = 0.0
+            if event_type == "MAGNET_CANCELLED":
+                self._magnet_info_hash = ""
 
     def _open_native_file_dialog(self):
         """Native Windows file picker (instant, zero DPG selection bugs)."""
@@ -1531,6 +1675,7 @@ class DownloadView:
         # every stale 0.5-second snapshot on return can lock the UI for seconds.
         latest_transfer = {}
         removed_messages = []
+        latest_magnet = {}
 
         while True:
             try:
@@ -1547,6 +1692,26 @@ class DownloadView:
                 h = str(msg.get("info_hash") or "")
                 latest_transfer.pop(h, None)
                 removed_messages.append(msg)
+            elif msg_type in {
+                "MAGNET_PROGRESS",
+                "MAGNET_READY",
+                "MAGNET_ERROR",
+                "MAGNET_CANCELLED",
+            }:
+                h = str(msg.get("info_hash") or "magnet")
+                latest_magnet[h] = msg
+
+        # Magnet metadata can contain hundreds of 16 KiB chunks. If this view
+        # was hidden, show only the newest progress/terminal event per magnet
+        # rather than replaying every stale percentage update on return.
+        for msg in latest_magnet.values():
+            self._handle_magnet_event(msg)
+
+        if self._magnet_close_at and time.monotonic() >= self._magnet_close_at:
+            self._magnet_close_at = 0.0
+            self._magnet_info_hash = ""
+            if dpg.does_item_exist(self.magnet_modal):
+                dpg.hide_item(self.magnet_modal)
 
         changed_rows = False
 
@@ -1603,4 +1768,3 @@ class DownloadView:
             snapshot = self.latest_stats.get(self.active_info_hash)
             if snapshot:
                 self._render_inspector(snapshot, force_detail=True)
-

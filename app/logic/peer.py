@@ -30,7 +30,10 @@ class PeerMessageID:
 # SalixTorrent supports both, so every normal peer handshake can advertise both.
 EXTENSION_RESERVED_BYTES = b"\x00\x00\x00\x00\x00\x10\x00\x01"
 UT_PEX_EXTENSION_NAME = b"ut_pex"
+UT_METADATA_EXTENSION_NAME = b"ut_metadata"
 LOCAL_UT_PEX_ID = 1
+LOCAL_UT_METADATA_ID = 2
+METADATA_BLOCK_SIZE = 16 * 1024
 PEX_SEND_INTERVAL = 60.0
 PEX_MAX_PEERS_PER_MESSAGE = 50
 
@@ -126,9 +129,15 @@ def build_extended_message(extension_id: int, payload: bytes) -> bytes:
     return struct.pack(">IB", 1 + len(body), PeerMessageID.EXTENDED) + body
 
 
-def build_extended_handshake_payload(listen_port: int = 0) -> bytes:
+def build_extended_handshake_payload(
+    listen_port: int = 0,
+    metadata_size: int = 0,
+) -> bytes:
     payload = {
-        b"m": {UT_PEX_EXTENSION_NAME: LOCAL_UT_PEX_ID},
+        b"m": {
+            UT_PEX_EXTENSION_NAME: LOCAL_UT_PEX_ID,
+            UT_METADATA_EXTENSION_NAME: LOCAL_UT_METADATA_ID,
+        },
         b"v": b"Salix_T 1.0",
         b"reqq": 64,
     }
@@ -138,6 +147,14 @@ def build_extended_handshake_payload(listen_port: int = 0) -> bytes:
         port = 0
     if 0 < port <= 65535:
         payload[b"p"] = port
+
+    try:
+        size = int(metadata_size or 0)
+    except (TypeError, ValueError):
+        size = 0
+    if size > 0:
+        payload[b"metadata_size"] = size
+
     return Bencode.encode(payload)
 
 
@@ -149,6 +166,17 @@ def parse_extended_handshake(payload: bytes) -> dict:
     if not isinstance(decoded, dict):
         return {}
     return decoded
+
+
+def parse_metadata_payload(payload: bytes) -> dict:
+    """Split a BEP-9 metadata message into its bencoded header and raw data."""
+    try:
+        header, remaining = Bencode._decode_item(bytes(payload))
+    except Exception:
+        return {"header": {}, "data": b""}
+    if not isinstance(header, dict):
+        return {"header": {}, "data": b""}
+    return {"header": header, "data": bytes(remaining)}
 
 
 def _compact_ipv4(endpoint: Tuple[str, int]) -> bytes:
@@ -291,6 +319,7 @@ class PeerConnection:
         self.pex_messages_sent: int = 0
         self.last_pex_sent_at: float = 0.0
         self.last_pex_received_at: float = 0.0
+        self.remote_metadata_size: int = 0
 
         # Per-peer telemetry used by the Peers view.
         self.connected_at: float = 0.0
@@ -310,6 +339,13 @@ class PeerConnection:
     def pex_supported(self) -> bool:
         try:
             return int(self.remote_extensions.get(UT_PEX_EXTENSION_NAME, 0)) > 0
+        except (TypeError, ValueError):
+            return False
+
+    @property
+    def metadata_supported(self) -> bool:
+        try:
+            return int(self.remote_extensions.get(UT_METADATA_EXTENSION_NAME, 0)) > 0
         except (TypeError, ValueError):
             return False
 
@@ -465,7 +501,11 @@ class PeerConnection:
             struct.pack(">IBH", 3, PeerMessageID.PORT, port)
         )
 
-    async def send_extended_handshake(self, listen_port: int = 0) -> bool:
+    async def send_extended_handshake(
+        self,
+        listen_port: int = 0,
+        metadata_size: int = 0,
+    ) -> bool:
         if (
             not self.is_connected
             or not self.writer
@@ -475,12 +515,68 @@ class PeerConnection:
         sent = await self._write_and_drain(
             build_extended_message(
                 0,
-                build_extended_handshake_payload(listen_port=listen_port),
+                build_extended_handshake_payload(
+                    listen_port=listen_port,
+                    metadata_size=metadata_size,
+                ),
             )
         )
         if sent:
             self.extended_handshake_sent = True
         return sent
+
+    async def send_metadata_request(self, piece_index: int) -> bool:
+        if not self.is_connected or not self.writer or not self.metadata_supported:
+            return False
+        try:
+            remote_id = int(self.remote_extensions.get(UT_METADATA_EXTENSION_NAME, 0))
+            piece = int(piece_index)
+        except (TypeError, ValueError):
+            return False
+        if remote_id <= 0 or remote_id > 255 or piece < 0:
+            return False
+        payload = Bencode.encode({b"msg_type": 0, b"piece": piece})
+        return await self._write_and_drain(build_extended_message(remote_id, payload))
+
+    async def send_metadata_piece(
+        self,
+        piece_index: int,
+        metadata: bytes,
+    ) -> bool:
+        if not self.is_connected or not self.writer or not self.metadata_supported:
+            return False
+        try:
+            remote_id = int(self.remote_extensions.get(UT_METADATA_EXTENSION_NAME, 0))
+            piece = int(piece_index)
+        except (TypeError, ValueError):
+            return False
+        if remote_id <= 0 or remote_id > 255 or piece < 0:
+            return False
+
+        raw_metadata = bytes(metadata)
+        start = piece * METADATA_BLOCK_SIZE
+        if start >= len(raw_metadata):
+            return await self.send_metadata_reject(piece)
+        block = raw_metadata[start:start + METADATA_BLOCK_SIZE]
+        header = Bencode.encode(
+            {b"msg_type": 1, b"piece": piece, b"total_size": len(raw_metadata)}
+        )
+        return await self._write_and_drain(
+            build_extended_message(remote_id, header + block)
+        )
+
+    async def send_metadata_reject(self, piece_index: int) -> bool:
+        if not self.is_connected or not self.writer or not self.metadata_supported:
+            return False
+        try:
+            remote_id = int(self.remote_extensions.get(UT_METADATA_EXTENSION_NAME, 0))
+            piece = int(piece_index)
+        except (TypeError, ValueError):
+            return False
+        if remote_id <= 0 or remote_id > 255 or piece < 0:
+            return False
+        payload = Bencode.encode({b"msg_type": 2, b"piece": piece})
+        return await self._write_and_drain(build_extended_message(remote_id, payload))
 
     async def send_pex(self, endpoints: Iterable[Tuple[str, int]]) -> bool:
         if not self.is_connected or not self.writer or not self.pex_supported:
@@ -535,16 +631,25 @@ class PeerConnection:
             except (TypeError, ValueError):
                 listen_port = 0
             self.remote_listen_port = listen_port if 0 < listen_port <= 65535 else 0
+            try:
+                metadata_size = int(handshake.get(b"metadata_size", 0) or 0)
+            except (TypeError, ValueError):
+                metadata_size = 0
+            self.remote_metadata_size = max(0, metadata_size)
             self.extended_handshake_received = True
             return ("EXTENDED_HANDSHAKE", handshake)
 
         # Incoming extension IDs are interpreted using the mapping *we*
-        # advertised. SalixTorrent advertises ut_pex as local extension ID 1.
+        # advertised. SalixTorrent advertises ut_pex as local extension ID 1
+        # and ut_metadata as local extension ID 2.
         if extension_id == LOCAL_UT_PEX_ID:
             parsed = parse_pex_payload(extension_payload)
             self.pex_messages_received += 1
             self.last_pex_received_at = time.monotonic()
             return ("PEX", parsed)
+
+        if extension_id == LOCAL_UT_METADATA_ID:
+            return ("METADATA", parse_metadata_payload(extension_payload))
 
         return ("EXTENDED", (extension_id, extension_payload))
 

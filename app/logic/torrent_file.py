@@ -24,6 +24,7 @@ class TorrentFile:
         self.announce: str = ""
         self.announce_list: List[str] = []
         self.info_hash: bytes = b""
+        self.raw_info_bytes: bytes = b""
         self.piece_length: int = 0
         self.pieces: List[bytes] = []
         self.name: str = ""
@@ -44,6 +45,33 @@ class TorrentFile:
         if value is None:
             return default
         return str(value)
+
+    @staticmethod
+    def _extract_raw_info_bytes(raw_bytes: bytes) -> bytes:
+        """Return the exact bencoded top-level ``info`` value bytes.
+
+        The v1 BitTorrent info hash is SHA-1 over the original encoded info
+        dictionary, not over a decoded/re-encoded approximation. Preserving the
+        exact bytes also makes BEP-9 magnet metadata verification correct for
+        torrents whose metainfo was encoded unusually but validly.
+        """
+        data = bytes(raw_bytes)
+        if not data.startswith(b"d"):
+            raise ValueError("Root bencoded element must be a dictionary.")
+
+        rest = data[1:]
+        while rest and not rest.startswith(b"e"):
+            key, after_key = Bencode._decode_item(rest)
+            if not isinstance(key, bytes):
+                raise ValueError("Torrent root dictionary contains a non-bytes key.")
+            value_start = after_key
+            _value, after_value = Bencode._decode_item(value_start)
+            consumed = len(value_start) - len(after_value)
+            if key == b"info":
+                return value_start[:consumed]
+            rest = after_value
+
+        raise ValueError("Torrent missing valid 'info' dictionary.")
 
     @staticmethod
     def _validate_component(component: str, label: str) -> str:
@@ -112,8 +140,8 @@ class TorrentFile:
         if not info_dict or not isinstance(info_dict, dict):
             raise ValueError("Torrent missing valid 'info' dictionary.")
 
-        raw_info = Bencode.encode(info_dict)
-        self.info_hash = hashlib.sha1(raw_info).digest()
+        self.raw_info_bytes = self._extract_raw_info_bytes(raw_bytes)
+        self.info_hash = hashlib.sha1(self.raw_info_bytes).digest()
 
         try:
             self.piece_length = int(info_dict[b"piece length"])
