@@ -817,6 +817,194 @@ class PieceManager:
         file_offset = piece.index * self.torrent.piece_length + offset
         return self._read_range(file_offset, length)
 
+    def build_file_telemetry(self, detail_limit: int = 500) -> dict:
+        """Build per-file progress without allocating untouched piece blocks.
+
+        File progress is based on *verified* piece bytes, not raw file size. This
+        matters because out-of-order writes can make a partially downloaded file
+        look physically large even though many logical ranges are still missing.
+        Active in-memory blocks are used only to label files as Downloading or
+        Requested; they are not counted as verified until the owning piece passes
+        its SHA-1 check.
+        """
+        storage_files = self._storage_files
+        file_count = len(storage_files)
+        detail_limit = max(1, int(detail_limit))
+
+        verified_total = sum(piece.length for piece in self.pieces if piece.is_complete)
+
+        # Prefix bytes let a file spanning many pieces calculate the verified
+        # contribution of its fully-contained middle pieces in O(1). Only its
+        # two edge pieces need special overlap handling.
+        complete_prefix = [0]
+        running = 0
+        for piece in self.pieces:
+            if piece.is_complete:
+                running += piece.length
+            complete_prefix.append(running)
+
+        # Track only blocks that already exist. This preserves lazy allocation
+        # and lets the Files view identify which actual file(s) an active block
+        # overlaps, including a block that happens to cross a file boundary.
+        active_files = {}
+        for piece in self.pieces:
+            if piece.is_complete or not piece.blocks_initialized:
+                continue
+
+            piece_start = piece.index * self.torrent.piece_length
+            blocks = piece._blocks or []
+            for block in blocks:
+                if block.data is not None:
+                    activity = "received"
+                elif block.is_requested:
+                    activity = "requested"
+                else:
+                    continue
+
+                block_start = piece_start + block.offset
+                block_end = min(block_start + block.length, self.torrent.total_length)
+                storage_index = self._storage_index_for_offset(block_start)
+
+                while 0 <= storage_index < file_count:
+                    item = storage_files[storage_index]
+                    if item.start >= block_end:
+                        break
+                    if item.end > block_start:
+                        flags = active_files.setdefault(
+                            storage_index,
+                            {"received": False, "requested": False},
+                        )
+                        flags[activity] = True
+                    storage_index += 1
+
+        # Huge folder torrents should not push thousands of live Dear PyGui rows
+        # through the UI every telemetry tick. Show the beginning of the torrent,
+        # a window around the current download position, and any active files.
+        if file_count <= detail_limit:
+            selected_indices = list(range(file_count))
+        else:
+            selected = set(range(min(20, file_count)))
+
+            first_incomplete_piece = next(
+                (piece for piece in self.pieces if not piece.is_complete),
+                None,
+            )
+            if first_incomplete_piece is not None:
+                current_offset = first_incomplete_piece.index * self.torrent.piece_length
+                current_file = self._storage_index_for_offset(current_offset)
+            else:
+                current_file = 0
+
+            active_indices = sorted(active_files)
+            active_reserve = min(len(active_indices), 64)
+            window_budget = max(1, detail_limit - len(selected) - active_reserve)
+            window_start = max(0, current_file - min(12, window_budget // 4))
+            window_start = min(window_start, max(0, file_count - window_budget))
+
+            for index in range(window_start, min(file_count, window_start + window_budget)):
+                selected.add(index)
+
+            for index in active_indices:
+                if len(selected) >= detail_limit:
+                    break
+                selected.add(index)
+
+            if len(selected) < detail_limit:
+                for index in range(file_count):
+                    selected.add(index)
+                    if len(selected) >= detail_limit:
+                        break
+
+            selected_indices = sorted(selected)[:detail_limit]
+
+        def verified_bytes_for_file(item: StorageFile) -> tuple[int, int, int]:
+            if item.length <= 0 or not self.pieces:
+                return (0, -1, -1)
+
+            first_piece = min(
+                len(self.pieces) - 1,
+                item.start // self.torrent.piece_length,
+            )
+            last_piece = min(
+                len(self.pieces) - 1,
+                (item.end - 1) // self.torrent.piece_length,
+            )
+
+            if first_piece == last_piece:
+                verified = item.length if self.pieces[first_piece].is_complete else 0
+                return (verified, first_piece, last_piece)
+
+            verified = 0
+
+            first = self.pieces[first_piece]
+            first_piece_start = first_piece * self.torrent.piece_length
+            first_piece_end = first_piece_start + first.length
+            if first.is_complete:
+                verified += max(0, min(item.end, first_piece_end) - item.start)
+
+            last = self.pieces[last_piece]
+            last_piece_start = last_piece * self.torrent.piece_length
+            if last.is_complete:
+                verified += max(0, item.end - max(item.start, last_piece_start))
+
+            if last_piece > first_piece + 1:
+                verified += complete_prefix[last_piece] - complete_prefix[first_piece + 1]
+
+            return (min(item.length, verified), first_piece, last_piece)
+
+        records = []
+        for index in selected_indices:
+            item = storage_files[index]
+            verified_bytes, first_piece, last_piece = verified_bytes_for_file(item)
+
+            if item.length == 0:
+                progress = 1.0
+            else:
+                progress = max(0.0, min(1.0, verified_bytes / item.length))
+
+            activity = active_files.get(index, {})
+            if item.length == 0 or verified_bytes >= item.length:
+                state = "Complete"
+            elif activity.get("received"):
+                state = "Downloading"
+            elif activity.get("requested"):
+                state = "Requested"
+            elif verified_bytes > 0:
+                state = "Partial"
+            else:
+                state = "Missing"
+
+            if first_piece < 0:
+                piece_span = "--"
+            elif first_piece == last_piece:
+                piece_span = str(first_piece)
+            else:
+                piece_span = f"{first_piece}-{last_piece}"
+
+            records.append({
+                "index": index,
+                "path": item.relative_path.replace("\\", "/"),
+                "length": item.length,
+                "verified_bytes": verified_bytes,
+                "progress": progress,
+                "first_piece": first_piece,
+                "last_piece": last_piece,
+                "piece_span": piece_span,
+                "state": state,
+            })
+
+        return {
+            "file_count": file_count,
+            "displayed_count": len(records),
+            "truncated": file_count > len(records),
+            "is_multi_file": bool(self.torrent.is_multi_file),
+            "total_bytes": self.torrent.total_length,
+            "verified_bytes": verified_total,
+            "storage_mode": self.storage_mode,
+            "backing_path": os.path.abspath(self.backing_path),
+            "files": records,
+        }
+
     def build_piece_telemetry(
         self,
         peer_bitfields: Iterable[bytes] = (),

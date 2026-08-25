@@ -558,6 +558,9 @@ class TorrentSession:
             map_cell_limit=768,
         )
 
+    def _build_file_view_snapshot(self) -> dict:
+        return self.piece_mgr.build_file_telemetry(detail_limit=500)
+
     def _build_snapshot(
         self,
         speed_kbps: float = 0.0,
@@ -582,6 +585,7 @@ class TorrentSession:
             "connected_peers": self._connected_peer_count(),
             "peers": self._build_peer_snapshots(),
             "piece_view": self._build_piece_view_snapshot(),
+            "file_view": self._build_file_view_snapshot(),
             "completed_pieces": self.piece_mgr.completed_pieces,
             "total_pieces": len(self.piece_mgr.pieces),
             "listen_port": self._seed_port if self._seed_server else 0,

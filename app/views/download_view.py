@@ -10,6 +10,7 @@ import dearpygui.dearpygui as dpg
 from app.logic.torrent_manager import TorrentManager
 from app.views.peer_view import PeerView
 from app.views.piece_view import PieceView
+from app.views.file_view import FileView
 
 
 class DownloadView:
@@ -41,6 +42,7 @@ class DownloadView:
         self._removed_info_hashes = set()
         self.peer_view = PeerView()
         self.piece_view = PieceView()
+        self.file_view = FileView()
 
     def build_view(self, parent_tag: str | int = "primary_window"):
         with dpg.group(parent=parent_tag):
@@ -209,6 +211,9 @@ class DownloadView:
 
                 with dpg.tab(label="Pieces") as pieces_tab:
                     self.piece_view.build_view(parent_tag=pieces_tab)
+
+                with dpg.tab(label="Files") as files_tab:
+                    self.file_view.build_view(parent_tag=files_tab)
 
         # Shared confirmation dialog for destructive queue actions.
         with dpg.window(
@@ -578,6 +583,7 @@ class DownloadView:
         self._limit_controls_hash = ""
         self.peer_view.reset()
         self.piece_view.reset()
+        self.file_view.reset()
 
     def _handle_torrent_removed(self, msg: dict):
         info_hash = msg.get("info_hash", "")
@@ -828,6 +834,7 @@ class DownloadView:
 
         self.peer_view.render(msg)
         self.piece_view.render(msg)
+        self.file_view.render(msg)
 
     def update(self, delta_time: float):
         while not self.ui_queue.empty():
