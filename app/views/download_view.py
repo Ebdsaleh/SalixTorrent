@@ -4,6 +4,7 @@ import os
 import queue
 import subprocess
 import sys
+import time
 import tkinter as tk
 from datetime import datetime
 from tkinter import filedialog
@@ -19,6 +20,19 @@ from app.views.speed_view import SpeedView
 
 
 class DownloadView:
+    # Heavy detail tabs deliberately update less often than the lightweight
+    # queue/general telemetry. Dear PyGui item creation/deletion is synchronous
+    # on the UI thread, so rebuilding hidden tables/maps every 0.5 seconds can
+    # make Windows mark the application as Not Responding.
+    DETAIL_RENDER_INTERVALS = {
+        "General": 0.0,
+        "Peers": 0.75,
+        "Pieces": 1.0,
+        "Files": 1.0,
+        "Sources": 1.0,
+        "Speed": 0.45,
+    }
+
     ACTIVE_PAUSABLE_STATES = {"Checking", "Downloading", "Seeding"}
     STARTABLE_STATES = {"Idle", "Stopped", "Completed", "Error"}
     STOPPABLE_STATES = {
@@ -57,6 +71,13 @@ class DownloadView:
         self.source_view = SourceView()
         self.speed_view = SpeedView()
         self._queue_slots_value = self.manager.get_max_active_downloads()
+
+        # Only the currently visible detail tab is rendered. Previously every
+        # TRANSFER_STATS message rebuilt Peers, Pieces, Files, Sources and Speed
+        # even when those tabs were hidden. That was the main UI-freeze source.
+        self._active_detail_tab: str = "General"
+        self._detail_tab_ids = {}
+        self._detail_last_render_at = {}
 
     def build_view(self, parent_tag: str | int = "primary_window"):
         with dpg.group(parent=parent_tag):
@@ -186,8 +207,8 @@ class DownloadView:
 
             # Selected-torrent detail views. General preserves the existing
             # inspector metrics while Peers exposes live connection telemetry.
-            with dpg.tab_bar():
-                with dpg.tab(label="General"):
+            with dpg.tab_bar(callback=self._on_detail_tab_changed) as self.detail_tab_bar:
+                with dpg.tab(label="General") as general_tab:
                     with dpg.group(horizontal=True):
                         with dpg.child_window(width=410, height=355, border=True):
                             dpg.add_text("TRANSFER", color=(100, 180, 255))
@@ -299,6 +320,15 @@ class DownloadView:
                 with dpg.tab(label="Speed") as speed_tab:
                     self.speed_view.build_view(parent_tag=speed_tab)
 
+            self._detail_tab_ids = {
+                general_tab: "General",
+                peers_tab: "Peers",
+                pieces_tab: "Pieces",
+                files_tab: "Files",
+                sources_tab: "Sources",
+                speed_tab: "Speed",
+            }
+
         # Shared confirmation dialog for destructive queue actions.
         with dpg.window(
             label="Remove Torrent",
@@ -403,6 +433,66 @@ class DownloadView:
             with dpg.group(horizontal=True):
                 dpg.add_button(label=" Open Folder ", callback=self._completion_open_folder)
                 dpg.add_button(label=" Dismiss ", callback=lambda: dpg.hide_item(self.completion_notice_modal))
+
+    def _on_detail_tab_changed(self, sender=None, app_data=None, user_data=None):
+        """Render a detail view only when the user actually selects that tab."""
+        del user_data
+
+        selected = app_data
+        if selected not in self._detail_tab_ids and sender is not None:
+            try:
+                selected = dpg.get_value(sender)
+            except Exception:
+                selected = app_data
+
+        tab_name = self._detail_tab_ids.get(selected)
+        if tab_name is None and isinstance(selected, str):
+            # Defensive fallback for Dear PyGui builds that return a label.
+            candidate = selected.strip()
+            if candidate in self.DETAIL_RENDER_INTERVALS:
+                tab_name = candidate
+
+        if not tab_name:
+            return
+
+        self._active_detail_tab = tab_name
+        if self.active_info_hash:
+            snapshot = self.latest_stats.get(self.active_info_hash)
+            if snapshot:
+                self._render_active_detail(snapshot, force=True)
+
+    def _render_active_detail(self, msg: dict, force: bool = False):
+        """Update only the visible heavy detail tab.
+
+        General's text fields are updated by _render_inspector itself. The
+        table/map/plot tabs are intentionally lazy and rate-limited.
+        """
+        tab = self._active_detail_tab
+        if tab == "General":
+            return
+
+        info_hash = str(msg.get("info_hash") or "")
+        now = time.monotonic()
+        key = (tab, info_hash)
+        interval = float(self.DETAIL_RENDER_INTERVALS.get(tab, 1.0))
+        last = float(self._detail_last_render_at.get(key, 0.0))
+        if not force and interval > 0.0 and now - last < interval:
+            return
+
+        if tab == "Peers":
+            self.peer_view.render(msg)
+        elif tab == "Pieces":
+            self.piece_view.render(msg)
+        elif tab == "Files":
+            self.file_view.render(msg)
+        elif tab == "Sources":
+            self.source_view.render(msg)
+        elif tab == "Speed":
+            self.speed_view.render(msg)
+        else:
+            return
+
+        self._detail_last_render_at[key] = now
 
     def _open_native_file_dialog(self):
         """Native Windows file picker (instant, zero DPG selection bugs)."""
@@ -1217,8 +1307,6 @@ class DownloadView:
             dpg.set_value(row["name"], self.active_info_hash == h)
             self._refresh_context_menu_state(h)
 
-        self._apply_queue_filters()
-
     def _select_torrent(self, info_hash: str):
         self.active_info_hash = info_hash
         self._limit_controls_hash = ""
@@ -1228,9 +1316,9 @@ class DownloadView:
             dpg.set_value(row["name"], h == info_hash)
 
         if info_hash in self.latest_stats:
-            self._render_inspector(self.latest_stats[info_hash])
+            self._render_inspector(self.latest_stats[info_hash], force_detail=True)
 
-    def _render_inspector(self, msg: dict):
+    def _render_inspector(self, msg: dict, force_detail: bool = False):
         dpg.set_value(self.title_text, f"Torrent: {msg['torrent_name']}")
 
         state = msg["state"]
@@ -1423,13 +1511,11 @@ class DownloadView:
             f".torrent: {msg.get('torrent_path') or '--'}",
         )
 
-        self.peer_view.render(msg)
-        self.piece_view.render(msg)
-        self.file_view.render(msg)
-        self.source_view.render(msg)
-        self.speed_view.render(msg)
+        self._render_active_detail(msg, force=force_detail)
 
     def update(self, delta_time: float):
+        del delta_time
+
         # Keep the toolbar synchronized when queue settings are changed from
         # the Preferences view.
         current_slots = self.manager.get_max_active_downloads()
@@ -1438,43 +1524,83 @@ class DownloadView:
             if hasattr(self, "queue_slots_input") and dpg.does_item_exist(self.queue_slots_input):
                 dpg.set_value(self.queue_slots_input, current_slots)
 
-        while not self.ui_queue.empty():
+        # Drain the thread-safe queue without touching Dear PyGui, coalescing
+        # multiple telemetry snapshots for the same torrent down to the newest
+        # one. This is essential when DownloadView has been hidden: telemetry
+        # can arrive while Preferences/Create Torrent is visible, and replaying
+        # every stale 0.5-second snapshot on return can lock the UI for seconds.
+        latest_transfer = {}
+        removed_messages = []
+
+        while True:
             try:
                 msg = self.ui_queue.get_nowait()
-                if msg.get("type") == "TRANSFER_STATS":
-                    h = msg["info_hash"]
-                    if h in self._removed_info_hashes:
-                        continue
-
-                    previous = self.latest_stats.get(h, {})
-                    previous_state = str(previous.get("state") or "")
-                    self.latest_stats[h] = msg
-
-                    if not self.active_info_hash:
-                        self.active_info_hash = h
-                        self.manager.set_selected_torrent(h)
-
-                    self._update_table_row(msg)
-
-                    if self.active_info_hash == h:
-                        self._render_inspector(msg)
-
-                    new_state = str(msg.get("state") or "")
-                    if (
-                        h not in self._completion_notified
-                        and previous_state in {"Downloading", "Checking", "Fast Resume"}
-                        and new_state in {"Completed", "Seeding"}
-                    ):
-                        self._completion_notified.add(h)
-                        self._show_completion_notice(h, msg)
-
-                    # If the user later makes more files wanted or restarts an
-                    # incomplete torrent, allow a fresh future completion notice.
-                    if new_state in {"Downloading", "Checking"} and not msg.get("wanted_finished"):
-                        self._completion_notified.discard(h)
-
-                elif msg.get("type") == "TORRENT_REMOVED":
-                    self._completion_notified.discard(str(msg.get("info_hash") or ""))
-                    self._handle_torrent_removed(msg)
             except queue.Empty:
                 break
+
+            msg_type = msg.get("type")
+            if msg_type == "TRANSFER_STATS":
+                h = str(msg.get("info_hash") or "")
+                if h and h not in self._removed_info_hashes:
+                    latest_transfer[h] = msg
+            elif msg_type == "TORRENT_REMOVED":
+                h = str(msg.get("info_hash") or "")
+                latest_transfer.pop(h, None)
+                removed_messages.append(msg)
+
+        changed_rows = False
+
+        # Removal wins over any older telemetry drained in the same frame.
+        for msg in removed_messages:
+            h = str(msg.get("info_hash") or "")
+            self._completion_notified.discard(h)
+            self._handle_torrent_removed(msg)
+            changed_rows = True
+
+        for h, msg in latest_transfer.items():
+            if h in self._removed_info_hashes:
+                continue
+
+            previous = self.latest_stats.get(h, {})
+            previous_state = str(previous.get("state") or "")
+            self.latest_stats[h] = msg
+
+            if not self.active_info_hash:
+                self.active_info_hash = h
+                self.manager.set_selected_torrent(h)
+
+            self._update_table_row(msg)
+            changed_rows = True
+
+            if self.active_info_hash == h:
+                self._render_inspector(msg)
+
+            new_state = str(msg.get("state") or "")
+            if (
+                h not in self._completion_notified
+                and previous_state in {"Downloading", "Checking", "Fast Resume"}
+                and new_state in {"Completed", "Seeding"}
+            ):
+                self._completion_notified.add(h)
+                self._show_completion_notice(h, msg)
+
+            # If the user later makes more files wanted or restarts an
+            # incomplete torrent, allow a fresh future completion notice.
+            if new_state in {"Downloading", "Checking"} and not msg.get("wanted_finished"):
+                self._completion_notified.discard(h)
+
+        # Filtering walks the whole queue; do it once per UI frame instead of
+        # once for every torrent snapshot.
+        if changed_rows:
+            self._apply_queue_filters()
+
+    def on_show(self, **kwargs):
+        del kwargs
+        # Render the selected torrent immediately from the latest cached state.
+        # Incoming queue telemetry will be coalesced by update() on the next
+        # frame rather than replayed one-by-one.
+        if self.active_info_hash:
+            snapshot = self.latest_stats.get(self.active_info_hash)
+            if snapshot:
+                self._render_inspector(snapshot, force_detail=True)
+

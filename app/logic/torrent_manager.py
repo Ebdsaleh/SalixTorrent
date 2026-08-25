@@ -590,7 +590,12 @@ class TorrentManager:
                 self._selected_info_hash = ""
             else:
                 return
-        self.save_session_state()
+
+        # Selection is a hot UI path (left/right click in the transfer table).
+        # Do not synchronously rewrite session.json on every selection change.
+        # The selected torrent is persisted by the next normal state save and
+        # always by shutdown(force=True), which preserves the same UX without
+        # injecting filesystem latency into Dear PyGui callbacks.
 
     def get_selected_torrent(self) -> str:
         with self._sessions_lock:
@@ -1388,3 +1393,5 @@ class TorrentManager:
 
         if thread and thread.is_alive():
             print("[Salix_T Notice] Async engine did not finish shutdown before timeout.")
+
+

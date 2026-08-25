@@ -42,6 +42,16 @@ SPEED_HISTORY_SECONDS = 120.0
 SPEED_SAMPLE_INTERVAL = 0.5
 SPEED_HISTORY_MAX_SAMPLES = int(SPEED_HISTORY_SECONDS / SPEED_SAMPLE_INTERVAL) + 8
 
+# UI telemetry is intentionally lossy. State transitions still emit immediately,
+# but periodic 0.5-second snapshots are skipped while the UI queue is backed up.
+# A stale speed sample is less valuable than keeping Dear PyGui responsive.
+UI_QUEUE_BACKPRESSURE_LIMIT = 8
+
+# Piece/file/source telemetry is much more expensive than the lightweight
+# transfer counters. Cache it briefly so peer churn or other state events do not
+# rebuild thousands of piece/file calculations several times in one second.
+DETAIL_TELEMETRY_INTERVAL = 1.0
+
 TORRENT_PRIORITY_HIGH = "High"
 TORRENT_PRIORITY_NORMAL = "Normal"
 TORRENT_PRIORITY_LOW = "Low"
@@ -200,6 +210,11 @@ class TorrentSession:
             maxlen=SPEED_HISTORY_MAX_SAMPLES
         )
         self._speed_history.append((time.monotonic(), 0.0, 0.0))
+
+        self._detail_telemetry_cached_at: float = 0.0
+        self._piece_view_cache: dict = {}
+        self._file_view_cache: dict = {}
+        self._sources_view_cache: dict = {}
 
         # User-facing active elapsed-time telemetry. Time spent intentionally
         # paused/stopped/queued is not counted.
@@ -813,12 +828,30 @@ class TorrentSession:
     def _build_piece_view_snapshot(self) -> dict:
         return self.piece_mgr.build_piece_telemetry(
             peer_bitfields=self._piece_peer_bitfields(),
-            detail_limit=120,
-            map_cell_limit=768,
+            detail_limit=80,
+            map_cell_limit=384,
         )
 
     def _build_file_view_snapshot(self) -> dict:
-        return self.piece_mgr.build_file_telemetry(detail_limit=500)
+        return self.piece_mgr.build_file_telemetry(detail_limit=250)
+
+    def _cached_detail_snapshots(self, force: bool = False):
+        now = time.monotonic()
+        if (
+            force
+            or not self._piece_view_cache
+            or now - self._detail_telemetry_cached_at >= DETAIL_TELEMETRY_INTERVAL
+        ):
+            self._piece_view_cache = self._build_piece_view_snapshot()
+            self._file_view_cache = self._build_file_view_snapshot()
+            self._sources_view_cache = self._build_sources_view_snapshot()
+            self._detail_telemetry_cached_at = now
+
+        return (
+            self._piece_view_cache,
+            self._file_view_cache,
+            self._sources_view_cache,
+        )
 
     def _build_pex_source_snapshot(self) -> dict:
         now = time.monotonic()
@@ -1028,6 +1061,7 @@ class TorrentSession:
         self,
         speed_kbps: Optional[float] = None,
         upload_speed_kbps: Optional[float] = None,
+        force_detail_refresh: bool = False,
     ) -> dict:
         if speed_kbps is None:
             speed_kbps = self._current_download_speed_kbps
@@ -1035,9 +1069,9 @@ class TorrentSession:
             upload_speed_kbps = self._current_upload_speed_kbps
 
         peer_snapshots = self._build_peer_snapshots()
-        piece_view = self._build_piece_view_snapshot()
-        file_view = self._build_file_view_snapshot()
-        sources_view = self._build_sources_view_snapshot()
+        piece_view, file_view, sources_view = self._cached_detail_snapshots(
+            force=force_detail_refresh
+        )
         speed_view = self._build_speed_view_snapshot()
 
         tracker_sources = [
@@ -1142,8 +1176,22 @@ class TorrentSession:
             "trackers": list(self.torrent.announce_list),
         }
 
-    def _emit_snapshot(self):
-        self.ui_queue.put(self._build_snapshot())
+    def _emit_snapshot(
+        self,
+        *,
+        drop_if_ui_busy: bool = False,
+        force_detail_refresh: bool = False,
+    ):
+        if drop_if_ui_busy:
+            try:
+                if self.ui_queue.qsize() >= UI_QUEUE_BACKPRESSURE_LIMIT:
+                    return
+            except (AttributeError, NotImplementedError):
+                pass
+
+        self.ui_queue.put(
+            self._build_snapshot(force_detail_refresh=force_detail_refresh)
+        )
 
     async def start(self):
         if self.is_running:
@@ -2205,7 +2253,9 @@ class TorrentSession:
                     upload_speed_bps / 1024.0,
                 )
 
-                self.ui_queue.put(self._build_snapshot())
+                self._emit_snapshot(drop_if_ui_busy=True)
 
         except asyncio.CancelledError:
             pass
+
+
