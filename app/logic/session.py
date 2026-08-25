@@ -534,6 +534,30 @@ class TorrentSession:
             record["_last_sample_downloaded"] = downloaded
             record["_last_sample_uploaded"] = uploaded
 
+    def _piece_peer_bitfields(self) -> List[bytes]:
+        bitfields: List[bytes] = []
+
+        for peer in list(self.active_peers):
+            if peer.bitfield:
+                bitfields.append(bytes(peer.bitfield))
+
+        for record in list(self._inbound_peer_records.values()):
+            bitfield = record.get("bitfield", bytearray())
+            if bitfield:
+                try:
+                    bitfields.append(bytes(bitfield))
+                except Exception:
+                    pass
+
+        return bitfields
+
+    def _build_piece_view_snapshot(self) -> dict:
+        return self.piece_mgr.build_piece_telemetry(
+            peer_bitfields=self._piece_peer_bitfields(),
+            detail_limit=120,
+            map_cell_limit=768,
+        )
+
     def _build_snapshot(
         self,
         speed_kbps: float = 0.0,
@@ -557,6 +581,7 @@ class TorrentSession:
             "upload_speed_kbps": upload_speed_kbps,
             "connected_peers": self._connected_peer_count(),
             "peers": self._build_peer_snapshots(),
+            "piece_view": self._build_piece_view_snapshot(),
             "completed_pieces": self.piece_mgr.completed_pieces,
             "total_pieces": len(self.piece_mgr.pieces),
             "listen_port": self._seed_port if self._seed_server else 0,
@@ -1357,5 +1382,3 @@ class TorrentSession:
 
         except asyncio.CancelledError:
             pass
-
-

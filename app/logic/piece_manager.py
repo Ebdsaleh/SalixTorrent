@@ -817,6 +817,189 @@ class PieceManager:
         file_offset = piece.index * self.torrent.piece_length + offset
         return self._read_range(file_offset, length)
 
+    def build_piece_telemetry(
+        self,
+        peer_bitfields: Iterable[bytes] = (),
+        detail_limit: int = 120,
+        map_cell_limit: int = 768,
+    ) -> dict:
+        """Build a compact read-only snapshot for the Pieces view.
+
+        The method deliberately inspects only blocks that have already been
+        initialized by the downloader. Merely opening the Pieces tab must not
+        defeat lazy block allocation by creating blocks for thousands of
+        untouched pieces.
+        """
+        total_pieces = len(self.pieces)
+        detail_limit = max(1, int(detail_limit))
+        map_cell_limit = max(1, int(map_cell_limit))
+
+        availability = [0] * total_pieces
+        usable_bitfields = []
+        for bitfield in peer_bitfields:
+            if not bitfield:
+                continue
+            try:
+                raw = bytes(bitfield)
+            except Exception:
+                continue
+            usable_bitfields.append(raw)
+            for piece_index in range(total_pieces):
+                byte_index = piece_index // 8
+                if byte_index >= len(raw):
+                    break
+                bit_index = 7 - (piece_index % 8)
+                if raw[byte_index] & (1 << bit_index):
+                    availability[piece_index] += 1
+
+        records = []
+        state_codes = []
+        verified_count = 0
+        downloading_count = 0
+        requested_count = 0
+        missing_count = 0
+
+        for piece in self.pieces:
+            total_blocks = math.ceil(piece.length / BLOCK_SIZE) if piece.length else 0
+            received_blocks = 0
+            requested_blocks = 0
+            received_bytes = 0
+
+            blocks = piece._blocks if piece.blocks_initialized else None
+            if blocks is not None:
+                for block in blocks:
+                    if block.data is not None:
+                        received_blocks += 1
+                        received_bytes += len(block.data)
+                    elif block.is_requested:
+                        requested_blocks += 1
+
+            if piece.is_complete:
+                state = "Verified"
+                code = "V"
+                verified_count += 1
+                progress = 1.0
+                received_blocks = total_blocks
+                received_bytes = piece.length
+            elif received_blocks > 0:
+                state = "Downloading"
+                code = "D"
+                downloading_count += 1
+                progress = received_bytes / piece.length if piece.length else 0.0
+            elif requested_blocks > 0:
+                state = "Requested"
+                code = "R"
+                requested_count += 1
+                progress = 0.0
+            else:
+                state = "Missing"
+                code = "M"
+                missing_count += 1
+                progress = 0.0
+
+            state_codes.append(code)
+            records.append({
+                "index": piece.index,
+                "length": piece.length,
+                "progress": max(0.0, min(1.0, progress)),
+                "received_blocks": received_blocks,
+                "requested_blocks": requested_blocks,
+                "total_blocks": total_blocks,
+                "availability": availability[piece.index] if piece.index < len(availability) else 0,
+                "state": state,
+            })
+
+        # Traditional torrent availability is the minimum full-copy count plus
+        # the fraction of pieces that have at least one additional copy. Count
+        # our own verified pieces as one copy.
+        swarm_availability = 0.0
+        if total_pieces:
+            copy_counts = [
+                availability[index] + (1 if self.pieces[index].is_complete else 0)
+                for index in range(total_pieces)
+            ]
+            minimum_copies = min(copy_counts)
+            extra_fraction = sum(1 for count in copy_counts if count > minimum_copies) / total_pieces
+            swarm_availability = float(minimum_copies) + extra_fraction
+
+        # Keep the detailed table useful without sending/rendering thousands of
+        # rows every telemetry tick. Active pieces are always included, then a
+        # window around the first incomplete piece (or the tail when complete).
+        selected_indices = []
+        seen = set()
+
+        def add_index(index: int):
+            if 0 <= index < total_pieces and index not in seen and len(selected_indices) < detail_limit:
+                seen.add(index)
+                selected_indices.append(index)
+
+        for record in records:
+            if record["state"] in ("Downloading", "Requested"):
+                add_index(record["index"])
+
+        first_incomplete = next(
+            (record["index"] for record in records if record["state"] != "Verified"),
+            None,
+        )
+        if first_incomplete is None:
+            window_start = max(0, total_pieces - detail_limit)
+        else:
+            window_start = max(0, first_incomplete - 8)
+
+        for index in range(window_start, total_pieces):
+            add_index(index)
+            if len(selected_indices) >= detail_limit:
+                break
+
+        details = [records[index] for index in sorted(selected_indices)]
+
+        # The map is bucketed for large torrents so an 8,000-piece torrent does
+        # not require thousands of Dear PyGui draw items every half second. For
+        # smaller torrents each cell still represents exactly one piece.
+        map_cells = []
+        if total_pieces:
+            pieces_per_cell = max(1, math.ceil(total_pieces / map_cell_limit))
+            have_peer_availability = bool(usable_bitfields)
+
+            for start in range(0, total_pieces, pieces_per_cell):
+                end = min(total_pieces, start + pieces_per_cell)
+                codes = state_codes[start:end]
+                bucket_availability = max(availability[start:end], default=0)
+
+                if codes and all(code == "V" for code in codes):
+                    bucket_state = "verified"
+                elif "D" in codes:
+                    bucket_state = "downloading"
+                elif "R" in codes:
+                    bucket_state = "requested"
+                elif "V" in codes:
+                    bucket_state = "mixed"
+                elif have_peer_availability and bucket_availability == 0:
+                    bucket_state = "unavailable"
+                else:
+                    bucket_state = "missing"
+
+                map_cells.append({
+                    "start": start,
+                    "end": end - 1,
+                    "state": bucket_state,
+                    "availability": bucket_availability,
+                })
+        else:
+            pieces_per_cell = 1
+
+        return {
+            "total": total_pieces,
+            "verified": verified_count,
+            "downloading": downloading_count,
+            "requested": requested_count,
+            "missing": missing_count,
+            "swarm_availability": swarm_availability,
+            "pieces_per_map_cell": pieces_per_cell,
+            "map_cells": map_cells,
+            "details": details,
+        }
+
     def completed_bitfield(self) -> bytes:
         return self._build_completed_bitfield()
 
@@ -844,5 +1027,3 @@ class PieceManager:
         if not self.pieces:
             return self.torrent.total_length == 0
         return all(piece.is_complete for piece in self.pieces)
-
-
