@@ -16,6 +16,7 @@ from app.logic.torrent_creator import (
     TorrentCreator,
 )
 from app.logic.torrent_file import FALLBACK_TRACKERS
+from app.logic.torrent_manager import TorrentManager
 
 
 class CreateTorrentView:
@@ -31,8 +32,11 @@ class CreateTorrentView:
     }
 
     def __init__(self):
+        self.manager = TorrentManager.get_instance()
         self.source_path = ""
         self.output_path = ""
+        self._created_source_path = ""
+        self._created_torrent_path = ""
         self._events: queue.Queue = queue.Queue()
         self._worker: threading.Thread | None = None
         self._cancel_event: threading.Event | None = None
@@ -141,12 +145,22 @@ class CreateTorrentView:
                         callback=self._cancel_creation,
                         enabled=False,
                     )
+                    self.start_seeding_button = dpg.add_button(
+                        label=" Start Seeding ",
+                        callback=self._start_seeding_created_torrent,
+                        enabled=False,
+                        show=False,
+                    )
 
     def _set_source(self, path: str):
         if not path:
             return
 
         self.source_path = os.path.abspath(path)
+        self._created_source_path = ""
+        self._created_torrent_path = ""
+        if hasattr(self, "start_seeding_button"):
+            dpg.configure_item(self.start_seeding_button, enabled=False, show=False)
         dpg.set_value(self.source_text, self.source_path)
 
         if os.path.isfile(self.source_path):
@@ -260,6 +274,9 @@ class CreateTorrentView:
         source_path = self.source_path
         output_path = self.output_path
         self._cancel_event = threading.Event()
+        self._created_source_path = ""
+        self._created_torrent_path = ""
+        dpg.configure_item(self.start_seeding_button, enabled=False, show=False)
         self._set_creation_controls_busy(True)
         dpg.set_value(self.progress_bar, 0.0)
         dpg.set_value(self.status_text, "Starting...")
@@ -292,6 +309,40 @@ class CreateTorrentView:
             name="SalixTorrentCreator",
         )
         self._worker.start()
+
+    def _start_seeding_created_torrent(self):
+        if not self._created_torrent_path or not self._created_source_path:
+            return
+
+        try:
+            session = self.manager.add_seed_torrent(
+                self._created_torrent_path,
+                self._created_source_path,
+            )
+            info_hash = session.torrent.hex_info_hash
+            self.manager.set_selected_torrent(info_hash)
+            self.manager.start_torrent(info_hash)
+
+            dpg.set_value(
+                self.status_text,
+                "Added to Active Transfers — verifying source for seeding",
+            )
+            dpg.set_value(
+                self.detail_text,
+                (
+                    f"Source is seeded in place (no copy to downloads):\n"
+                    f"{self._created_source_path}"
+                ),
+            )
+            dpg.configure_item(self.start_seeding_button, enabled=False)
+
+            # Switch to the transfer queue so Checking -> Seeding is visible.
+            from app.engine.gui_engine import GuiEngine
+            GuiEngine.get_instance().switch_scene("DownloadView")
+
+        except Exception as exc:
+            dpg.set_value(self.status_text, "Could not start seeding")
+            dpg.set_value(self.detail_text, str(exc))
 
     def _cancel_creation(self):
         if self._cancel_event:
@@ -341,6 +392,8 @@ class CreateTorrentView:
             elif event_type == "complete":
                 result = payload
                 self.output_path = result.output_path
+                self._created_source_path = os.path.abspath(self.source_path)
+                self._created_torrent_path = os.path.abspath(result.output_path)
                 dpg.set_value(self.output_text, result.output_path)
                 dpg.set_value(self.progress_bar, 1.0)
                 dpg.set_value(self.status_text, "Torrent created successfully")
@@ -363,6 +416,11 @@ class CreateTorrentView:
                     ),
                 )
                 self._set_creation_controls_busy(False)
+                dpg.configure_item(
+                    self.start_seeding_button,
+                    enabled=True,
+                    show=True,
+                )
 
             elif event_type == "cancelled":
                 dpg.set_value(self.status_text, "Creation cancelled")
@@ -373,3 +431,5 @@ class CreateTorrentView:
                 dpg.set_value(self.status_text, "Creation failed")
                 dpg.set_value(self.detail_text, str(payload))
                 self._set_creation_controls_busy(False)
+
+

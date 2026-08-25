@@ -1,14 +1,16 @@
 # app/logic/session.py
 
 import asyncio
+import os
 import queue
 import random
 import struct
 import threading
 import time
-from typing import List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
-from app.logic.peer import PeerConnection, PeerMessageID
+from app.logic.local_peer_discovery import LocalPeerDiscovery
+from app.logic.peer import PeerConnection, PeerMessageID, identify_peer_client
 from app.logic.piece_manager import BLOCK_SIZE, Block, PieceManager
 from app.logic.torrent_file import TorrentFile
 from app.logic.tracker import TrackerClient
@@ -95,6 +97,7 @@ class SessionState:
     PAUSED = "Paused"
     STOPPED = "Stopped"
     COMPLETED = "Completed"
+    ERROR = "Error"
 
 
 class TorrentSession:
@@ -103,6 +106,8 @@ class TorrentSession:
         torrent_path: str,
         ui_queue: Optional[queue.Queue] = None,
         max_peers: int = 25,
+        download_dir: str = "downloads",
+        seed_source_path: Optional[str] = None,
     ):
         self.torrent_path = torrent_path
         self.torrent = TorrentFile(torrent_path)
@@ -112,7 +117,16 @@ class TorrentSession:
         random_id = "".join(str(random.randint(0, 9)) for _ in range(12)).encode("ascii")
         self.peer_id = b"-ST0001-" + random_id
 
-        self.piece_mgr = PieceManager(self.torrent)
+        self.seed_source_path = (
+            os.path.abspath(os.path.expanduser(seed_source_path))
+            if seed_source_path
+            else ""
+        )
+        self.piece_mgr = PieceManager(
+            self.torrent,
+            download_dir=download_dir,
+            seed_source_path=self.seed_source_path or None,
+        )
         self.tracker = TrackerClient(self.torrent, self.peer_id)
 
         self.active_peers: List[PeerConnection] = []
@@ -125,8 +139,14 @@ class TorrentSession:
 
         self._seed_server: Optional[asyncio.AbstractServer] = None
         self._seed_client_writers: Set[asyncio.StreamWriter] = set()
+        self._inbound_peer_records: Dict[int, dict] = {}
         self._seed_outbound_endpoints: Set[Tuple[str, int]] = set()
+        self._download_endpoints: Set[Tuple[str, int]] = set()
         self._seed_port: int = 6881
+
+        self._lpd = LocalPeerDiscovery(self.torrent.info_hash)
+        self.local_peers_discovered: int = 0
+        self.error_message: str = ""
 
         self.uploaded_bytes: int = 0
 
@@ -282,6 +302,14 @@ class TorrentSession:
                 except Exception:
                     pass
 
+        # Present Stop as an immediate terminal UI state. The cancelled worker
+        # tasks still own and close their sockets in their finally blocks, but
+        # the peer list should not continue displaying stale connections while
+        # that asynchronous cleanup finishes.
+        self.active_peers.clear()
+        self._seed_client_writers.clear()
+        self._inbound_peer_records.clear()
+
         self.piece_mgr.reset_inflight_requests()
         self.piece_mgr.save_resume_state(force=True)
         self._emit_snapshot()
@@ -306,6 +334,206 @@ class TorrentSession:
     def _connected_peer_count(self) -> int:
         return len(self.active_peers) + len(self._seed_client_writers)
 
+    @staticmethod
+    def _bitfield_progress(bitfield: bytes, total_pieces: int) -> Optional[float]:
+        if not bitfield or total_pieces <= 0:
+            return None
+
+        have_count = 0
+        for piece_index in range(total_pieces):
+            byte_index = piece_index // 8
+            if byte_index >= len(bitfield):
+                break
+            bit_index = 7 - (piece_index % 8)
+            if bitfield[byte_index] & (1 << bit_index):
+                have_count += 1
+
+        return have_count / total_pieces
+
+    def _apply_have_to_peer(self, peer: PeerConnection, piece_index: int):
+        total_pieces = len(self.piece_mgr.pieces)
+        if piece_index < 0 or piece_index >= total_pieces:
+            return
+
+        needed_bytes = (total_pieces + 7) // 8
+        if len(peer.bitfield) < needed_bytes:
+            peer.bitfield.extend(b"\x00" * (needed_bytes - len(peer.bitfield)))
+
+        byte_index = piece_index // 8
+        bit_index = 7 - (piece_index % 8)
+        peer.bitfield[byte_index] |= 1 << bit_index
+
+    @staticmethod
+    def _peer_flags(
+        am_interested: bool,
+        peer_interested: bool,
+        peer_choking: bool,
+        am_choking: bool,
+    ) -> str:
+        flags = []
+        if am_interested:
+            flags.append("I")
+        if peer_interested:
+            flags.append("i")
+        if peer_choking:
+            flags.append("C")
+        if am_choking:
+            flags.append("c")
+        return " ".join(flags) if flags else "--"
+
+    def _peer_state_label(
+        self,
+        *,
+        am_interested: bool,
+        peer_interested: bool,
+        peer_choking: bool,
+        am_choking: bool,
+        down_kbps: float,
+        up_kbps: float,
+    ) -> str:
+        if self.state == SessionState.DOWNLOADING:
+            if down_kbps > 0.01:
+                return "Downloading"
+            if peer_choking:
+                return "Choked"
+            if am_interested:
+                return "Ready"
+            return "Connected"
+
+        if self.state == SessionState.SEEDING:
+            if up_kbps > 0.01:
+                return "Uploading"
+            if am_choking:
+                return "Choking"
+            if peer_interested:
+                return "Ready"
+            return "Connected"
+
+        return "Connected"
+
+    def _build_peer_snapshots(self) -> List[dict]:
+        now = time.monotonic()
+        total_pieces = len(self.piece_mgr.pieces)
+        peers: List[dict] = []
+
+        for peer in list(self.active_peers):
+            progress = self._bitfield_progress(peer.bitfield, total_pieces)
+            down_kbps = float(getattr(peer, "download_speed_kbps", 0.0))
+            up_kbps = float(getattr(peer, "upload_speed_kbps", 0.0))
+            connected_at = float(getattr(peer, "connected_at", 0.0) or now)
+
+            peers.append({
+                "connection_id": f"out:{id(peer)}",
+                "ip": str(peer.ip),
+                "port": int(peer.port),
+                "address": f"{peer.ip}:{peer.port}",
+                "client": peer.client_name,
+                "source": str(getattr(peer, "source", "Unknown")),
+                "direction": str(getattr(peer, "direction", "Outgoing")),
+                "progress": progress,
+                "download_speed_kbps": down_kbps,
+                "upload_speed_kbps": up_kbps,
+                "downloaded_bytes": int(getattr(peer, "downloaded_bytes", 0)),
+                "uploaded_bytes": int(getattr(peer, "uploaded_bytes", 0)),
+                "state": self._peer_state_label(
+                    am_interested=bool(peer.am_interested),
+                    peer_interested=bool(peer.peer_interested),
+                    peer_choking=bool(peer.peer_choking),
+                    am_choking=bool(peer.am_choking),
+                    down_kbps=down_kbps,
+                    up_kbps=up_kbps,
+                ),
+                "flags": self._peer_flags(
+                    bool(peer.am_interested),
+                    bool(peer.peer_interested),
+                    bool(peer.peer_choking),
+                    bool(peer.am_choking),
+                ),
+                "connected_seconds": max(0.0, now - connected_at),
+            })
+
+        for record in list(self._inbound_peer_records.values()):
+            bitfield = record.get("bitfield", bytearray())
+            progress = self._bitfield_progress(bitfield, total_pieces)
+            down_kbps = float(record.get("download_speed_kbps", 0.0))
+            up_kbps = float(record.get("upload_speed_kbps", 0.0))
+            connected_at = float(record.get("connected_at", now))
+            am_interested = bool(record.get("am_interested", False))
+            peer_interested = bool(record.get("peer_interested", False))
+            peer_choking = bool(record.get("peer_choking", True))
+            am_choking = bool(record.get("am_choking", False))
+
+            peers.append({
+                "connection_id": str(record.get("connection_id", "")),
+                "ip": str(record.get("ip", "?")),
+                "port": int(record.get("port", 0) or 0),
+                "address": str(record.get("address", "?")),
+                "client": str(record.get("client", "Unknown")),
+                "source": str(record.get("source", "Incoming")),
+                "direction": str(record.get("direction", "Incoming")),
+                "progress": progress,
+                "download_speed_kbps": down_kbps,
+                "upload_speed_kbps": up_kbps,
+                "downloaded_bytes": int(record.get("downloaded_bytes", 0)),
+                "uploaded_bytes": int(record.get("uploaded_bytes", 0)),
+                "state": self._peer_state_label(
+                    am_interested=am_interested,
+                    peer_interested=peer_interested,
+                    peer_choking=peer_choking,
+                    am_choking=am_choking,
+                    down_kbps=down_kbps,
+                    up_kbps=up_kbps,
+                ),
+                "flags": self._peer_flags(
+                    am_interested,
+                    peer_interested,
+                    peer_choking,
+                    am_choking,
+                ),
+                "connected_seconds": max(0.0, now - connected_at),
+            })
+
+        peers.sort(key=lambda item: (item.get("direction", ""), item.get("address", "")))
+        return peers
+
+    def _sample_peer_speeds(self, interval_seconds: float):
+        if interval_seconds <= 0:
+            return
+
+        for peer in list(self.active_peers):
+            downloaded = int(getattr(peer, "downloaded_bytes", 0))
+            uploaded = int(getattr(peer, "uploaded_bytes", 0))
+            last_downloaded = int(getattr(peer, "_last_sample_downloaded", 0))
+            last_uploaded = int(getattr(peer, "_last_sample_uploaded", 0))
+
+            peer.download_speed_kbps = max(
+                0.0,
+                (downloaded - last_downloaded) / interval_seconds / 1024.0,
+            )
+            peer.upload_speed_kbps = max(
+                0.0,
+                (uploaded - last_uploaded) / interval_seconds / 1024.0,
+            )
+            peer._last_sample_downloaded = downloaded
+            peer._last_sample_uploaded = uploaded
+
+        for record in list(self._inbound_peer_records.values()):
+            downloaded = int(record.get("downloaded_bytes", 0))
+            uploaded = int(record.get("uploaded_bytes", 0))
+            last_downloaded = int(record.get("_last_sample_downloaded", 0))
+            last_uploaded = int(record.get("_last_sample_uploaded", 0))
+
+            record["download_speed_kbps"] = max(
+                0.0,
+                (downloaded - last_downloaded) / interval_seconds / 1024.0,
+            )
+            record["upload_speed_kbps"] = max(
+                0.0,
+                (uploaded - last_uploaded) / interval_seconds / 1024.0,
+            )
+            record["_last_sample_downloaded"] = downloaded
+            record["_last_sample_uploaded"] = uploaded
+
     def _build_snapshot(
         self,
         speed_kbps: float = 0.0,
@@ -328,9 +556,15 @@ class TorrentSession:
             "speed_kbps": speed_kbps,
             "upload_speed_kbps": upload_speed_kbps,
             "connected_peers": self._connected_peer_count(),
+            "peers": self._build_peer_snapshots(),
             "completed_pieces": self.piece_mgr.completed_pieces,
             "total_pieces": len(self.piece_mgr.pieces),
             "listen_port": self._seed_port if self._seed_server else 0,
+            "storage_mode": self.piece_mgr.storage_mode,
+            "seed_source_path": self.seed_source_path,
+            "local_discovery_enabled": bool(self._lpd.enabled),
+            "local_peers_discovered": int(self.local_peers_discovered),
+            "error_message": self.error_message or self.piece_mgr.last_error,
             "download_limit_value": self.download_limit_value,
             "download_limit_unit": self.download_limit_unit,
             "download_limit_bps": self.download_limit_bps,
@@ -354,8 +588,8 @@ class TorrentSession:
         self._prepare_pause_event = threading.Event()
         self._prepare_pause_event.set()
         self._paused_from_state = None
+        self.error_message = ""
 
-        local_worker_tasks: List[asyncio.Task] = []
         local_telemetry_task: Optional[asyncio.Task] = None
 
         try:
@@ -371,8 +605,28 @@ class TorrentSession:
                     self._prepare_pause_event,
                 )
 
-                if not prepared or not self._is_current_run(run_token):
+                if not prepared:
+                    if (
+                        self._is_current_run(run_token)
+                        and self.piece_mgr.last_error
+                    ):
+                        self.error_message = self.piece_mgr.last_error
+                        self.state = SessionState.ERROR
+                        self._emit_snapshot()
                     return
+                if not self._is_current_run(run_token):
+                    return
+
+            # An external source is a read-only seed, never a download target.
+            # It must verify to 100% before any peer is allowed to request data.
+            if self.seed_source_path and not self.piece_mgr.is_finished:
+                self.error_message = (
+                    self.piece_mgr.last_error
+                    or "The external seed source is incomplete or does not match this torrent."
+                )
+                self.state = SessionState.ERROR
+                self._emit_snapshot()
+                return
 
             if (
                 self.piece_mgr.fast_resume_used
@@ -398,46 +652,7 @@ class TorrentSession:
                 await self._run_seeding(run_token, completion_event=False)
                 return
 
-            if self.state != SessionState.PAUSED:
-                self.state = SessionState.DOWNLOADING
-                self._pause_event.set()
-                self._emit_snapshot()
-
-            await self._pause_event.wait()
-            if not self._is_current_run(run_token):
-                return
-
-            if self.state != SessionState.PAUSED:
-                self.state = SessionState.DOWNLOADING
-
-            downloaded = self.piece_mgr.downloaded_bytes
-            left = max(0, self.torrent.total_length - downloaded)
-
-            discovered_peers = await self.tracker.fetch_peers(
-                uploaded=self.uploaded_bytes,
-                downloaded=downloaded,
-                left=left,
-                event="started",
-            )
-
-            if not self._is_current_run(run_token):
-                return
-
-            await self._pause_event.wait()
-            if not self._is_current_run(run_token):
-                return
-
-            local_worker_tasks = [
-                asyncio.create_task(self._peer_worker(run_token, ip, port))
-                for ip, port in discovered_peers[:self.max_peers]
-            ]
-            self._worker_tasks = local_worker_tasks
-
-            if local_worker_tasks:
-                await asyncio.gather(*local_worker_tasks, return_exceptions=True)
-
-            self._worker_tasks = []
-            local_worker_tasks = []
+            await self._run_downloading(run_token)
 
             if self._is_current_run(run_token) and self.piece_mgr.is_finished:
                 await self._run_seeding(run_token, completion_event=True)
@@ -446,21 +661,17 @@ class TorrentSession:
             pass
 
         finally:
-            for task in local_worker_tasks:
-                if not task.done():
-                    task.cancel()
-
-            if local_worker_tasks:
-                await asyncio.gather(*local_worker_tasks, return_exceptions=True)
-
             for task in list(self._worker_tasks):
                 if not task.done():
                     task.cancel()
             if self._worker_tasks:
                 await asyncio.gather(*self._worker_tasks, return_exceptions=True)
             self._worker_tasks = []
+            self._download_endpoints.clear()
+            self._seed_outbound_endpoints.clear()
 
             await self._close_seed_server()
+            await self._lpd.close()
 
             if local_telemetry_task and not local_telemetry_task.done():
                 local_telemetry_task.cancel()
@@ -472,7 +683,9 @@ class TorrentSession:
             if run_token == self._run_token:
                 self.is_running = False
 
-                if self.piece_mgr.is_finished:
+                if self.state == SessionState.ERROR:
+                    pass
+                elif self.piece_mgr.is_finished:
                     # This state is only reached if seeding exits unexpectedly.
                     # Normal completed torrents remain in SEEDING until Paused
                     # or Stopped by the user.
@@ -487,6 +700,118 @@ class TorrentSession:
 
             if self._main_task is asyncio.current_task():
                 self._main_task = None
+
+    async def _run_downloading(self, run_token: int):
+        """Keep discovering peers while a torrent is incomplete.
+
+        Tracker requests run in the background so a slow/dead tracker cannot
+        prevent a LAN peer discovered through BEP-14 multicast from being used
+        immediately. Unlike the original one-shot peer fetch, this loop keeps
+        a stopped swarm alive long enough for peers to appear later.
+        """
+        self.state = SessionState.DOWNLOADING
+        self._pause_event.set()
+        await self._lpd.start(listen_port=0)
+        self._emit_snapshot()
+
+        tracker_task: Optional[asyncio.Task] = None
+        next_tracker_announce = 0.0
+        tracker_event: Optional[str] = "started"
+
+        try:
+            while self._is_current_run(run_token) and not self.piece_mgr.is_finished:
+                await self._pause_event.wait()
+                if not self._is_current_run(run_token):
+                    break
+
+                if self.state != SessionState.PAUSED:
+                    self.state = SessionState.DOWNLOADING
+
+                # Local peers are available without Internet tracker access.
+                local_peers = self._lpd.drain_peers()
+                if local_peers:
+                    self.local_peers_discovered += len(local_peers)
+                    self._start_download_workers(run_token, local_peers, source="LAN")
+                    self._emit_snapshot()
+
+                now = time.monotonic()
+                if tracker_task is None and now >= next_tracker_announce:
+                    downloaded = self.piece_mgr.downloaded_bytes
+                    left = max(0, self.torrent.total_length - downloaded)
+                    tracker_task = asyncio.create_task(
+                        self.tracker.fetch_peers(
+                            uploaded=self.uploaded_bytes,
+                            downloaded=downloaded,
+                            left=left,
+                            event=tracker_event,
+                        )
+                    )
+
+                if tracker_task is not None and tracker_task.done():
+                    try:
+                        tracker_peers = tracker_task.result()
+                    except asyncio.CancelledError:
+                        raise
+                    except Exception:
+                        tracker_peers = []
+
+                    tracker_task = None
+                    tracker_event = None
+                    next_tracker_announce = time.monotonic() + 5 * 60
+                    self._start_download_workers(run_token, tracker_peers, source="Tracker")
+
+                self._worker_tasks = [
+                    task for task in self._worker_tasks if not task.done()
+                ]
+                await asyncio.sleep(0.20)
+
+        finally:
+            if tracker_task is not None and not tracker_task.done():
+                tracker_task.cancel()
+                await asyncio.gather(tracker_task, return_exceptions=True)
+
+    def _start_download_workers(
+        self,
+        run_token: int,
+        peers: List[Tuple[str, int]],
+        source: str = "Tracker",
+    ):
+        available_slots = max(0, self.max_peers - len(self._download_endpoints))
+        if available_slots <= 0:
+            return
+
+        for endpoint in peers:
+            if available_slots <= 0:
+                break
+            if not isinstance(endpoint, tuple) or len(endpoint) != 2:
+                continue
+
+            ip, port = endpoint
+            try:
+                port = int(port)
+            except (TypeError, ValueError):
+                continue
+            if port <= 0 or port > 65535:
+                continue
+
+            endpoint = (str(ip), port)
+            if endpoint in self._download_endpoints:
+                continue
+
+            self._download_endpoints.add(endpoint)
+            task = asyncio.create_task(
+                self._peer_worker(
+                    run_token,
+                    endpoint[0],
+                    endpoint[1],
+                    source=source,
+                )
+            )
+            task.add_done_callback(
+                lambda _task, ep=endpoint: self._download_endpoints.discard(ep)
+            )
+            self._worker_tasks.append(task)
+            available_slots -= 1
 
     async def _request_one_block(
         self,
@@ -526,8 +851,21 @@ class TorrentSession:
 
         return True
 
-    async def _peer_worker(self, run_token: int, ip: str, port: int):
-        peer = PeerConnection(ip, port, self.torrent.info_hash, self.peer_id)
+    async def _peer_worker(
+        self,
+        run_token: int,
+        ip: str,
+        port: int,
+        source: str = "Tracker",
+    ):
+        peer = PeerConnection(
+            ip,
+            port,
+            self.torrent.info_hash,
+            self.peer_id,
+            source=source,
+            direction="Outgoing",
+        )
         owned_requests: List[Block] = []
 
         if not await peer.connect(timeout=4.0):
@@ -580,6 +918,9 @@ class TorrentSession:
                     if self.state == SessionState.DOWNLOADING:
                         await self._request_one_block(peer, owned_requests)
 
+                elif msg_type == "HAVE":
+                    self._apply_have_to_peer(peer, int(data))
+
                 elif msg_type == "UNCHOKE":
                     for _ in range(4):
                         if self.state != SessionState.DOWNLOADING:
@@ -605,6 +946,8 @@ class TorrentSession:
         self.state = SessionState.SEEDING
         self._pause_event.set()
         await self._open_seed_server(run_token)
+        await self._lpd.start(listen_port=self._seed_port if self._seed_server else 0)
+        self._lpd.update_listen_port(self._seed_port if self._seed_server else 0)
         self._emit_snapshot()
 
         first_event = "completed" if completion_event else "started"
@@ -619,6 +962,12 @@ class TorrentSession:
             # Resume returns us to the state that was paused.
             if self.state != SessionState.PAUSED:
                 self.state = SessionState.SEEDING
+
+            local_peers = self._lpd.drain_peers()
+            if local_peers:
+                self.local_peers_discovered += len(local_peers)
+                self._start_outbound_seed_workers(run_token, local_peers, source="LAN")
+                self._emit_snapshot()
 
             now = time.monotonic()
             if now >= next_announce:
@@ -636,7 +985,7 @@ class TorrentSession:
 
                 announce_event = None
                 next_announce = time.monotonic() + 15 * 60
-                self._start_outbound_seed_workers(run_token, peers)
+                self._start_outbound_seed_workers(run_token, peers, source="Tracker")
 
             # Remove completed outbound tasks from the manager list.
             self._worker_tasks = [task for task in self._worker_tasks if not task.done()]
@@ -685,11 +1034,13 @@ class TorrentSession:
             except Exception:
                 pass
         self._seed_client_writers.clear()
+        self._inbound_peer_records.clear()
 
     def _start_outbound_seed_workers(
         self,
         run_token: int,
         peers: List[Tuple[str, int]],
+        source: str = "Tracker",
     ):
         available_slots = max(0, self.max_peers - self._connected_peer_count())
         if available_slots <= 0:
@@ -704,14 +1055,27 @@ class TorrentSession:
             ip, port = endpoint
             self._seed_outbound_endpoints.add(endpoint)
             task = asyncio.create_task(
-                self._seed_peer_worker(run_token, ip, port)
+                self._seed_peer_worker(run_token, ip, port, source=source)
             )
             self._worker_tasks.append(task)
             available_slots -= 1
 
-    async def _seed_peer_worker(self, run_token: int, ip: str, port: int):
+    async def _seed_peer_worker(
+        self,
+        run_token: int,
+        ip: str,
+        port: int,
+        source: str = "Tracker",
+    ):
         endpoint = (ip, port)
-        peer = PeerConnection(ip, port, self.torrent.info_hash, self.peer_id)
+        peer = PeerConnection(
+            ip,
+            port,
+            self.torrent.info_hash,
+            self.peer_id,
+            source=source,
+            direction="Outgoing",
+        )
 
         try:
             if not await peer.connect(timeout=4.0):
@@ -737,6 +1101,10 @@ class TorrentSession:
                     break
 
                 msg_type, data = message
+                if msg_type == "HAVE":
+                    self._apply_have_to_peer(peer, int(data))
+                    continue
+
                 if msg_type == "REQUEST" and self.state == SessionState.SEEDING:
                     piece_index, begin, length = data
                     block_data = await asyncio.to_thread(
@@ -784,6 +1152,7 @@ class TorrentSession:
             )
             protocol = remainder[:pstrlen]
             info_hash = remainder[pstrlen + 8:pstrlen + 28]
+            remote_peer_id = bytes(remainder[pstrlen + 28:pstrlen + 48])
 
             if protocol != b"BitTorrent protocol" or info_hash != self.torrent.info_hash:
                 return
@@ -808,6 +1177,42 @@ class TorrentSession:
             await writer.drain()
 
             self._seed_client_writers.add(writer)
+
+            peername = writer.get_extra_info("peername")
+            if isinstance(peername, tuple) and len(peername) >= 2:
+                peer_ip = str(peername[0])
+                try:
+                    peer_port = int(peername[1])
+                except (TypeError, ValueError):
+                    peer_port = 0
+            else:
+                peer_ip = "?"
+                peer_port = 0
+
+            record_key = id(writer)
+            inbound_record = {
+                "connection_id": f"in:{record_key}",
+                "ip": peer_ip,
+                "port": peer_port,
+                "address": f"{peer_ip}:{peer_port}" if peer_port else peer_ip,
+                "client": identify_peer_client(remote_peer_id),
+                "source": "Incoming",
+                "direction": "Incoming",
+                "connected_at": time.monotonic(),
+                "last_activity_at": time.monotonic(),
+                "downloaded_bytes": 0,
+                "uploaded_bytes": 0,
+                "download_speed_kbps": 0.0,
+                "upload_speed_kbps": 0.0,
+                "_last_sample_downloaded": 0,
+                "_last_sample_uploaded": 0,
+                "am_choking": False,
+                "am_interested": False,
+                "peer_choking": True,
+                "peer_interested": False,
+                "bitfield": bytearray(),
+            }
+            self._inbound_peer_records[record_key] = inbound_record
             registered = True
             self._emit_snapshot()
 
@@ -826,10 +1231,40 @@ class TorrentSession:
                 )
                 msg_id = payload[0]
                 body = payload[1:]
+                inbound_record["last_activity_at"] = time.monotonic()
+
+                if msg_id == PeerMessageID.CHOKE:
+                    inbound_record["peer_choking"] = True
+                    continue
+                if msg_id == PeerMessageID.UNCHOKE:
+                    inbound_record["peer_choking"] = False
+                    continue
+                if msg_id == PeerMessageID.INTERESTED:
+                    inbound_record["peer_interested"] = True
+                    continue
+                if msg_id == PeerMessageID.NOT_INTERESTED:
+                    inbound_record["peer_interested"] = False
+                    continue
+                if msg_id == PeerMessageID.BITFIELD:
+                    inbound_record["bitfield"] = bytearray(body)
+                    continue
+                if msg_id == PeerMessageID.HAVE and len(body) == 4:
+                    (piece_index,) = struct.unpack(">I", body)
+                    total_pieces = len(self.piece_mgr.pieces)
+                    if 0 <= piece_index < total_pieces:
+                        needed_bytes = (total_pieces + 7) // 8
+                        peer_bits = inbound_record.setdefault("bitfield", bytearray())
+                        if len(peer_bits) < needed_bytes:
+                            peer_bits.extend(b"\x00" * (needed_bytes - len(peer_bits)))
+                        byte_index = piece_index // 8
+                        bit_index = 7 - (piece_index % 8)
+                        peer_bits[byte_index] |= 1 << bit_index
+                    continue
 
                 if msg_id != PeerMessageID.REQUEST or len(body) != 12:
                     continue
 
+                inbound_record["peer_interested"] = True
                 await self._pause_event.wait()
                 if not self._is_current_run(run_token):
                     break
@@ -861,6 +1296,10 @@ class TorrentSession:
                 )
                 await writer.drain()
                 self.uploaded_bytes += len(block_data)
+                inbound_record["uploaded_bytes"] = int(
+                    inbound_record.get("uploaded_bytes", 0)
+                ) + len(block_data)
+                inbound_record["last_activity_at"] = time.monotonic()
 
         except (asyncio.IncompleteReadError, asyncio.TimeoutError, ConnectionError):
             pass
@@ -869,6 +1308,7 @@ class TorrentSession:
         finally:
             if registered:
                 self._seed_client_writers.discard(writer)
+                self._inbound_peer_records.pop(id(writer), None)
                 self._emit_snapshot()
 
             try:
@@ -906,6 +1346,7 @@ class TorrentSession:
 
                 last_downloaded = current_downloaded
                 last_uploaded = current_uploaded
+                self._sample_peer_speeds(0.5)
 
                 self.ui_queue.put(
                     self._build_snapshot(
@@ -916,3 +1357,5 @@ class TorrentSession:
 
         except asyncio.CancelledError:
             pass
+
+

@@ -36,7 +36,7 @@ class SessionIntent:
 
 class TorrentManager:
     _instance: Optional["TorrentManager"] = None
-    SESSION_STATE_VERSION = 1
+    SESSION_STATE_VERSION = 2
 
     def __new__(cls, ui_queue: Optional[queue.Queue] = None):
         if cls._instance is None:
@@ -187,6 +187,7 @@ class TorrentManager:
                     "upload_limit_value": float(session.upload_limit_value),
                     "upload_limit_unit": session.upload_limit_unit,
                     "uploaded_bytes": int(session.uploaded_bytes),
+                    "seed_source_path": session.seed_source_path,
                 }
             )
 
@@ -230,7 +231,7 @@ class TorrentManager:
 
         if not isinstance(data, dict):
             return None
-        if data.get("version") != self.SESSION_STATE_VERSION:
+        if data.get("version") not in (1, self.SESSION_STATE_VERSION):
             print("[Salix_T Notice] Previous session uses an unsupported format.")
             return None
         if not isinstance(data.get("torrents", []), list):
@@ -292,10 +293,12 @@ class TorrentManager:
                     max_peers = 25
 
                 try:
+                    seed_source_path = str(entry.get("seed_source_path") or "")
                     session = TorrentSession(
                         restore_path,
                         ui_queue=self.ui_queue,
                         max_peers=max_peers,
+                        seed_source_path=seed_source_path or None,
                     )
                 except Exception as exc:
                     print(f"[Salix_T Notice] Could not restore '{restore_path}': {exc}")
@@ -686,26 +689,80 @@ class TorrentManager:
         torrent_path: str,
         max_peers: int = 25,
         persist: bool = True,
+        seed_source_path: Optional[str] = None,
     ) -> TorrentSession:
         torrent_path = os.path.abspath(os.path.expanduser(torrent_path))
+        seed_source_path = (
+            os.path.abspath(os.path.expanduser(seed_source_path))
+            if seed_source_path
+            else ""
+        )
 
         # TorrentSession construction is lightweight: it parses .torrent
         # metadata and creates Piece descriptors, but does not hash the payload
-        # file or allocate every block.
+        # file or allocate every block. External seed sources are read-only and
+        # are verified only after Start is requested.
         new_session = TorrentSession(
             torrent_path,
             ui_queue=self.ui_queue,
             max_peers=max_peers,
+            seed_source_path=seed_source_path or None,
         )
         info_hash = new_session.torrent.hex_info_hash
 
+        if seed_source_path:
+            if new_session.torrent.is_multi_file and not os.path.isdir(seed_source_path):
+                raise ValueError("A multi-file torrent must be seeded from its source folder.")
+            if not new_session.torrent.is_multi_file and not os.path.isfile(seed_source_path):
+                raise ValueError("A single-file torrent must be seeded from its source file.")
+
+        replacement_limits = None
+        replacement_uploaded = 0
+        replaced_existing = False
+
         with self._sessions_lock:
             existing_session = self.sessions.get(info_hash)
-            if existing_session:
+
+            if existing_session and seed_source_path:
+                same_source = (
+                    existing_session.seed_source_path
+                    and os.path.normcase(existing_session.seed_source_path)
+                    == os.path.normcase(seed_source_path)
+                )
+
+                if same_source:
+                    if persist:
+                        self._source_paths[info_hash] = torrent_path
+                    existing_session.emit_snapshot()
+                    session = existing_session
+                else:
+                    if existing_session.is_running:
+                        raise RuntimeError(
+                            "This torrent is already active. Stop it before attaching "
+                            "a different local seed source."
+                        )
+
+                    replacement_limits = (
+                        existing_session.download_limit_value,
+                        existing_session.download_limit_unit,
+                        existing_session.upload_limit_value,
+                        existing_session.upload_limit_unit,
+                    )
+                    replacement_uploaded = existing_session.uploaded_bytes
+                    self.sessions[info_hash] = new_session
+                    self._desired_states[info_hash] = SessionIntent.IDLE
+                    self._source_paths[info_hash] = torrent_path
+                    if info_hash not in self._queue_order:
+                        self._queue_order.append(info_hash)
+                    session = new_session
+                    replaced_existing = True
+
+            elif existing_session:
                 if persist:
                     self._source_paths[info_hash] = torrent_path
                 existing_session.emit_snapshot()
                 session = existing_session
+
             else:
                 self.sessions[info_hash] = new_session
                 self._desired_states[info_hash] = SessionIntent.IDLE
@@ -714,21 +771,39 @@ class TorrentManager:
                     self._queue_order.append(info_hash)
                 session = new_session
 
-        if existing_session:
+        if existing_session and not replaced_existing:
             if persist:
                 self._cache_torrent_file(info_hash, torrent_path)
                 self.save_session_state()
             return session
 
+        if replacement_limits:
+            new_session.uploaded_bytes = replacement_uploaded
+            new_session.set_transfer_limits(*replacement_limits)
+
         self._cache_torrent_file(info_hash, torrent_path)
 
         # Put an Idle row into the UI immediately. The background engine will
-        # later change it to Checking/Downloading/Paused/Stopped as appropriate.
+        # later change it to Checking/Downloading/Seeding as appropriate.
         new_session.emit_snapshot()
 
         if persist:
             self.save_session_state()
         return new_session
+
+    def add_seed_torrent(
+        self,
+        torrent_path: str,
+        seed_source_path: str,
+        max_peers: int = 25,
+    ) -> TorrentSession:
+        """Attach a locally-created torrent to its original payload read-only."""
+        return self.add_torrent(
+            torrent_path,
+            max_peers=max_peers,
+            persist=True,
+            seed_source_path=seed_source_path,
+        )
 
     def _send_cmd(self, action: str, info_hash: str, payload=None):
         if not self._running:
@@ -831,3 +906,5 @@ class TorrentManager:
 
         if thread and thread.is_alive():
             print("[Salix_T Notice] Async engine did not finish shutdown before timeout.")
+
+

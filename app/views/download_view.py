@@ -8,11 +8,12 @@ from tkinter import filedialog
 import dearpygui.dearpygui as dpg
 
 from app.logic.torrent_manager import TorrentManager
+from app.views.peer_view import PeerView
 
 
 class DownloadView:
     ACTIVE_PAUSABLE_STATES = {"Checking", "Downloading", "Seeding"}
-    STARTABLE_STATES = {"Idle", "Stopped", "Completed"}
+    STARTABLE_STATES = {"Idle", "Stopped", "Completed", "Error"}
     STOPPABLE_STATES = {
         "Checking",
         "Fast Resume",
@@ -37,6 +38,7 @@ class DownloadView:
         self._limit_controls_hash: str = ""
         self._pending_remove_info_hash: str = ""
         self._removed_info_hashes = set()
+        self.peer_view = PeerView()
 
     def build_view(self, parent_tag: str | int = "primary_window"):
         with dpg.group(parent=parent_tag):
@@ -125,74 +127,83 @@ class DownloadView:
 
             dpg.add_spacer(height=10)
 
-            # Telemetry Metrics
-            with dpg.group(horizontal=True):
-                with dpg.child_window(width=520, height=245, border=True):
-                    dpg.add_text("TRANSFER METRICS", color=(100, 180, 255))
-                    dpg.add_separator()
-                    self.speed_text = dpg.add_text("Download Speed: 0.0 KB/s")
-                    self.upload_speed_text = dpg.add_text("Upload Speed: 0.0 KB/s")
-                    self.downloaded_text = dpg.add_text("Downloaded: 0.0 MB / 0.0 MB")
-                    self.uploaded_text = dpg.add_text("Uploaded: 0.0 MB")
-                    self.peers_text = dpg.add_text("Connected Peers: 0")
-
-                with dpg.child_window(width=-1, height=245, border=True):
-                    dpg.add_text("SWARM STATUS", color=(255, 200, 100))
-                    dpg.add_separator()
-                    self.state_text = dpg.add_text("Session State: Idle")
-                    self.client_id_text = dpg.add_text("Client ID: Salix_T 1.0")
-                    self.listen_port_text = dpg.add_text("Listen Port: --")
-                    self.health_text = dpg.add_text("Swarm Health: Active")
-
-                    dpg.add_spacer(height=5)
-                    dpg.add_separator()
-                    dpg.add_text("TRANSFER LIMITS", color=(180, 160, 255))
-                    dpg.add_text("0 = Unlimited", color=(150, 150, 150))
-
+            # Selected-torrent detail views. General preserves the existing
+            # inspector metrics while Peers exposes live connection telemetry.
+            with dpg.tab_bar():
+                with dpg.tab(label="General"):
                     with dpg.group(horizontal=True):
-                        dpg.add_text("Down")
-                        self.download_limit_input = dpg.add_input_float(
-                            default_value=0.0,
-                            min_value=0.0,
-                            min_clamped=True,
-                            format="%.2f",
-                            width=95,
-                        )
-                        self.download_limit_unit = dpg.add_combo(
-                            items=["KB/s", "MB/s", "kbps", "Mbps"],
-                            default_value="KB/s",
-                            width=80,
-                        )
+                        with dpg.child_window(width=520, height=285, border=True):
+                            dpg.add_text("TRANSFER METRICS", color=(100, 180, 255))
+                            dpg.add_separator()
+                            self.speed_text = dpg.add_text("Download Speed: 0.0 KB/s")
+                            self.upload_speed_text = dpg.add_text("Upload Speed: 0.0 KB/s")
+                            self.downloaded_text = dpg.add_text("Downloaded: 0.0 MB / 0.0 MB")
+                            self.uploaded_text = dpg.add_text("Uploaded: 0.0 MB")
+                            self.peers_text = dpg.add_text("Connected Peers: 0")
 
-                    with dpg.group(horizontal=True):
-                        dpg.add_text("Up  ")
-                        self.upload_limit_input = dpg.add_input_float(
-                            default_value=0.0,
-                            min_value=0.0,
-                            min_clamped=True,
-                            format="%.2f",
-                            width=95,
-                        )
-                        self.upload_limit_unit = dpg.add_combo(
-                            items=["KB/s", "MB/s", "kbps", "Mbps"],
-                            default_value="KB/s",
-                            width=80,
-                        )
+                        with dpg.child_window(width=-1, height=285, border=True):
+                            dpg.add_text("SWARM STATUS", color=(255, 200, 100))
+                            dpg.add_separator()
+                            self.state_text = dpg.add_text("Session State: Idle")
+                            self.client_id_text = dpg.add_text("Client ID: Salix_T 1.0")
+                            self.listen_port_text = dpg.add_text("Listen Port: --")
+                            self.storage_text = dpg.add_text("Storage: Downloads")
+                            self.lpd_text = dpg.add_text("LAN Discovery: --")
+                            self.health_text = dpg.add_text("Swarm Health: Active")
 
-                    with dpg.group(horizontal=True):
-                        dpg.add_button(
-                            label=" Apply Limits ",
-                            callback=self._on_apply_limits_clicked,
-                        )
-                        dpg.add_button(
-                            label=" Unlimited ",
-                            callback=self._on_unlimited_limits_clicked,
-                        )
+                            dpg.add_spacer(height=5)
+                            dpg.add_separator()
+                            dpg.add_text("TRANSFER LIMITS", color=(180, 160, 255))
+                            dpg.add_text("0 = Unlimited", color=(150, 150, 150))
 
-                    self.limit_status_text = dpg.add_text(
-                        "Limits: Down Unlimited | Up Unlimited",
-                        color=(170, 170, 170),
-                    )
+                            with dpg.group(horizontal=True):
+                                dpg.add_text("Down")
+                                self.download_limit_input = dpg.add_input_float(
+                                    default_value=0.0,
+                                    min_value=0.0,
+                                    min_clamped=True,
+                                    format="%.2f",
+                                    width=95,
+                                )
+                                self.download_limit_unit = dpg.add_combo(
+                                    items=["KB/s", "MB/s", "kbps", "Mbps"],
+                                    default_value="KB/s",
+                                    width=80,
+                                )
+
+                            with dpg.group(horizontal=True):
+                                dpg.add_text("Up  ")
+                                self.upload_limit_input = dpg.add_input_float(
+                                    default_value=0.0,
+                                    min_value=0.0,
+                                    min_clamped=True,
+                                    format="%.2f",
+                                    width=95,
+                                )
+                                self.upload_limit_unit = dpg.add_combo(
+                                    items=["KB/s", "MB/s", "kbps", "Mbps"],
+                                    default_value="KB/s",
+                                    width=80,
+                                )
+
+                            with dpg.group(horizontal=True):
+                                dpg.add_button(
+                                    label=" Apply Limits ",
+                                    callback=self._on_apply_limits_clicked,
+                                )
+                                dpg.add_button(
+                                    label=" Unlimited ",
+                                    callback=self._on_unlimited_limits_clicked,
+                                )
+
+                            self.limit_status_text = dpg.add_text(
+                                "Limits: Down Unlimited | Up Unlimited",
+                                color=(170, 170, 170),
+                            )
+
+
+                with dpg.tab(label="Peers") as peers_tab:
+                    self.peer_view.build_view(parent_tag=peers_tab)
 
         # Shared confirmation dialog for destructive queue actions.
         with dpg.window(
@@ -416,15 +427,24 @@ class DownloadView:
             self.remove_torrent_title,
             f"Remove: {name}",
         )
-        dpg.set_value(
-            self.remove_torrent_message,
-            (
+        stats = self.latest_stats.get(info_hash, {})
+        if stats.get("seed_source_path"):
+            removal_text = (
+                "Remove from SalixTorrent removes the transfer from the queue and leaves "
+                "the original seed source untouched.\n\n"
+                "Remove + Delete Data only deletes SalixTorrent-managed data under the "
+                "downloads folder and resume metadata. The external seed source and your "
+                "original .torrent file are NEVER deleted."
+            )
+        else:
+            removal_text = (
                 "Remove from SalixTorrent removes the transfer from the queue but keeps "
                 "downloaded data on disk.\n\n"
                 "Remove + Delete Data permanently deletes the downloaded payload and its "
                 "SalixTorrent resume metadata. Your original .torrent file is NOT deleted."
-            ),
-        )
+            )
+
+        dpg.set_value(self.remove_torrent_message, removal_text)
 
         dpg.show_item(self.remove_torrent_modal)
         try:
@@ -544,10 +564,14 @@ class DownloadView:
         dpg.set_value(self.peers_text, "Connected Peers: 0")
         dpg.set_value(self.state_text, "Session State: Idle")
         dpg.set_value(self.listen_port_text, "Listen Port: --")
+        dpg.set_value(self.storage_text, "Storage: Downloads")
+        dpg.set_value(self.lpd_text, "LAN Discovery: --")
+        dpg.set_value(self.health_text, "Swarm Health: Active")
         dpg.set_value(self.limit_status_text, "Limits: Down Unlimited | Up Unlimited")
         dpg.set_value(self.download_limit_input, 0.0)
         dpg.set_value(self.upload_limit_input, 0.0)
         self._limit_controls_hash = ""
+        self.peer_view.reset()
 
     def _handle_torrent_removed(self, msg: dict):
         info_hash = msg.get("info_hash", "")
@@ -775,6 +799,29 @@ class DownloadView:
             f"Listen Port: {listen_port if listen_port else '--'}",
         )
 
+        storage_mode = msg.get("storage_mode", "Download")
+        if storage_mode == "External Seed":
+            dpg.set_value(self.storage_text, "Storage: External Seed (read-only)")
+        else:
+            dpg.set_value(self.storage_text, "Storage: Downloads")
+
+        local_count = int(msg.get("local_peers_discovered", 0))
+        if msg.get("local_discovery_enabled"):
+            dpg.set_value(
+                self.lpd_text,
+                f"LAN Discovery: Active ({local_count} peer(s) found)",
+            )
+        else:
+            dpg.set_value(self.lpd_text, "LAN Discovery: --")
+
+        error_message = str(msg.get("error_message") or "")
+        if error_message:
+            dpg.set_value(self.health_text, f"Notice: {error_message}")
+        else:
+            dpg.set_value(self.health_text, "Swarm Health: Active")
+
+        self.peer_view.render(msg)
+
     def update(self, delta_time: float):
         while not self.ui_queue.empty():
             try:
@@ -799,3 +846,5 @@ class DownloadView:
                     self._handle_torrent_removed(msg)
             except queue.Empty:
                 break
+
+

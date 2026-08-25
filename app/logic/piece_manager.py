@@ -112,15 +112,29 @@ class StorageFile:
 class PieceManager:
     """Coordinates pieces, disk storage, verification and fast resume.
 
-    Single-file torrents use downloads/<torrent name> as before. Multi-file
-    torrents now use downloads/<torrent name>/... and are treated as one
-    contiguous BitTorrent byte stream when pieces cross file boundaries.
+    Normal downloads use downloads/<torrent name>. A torrent created locally
+    can instead be attached to an external read-only source file/folder; that
+    source is verified and seeded in place without being copied to downloads/.
+    Multi-file torrents are always treated as one contiguous BitTorrent byte
+    stream when pieces cross file boundaries.
     """
 
-    def __init__(self, torrent: TorrentFile, download_dir: str = "downloads"):
+    def __init__(
+        self,
+        torrent: TorrentFile,
+        download_dir: str = "downloads",
+        seed_source_path: Optional[str] = None,
+    ):
         self.torrent = torrent
         self.download_dir = download_dir
         self.output_path = os.path.join(download_dir, torrent.name)
+        self.seed_source_path = (
+            os.path.abspath(os.path.expanduser(seed_source_path))
+            if seed_source_path
+            else ""
+        )
+        self.read_only_seed_source = bool(self.seed_source_path)
+        self.last_error: str = ""
 
         self.resume_dir = os.path.join(download_dir, ".salix_resume")
         self.resume_path = os.path.join(
@@ -157,11 +171,13 @@ class PieceManager:
 
     def _initialize_storage_files(self):
         current_offset = 0
+        backing_root = self.seed_source_path or self.output_path
 
         if not self.torrent.is_multi_file:
+            single_path = self.seed_source_path or self.output_path
             self._storage_files = [
                 StorageFile(
-                    path=self.output_path,
+                    path=single_path,
                     relative_path=self.torrent.name,
                     length=self.torrent.total_length,
                     start=0,
@@ -171,7 +187,7 @@ class PieceManager:
             self._storage_starts = [0]
             return
 
-        root = self.output_path
+        root = backing_root
         for file_entry in self.torrent.files:
             length = int(file_entry["length"])
             relative_path = str(file_entry["path"])
@@ -192,6 +208,14 @@ class PieceManager:
     @property
     def storage_prepared(self) -> bool:
         return self._storage_prepared
+
+    @property
+    def storage_mode(self) -> str:
+        return "External Seed" if self.read_only_seed_source else "Download"
+
+    @property
+    def backing_path(self) -> str:
+        return self.seed_source_path or self.output_path
 
     def _set_check_progress(self, checked: int, total: int):
         total = max(0, int(total))
@@ -218,14 +242,21 @@ class PieceManager:
 
     def _payload_exists(self) -> bool:
         if not self.torrent.is_multi_file:
-            return os.path.exists(self.output_path)
+            return bool(self._storage_files) and os.path.isfile(self._storage_files[0].path)
 
-        if not os.path.isdir(self.output_path):
+        root = self.seed_source_path or self.output_path
+        if not os.path.isdir(root):
             return False
 
+        # A folder torrent may legitimately contain only zero-byte files.
+        if not self._storage_files:
+            return os.path.isdir(root)
         return any(os.path.exists(item.path) for item in self._storage_files)
 
     def _create_empty_storage(self):
+        if self.read_only_seed_source:
+            raise OSError("External seed sources are read-only and cannot be created by SalixTorrent.")
+
         os.makedirs(self.download_dir, exist_ok=True)
 
         if not self.torrent.is_multi_file:
@@ -261,10 +292,11 @@ class PieceManager:
             return b""
 
         if not self.torrent.is_multi_file:
-            if not os.path.exists(self.output_path):
+            single_path = self._storage_files[0].path if self._storage_files else self.output_path
+            if not os.path.exists(single_path):
                 return b""
             try:
-                with open(self.output_path, "rb") as file_handle:
+                with open(single_path, "rb") as file_handle:
                     file_handle.seek(offset)
                     data = file_handle.read(length)
                 return data if len(data) == length else b""
@@ -312,6 +344,8 @@ class PieceManager:
             raise ValueError("Attempted to write outside the torrent payload range.")
         if not data:
             return
+        if self.read_only_seed_source:
+            raise OSError("Refusing to write into an external seed source.")
 
         if not self.torrent.is_multi_file:
             os.makedirs(self.download_dir, exist_ok=True)
@@ -360,9 +394,10 @@ class PieceManager:
             return []
 
         if not self.torrent.is_multi_file:
-            if not os.path.exists(self.output_path):
+            single_path = self._storage_files[0].path if self._storage_files else self.backing_path
+            if not os.path.exists(single_path):
                 return []
-            file_size = os.path.getsize(self.output_path)
+            file_size = os.path.getsize(single_path)
             if file_size <= 0:
                 return []
             capped = min(file_size, self.torrent.total_length)
@@ -438,22 +473,40 @@ class PieceManager:
 
             if not self._payload_exists():
                 self._delete_resume_state()
-                self._create_empty_storage()
                 self.downloaded_bytes = 0
                 self.fast_resume_used = False
                 self._set_check_progress(0, 0)
+
+                if self.read_only_seed_source:
+                    self.last_error = (
+                        "Seed source is unavailable: "
+                        f"{self.seed_source_path}"
+                    )
+                    if progress_callback:
+                        progress_callback()
+                    return False
+
+                self._create_empty_storage()
                 self._storage_prepared = True
                 if progress_callback:
                     progress_callback()
                 return True
 
             if self._load_resume_state():
-                self.fast_resume_used = True
-                self._set_check_progress(len(self.pieces), len(self.pieces))
-                self._storage_prepared = True
-                if progress_callback:
-                    progress_callback()
-                return True
+                if self.read_only_seed_source and not self.is_finished:
+                    # An external seed must represent the complete payload. A
+                    # partial resume record is not sufficient evidence.
+                    for piece in self.pieces:
+                        piece.is_complete = False
+                    self.downloaded_bytes = 0
+                else:
+                    self.fast_resume_used = True
+                    self._set_check_progress(len(self.pieces), len(self.pieces))
+                    self._storage_prepared = True
+                    self.last_error = ""
+                    if progress_callback:
+                        progress_callback()
+                    return True
 
             self.fast_resume_used = False
             completed = self._check_existing_pieces(
@@ -464,6 +517,15 @@ class PieceManager:
 
             if completed:
                 self._storage_prepared = True
+
+                if self.read_only_seed_source and not self.is_finished:
+                    self.last_error = (
+                        "The selected seed source does not match every piece in "
+                        "this .torrent. The source was left untouched."
+                    )
+                    return False
+
+                self.last_error = ""
                 self.save_resume_state(force=True)
 
             return completed
@@ -566,9 +628,15 @@ class PieceManager:
                 and int(state.get("total_length", -1)) == self.torrent.total_length
                 and int(state.get("piece_length", -1)) == self.torrent.piece_length
                 and int(state.get("piece_count", -1)) == len(self.pieces)
+                and bool(state.get("external_seed", False)) == self.read_only_seed_source
             )
             if not common:
                 return False
+
+            if self.read_only_seed_source:
+                saved_source = str(state.get("seed_source_path") or "")
+                if os.path.normcase(os.path.abspath(saved_source)) != os.path.normcase(self.seed_source_path):
+                    return False
 
             if self.torrent.is_multi_file:
                 return (
@@ -578,7 +646,8 @@ class PieceManager:
 
             if state.get("multi_file"):
                 return False
-            stat = os.stat(self.output_path)
+            single_path = self._storage_files[0].path if self._storage_files else self.backing_path
+            stat = os.stat(single_path)
             return (
                 int(state.get("file_size", -1)) == stat.st_size
                 and int(state.get("file_mtime_ns", -1)) == stat.st_mtime_ns
@@ -632,6 +701,8 @@ class PieceManager:
                     "completed_bitfield": base64.b64encode(bitfield).decode("ascii"),
                     "completed_pieces": self.completed_pieces,
                     "downloaded_bytes": self.downloaded_bytes,
+                    "external_seed": self.read_only_seed_source,
+                    "seed_source_path": self.seed_source_path if self.read_only_seed_source else "",
                 }
 
                 if self.torrent.is_multi_file:
@@ -644,7 +715,8 @@ class PieceManager:
                         }
                     )
                 else:
-                    stat = os.stat(self.output_path)
+                    single_path = self._storage_files[0].path if self._storage_files else self.backing_path
+                    stat = os.stat(single_path)
                     state.update(
                         {
                             "file_size": stat.st_size,
@@ -772,3 +844,5 @@ class PieceManager:
         if not self.pieces:
             return self.torrent.total_length == 0
         return all(piece.is_complete for piece in self.pieces)
+
+
