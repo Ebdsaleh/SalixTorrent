@@ -12,6 +12,7 @@ from app.views.peer_view import PeerView
 from app.views.piece_view import PieceView
 from app.views.file_view import FileView
 from app.views.source_view import SourceView
+from app.views.speed_view import SpeedView
 
 
 class DownloadView:
@@ -45,6 +46,7 @@ class DownloadView:
         self.piece_view = PieceView()
         self.file_view = FileView()
         self.source_view = SourceView()
+        self.speed_view = SpeedView()
 
     def build_view(self, parent_tag: str | int = "primary_window"):
         with dpg.group(parent=parent_tag):
@@ -219,6 +221,9 @@ class DownloadView:
 
                 with dpg.tab(label="Sources") as sources_tab:
                     self.source_view.build_view(parent_tag=sources_tab)
+
+                with dpg.tab(label="Speed") as speed_tab:
+                    self.speed_view.build_view(parent_tag=speed_tab)
 
         # Shared confirmation dialog for destructive queue actions.
         with dpg.window(
@@ -590,6 +595,7 @@ class DownloadView:
         self.piece_view.reset()
         self.file_view.reset()
         self.source_view.reset()
+        self.speed_view.reset()
 
     def _handle_torrent_removed(self, msg: dict):
         info_hash = msg.get("info_hash", "")
@@ -842,6 +848,7 @@ class DownloadView:
         self.piece_view.render(msg)
         self.file_view.render(msg)
         self.source_view.render(msg)
+        self.speed_view.render(msg)
 
     def update(self, delta_time: float):
         while not self.ui_queue.empty():

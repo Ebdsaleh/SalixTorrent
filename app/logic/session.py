@@ -7,7 +7,8 @@ import random
 import struct
 import threading
 import time
-from typing import Dict, List, Optional, Set, Tuple
+from collections import deque
+from typing import Deque, Dict, List, Optional, Set, Tuple
 
 from app.logic.local_peer_discovery import LocalPeerDiscovery
 from app.logic.peer import PeerConnection, PeerMessageID, identify_peer_client
@@ -21,6 +22,10 @@ RATE_UNIT_MULTIPLIERS = {
     "kbps": 1000.0 / 8.0,
     "Mbps": 1000.0 * 1000.0 / 8.0,
 }
+
+SPEED_HISTORY_SECONDS = 120.0
+SPEED_SAMPLE_INTERVAL = 0.5
+SPEED_HISTORY_MAX_SAMPLES = int(SPEED_HISTORY_SECONDS / SPEED_SAMPLE_INTERVAL) + 8
 
 
 class AsyncBandwidthLimiter:
@@ -150,6 +155,16 @@ class TorrentSession:
 
         self.uploaded_bytes: int = 0
 
+        # Rolling transfer-rate telemetry used by the Speed detail view.
+        # History is intentionally session-local and bounded: 120 seconds at
+        # the existing 0.5 second telemetry cadence is only ~240 samples.
+        self._current_download_speed_kbps: float = 0.0
+        self._current_upload_speed_kbps: float = 0.0
+        self._speed_history: Deque[Tuple[float, float, float]] = deque(
+            maxlen=SPEED_HISTORY_MAX_SAMPLES
+        )
+        self._speed_history.append((time.monotonic(), 0.0, 0.0))
+
         # Per-torrent transfer limits. The user-facing value/unit pair is kept
         # alongside canonical bytes-per-second values so the GUI can restore
         # exactly what the user entered when switching between torrents.
@@ -228,6 +243,7 @@ class TorrentSession:
         ):
             self._prepare_pause_event.clear()
 
+        self._record_speed_sample(0.0, 0.0)
         self._emit_snapshot()
 
     def resume(self):
@@ -312,6 +328,7 @@ class TorrentSession:
 
         self.piece_mgr.reset_inflight_requests()
         self.piece_mgr.save_resume_state(force=True)
+        self._record_speed_sample(0.0, 0.0)
         self._emit_snapshot()
 
     def _is_current_run(self, run_token: int) -> bool:
@@ -589,11 +606,64 @@ class TorrentSession:
             "lan_peers_seen": int(lan_source.get("peers", 0) or 0),
         }
 
+    def _record_speed_sample(self, download_kbps: float, upload_kbps: float):
+        """Record one aggregate transfer-rate sample for this torrent."""
+        down = max(0.0, float(download_kbps or 0.0))
+        up = max(0.0, float(upload_kbps or 0.0))
+        self._current_download_speed_kbps = down
+        self._current_upload_speed_kbps = up
+        self._speed_history.append((time.monotonic(), down, up))
+
+    def _build_speed_view_snapshot(self) -> dict:
+        now = time.monotonic()
+        cutoff = now - SPEED_HISTORY_SECONDS
+        samples = [sample for sample in self._speed_history if sample[0] >= cutoff]
+
+        rendered_samples = [
+            {
+                "age_seconds": max(0.0, now - timestamp),
+                "download_kbps": download_kbps,
+                "upload_kbps": upload_kbps,
+            }
+            for timestamp, download_kbps, upload_kbps in samples
+        ]
+
+        if samples:
+            down_values = [sample[1] for sample in samples]
+            up_values = [sample[2] for sample in samples]
+            average_download = sum(down_values) / len(down_values)
+            average_upload = sum(up_values) / len(up_values)
+            peak_download = max(down_values)
+            peak_upload = max(up_values)
+        else:
+            average_download = 0.0
+            average_upload = 0.0
+            peak_download = 0.0
+            peak_upload = 0.0
+
+        return {
+            "samples": rendered_samples,
+            "history_seconds": SPEED_HISTORY_SECONDS,
+            "sample_interval_seconds": SPEED_SAMPLE_INTERVAL,
+            "current_download_kbps": self._current_download_speed_kbps,
+            "current_upload_kbps": self._current_upload_speed_kbps,
+            "average_download_kbps": average_download,
+            "average_upload_kbps": average_upload,
+            "peak_download_kbps": peak_download,
+            "peak_upload_kbps": peak_upload,
+            "download_limit_kbps": self.download_limit_bps / 1024.0,
+            "upload_limit_kbps": self.upload_limit_bps / 1024.0,
+        }
+
     def _build_snapshot(
         self,
-        speed_kbps: float = 0.0,
-        upload_speed_kbps: float = 0.0,
+        speed_kbps: Optional[float] = None,
+        upload_speed_kbps: Optional[float] = None,
     ) -> dict:
+        if speed_kbps is None:
+            speed_kbps = self._current_download_speed_kbps
+        if upload_speed_kbps is None:
+            upload_speed_kbps = self._current_upload_speed_kbps
         return {
             "type": "TRANSFER_STATS",
             "info_hash": self.torrent.hex_info_hash,
@@ -615,6 +685,7 @@ class TorrentSession:
             "piece_view": self._build_piece_view_snapshot(),
             "file_view": self._build_file_view_snapshot(),
             "sources_view": self._build_sources_view_snapshot(),
+            "speed_view": self._build_speed_view_snapshot(),
             "completed_pieces": self.piece_mgr.completed_pieces,
             "total_pieces": len(self.piece_mgr.pieces),
             "listen_port": self._seed_port if self._seed_server else 0,
@@ -1381,7 +1452,7 @@ class TorrentSession:
 
         try:
             while self._is_current_run(run_token):
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(SPEED_SAMPLE_INTERVAL)
 
                 current_downloaded = self.piece_mgr.downloaded_bytes
                 current_uploaded = self.uploaded_bytes
@@ -1389,7 +1460,7 @@ class TorrentSession:
                 if self.state == SessionState.DOWNLOADING:
                     download_speed_bps = max(
                         0.0,
-                        (current_downloaded - last_downloaded) / 0.5,
+                        (current_downloaded - last_downloaded) / SPEED_SAMPLE_INTERVAL,
                     )
                 else:
                     download_speed_bps = 0.0
@@ -1397,21 +1468,20 @@ class TorrentSession:
                 if self.state == SessionState.SEEDING:
                     upload_speed_bps = max(
                         0.0,
-                        (current_uploaded - last_uploaded) / 0.5,
+                        (current_uploaded - last_uploaded) / SPEED_SAMPLE_INTERVAL,
                     )
                 else:
                     upload_speed_bps = 0.0
 
                 last_downloaded = current_downloaded
                 last_uploaded = current_uploaded
-                self._sample_peer_speeds(0.5)
-
-                self.ui_queue.put(
-                    self._build_snapshot(
-                        speed_kbps=download_speed_bps / 1024,
-                        upload_speed_kbps=upload_speed_bps / 1024,
-                    )
+                self._sample_peer_speeds(SPEED_SAMPLE_INTERVAL)
+                self._record_speed_sample(
+                    download_speed_bps / 1024.0,
+                    upload_speed_bps / 1024.0,
                 )
+
+                self.ui_queue.put(self._build_snapshot())
 
         except asyncio.CancelledError:
             pass
