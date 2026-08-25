@@ -55,6 +55,15 @@ class LocalPeerDiscovery:
         self._closed: bool = False
         self._last_query_response: float = 0.0
 
+        # Lightweight telemetry for the Sources view. These values describe
+        # actual BEP-14 multicast activity; they are not inferred from the
+        # torrent's tracker results.
+        self.started_at: float = 0.0
+        self.last_announce_at: float = 0.0
+        self.last_peer_at: float = 0.0
+        self.announce_count: int = 0
+        self.remote_queries_seen: int = 0
+
     @staticmethod
     def _make_socket() -> socket.socket:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
@@ -100,6 +109,8 @@ class LocalPeerDiscovery:
         self.protocol = protocol
         self.enabled = True
         self.last_error = ""
+        if not self.started_at:
+            self.started_at = time.monotonic()
         self.announce()
         self._announce_task = asyncio.create_task(self._announce_loop())
         return True
@@ -128,6 +139,8 @@ class LocalPeerDiscovery:
                 self._build_announcement(),
                 (LPD_MULTICAST_GROUP, LPD_PORT),
             )
+            self.last_announce_at = time.monotonic()
+            self.announce_count += 1
         except (OSError, RuntimeError) as exc:
             self.last_error = str(exc)
 
@@ -180,6 +193,7 @@ class LocalPeerDiscovery:
         # multicast announcement. Only port-0 queries trigger this response, so
         # two seeders cannot get stuck echoing announcements at each other.
         if remote_port == 0:
+            self.remote_queries_seen += 1
             now = time.monotonic()
             if self.listen_port > 0 and now - self._last_query_response >= 1.0:
                 self._last_query_response = now
@@ -201,6 +215,7 @@ class LocalPeerDiscovery:
         if endpoint in self._seen:
             return
         self._seen.add(endpoint)
+        self.last_peer_at = time.monotonic()
 
         try:
             self._peer_queue.put_nowait(endpoint)
@@ -215,6 +230,42 @@ class LocalPeerDiscovery:
             except asyncio.QueueEmpty:
                 break
         return peers
+
+
+    def get_source_snapshot(self) -> dict:
+        """Return current Local Peer Discovery telemetry for the Sources tab."""
+        now = time.monotonic()
+        if self.enabled:
+            status = "Active" if not self.last_error else "Error"
+        else:
+            status = "Disabled" if not self.last_error else "Error"
+
+        last_update_at = self.last_peer_at or self.last_announce_at
+        return {
+            "id": "lpd",
+            "source": "Local Peer Discovery",
+            "type": "LAN",
+            "status": status,
+            "peers": len(self._seen),
+            "seeders": None,
+            "leechers": None,
+            "interval": int(self.announce_interval),
+            "response_ms": None,
+            "last_error": str(self.last_error or ""),
+            "last_event": "multicast",
+            "query_count": int(self.announce_count),
+            "last_update_seconds": (
+                max(0.0, now - last_update_at) if last_update_at else None
+            ),
+            "last_success_seconds": (
+                max(0.0, now - self.last_peer_at) if self.last_peer_at else None
+            ),
+            "detail": (
+                f"{LPD_MULTICAST_GROUP}:{LPD_PORT} | "
+                f"listen {self.listen_port if self.listen_port else '--'} | "
+                f"queries {self.remote_queries_seen}"
+            ),
+        }
 
     async def close(self):
         self._closed = True

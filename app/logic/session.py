@@ -561,6 +561,34 @@ class TorrentSession:
     def _build_file_view_snapshot(self) -> dict:
         return self.piece_mgr.build_file_telemetry(detail_limit=500)
 
+    def _build_sources_view_snapshot(self) -> dict:
+        tracker_sources = self.tracker.get_source_snapshots()
+        lan_source = self._lpd.get_source_snapshot()
+        sources = list(tracker_sources) + [lan_source]
+
+        active_statuses = {"Active", "No Peers"}
+        active_count = sum(
+            1 for source in sources
+            if str(source.get("status", "")) in active_statuses
+        )
+        problem_count = sum(
+            1 for source in sources
+            if str(source.get("status", "")) in {"Timeout", "Error"}
+        )
+        tracker_peer_count = sum(
+            max(0, int(source.get("peers", 0) or 0))
+            for source in tracker_sources
+        )
+
+        return {
+            "sources": sources,
+            "tracker_count": len(tracker_sources),
+            "active_count": active_count,
+            "problem_count": problem_count,
+            "tracker_peers_last_seen": tracker_peer_count,
+            "lan_peers_seen": int(lan_source.get("peers", 0) or 0),
+        }
+
     def _build_snapshot(
         self,
         speed_kbps: float = 0.0,
@@ -586,6 +614,7 @@ class TorrentSession:
             "peers": self._build_peer_snapshots(),
             "piece_view": self._build_piece_view_snapshot(),
             "file_view": self._build_file_view_snapshot(),
+            "sources_view": self._build_sources_view_snapshot(),
             "completed_pieces": self.piece_mgr.completed_pieces,
             "total_pieces": len(self.piece_mgr.pieces),
             "listen_port": self._seed_port if self._seed_server else 0,
