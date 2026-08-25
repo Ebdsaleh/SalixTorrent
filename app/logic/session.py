@@ -225,6 +225,30 @@ class TorrentSession:
         self._upload_limiter.set_rate(self.upload_limit_bps)
         self._emit_snapshot()
 
+    def set_file_priority(self, file_index: int, priority: object) -> bool:
+        """Apply one file priority live and refresh the selected-torrent views."""
+        changed = self.piece_mgr.set_file_priority(file_index, priority)
+        if not changed:
+            return False
+
+        # A torrent may have previously completed only its selected files. If a
+        # skipped file becomes wanted again, expose it as startable work.
+        if (
+            self.state == SessionState.COMPLETED
+            and not self.piece_mgr.is_finished
+            and not self.piece_mgr.wanted_is_finished
+        ):
+            self.state = SessionState.STOPPED
+
+        self._emit_snapshot()
+        return True
+
+    def set_file_priorities(self, priorities: object, emit: bool = True) -> bool:
+        changed = self.piece_mgr.set_file_priorities(priorities)
+        if changed and emit:
+            self._emit_snapshot()
+        return changed
+
     def pause(self):
         if self.state not in (
             SessionState.CHECKING,
@@ -345,6 +369,13 @@ class TorrentSession:
                 return f"Paused (Checking {check_percent:.0f}%)"
             if self._paused_from_state:
                 return f"Paused ({self._paused_from_state})"
+
+        if (
+            self.state == SessionState.COMPLETED
+            and not self.piece_mgr.is_finished
+            and self.piece_mgr.wanted_is_finished
+        ):
+            return "Completed (Selected Files)"
 
         return self.state
 
@@ -671,6 +702,10 @@ class TorrentSession:
             "state": self.state,
             "state_label": self._state_label(),
             "progress": self.piece_mgr.progress,
+            "wanted_progress": self.piece_mgr.wanted_progress,
+            "wanted_completed_pieces": self.piece_mgr.completed_wanted_pieces,
+            "wanted_total_pieces": self.piece_mgr.wanted_piece_count,
+            "wanted_finished": self.piece_mgr.wanted_is_finished,
             "checking_progress": self.piece_mgr.check_progress,
             "checked_pieces": self.piece_mgr.check_checked_pieces,
             "check_total_pieces": self.piece_mgr.check_total_pieces,
@@ -772,6 +807,15 @@ class TorrentSession:
 
             started_complete = self.piece_mgr.is_finished
 
+            # If every currently wanted file is already complete (including
+            # the valid case where every file is marked Don't Download), there
+            # is no network work to schedule. A fully complete torrent still
+            # proceeds into seeding below.
+            if not started_complete and self.piece_mgr.wanted_is_finished:
+                self.state = SessionState.COMPLETED
+                self._emit_snapshot()
+                return
+
             local_telemetry_task = asyncio.create_task(
                 self._telemetry_loop(run_token)
             )
@@ -785,6 +829,10 @@ class TorrentSession:
 
             if self._is_current_run(run_token) and self.piece_mgr.is_finished:
                 await self._run_seeding(run_token, completion_event=True)
+            elif self._is_current_run(run_token) and self.piece_mgr.wanted_is_finished:
+                self.state = SessionState.COMPLETED
+                self._record_speed_sample(0.0, 0.0)
+                self._emit_snapshot()
 
         except asyncio.CancelledError:
             pass
@@ -820,6 +868,9 @@ class TorrentSession:
                     # or Stopped by the user.
                     if self.state not in (SessionState.PAUSED, SessionState.STOPPED):
                         self.state = SessionState.COMPLETED
+                elif self.piece_mgr.wanted_is_finished:
+                    if self.state not in (SessionState.PAUSED, SessionState.STOPPED):
+                        self.state = SessionState.COMPLETED
                 elif self.state not in (SessionState.PAUSED, SessionState.STOPPED):
                     self.state = SessionState.STOPPED
 
@@ -848,7 +899,7 @@ class TorrentSession:
         tracker_event: Optional[str] = "started"
 
         try:
-            while self._is_current_run(run_token) and not self.piece_mgr.is_finished:
+            while self._is_current_run(run_token) and not self.piece_mgr.wanted_is_finished:
                 await self._pause_event.wait()
                 if not self._is_current_run(run_token):
                     break
@@ -963,7 +1014,11 @@ class TorrentSession:
         try:
             await self._download_limiter.throttle(block.length)
 
-            if self.state != SessionState.DOWNLOADING or not peer.is_connected:
+            if (
+                self.state != SessionState.DOWNLOADING
+                or not peer.is_connected
+                or not self.piece_mgr.is_piece_wanted(block.piece_index)
+            ):
                 block.is_requested = False
                 if block in owned_requests:
                     owned_requests.remove(block)
@@ -1008,7 +1063,7 @@ class TorrentSession:
         await peer.send_interested()
 
         try:
-            while self._is_current_run(run_token) and not self.piece_mgr.is_finished:
+            while self._is_current_run(run_token) and not self.piece_mgr.wanted_is_finished:
                 await self._pause_event.wait()
 
                 if not self._is_current_run(run_token):

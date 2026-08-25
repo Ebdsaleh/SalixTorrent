@@ -19,6 +19,23 @@ BLOCK_SIZE = 16384
 RESUME_STATE_VERSION = 1
 MULTI_FILE_RESUME_INTERVAL = 5.0
 
+FILE_PRIORITY_SKIP = "Don't Download"
+FILE_PRIORITY_LOW = "Low"
+FILE_PRIORITY_NORMAL = "Normal"
+FILE_PRIORITY_HIGH = "High"
+FILE_PRIORITIES = (
+    FILE_PRIORITY_HIGH,
+    FILE_PRIORITY_NORMAL,
+    FILE_PRIORITY_LOW,
+    FILE_PRIORITY_SKIP,
+)
+FILE_PRIORITY_RANK = {
+    FILE_PRIORITY_SKIP: 0,
+    FILE_PRIORITY_LOW: 1,
+    FILE_PRIORITY_NORMAL: 2,
+    FILE_PRIORITY_HIGH: 3,
+}
+
 
 class Block:
     def __init__(self, piece_index: int, offset: int, length: int):
@@ -161,6 +178,15 @@ class PieceManager:
         self._initialize_pieces()
         self._initialize_storage_files()
 
+        # Per-file download priorities. These are local user preferences rather
+        # than .torrent metadata, so TorrentManager persists them in session
+        # state and restores them when SalixTorrent starts again.
+        self.file_priorities: List[str] = [
+            FILE_PRIORITY_NORMAL for _ in self._storage_files
+        ]
+        self._piece_priority_ranks: List[int] = []
+        self._rebuild_piece_priority_cache()
+
     def _initialize_pieces(self):
         total_remaining = self.torrent.total_length
 
@@ -204,6 +230,138 @@ class PieceManager:
             current_offset += length
 
         self._storage_starts = [item.start for item in self._storage_files]
+
+    @staticmethod
+    def normalise_file_priority(priority: object) -> str:
+        value = str(priority or "").strip()
+        return value if value in FILE_PRIORITY_RANK else FILE_PRIORITY_NORMAL
+
+    def _file_indices_for_piece(self, piece_index: int) -> List[int]:
+        """Return every payload file overlapped by one BitTorrent piece."""
+        if piece_index < 0 or piece_index >= len(self.pieces) or not self._storage_files:
+            return []
+
+        piece = self.pieces[piece_index]
+        start = piece_index * self.torrent.piece_length
+        end = min(self.torrent.total_length, start + piece.length)
+        index = self._storage_index_for_offset(start)
+        result: List[int] = []
+
+        while 0 <= index < len(self._storage_files):
+            item = self._storage_files[index]
+            if item.start >= end:
+                break
+            if item.end > start:
+                result.append(index)
+            index += 1
+
+        return result
+
+    def _rebuild_piece_priority_cache(self):
+        """Collapse file preferences into one scheduler priority per piece.
+
+        A piece can straddle file boundaries. The highest-priority wanted file
+        wins. A piece is skipped only when every overlapping file is marked
+        Don't Download, because boundary bytes may still be required to finish
+        a wanted neighbouring file.
+        """
+        ranks: List[int] = [0] * len(self.pieces)
+
+        for piece_index in range(len(self.pieces)):
+            file_indices = self._file_indices_for_piece(piece_index)
+            if not file_indices:
+                ranks[piece_index] = FILE_PRIORITY_RANK[FILE_PRIORITY_NORMAL]
+                continue
+
+            ranks[piece_index] = max(
+                FILE_PRIORITY_RANK.get(
+                    self.file_priorities[file_index],
+                    FILE_PRIORITY_RANK[FILE_PRIORITY_NORMAL],
+                )
+                for file_index in file_indices
+            )
+
+        self._piece_priority_ranks = ranks
+
+    def get_file_priorities(self) -> List[str]:
+        return list(self.file_priorities)
+
+    def set_file_priorities(self, priorities: object) -> bool:
+        """Restore/replace all file priorities from persistent session state."""
+        if not isinstance(priorities, (list, tuple)):
+            return False
+
+        changed = False
+        for index in range(len(self.file_priorities)):
+            if index >= len(priorities):
+                break
+            priority = self.normalise_file_priority(priorities[index])
+            if self.file_priorities[index] != priority:
+                self.file_priorities[index] = priority
+                changed = True
+
+        if changed:
+            self._rebuild_piece_priority_cache()
+        return changed
+
+    def set_file_priority(self, file_index: int, priority: object) -> bool:
+        try:
+            file_index = int(file_index)
+        except (TypeError, ValueError):
+            return False
+
+        if file_index < 0 or file_index >= len(self.file_priorities):
+            return False
+
+        priority = self.normalise_file_priority(priority)
+        if self.file_priorities[file_index] == priority:
+            return False
+
+        self.file_priorities[file_index] = priority
+        self._rebuild_piece_priority_cache()
+        return True
+
+    def is_piece_wanted(self, piece_index: int) -> bool:
+        return self.piece_priority_rank(piece_index) > 0
+
+    def piece_priority_rank(self, piece_index: int) -> int:
+        if piece_index < 0 or piece_index >= len(self._piece_priority_ranks):
+            return 0
+        return int(self._piece_priority_ranks[piece_index])
+
+    def piece_priority_name(self, piece_index: int) -> str:
+        rank = self.piece_priority_rank(piece_index)
+        for name, value in FILE_PRIORITY_RANK.items():
+            if value == rank:
+                return name
+        return FILE_PRIORITY_NORMAL
+
+    @property
+    def wanted_piece_count(self) -> int:
+        return sum(1 for rank in self._piece_priority_ranks if rank > 0)
+
+    @property
+    def completed_wanted_pieces(self) -> int:
+        return sum(
+            1
+            for index, piece in enumerate(self.pieces)
+            if self.piece_priority_rank(index) > 0 and piece.is_complete
+        )
+
+    @property
+    def wanted_progress(self) -> float:
+        total = self.wanted_piece_count
+        if total <= 0:
+            return 1.0
+        return self.completed_wanted_pieces / total
+
+    @property
+    def wanted_is_finished(self) -> bool:
+        return all(
+            piece.is_complete
+            for index, piece in enumerate(self.pieces)
+            if self.piece_priority_rank(index) > 0
+        )
 
     @property
     def storage_prepared(self) -> bool:
@@ -744,21 +902,33 @@ class PieceManager:
             pass
 
     def get_next_request(self, peer_bitfield: bytearray) -> Optional[Block]:
-        for piece in self.pieces:
-            if piece.is_complete:
-                continue
+        """Return the next block this peer can provide, honoring file priority.
 
-            byte_index = piece.index // 8
-            bit_index = 7 - (piece.index % 8)
-            if byte_index >= len(peer_bitfield):
-                continue
-            if not (peer_bitfield[byte_index] & (1 << bit_index)):
-                continue
+        High-priority files are exhausted before Normal, then Low. Pieces whose
+        overlapping files are all marked Don't Download are never requested.
+        """
+        for wanted_rank in (
+            FILE_PRIORITY_RANK[FILE_PRIORITY_HIGH],
+            FILE_PRIORITY_RANK[FILE_PRIORITY_NORMAL],
+            FILE_PRIORITY_RANK[FILE_PRIORITY_LOW],
+        ):
+            for piece in self.pieces:
+                if piece.is_complete:
+                    continue
+                if self.piece_priority_rank(piece.index) != wanted_rank:
+                    continue
 
-            for block in piece.blocks:
-                if not block.is_requested and block.data is None:
-                    block.is_requested = True
-                    return block
+                byte_index = piece.index // 8
+                bit_index = 7 - (piece.index % 8)
+                if byte_index >= len(peer_bitfield):
+                    continue
+                if not (peer_bitfield[byte_index] & (1 << bit_index)):
+                    continue
+
+                for block in piece.blocks:
+                    if not block.is_requested and block.data is None:
+                        block.is_requested = True
+                        return block
 
         return None
 
@@ -962,9 +1132,16 @@ class PieceManager:
             else:
                 progress = max(0.0, min(1.0, verified_bytes / item.length))
 
+            priority = (
+                self.file_priorities[index]
+                if index < len(self.file_priorities)
+                else FILE_PRIORITY_NORMAL
+            )
             activity = active_files.get(index, {})
             if item.length == 0 or verified_bytes >= item.length:
                 state = "Complete"
+            elif priority == FILE_PRIORITY_SKIP:
+                state = "Skipped"
             elif activity.get("received"):
                 state = "Downloading"
             elif activity.get("requested"):
@@ -991,6 +1168,7 @@ class PieceManager:
                 "last_piece": last_piece,
                 "piece_span": piece_span,
                 "state": state,
+                "priority": priority,
             })
 
         return {
@@ -1000,6 +1178,10 @@ class PieceManager:
             "is_multi_file": bool(self.torrent.is_multi_file),
             "total_bytes": self.torrent.total_length,
             "verified_bytes": verified_total,
+            "wanted_piece_count": self.wanted_piece_count,
+            "completed_wanted_pieces": self.completed_wanted_pieces,
+            "wanted_progress": self.wanted_progress,
+            "wanted_finished": self.wanted_is_finished,
             "storage_mode": self.storage_mode,
             "backing_path": os.path.abspath(self.backing_path),
             "files": records,

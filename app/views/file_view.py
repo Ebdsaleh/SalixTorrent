@@ -4,9 +4,13 @@ from __future__ import annotations
 
 import dearpygui.dearpygui as dpg
 
+from app.logic.torrent_manager import TorrentManager
+
 
 class FileView:
-    """Live per-file progress for single-file and multi-file torrents."""
+    """Live per-file progress plus per-file download-priority controls."""
+
+    PRIORITIES = ("High", "Normal", "Low", "Don't Download")
 
     STATE_COLORS = {
         "Complete": (100, 180, 255),
@@ -14,15 +18,25 @@ class FileView:
         "Requested": (255, 200, 100),
         "Partial": (180, 160, 255),
         "Missing": (155, 155, 160),
+        "Skipped": (120, 120, 125),
+    }
+
+    PRIORITY_COLORS = {
+        "High": (255, 190, 90),
+        "Normal": (190, 190, 195),
+        "Low": (150, 170, 220),
+        "Don't Download": (125, 125, 130),
     }
 
     def __init__(self):
+        self.manager = TorrentManager.get_instance()
         self.summary_text = None
         self.storage_text = None
         self.note_text = None
         self.table_id = None
         self._rows = {}
         self._current_info_hash = ""
+        self._storage_mode = "Download"
 
     def build_view(self, parent_tag):
         with dpg.child_window(parent=parent_tag, height=315, border=True):
@@ -35,7 +49,7 @@ class FileView:
                 color=(180, 180, 180),
             )
             self.note_text = dpg.add_text(
-                "Per-file progress counts SHA-1 verified bytes only.",
+                "Right-click a file to set High, Normal, Low, or Don't Download.",
                 color=(150, 150, 150),
             )
             dpg.add_separator()
@@ -53,7 +67,7 @@ class FileView:
                 dpg.add_table_column(
                     label="File",
                     width_stretch=True,
-                    init_width_or_weight=0.50,
+                    init_width_or_weight=0.45,
                 )
                 dpg.add_table_column(
                     label="Size",
@@ -69,6 +83,11 @@ class FileView:
                     label="Pieces",
                     width_fixed=True,
                     init_width_or_weight=90,
+                )
+                dpg.add_table_column(
+                    label="Priority",
+                    width_fixed=True,
+                    init_width_or_weight=125,
                 )
                 dpg.add_table_column(
                     label="State",
@@ -95,16 +114,28 @@ class FileView:
             return f"{value / kib:.1f} KiB"
         return f"{value} B"
 
+    def _delete_row(self, index: int):
+        row = self._rows.pop(index, None)
+        if not row:
+            return
+
+        row_id = row.get("row")
+        if row_id and dpg.does_item_exist(row_id):
+            dpg.delete_item(row_id)
+
+        for key in ("popup", "right_click_registry"):
+            item = row.get(key)
+            if item and dpg.does_item_exist(item):
+                dpg.delete_item(item)
+
     def _clear_rows(self):
-        for row in self._rows.values():
-            row_id = row.get("row")
-            if row_id and dpg.does_item_exist(row_id):
-                dpg.delete_item(row_id)
-        self._rows.clear()
+        for index in list(self._rows):
+            self._delete_row(index)
 
     def reset(self):
         self._clear_rows()
         self._current_info_hash = ""
+        self._storage_mode = "Download"
 
         if self.summary_text and dpg.does_item_exist(self.summary_text):
             dpg.set_value(
@@ -116,20 +147,99 @@ class FileView:
         if self.note_text and dpg.does_item_exist(self.note_text):
             dpg.set_value(
                 self.note_text,
-                "Per-file progress counts SHA-1 verified bytes only.",
+                "Right-click a file to set High, Normal, Low, or Don't Download.",
             )
+
+    def _set_priority(self, file_index: int, priority: str):
+        if not self._current_info_hash or self._storage_mode == "External Seed":
+            return
+
+        self.manager.set_file_priority(
+            self._current_info_hash,
+            int(file_index),
+            priority,
+        )
+
+        row = self._rows.get(int(file_index))
+        if row:
+            popup_id = row.get("popup")
+            if popup_id and dpg.does_item_exist(popup_id):
+                dpg.hide_item(popup_id)
+
+    def _refresh_priority_menu(self, row: dict, priority: str):
+        read_only = self._storage_mode == "External Seed"
+        for name, item_id in row.get("priority_items", {}).items():
+            if not dpg.does_item_exist(item_id):
+                continue
+            dpg.configure_item(
+                item_id,
+                label=(f"* {name}" if name == priority else name),
+                enabled=(not read_only and name != priority),
+            )
+
+    def _on_file_right_clicked(self, file_index: int, popup_id):
+        row = self._rows.get(int(file_index))
+        if not row:
+            return
+        self._refresh_priority_menu(row, row.get("priority_value", "Normal"))
+        dpg.configure_item(popup_id, show=True)
+
+    def _build_priority_menu(self, file_index: int, row_cells):
+        with dpg.window(
+            popup=True,
+            show=False,
+            autosize=True,
+            no_title_bar=True,
+        ) as popup_id:
+            dpg.add_text("File Priority", color=(180, 160, 255))
+            dpg.add_separator()
+            priority_items = {}
+            for priority in self.PRIORITIES:
+                priority_items[priority] = dpg.add_menu_item(
+                    label=priority,
+                    user_data=(file_index, priority),
+                    callback=lambda s, a, u: self._set_priority(u[0], u[1]),
+                )
+
+        with dpg.item_handler_registry() as right_click_registry:
+            dpg.add_item_clicked_handler(
+                button=dpg.mvMouseButton_Right,
+                user_data=(file_index, popup_id),
+                callback=lambda s, a, u: self._on_file_right_clicked(u[0], u[1]),
+            )
+
+        for cell in row_cells:
+            dpg.bind_item_handler_registry(cell, right_click_registry)
+
+        return popup_id, right_click_registry, priority_items
 
     def _create_row(self, record: dict):
         index = int(record.get("index", 0) or 0)
         state = str(record.get("state", "Missing"))
-        color = self.STATE_COLORS.get(state, self.STATE_COLORS["Missing"])
+        priority = str(record.get("priority", "Normal"))
+        state_color = self.STATE_COLORS.get(state, self.STATE_COLORS["Missing"])
+        priority_color = self.PRIORITY_COLORS.get(
+            priority,
+            self.PRIORITY_COLORS["Normal"],
+        )
 
         with dpg.table_row(parent=self.table_id) as row_id:
             path_cell = dpg.add_text(str(record.get("path", "")))
             size_cell = dpg.add_text(self._format_size(record.get("length", 0)))
             progress_cell = dpg.add_text("0.0%")
             pieces_cell = dpg.add_text(str(record.get("piece_span", "--")))
-            state_cell = dpg.add_text(state, color=color)
+            priority_cell = dpg.add_text(priority, color=priority_color)
+            state_cell = dpg.add_text(state, color=state_color)
+
+        cells = (
+            path_cell,
+            size_cell,
+            progress_cell,
+            pieces_cell,
+            priority_cell,
+            state_cell,
+        )
+        popup_id, registry, priority_items = self._build_priority_menu(index, cells)
 
         self._rows[index] = {
             "row": row_id,
@@ -137,8 +247,14 @@ class FileView:
             "size": size_cell,
             "progress": progress_cell,
             "pieces": pieces_cell,
+            "priority": priority_cell,
             "state": state_cell,
+            "popup": popup_id,
+            "right_click_registry": registry,
+            "priority_items": priority_items,
+            "priority_value": priority,
         }
+        self._refresh_priority_menu(self._rows[index], priority)
         return self._rows[index]
 
     def render(self, snapshot: dict):
@@ -152,6 +268,8 @@ class FileView:
             self._clear_rows()
             self._current_info_hash = info_hash
 
+        self._storage_mode = str(file_view.get("storage_mode", "Download"))
+
         file_count = int(file_view.get("file_count", 0) or 0)
         displayed_count = int(file_view.get("displayed_count", 0) or 0)
         total_bytes = int(file_view.get("total_bytes", 0) or 0)
@@ -161,14 +279,15 @@ class FileView:
             min(1.0, verified_bytes / total_bytes),
         )
         kind = "multi-file" if file_view.get("is_multi_file") else "single-file"
-        storage_mode = str(file_view.get("storage_mode", "Download"))
 
+        wanted_done = int(file_view.get("completed_wanted_pieces", 0) or 0)
+        wanted_total = int(file_view.get("wanted_piece_count", 0) or 0)
         dpg.set_value(
             self.summary_text,
             (
                 f"Files: {file_count:,} ({kind}) | "
                 f"Verified: {self._format_size(verified_bytes)} / {self._format_size(total_bytes)} "
-                f"({progress * 100:.2f}%) | Storage: {storage_mode}"
+                f"({progress * 100:.2f}%) | Wanted pieces: {wanted_done:,}/{wanted_total:,}"
             ),
         )
         dpg.set_value(
@@ -176,13 +295,20 @@ class FileView:
             f"Storage Root: {file_view.get('backing_path') or '--'}",
         )
 
-        if file_view.get("truncated"):
+        if self._storage_mode == "External Seed":
             note = (
-                f"Showing {displayed_count:,} of {file_count:,} files around the current "
-                "download position and active transfers. Per-file progress counts verified bytes."
+                "External seed source is read-only; file priorities are disabled while seeding it."
+            )
+        elif file_view.get("truncated"):
+            note = (
+                f"Showing {displayed_count:,} of {file_count:,} files. Right-click a file to set priority. "
+                "Don't Download skips pieces used only by skipped files."
             )
         else:
-            note = "Per-file progress counts SHA-1 verified bytes only; active pieces are labelled separately."
+            note = (
+                "Right-click a file to set priority. Boundary pieces shared with a wanted file may still "
+                "write a small amount into a skipped neighbouring file."
+            )
         dpg.set_value(self.note_text, note)
 
         visible_indices = set()
@@ -196,19 +322,24 @@ class FileView:
                 min(1.0, float(record.get("progress", 0.0) or 0.0)),
             )
             state = str(record.get("state", "Missing"))
-            color = self.STATE_COLORS.get(state, self.STATE_COLORS["Missing"])
+            priority = str(record.get("priority", "Normal"))
+            state_color = self.STATE_COLORS.get(state, self.STATE_COLORS["Missing"])
+            priority_color = self.PRIORITY_COLORS.get(
+                priority,
+                self.PRIORITY_COLORS["Normal"],
+            )
 
             dpg.set_value(row["path"], str(record.get("path", "")))
             dpg.set_value(row["size"], self._format_size(record.get("length", 0)))
             dpg.set_value(row["progress"], f"{progress_value * 100:.1f}%")
             dpg.set_value(row["pieces"], str(record.get("piece_span", "--")))
+            dpg.set_value(row["priority"], priority)
+            dpg.configure_item(row["priority"], color=priority_color)
             dpg.set_value(row["state"], state)
-            dpg.configure_item(row["state"], color=color)
+            dpg.configure_item(row["state"], color=state_color)
+            row["priority_value"] = priority
+            self._refresh_priority_menu(row, priority)
 
         for index in list(self._rows):
-            if index in visible_indices:
-                continue
-            row_id = self._rows[index].get("row")
-            if row_id and dpg.does_item_exist(row_id):
-                dpg.delete_item(row_id)
-            self._rows.pop(index, None)
+            if index not in visible_indices:
+                self._delete_row(index)

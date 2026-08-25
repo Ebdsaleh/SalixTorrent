@@ -769,6 +769,19 @@ class DownloadView:
                     f"{msg['completed_pieces']} / {msg['total_pieces']} Pieces Verified"
                 ),
             )
+        elif state == "Completed" and msg.get("wanted_finished") and msg.get("progress", 0.0) < 1.0:
+            wanted_prog = float(msg.get("wanted_progress", 1.0) or 0.0)
+            total_prog = float(msg.get("progress", 0.0) or 0.0)
+            dpg.set_value(self.progress_bar, wanted_prog)
+            dpg.set_value(
+                self.progress_label,
+                (
+                    f"{wanted_prog * 100:.2f}% Selected Files Complete "
+                    f"({msg.get('wanted_completed_pieces', 0)} / "
+                    f"{msg.get('wanted_total_pieces', 0)} Wanted Pieces) — "
+                    f"{total_prog * 100:.2f}% of full torrent"
+                ),
+            )
         else:
             prog = msg["progress"]
             dpg.set_value(self.progress_bar, prog)

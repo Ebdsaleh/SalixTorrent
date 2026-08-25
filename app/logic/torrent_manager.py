@@ -20,6 +20,7 @@ class TorrentCommand:
     STOP = "STOP"
     REMOVE = "REMOVE"
     SET_LIMITS = "SET_LIMITS"
+    SET_FILE_PRIORITY = "SET_FILE_PRIORITY"
     SHUTDOWN = "SHUTDOWN"
 
 
@@ -36,7 +37,7 @@ class SessionIntent:
 
 class TorrentManager:
     _instance: Optional["TorrentManager"] = None
-    SESSION_STATE_VERSION = 2
+    SESSION_STATE_VERSION = 3
 
     def __new__(cls, ui_queue: Optional[queue.Queue] = None):
         if cls._instance is None:
@@ -188,6 +189,7 @@ class TorrentManager:
                     "upload_limit_unit": session.upload_limit_unit,
                     "uploaded_bytes": int(session.uploaded_bytes),
                     "seed_source_path": session.seed_source_path,
+                    "file_priorities": session.piece_mgr.get_file_priorities(),
                 }
             )
 
@@ -231,7 +233,7 @@ class TorrentManager:
 
         if not isinstance(data, dict):
             return None
-        if data.get("version") not in (1, self.SESSION_STATE_VERSION):
+        if data.get("version") not in (1, 2, self.SESSION_STATE_VERSION):
             print("[Salix_T Notice] Previous session uses an unsupported format.")
             return None
         if not isinstance(data.get("torrents", []), list):
@@ -344,6 +346,11 @@ class TorrentManager:
                 except (TypeError, ValueError):
                     uploaded_bytes = 0
                 session.uploaded_bytes = uploaded_bytes
+
+                session.set_file_priorities(
+                    entry.get("file_priorities", []),
+                    emit=False,
+                )
 
                 session.set_transfer_limits(
                     entry.get("download_limit_value", 0.0),
@@ -677,6 +684,15 @@ class TorrentManager:
                     )
                     self.save_session_state()
 
+                elif action == TorrentCommand.SET_FILE_PRIORITY:
+                    payload = payload or {}
+                    changed = session.set_file_priority(
+                        payload.get("file_index", -1),
+                        payload.get("priority", "Normal"),
+                    )
+                    if changed:
+                        self.save_session_state()
+
             finally:
                 self._cmd_queue.task_done()
 
@@ -718,6 +734,7 @@ class TorrentManager:
 
         replacement_limits = None
         replacement_uploaded = 0
+        replacement_priorities = None
         replaced_existing = False
 
         with self._sessions_lock:
@@ -749,6 +766,7 @@ class TorrentManager:
                         existing_session.upload_limit_unit,
                     )
                     replacement_uploaded = existing_session.uploaded_bytes
+                    replacement_priorities = existing_session.piece_mgr.get_file_priorities()
                     self.sessions[info_hash] = new_session
                     self._desired_states[info_hash] = SessionIntent.IDLE
                     self._source_paths[info_hash] = torrent_path
@@ -780,6 +798,8 @@ class TorrentManager:
         if replacement_limits:
             new_session.uploaded_bytes = replacement_uploaded
             new_session.set_transfer_limits(*replacement_limits)
+        if replacement_priorities:
+            new_session.set_file_priorities(replacement_priorities, emit=False)
 
         self._cache_torrent_file(info_hash, torrent_path)
 
@@ -882,6 +902,22 @@ class TorrentManager:
             },
         )
 
+    def set_file_priority(
+        self,
+        info_hash: str,
+        file_index: int,
+        priority: str,
+    ):
+        """Set one payload file's scheduler priority for a torrent."""
+        self._send_cmd(
+            TorrentCommand.SET_FILE_PRIORITY,
+            info_hash,
+            {
+                "file_index": int(file_index),
+                "priority": str(priority),
+            },
+        )
+
     def shutdown(self, timeout: float = 5.0):
         """Persist intent, then cleanly stop the async engine before process exit."""
         # This snapshot is the important one: it captures ACTIVE before the
@@ -906,5 +942,3 @@ class TorrentManager:
 
         if thread and thread.is_alive():
             print("[Salix_T Notice] Async engine did not finish shutdown before timeout.")
-
-
