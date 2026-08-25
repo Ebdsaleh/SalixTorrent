@@ -7,6 +7,7 @@ import dearpygui.dearpygui as dpg
 from app.engine.gui_engine import GuiEngine
 from app.views.create_torrent_view import CreateTorrentView
 from app.views.download_view import DownloadView
+from app.views.settings_view import SettingsView
 
 
 class MasterViewport:
@@ -29,6 +30,10 @@ class MasterViewport:
                     label=" Create Torrent ",
                     callback=lambda: self.gui.switch_scene("CreateTorrentView"),
                 )
+                dpg.add_button(
+                    label=" Preferences ",
+                    callback=lambda: self.gui.switch_scene("SettingsView"),
+                )
 
             dpg.add_separator()
             dpg.add_spacer(height=5)
@@ -45,6 +50,11 @@ class MasterViewport:
                     "CreateTorrentView",
                     create_torrent_view,
                 )
+
+            with dpg.group(tag="view_container_SettingsView"):
+                settings_view = SettingsView()
+                settings_view.build_view(parent_tag="view_container_SettingsView")
+                self.gui.scene_mgr.register_scene("SettingsView", settings_view)
 
         dpg.set_primary_window("primary_window", True)
         self.gui.switch_scene("DownloadView")

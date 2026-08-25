@@ -201,6 +201,11 @@ class TorrentSession:
         )
         self._speed_history.append((time.monotonic(), 0.0, 0.0))
 
+        # User-facing active elapsed-time telemetry. Time spent intentionally
+        # paused/stopped/queued is not counted.
+        self._elapsed_active_seconds: float = 0.0
+        self._activity_started_at: Optional[float] = None
+
         # Per-torrent transfer limits. The user-facing value/unit pair is kept
         # alongside canonical bytes-per-second values so the GUI can restore
         # exactly what the user entered when switching between torrents.
@@ -227,6 +232,25 @@ class TorrentSession:
         # Old asynchronous work is prevented from overwriting a newer run.
         self._run_token = 0
         self._fast_resume_notice_shown = False
+
+    def _begin_activity_clock(self):
+        if self._activity_started_at is None:
+            self._activity_started_at = time.monotonic()
+
+    def _pause_activity_clock(self):
+        if self._activity_started_at is None:
+            return
+        self._elapsed_active_seconds += max(
+            0.0, time.monotonic() - self._activity_started_at
+        )
+        self._activity_started_at = None
+
+    @property
+    def elapsed_active_seconds(self) -> float:
+        elapsed = self._elapsed_active_seconds
+        if self._activity_started_at is not None:
+            elapsed += max(0.0, time.monotonic() - self._activity_started_at)
+        return elapsed
 
     def emit_snapshot(self):
         self._emit_snapshot()
@@ -319,6 +343,7 @@ class TorrentSession:
             self._prepare_pause_event.set()
 
         self._pause_event.set()
+        self._begin_activity_clock()
         self._emit_snapshot()
         return True
 
@@ -364,6 +389,7 @@ class TorrentSession:
         ):
             self._prepare_pause_event.clear()
 
+        self._pause_activity_clock()
         self._record_speed_sample(0.0, 0.0)
         self._emit_snapshot()
 
@@ -379,6 +405,7 @@ class TorrentSession:
             self._prepare_pause_event.set()
 
         self._pause_event.set()
+        self._begin_activity_clock()
         self._emit_snapshot()
 
     def stop(self):
@@ -449,8 +476,95 @@ class TorrentSession:
 
         self.piece_mgr.reset_inflight_requests()
         self.piece_mgr.save_resume_state(force=True)
+        self._pause_activity_clock()
         self._record_speed_sample(0.0, 0.0)
         self._emit_snapshot()
+
+    async def manual_announce(self) -> int:
+        """Ask trackers for a fresh peer list without restarting the torrent."""
+        if self.state not in (SessionState.DOWNLOADING, SessionState.SEEDING):
+            return 0
+
+        try:
+            downloaded = self.piece_mgr.downloaded_bytes
+            peers = await self.tracker.announce(
+                uploaded=self.uploaded_bytes,
+                downloaded=downloaded,
+                left=max(0, self.torrent.total_length - downloaded),
+                event=None,
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            # TrackerClient records per-source failures for the Sources tab. A
+            # manual announce failure is not a terminal torrent error.
+            self._emit_snapshot()
+            return 0
+
+        if self.state == SessionState.DOWNLOADING:
+            self._start_download_workers(self._run_token, peers, source="Tracker")
+        elif self.state == SessionState.SEEDING:
+            self._start_outbound_seed_workers(self._run_token, peers, source="Tracker")
+        self._emit_snapshot()
+        return len(peers)
+
+    async def force_recheck(self) -> bool:
+        """Hash existing payload data after fast-resume state is invalidated.
+
+        This performs only the disk verification phase. The manager decides
+        whether an active torrent should be started again afterward.
+        """
+        if self.is_running:
+            return False
+
+        self._run_token += 1
+        run_token = self._run_token
+        self.is_running = True
+        self._main_task = asyncio.current_task()
+        self._prepare_cancel_event = threading.Event()
+        self._prepare_pause_event = threading.Event()
+        self._prepare_pause_event.set()
+        self._paused_from_state = None
+        self.error_message = ""
+        self.state = SessionState.CHECKING
+        self._begin_activity_clock()
+        self._emit_snapshot()
+
+        success = False
+        try:
+            success = await asyncio.to_thread(
+                self.piece_mgr.prepare_storage,
+                self._prepare_cancel_event,
+                self._emit_snapshot,
+                self._prepare_pause_event,
+            )
+            if not self._is_current_run(run_token):
+                return False
+
+            if success:
+                self.state = SessionState.STOPPED
+                self.error_message = ""
+            else:
+                self.state = SessionState.ERROR
+                self.error_message = (
+                    self.piece_mgr.last_error or "Force recheck did not complete."
+                )
+            self._emit_snapshot()
+            return success
+        except asyncio.CancelledError:
+            return False
+        except Exception as exc:
+            if run_token == self._run_token:
+                self.state = SessionState.ERROR
+                self.error_message = f"Force recheck failed: {exc}"
+                self._emit_snapshot()
+            return False
+        finally:
+            if run_token == self._run_token:
+                self.is_running = False
+                self._pause_activity_clock()
+            if self._main_task is asyncio.current_task():
+                self._main_task = None
 
     def _is_current_run(self, run_token: int) -> bool:
         return self.is_running and run_token == self._run_token
@@ -919,10 +1033,57 @@ class TorrentSession:
             speed_kbps = self._current_download_speed_kbps
         if upload_speed_kbps is None:
             upload_speed_kbps = self._current_upload_speed_kbps
+
+        peer_snapshots = self._build_peer_snapshots()
+        piece_view = self._build_piece_view_snapshot()
+        file_view = self._build_file_view_snapshot()
+        sources_view = self._build_sources_view_snapshot()
+        speed_view = self._build_speed_view_snapshot()
+
+        tracker_sources = [
+            source
+            for source in list(sources_view.get("sources") or [])
+            if str(source.get("type", "")).upper() in {"HTTP", "UDP"}
+        ]
+        seed_counts = [
+            int(source.get("seeders"))
+            for source in tracker_sources
+            if source.get("seeders") is not None
+        ]
+        leecher_counts = [
+            int(source.get("leechers"))
+            for source in tracker_sources
+            if source.get("leechers") is not None
+        ]
+        swarm_seeders = max(seed_counts) if seed_counts else None
+        swarm_leechers = max(leecher_counts) if leecher_counts else None
+
+        downloaded_bytes = max(0, int(self.piece_mgr.downloaded_bytes))
+        total_bytes = max(0, int(self.torrent.total_length))
+        remaining_bytes = max(0, total_bytes - downloaded_bytes)
+        down_bps = max(0.0, float(speed_kbps or 0.0)) * 1024.0
+        eta_seconds = (remaining_bytes / down_bps) if remaining_bytes > 0 and down_bps > 1.0 else None
+        share_ratio = (self.uploaded_bytes / downloaded_bytes) if downloaded_bytes > 0 else None
+
+        discovery_parts = []
+        if int(sources_view.get("tracker_count", 0) or 0):
+            discovery_parts.append("Tracker")
+        dht_source = next((x for x in sources_view.get("sources", []) if x.get("type") == "DHT"), None)
+        pex_source = next((x for x in sources_view.get("sources", []) if x.get("type") == "PEX"), None)
+        lan_source = next((x for x in sources_view.get("sources", []) if x.get("type") == "LAN"), None)
+        if dht_source and dht_source.get("status") != "Disabled":
+            discovery_parts.append("DHT")
+        if pex_source and pex_source.get("status") != "Disabled":
+            discovery_parts.append("PEX")
+        if lan_source and lan_source.get("status") != "Disabled":
+            discovery_parts.append("LAN")
+
         return {
             "type": "TRANSFER_STATS",
             "info_hash": self.torrent.hex_info_hash,
+            "magnet_uri": self.torrent.magnet_uri,
             "torrent_name": self.torrent.name,
+            "torrent_path": os.path.abspath(self.torrent_path),
             "state": self.state,
             "state_label": self._state_label(),
             "progress": self.piece_mgr.progress,
@@ -934,21 +1095,32 @@ class TorrentSession:
             "checked_pieces": self.piece_mgr.check_checked_pieces,
             "check_total_pieces": self.piece_mgr.check_total_pieces,
             "fast_resume_used": self.piece_mgr.fast_resume_used,
-            "downloaded_bytes": self.piece_mgr.downloaded_bytes,
+            "downloaded_bytes": downloaded_bytes,
+            "remaining_bytes": remaining_bytes,
             "uploaded_bytes": self.uploaded_bytes,
-            "total_bytes": self.torrent.total_length,
+            "total_bytes": total_bytes,
             "speed_kbps": speed_kbps,
             "upload_speed_kbps": upload_speed_kbps,
+            "eta_seconds": eta_seconds,
+            "elapsed_seconds": self.elapsed_active_seconds,
+            "share_ratio": share_ratio,
             "connected_peers": self._connected_peer_count(),
-            "peers": self._build_peer_snapshots(),
-            "piece_view": self._build_piece_view_snapshot(),
-            "file_view": self._build_file_view_snapshot(),
-            "sources_view": self._build_sources_view_snapshot(),
-            "speed_view": self._build_speed_view_snapshot(),
+            "swarm_seeders": swarm_seeders,
+            "swarm_leechers": swarm_leechers,
+            "swarm_availability": float(piece_view.get("swarm_availability", 0.0) or 0.0),
+            "discovery_summary": " + ".join(discovery_parts) if discovery_parts else "None",
+            "peers": peer_snapshots,
+            "piece_view": piece_view,
+            "file_view": file_view,
+            "sources_view": sources_view,
+            "speed_view": speed_view,
             "completed_pieces": self.piece_mgr.completed_pieces,
             "total_pieces": len(self.piece_mgr.pieces),
+            "piece_length": int(self.torrent.piece_length),
             "listen_port": self._seed_port if self._seed_server else 0,
             "storage_mode": self.piece_mgr.storage_mode,
+            "storage_path": os.path.abspath(self.piece_mgr.backing_path),
+            "download_dir": os.path.abspath(self.piece_mgr.download_dir),
             "seed_source_path": self.seed_source_path,
             "local_discovery_enabled": bool(self._lpd.enabled),
             "local_peers_discovered": int(self.local_peers_discovered),
@@ -960,6 +1132,14 @@ class TorrentSession:
             "upload_limit_unit": self.upload_limit_unit,
             "upload_limit_bps": self.upload_limit_bps,
             "queue_priority": self.queue_priority,
+            "max_peers": int(self.max_peers),
+            "private": bool(self.torrent.private),
+            "is_multi_file": bool(self.torrent.is_multi_file),
+            "file_count": len(self.torrent.files),
+            "comment": self.torrent.comment,
+            "created_by": self.torrent.created_by,
+            "creation_date": int(self.torrent.creation_date or 0),
+            "trackers": list(self.torrent.announce_list),
         }
 
     def _emit_snapshot(self):
@@ -978,6 +1158,7 @@ class TorrentSession:
         self._prepare_pause_event.set()
         self._paused_from_state = None
         self.error_message = ""
+        self._begin_activity_clock()
 
         local_telemetry_task: Optional[asyncio.Task] = None
 
@@ -1038,6 +1219,7 @@ class TorrentSession:
             # proceeds into seeding below.
             if not started_complete and self.piece_mgr.wanted_is_finished:
                 self.state = SessionState.COMPLETED
+                self._pause_activity_clock()
                 self._emit_snapshot()
                 return
 
@@ -1056,6 +1238,7 @@ class TorrentSession:
                 await self._run_seeding(run_token, completion_event=True)
             elif self._is_current_run(run_token) and self.piece_mgr.wanted_is_finished:
                 self.state = SessionState.COMPLETED
+                self._pause_activity_clock()
                 self._record_speed_sample(0.0, 0.0)
                 self._emit_snapshot()
 
@@ -1102,6 +1285,8 @@ class TorrentSession:
 
                 self.piece_mgr.reset_inflight_requests()
                 self.piece_mgr.save_resume_state(force=True)
+                if self.state not in (SessionState.DOWNLOADING, SessionState.SEEDING):
+                    self._pause_activity_clock()
                 self._emit_snapshot()
 
             if self._main_task is asyncio.current_task():

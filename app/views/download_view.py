@@ -2,7 +2,10 @@
 
 import os
 import queue
+import subprocess
+import sys
 import tkinter as tk
+from datetime import datetime
 from tkinter import filedialog
 
 import dearpygui.dearpygui as dpg
@@ -42,7 +45,12 @@ class DownloadView:
         self.latest_stats = {}
         self._limit_controls_hash: str = ""
         self._pending_remove_info_hash: str = ""
+        self._pending_recheck_info_hash: str = ""
         self._removed_info_hashes = set()
+        self._search_query: str = ""
+        self._state_filter: str = "All"
+        self._completion_notified = set()
+        self._completion_notice_info_hash: str = ""
         self.peer_view = PeerView()
         self.piece_view = PieceView()
         self.file_view = FileView()
@@ -84,6 +92,27 @@ class DownloadView:
                     callback=self._on_apply_queue_slots_clicked,
                 )
                 dpg.add_text("0 = Unlimited", color=(140, 140, 140))
+
+            with dpg.group(horizontal=True):
+                dpg.add_text("Search")
+                self.queue_search_input = dpg.add_input_text(
+                    hint="Filter torrent names...",
+                    width=260,
+                    callback=self._on_queue_filter_changed,
+                )
+                dpg.add_spacer(width=8)
+                dpg.add_text("Status")
+                self.queue_state_filter = dpg.add_combo(
+                    items=[
+                        "All", "Active", "Downloading", "Seeding", "Checking",
+                        "Queued", "Paused", "Stopped", "Completed", "Error",
+                    ],
+                    default_value="All",
+                    width=135,
+                    callback=self._on_queue_filter_changed,
+                )
+                dpg.add_button(label=" Clear Filter ", callback=self._clear_queue_filter)
+                self.queue_filter_summary = dpg.add_text("Showing 0 / 0")
 
             dpg.add_spacer(height=5)
 
@@ -160,24 +189,37 @@ class DownloadView:
             with dpg.tab_bar():
                 with dpg.tab(label="General"):
                     with dpg.group(horizontal=True):
-                        with dpg.child_window(width=520, height=285, border=True):
-                            dpg.add_text("TRANSFER METRICS", color=(100, 180, 255))
+                        with dpg.child_window(width=410, height=355, border=True):
+                            dpg.add_text("TRANSFER", color=(100, 180, 255))
                             dpg.add_separator()
                             self.speed_text = dpg.add_text("Download Speed: 0.0 KB/s")
                             self.upload_speed_text = dpg.add_text("Upload Speed: 0.0 KB/s")
-                            self.downloaded_text = dpg.add_text("Downloaded: 0.0 MB / 0.0 MB")
-                            self.uploaded_text = dpg.add_text("Uploaded: 0.0 MB")
+                            self.downloaded_text = dpg.add_text("Downloaded: 0 B / 0 B")
+                            self.remaining_text = dpg.add_text("Remaining: 0 B")
+                            self.uploaded_text = dpg.add_text("Uploaded: 0 B")
+                            self.eta_text = dpg.add_text("ETA: --")
+                            self.elapsed_text = dpg.add_text("Elapsed: 00:00")
+                            self.ratio_text = dpg.add_text("Share Ratio: --")
                             self.peers_text = dpg.add_text("Connected Peers: 0")
+                            self.error_text = dpg.add_text("", color=(255, 105, 105), wrap=390)
+                            self.retry_button = dpg.add_button(
+                                label=" Retry Torrent ",
+                                enabled=False,
+                                callback=lambda: self._on_resume_clicked(),
+                            )
 
-                        with dpg.child_window(width=-1, height=285, border=True):
+                        with dpg.child_window(width=430, height=355, border=True):
                             dpg.add_text("SWARM STATUS", color=(255, 200, 100))
                             dpg.add_separator()
                             self.state_text = dpg.add_text("Session State: Idle")
                             self.client_id_text = dpg.add_text("Client ID: Salix_T 1.0")
+                            self.seed_leech_text = dpg.add_text("Seeds / Leechers: -- / --")
+                            self.availability_text = dpg.add_text("Availability: --")
+                            self.discovery_text = dpg.add_text("Discovery: --")
                             self.listen_port_text = dpg.add_text("Listen Port: --")
                             self.storage_text = dpg.add_text("Storage: Downloads")
                             self.lpd_text = dpg.add_text("LAN Discovery: --")
-                            self.health_text = dpg.add_text("Swarm Health: Active")
+                            self.health_text = dpg.add_text("Swarm Health: --")
 
                             dpg.add_spacer(height=5)
                             dpg.add_separator()
@@ -215,20 +257,32 @@ class DownloadView:
                                 )
 
                             with dpg.group(horizontal=True):
-                                dpg.add_button(
-                                    label=" Apply Limits ",
-                                    callback=self._on_apply_limits_clicked,
-                                )
-                                dpg.add_button(
-                                    label=" Unlimited ",
-                                    callback=self._on_unlimited_limits_clicked,
-                                )
+                                dpg.add_button(label=" Apply Limits ", callback=self._on_apply_limits_clicked)
+                                dpg.add_button(label=" Unlimited ", callback=self._on_unlimited_limits_clicked)
 
                             self.limit_status_text = dpg.add_text(
                                 "Limits: Down Unlimited | Up Unlimited",
                                 color=(170, 170, 170),
                             )
 
+                        with dpg.child_window(width=-1, height=355, border=True):
+                            dpg.add_text("TORRENT INFO", color=(0, 255, 128))
+                            dpg.add_separator()
+                            self.info_hash_text = dpg.add_text("Info Hash: --", wrap=500)
+                            self.piece_info_text = dpg.add_text("Pieces: --")
+                            self.file_info_text = dpg.add_text("Files: --")
+                            self.private_text = dpg.add_text("Private: --")
+                            self.created_by_text = dpg.add_text("Created By: --", wrap=500)
+                            self.created_date_text = dpg.add_text("Created: --")
+                            self.comment_text = dpg.add_text("Comment: --", wrap=500)
+                            dpg.add_spacer(height=4)
+                            dpg.add_separator()
+                            self.storage_path_text = dpg.add_text("Storage Path: --", wrap=500)
+                            self.torrent_path_text = dpg.add_text(".torrent: --", wrap=500)
+                            dpg.add_spacer(height=6)
+                            with dpg.group(horizontal=True):
+                                dpg.add_button(label=" Open Folder ", callback=self._on_open_folder_clicked)
+                                dpg.add_button(label=" Properties... ", callback=self._on_properties_clicked)
 
                 with dpg.tab(label="Peers") as peers_tab:
                     self.peer_view.build_view(parent_tag=peers_tab)
@@ -295,6 +349,61 @@ class DownloadView:
                 callback=lambda: dpg.hide_item(self.remove_notice_modal),
             )
 
+        with dpg.window(
+            label="Force Recheck",
+            modal=True,
+            show=False,
+            no_resize=True,
+            width=560,
+            height=190,
+        ) as self.recheck_modal:
+            self.recheck_title = dpg.add_text("Force recheck?", color=(255, 200, 100))
+            dpg.add_spacer(height=4)
+            dpg.add_text(
+                "This discards SalixTorrent's fast-resume trust and SHA-1 checks the "
+                "existing payload again. No downloaded data is deleted. An active "
+                "torrent will resume automatically after a successful recheck.",
+                wrap=520,
+            )
+            dpg.add_spacer(height=10)
+            with dpg.group(horizontal=True):
+                dpg.add_button(label=" Force Recheck ", callback=self._confirm_force_recheck)
+                dpg.add_button(label=" Cancel ", callback=lambda: dpg.hide_item(self.recheck_modal))
+
+        with dpg.window(
+            label="Torrent Properties",
+            modal=True,
+            show=False,
+            width=720,
+            height=520,
+        ) as self.properties_modal:
+            self.properties_title = dpg.add_text("Torrent Properties", color=(0, 255, 128))
+            dpg.add_separator()
+            with dpg.child_window(height=400, border=False):
+                self.properties_text = dpg.add_text("", wrap=660)
+            dpg.add_spacer(height=8)
+            with dpg.group(horizontal=True):
+                dpg.add_button(label=" Copy Info Hash ", callback=self._properties_copy_info_hash)
+                dpg.add_button(label=" Copy Magnet Link ", callback=self._properties_copy_magnet)
+                dpg.add_button(label=" Open Folder ", callback=self._properties_open_folder)
+                dpg.add_button(label=" Close ", callback=lambda: dpg.hide_item(self.properties_modal))
+
+        with dpg.window(
+            label="Download Complete",
+            show=False,
+            no_resize=True,
+            width=480,
+            height=150,
+        ) as self.completion_notice_modal:
+            self.completion_notice_title = dpg.add_text(
+                "Download completed", color=(0, 255, 128)
+            )
+            self.completion_notice_text = dpg.add_text("", wrap=440)
+            dpg.add_spacer(height=8)
+            with dpg.group(horizontal=True):
+                dpg.add_button(label=" Open Folder ", callback=self._completion_open_folder)
+                dpg.add_button(label=" Dismiss ", callback=lambda: dpg.hide_item(self.completion_notice_modal))
+
     def _open_native_file_dialog(self):
         """Native Windows file picker (instant, zero DPG selection bugs)."""
         root = tk.Tk()
@@ -346,6 +455,234 @@ class DownloadView:
         dpg.set_value(self.queue_slots_input, value)
         self._queue_slots_value = value
         self.manager.set_max_active_downloads(value)
+
+    @staticmethod
+    def _format_bytes(value: object) -> str:
+        try:
+            size = max(0.0, float(value or 0.0))
+        except (TypeError, ValueError):
+            size = 0.0
+        units = ["B", "KiB", "MiB", "GiB", "TiB"]
+        unit = units[0]
+        for candidate in units:
+            unit = candidate
+            if size < 1024.0 or candidate == units[-1]:
+                break
+            size /= 1024.0
+        if unit == "B":
+            return f"{size:.0f} {unit}"
+        return f"{size:,.2f} {unit}"
+
+    @staticmethod
+    def _format_duration(seconds: object) -> str:
+        if seconds is None:
+            return "--"
+        try:
+            total = max(0, int(float(seconds)))
+        except (TypeError, ValueError):
+            return "--"
+        days, rem = divmod(total, 86400)
+        hours, rem = divmod(rem, 3600)
+        minutes, secs = divmod(rem, 60)
+        if days:
+            return f"{days}d {hours:02d}:{minutes:02d}:{secs:02d}"
+        if hours:
+            return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+        return f"{minutes:02d}:{secs:02d}"
+
+    @staticmethod
+    def _format_creation_date(timestamp: object) -> str:
+        try:
+            value = int(timestamp or 0)
+        except (TypeError, ValueError):
+            value = 0
+        if value <= 0:
+            return "--"
+        try:
+            return datetime.fromtimestamp(value).strftime("%Y-%m-%d %H:%M:%S")
+        except (OverflowError, OSError, ValueError):
+            return "--"
+
+    def _on_queue_filter_changed(self, sender=None, app_data=None, user_data=None):
+        self._search_query = str(dpg.get_value(self.queue_search_input) or "").strip().lower()
+        self._state_filter = str(dpg.get_value(self.queue_state_filter) or "All")
+        self._apply_queue_filters()
+
+    def _clear_queue_filter(self):
+        dpg.set_value(self.queue_search_input, "")
+        dpg.set_value(self.queue_state_filter, "All")
+        self._search_query = ""
+        self._state_filter = "All"
+        self._apply_queue_filters()
+
+    def _row_matches_filter(self, info_hash: str) -> bool:
+        stats = self.latest_stats.get(info_hash, {})
+        name = str(stats.get("torrent_name") or "").lower()
+        if self._search_query and self._search_query not in name:
+            return False
+
+        state = str(stats.get("state") or "Idle")
+        wanted = self._state_filter
+        if wanted == "All":
+            return True
+        if wanted == "Active":
+            return state in {"Queued", "Checking", "Fast Resume", "Downloading", "Seeding"}
+        return state == wanted
+
+    def _apply_queue_filters(self):
+        visible = 0
+        for info_hash, row in self.torrent_rows.items():
+            show = self._row_matches_filter(info_hash)
+            if dpg.does_item_exist(row["row"]):
+                dpg.configure_item(row["row"], show=show)
+            if show:
+                visible += 1
+        if hasattr(self, "queue_filter_summary") and dpg.does_item_exist(self.queue_filter_summary):
+            dpg.set_value(
+                self.queue_filter_summary,
+                f"Showing {visible} / {len(self.torrent_rows)}",
+            )
+
+    @staticmethod
+    def _folder_for_stats(stats: dict) -> str:
+        path = str(stats.get("storage_path") or stats.get("download_dir") or "").strip()
+        if not path:
+            return ""
+        if bool(stats.get("is_multi_file")) or os.path.isdir(path):
+            folder = path
+        else:
+            folder = os.path.dirname(path) or path
+        return os.path.abspath(folder)
+
+    @staticmethod
+    def _open_folder_path(folder: str) -> bool:
+        folder = os.path.abspath(os.path.expanduser(str(folder or "")))
+        if not folder or not os.path.isdir(folder):
+            return False
+        try:
+            if os.name == "nt":
+                os.startfile(folder)
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", folder])
+            else:
+                subprocess.Popen(["xdg-open", folder])
+            return True
+        except Exception:
+            return False
+
+    def _open_folder_for_hash(self, info_hash: str):
+        stats = self.latest_stats.get(info_hash, {})
+        folder = self._folder_for_stats(stats)
+        if folder:
+            self._open_folder_path(folder)
+
+    def _on_open_folder_clicked(self):
+        if self.active_info_hash:
+            self._open_folder_for_hash(self.active_info_hash)
+
+    def _on_properties_clicked(self):
+        if self.active_info_hash:
+            self._show_properties(self.active_info_hash)
+
+    def _copy_text(self, value: object):
+        text = str(value or "")
+        if text:
+            try:
+                dpg.set_clipboard_text(text)
+            except Exception:
+                pass
+
+    def _show_properties(self, info_hash: str):
+        stats = self.latest_stats.get(info_hash, {})
+        if not stats:
+            return
+        self._select_torrent(info_hash)
+        dpg.set_value(self.properties_title, f"Torrent Properties — {stats.get('torrent_name', '')}")
+
+        trackers = list(stats.get("trackers") or [])
+        tracker_text = "\n    ".join(trackers) if trackers else "--"
+        ratio = stats.get("share_ratio")
+        ratio_text = f"{float(ratio):.3f}" if ratio is not None else "--"
+        seeders = stats.get("swarm_seeders")
+        leechers = stats.get("swarm_leechers")
+        properties = (
+            f"Name: {stats.get('torrent_name', '--')}\n"
+            f"State: {stats.get('state_label', stats.get('state', '--'))}\n"
+            f"Info Hash: {stats.get('info_hash', '--')}\n"
+            f"Private: {'Yes' if stats.get('private') else 'No'}\n"
+            f"Total Size: {self._format_bytes(stats.get('total_bytes'))}\n"
+            f"Downloaded: {self._format_bytes(stats.get('downloaded_bytes'))}\n"
+            f"Uploaded: {self._format_bytes(stats.get('uploaded_bytes'))}\n"
+            f"Share Ratio: {ratio_text}\n"
+            f"Pieces: {stats.get('total_pieces', 0)} × {self._format_bytes(stats.get('piece_length'))}\n"
+            f"Files: {stats.get('file_count', 0)}\n"
+            f"Seeds / Leechers: {seeders if seeders is not None else '--'} / "
+            f"{leechers if leechers is not None else '--'}\n"
+            f"Availability: {float(stats.get('swarm_availability', 0.0) or 0.0):.2f}\n"
+            f"Discovery: {stats.get('discovery_summary', '--')}\n"
+            f"Elapsed: {self._format_duration(stats.get('elapsed_seconds'))}\n"
+            f"ETA: {self._format_duration(stats.get('eta_seconds'))}\n\n"
+            f"Storage Mode: {stats.get('storage_mode', '--')}\n"
+            f"Storage Path: {stats.get('storage_path', '--')}\n"
+            f".torrent File: {stats.get('torrent_path', '--')}\n\n"
+            f"Created By: {stats.get('created_by') or '--'}\n"
+            f"Created: {self._format_creation_date(stats.get('creation_date'))}\n"
+            f"Comment: {stats.get('comment') or '--'}\n\n"
+            f"Trackers:\n    {tracker_text}"
+        )
+        dpg.set_value(self.properties_text, properties)
+        dpg.show_item(self.properties_modal)
+
+    def _properties_copy_info_hash(self):
+        if self.active_info_hash:
+            self._copy_text(self.latest_stats.get(self.active_info_hash, {}).get("info_hash"))
+
+    def _properties_copy_magnet(self):
+        if self.active_info_hash:
+            self._copy_text(self.latest_stats.get(self.active_info_hash, {}).get("magnet_uri"))
+
+    def _properties_open_folder(self):
+        if self.active_info_hash:
+            self._open_folder_for_hash(self.active_info_hash)
+
+    def _completion_open_folder(self):
+        if self._completion_notice_info_hash:
+            self._open_folder_for_hash(self._completion_notice_info_hash)
+
+    def _show_completion_notice(self, info_hash: str, stats: dict):
+        if not self.manager.completion_notifications_enabled():
+            return
+        self._completion_notice_info_hash = info_hash
+        dpg.set_value(
+            self.completion_notice_title,
+            f"Download completed — {stats.get('torrent_name', 'Torrent')}",
+        )
+        state = stats.get("state_label", stats.get("state", "Completed"))
+        dpg.set_value(
+            self.completion_notice_text,
+            f"{state}. Downloaded {self._format_bytes(stats.get('downloaded_bytes'))}. "
+            "You can open the payload folder now or dismiss this notice.",
+        )
+        dpg.show_item(self.completion_notice_modal)
+
+    def _request_force_recheck(self, info_hash: str):
+        if info_hash not in self.torrent_rows:
+            return
+        self._select_torrent(info_hash)
+        self._pending_recheck_info_hash = info_hash
+        stats = self.latest_stats.get(info_hash, {})
+        dpg.set_value(
+            self.recheck_title,
+            f"Force Recheck — {stats.get('torrent_name', 'Torrent')}",
+        )
+        dpg.show_item(self.recheck_modal)
+
+    def _confirm_force_recheck(self):
+        info_hash = self._pending_recheck_info_hash
+        self._pending_recheck_info_hash = ""
+        dpg.hide_item(self.recheck_modal)
+        if info_hash:
+            self.manager.force_recheck(info_hash)
 
     # ------------------------------------------------------------------
     # Torrent row context menu
@@ -416,6 +753,47 @@ class DownloadView:
                 user_data=info_hash,
                 callback=lambda s, a, u: self._context_stop(u),
             )
+            retry_item = dpg.add_menu_item(
+                label="Retry",
+                user_data=info_hash,
+                callback=lambda s, a, u: self._context_retry(u),
+            )
+
+            dpg.add_separator()
+
+            open_folder_item = dpg.add_menu_item(
+                label="Open Download Folder",
+                user_data=info_hash,
+                callback=lambda s, a, u: self._context_open_folder(u),
+            )
+            announce_item = dpg.add_menu_item(
+                label="Update Trackers",
+                user_data=info_hash,
+                callback=lambda s, a, u: self._context_update_trackers(u),
+            )
+            recheck_item = dpg.add_menu_item(
+                label="Force Recheck...",
+                user_data=info_hash,
+                callback=lambda s, a, u: self._context_force_recheck(u),
+            )
+
+            dpg.add_separator()
+
+            copy_hash_item = dpg.add_menu_item(
+                label="Copy Info Hash",
+                user_data=info_hash,
+                callback=lambda s, a, u: self._context_copy_info_hash(u),
+            )
+            copy_magnet_item = dpg.add_menu_item(
+                label="Copy Magnet Link",
+                user_data=info_hash,
+                callback=lambda s, a, u: self._context_copy_magnet(u),
+            )
+            properties_item = dpg.add_menu_item(
+                label="Properties...",
+                user_data=info_hash,
+                callback=lambda s, a, u: self._context_properties(u),
+            )
 
             dpg.add_separator()
 
@@ -452,6 +830,13 @@ class DownloadView:
             "pause": pause_item,
             "resume": resume_item,
             "stop": stop_item,
+            "retry": retry_item,
+            "open_folder": open_folder_item,
+            "announce": announce_item,
+            "recheck": recheck_item,
+            "copy_hash": copy_hash_item,
+            "copy_magnet": copy_magnet_item,
+            "properties": properties_item,
             "remove": remove_item,
             "right_click_registry": right_click_registry,
         }
@@ -480,6 +865,32 @@ class DownloadView:
     def _context_stop(self, info_hash: str):
         self._select_torrent(info_hash)
         self.manager.stop_torrent(info_hash)
+
+    def _context_retry(self, info_hash: str):
+        self._select_torrent(info_hash)
+        self.manager.start_torrent(info_hash)
+
+    def _context_open_folder(self, info_hash: str):
+        self._select_torrent(info_hash)
+        self._open_folder_for_hash(info_hash)
+
+    def _context_update_trackers(self, info_hash: str):
+        self._select_torrent(info_hash)
+        self.manager.update_trackers(info_hash)
+
+    def _context_force_recheck(self, info_hash: str):
+        self._request_force_recheck(info_hash)
+
+    def _context_copy_info_hash(self, info_hash: str):
+        self._select_torrent(info_hash)
+        self._copy_text(self.latest_stats.get(info_hash, {}).get("info_hash"))
+
+    def _context_copy_magnet(self, info_hash: str):
+        self._select_torrent(info_hash)
+        self._copy_text(self.latest_stats.get(info_hash, {}).get("magnet_uri"))
+
+    def _context_properties(self, info_hash: str):
+        self._show_properties(info_hash)
 
     def _context_remove(self, info_hash: str):
         if info_hash not in self.torrent_rows:
@@ -617,10 +1028,20 @@ class DownloadView:
         dpg.configure_item(menu["priority_high"], enabled=queue_priority != "High")
         dpg.configure_item(menu["priority_normal"], enabled=queue_priority != "Normal")
         dpg.configure_item(menu["priority_low"], enabled=queue_priority != "Low")
-        dpg.configure_item(menu["start"], enabled=can_start)
+        dpg.configure_item(menu["start"], enabled=can_start and state != "Error")
         dpg.configure_item(menu["pause"], enabled=can_pause)
         dpg.configure_item(menu["resume"], enabled=can_resume)
         dpg.configure_item(menu["stop"], enabled=can_stop)
+        dpg.configure_item(menu["retry"], enabled=state == "Error")
+        dpg.configure_item(menu["open_folder"], enabled=bool(stats.get("storage_path")))
+        dpg.configure_item(menu["announce"], enabled=state in {"Downloading", "Seeding"})
+        dpg.configure_item(
+            menu["recheck"],
+            enabled=state not in {"Checking", "Fast Resume", "Queued"},
+        )
+        dpg.configure_item(menu["copy_hash"], enabled=bool(stats.get("info_hash")))
+        dpg.configure_item(menu["copy_magnet"], enabled=bool(stats.get("magnet_uri")))
+        dpg.configure_item(menu["properties"], enabled=True)
         dpg.configure_item(menu["remove"], enabled=True)
 
     def _refresh_context_menu_states(self):
@@ -634,14 +1055,32 @@ class DownloadView:
         dpg.set_value(self.progress_label, "0.0% Complete (0 / 0 Pieces)")
         dpg.set_value(self.speed_text, "Download Speed: 0.0 KB/s")
         dpg.set_value(self.upload_speed_text, "Upload Speed: 0.0 KB/s")
-        dpg.set_value(self.downloaded_text, "Downloaded: 0.0 MB / 0.0 MB")
-        dpg.set_value(self.uploaded_text, "Uploaded: 0.0 MB")
+        dpg.set_value(self.downloaded_text, "Downloaded: 0 B / 0 B")
+        dpg.set_value(self.remaining_text, "Remaining: 0 B")
+        dpg.set_value(self.uploaded_text, "Uploaded: 0 B")
+        dpg.set_value(self.eta_text, "ETA: --")
+        dpg.set_value(self.elapsed_text, "Elapsed: 00:00")
+        dpg.set_value(self.ratio_text, "Share Ratio: --")
         dpg.set_value(self.peers_text, "Connected Peers: 0")
+        dpg.set_value(self.error_text, "")
+        dpg.configure_item(self.retry_button, enabled=False)
         dpg.set_value(self.state_text, "Session State: Idle")
+        dpg.set_value(self.seed_leech_text, "Seeds / Leechers: -- / --")
+        dpg.set_value(self.availability_text, "Availability: --")
+        dpg.set_value(self.discovery_text, "Discovery: --")
         dpg.set_value(self.listen_port_text, "Listen Port: --")
         dpg.set_value(self.storage_text, "Storage: Downloads")
         dpg.set_value(self.lpd_text, "LAN Discovery: --")
-        dpg.set_value(self.health_text, "Swarm Health: Active")
+        dpg.set_value(self.health_text, "Swarm Health: --")
+        dpg.set_value(self.info_hash_text, "Info Hash: --")
+        dpg.set_value(self.piece_info_text, "Pieces: --")
+        dpg.set_value(self.file_info_text, "Files: --")
+        dpg.set_value(self.private_text, "Private: --")
+        dpg.set_value(self.created_by_text, "Created By: --")
+        dpg.set_value(self.created_date_text, "Created: --")
+        dpg.set_value(self.comment_text, "Comment: --")
+        dpg.set_value(self.storage_path_text, "Storage Path: --")
+        dpg.set_value(self.torrent_path_text, ".torrent: --")
         dpg.set_value(self.limit_status_text, "Limits: Down Unlimited | Up Unlimited")
         dpg.set_value(self.download_limit_input, 0.0)
         dpg.set_value(self.upload_limit_input, 0.0)
@@ -686,6 +1125,7 @@ class DownloadView:
                 self._reset_inspector()
 
         self._refresh_context_menu_states()
+        self._apply_queue_filters()
 
         cleanup_error = str(msg.get("cleanup_error") or "")
         if cleanup_error:
@@ -777,6 +1217,8 @@ class DownloadView:
             dpg.set_value(row["name"], self.active_info_hash == h)
             self._refresh_context_menu_state(h)
 
+        self._apply_queue_filters()
+
     def _select_torrent(self, info_hash: str):
         self.active_info_hash = info_hash
         self._limit_controls_hash = ""
@@ -861,17 +1303,51 @@ class DownloadView:
             self.upload_speed_text,
             f"Upload Speed: {msg.get('upload_speed_kbps', 0.0):,.1f} KB/s",
         )
-        dl_mb = msg["downloaded_bytes"] / (1024 * 1024)
-        up_mb = msg.get("uploaded_bytes", 0) / (1024 * 1024)
-        tot_mb = msg["total_bytes"] / (1024 * 1024)
         dpg.set_value(
             self.downloaded_text,
-            f"Downloaded: {dl_mb:,.1f} MB / {tot_mb:,.1f} MB",
+            f"Downloaded: {self._format_bytes(msg.get('downloaded_bytes'))} / "
+            f"{self._format_bytes(msg.get('total_bytes'))}",
         )
-        dpg.set_value(self.uploaded_text, f"Uploaded: {up_mb:,.1f} MB")
+        dpg.set_value(
+            self.remaining_text,
+            f"Remaining: {self._format_bytes(msg.get('remaining_bytes'))}",
+        )
+        dpg.set_value(
+            self.uploaded_text,
+            f"Uploaded: {self._format_bytes(msg.get('uploaded_bytes'))}",
+        )
+        dpg.set_value(self.eta_text, f"ETA: {self._format_duration(msg.get('eta_seconds'))}")
+        dpg.set_value(
+            self.elapsed_text,
+            f"Elapsed: {self._format_duration(msg.get('elapsed_seconds'))}",
+        )
+        ratio = msg.get("share_ratio")
+        ratio_text = f"{float(ratio):.3f}" if ratio is not None else "--"
+        dpg.set_value(self.ratio_text, f"Share Ratio: {ratio_text}")
         dpg.set_value(
             self.peers_text,
             f"Connected Peers: {msg['connected_peers']}",
+        )
+
+        error_message = str(msg.get("error_message") or "")
+        dpg.set_value(
+            self.error_text,
+            f"Error / Notice: {error_message}" if error_message else "",
+        )
+        dpg.configure_item(self.retry_button, enabled=state == "Error")
+
+        seeders = msg.get("swarm_seeders")
+        leechers = msg.get("swarm_leechers")
+        dpg.set_value(
+            self.seed_leech_text,
+            f"Seeds / Leechers: {seeders if seeders is not None else '--'} / "
+            f"{leechers if leechers is not None else '--'}",
+        )
+        availability = float(msg.get("swarm_availability", 0.0) or 0.0)
+        dpg.set_value(self.availability_text, f"Availability: {availability:.2f}")
+        dpg.set_value(
+            self.discovery_text,
+            f"Discovery: {msg.get('discovery_summary', '--')}",
         )
 
         self._sync_limit_controls(msg)
@@ -909,11 +1385,43 @@ class DownloadView:
         else:
             dpg.set_value(self.lpd_text, "LAN Discovery: --")
 
-        error_message = str(msg.get("error_message") or "")
         if error_message:
-            dpg.set_value(self.health_text, f"Notice: {error_message}")
+            dpg.set_value(self.health_text, "Swarm Health: Attention required")
+        elif state in {"Downloading", "Seeding"}:
+            if availability and availability < 1.0 and msg.get("progress", 0.0) < 1.0:
+                dpg.set_value(self.health_text, "Swarm Health: Incomplete availability")
+            elif availability >= 2.0:
+                dpg.set_value(self.health_text, "Swarm Health: Healthy")
+            else:
+                dpg.set_value(self.health_text, "Swarm Health: Active")
         else:
-            dpg.set_value(self.health_text, "Swarm Health: Active")
+            dpg.set_value(self.health_text, "Swarm Health: --")
+
+        dpg.set_value(self.info_hash_text, f"Info Hash: {msg.get('info_hash', '--')}")
+        dpg.set_value(
+            self.piece_info_text,
+            f"Pieces: {msg.get('total_pieces', 0):,} × {self._format_bytes(msg.get('piece_length'))}",
+        )
+        file_kind = "multi-file" if msg.get("is_multi_file") else "single-file"
+        dpg.set_value(
+            self.file_info_text,
+            f"Files: {msg.get('file_count', 0):,} ({file_kind})",
+        )
+        dpg.set_value(self.private_text, f"Private: {'Yes' if msg.get('private') else 'No'}")
+        dpg.set_value(self.created_by_text, f"Created By: {msg.get('created_by') or '--'}")
+        dpg.set_value(
+            self.created_date_text,
+            f"Created: {self._format_creation_date(msg.get('creation_date'))}",
+        )
+        dpg.set_value(self.comment_text, f"Comment: {msg.get('comment') or '--'}")
+        dpg.set_value(
+            self.storage_path_text,
+            f"Storage Path: {msg.get('storage_path') or '--'}",
+        )
+        dpg.set_value(
+            self.torrent_path_text,
+            f".torrent: {msg.get('torrent_path') or '--'}",
+        )
 
         self.peer_view.render(msg)
         self.piece_view.render(msg)
@@ -922,6 +1430,14 @@ class DownloadView:
         self.speed_view.render(msg)
 
     def update(self, delta_time: float):
+        # Keep the toolbar synchronized when queue settings are changed from
+        # the Preferences view.
+        current_slots = self.manager.get_max_active_downloads()
+        if current_slots != self._queue_slots_value:
+            self._queue_slots_value = current_slots
+            if hasattr(self, "queue_slots_input") and dpg.does_item_exist(self.queue_slots_input):
+                dpg.set_value(self.queue_slots_input, current_slots)
+
         while not self.ui_queue.empty():
             try:
                 msg = self.ui_queue.get_nowait()
@@ -930,6 +1446,8 @@ class DownloadView:
                     if h in self._removed_info_hashes:
                         continue
 
+                    previous = self.latest_stats.get(h, {})
+                    previous_state = str(previous.get("state") or "")
                     self.latest_stats[h] = msg
 
                     if not self.active_info_hash:
@@ -941,7 +1459,22 @@ class DownloadView:
                     if self.active_info_hash == h:
                         self._render_inspector(msg)
 
+                    new_state = str(msg.get("state") or "")
+                    if (
+                        h not in self._completion_notified
+                        and previous_state in {"Downloading", "Checking", "Fast Resume"}
+                        and new_state in {"Completed", "Seeding"}
+                    ):
+                        self._completion_notified.add(h)
+                        self._show_completion_notice(h, msg)
+
+                    # If the user later makes more files wanted or restarts an
+                    # incomplete torrent, allow a fresh future completion notice.
+                    if new_state in {"Downloading", "Checking"} and not msg.get("wanted_finished"):
+                        self._completion_notified.discard(h)
+
                 elif msg.get("type") == "TORRENT_REMOVED":
+                    self._completion_notified.discard(str(msg.get("info_hash") or ""))
                     self._handle_torrent_removed(msg)
             except queue.Empty:
                 break

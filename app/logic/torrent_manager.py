@@ -31,6 +31,8 @@ class TorrentCommand:
     SET_TORRENT_PRIORITY = "SET_TORRENT_PRIORITY"
     SET_QUEUE_LIMIT = "SET_QUEUE_LIMIT"
     REBALANCE_QUEUE = "REBALANCE_QUEUE"
+    FORCE_RECHECK = "FORCE_RECHECK"
+    ANNOUNCE = "ANNOUNCE"
     SHUTDOWN = "SHUTDOWN"
 
 
@@ -47,7 +49,7 @@ class SessionIntent:
 
 class TorrentManager:
     _instance: Optional["TorrentManager"] = None
-    SESSION_STATE_VERSION = 4
+    SESSION_STATE_VERSION = 5
     DEFAULT_MAX_ACTIVE_DOWNLOADS = 2
     PRIORITY_RANK = {
         TORRENT_PRIORITY_HIGH: 0,
@@ -82,10 +84,18 @@ class TorrentManager:
             # torrents that are seeding do not consume download slots.
             cls._instance._max_active_downloads: int = cls.DEFAULT_MAX_ACTIVE_DOWNLOADS
             cls._instance._explicit_start_requests = set()
+            cls._instance._maintenance_tasks: Dict[str, asyncio.Task] = {}
 
             cls._instance._state_dir = cls._instance._get_state_directory()
             cls._instance._state_file = cls._instance._state_dir / "session.json"
             cls._instance._torrent_cache_dir = cls._instance._state_dir / "torrents"
+            cls._instance._settings_file = cls._instance._state_dir / "settings.json"
+            cls._instance._settings = cls._instance._load_app_settings()
+            cls._instance._max_active_downloads = int(
+                cls._instance._settings.get(
+                    "max_active_downloads", cls.DEFAULT_MAX_ACTIVE_DOWNLOADS
+                )
+            )
         elif ui_queue is not None:
             # Keep the singleton attached to the application's real UI queue.
             cls._instance.ui_queue = ui_queue
@@ -126,9 +136,113 @@ class TorrentManager:
             return Path(xdg_state_home) / "SalixTorrent"
         return Path.home() / ".local" / "state" / "SalixTorrent"
 
+    @classmethod
+    def _default_app_settings(cls) -> dict:
+        return {
+            "download_dir": os.path.abspath("downloads"),
+            "default_max_peers": 25,
+            "max_active_downloads": cls.DEFAULT_MAX_ACTIVE_DOWNLOADS,
+            "auto_resume_active": True,
+            "completion_notifications": True,
+            "default_download_limit_value": 0.0,
+            "default_download_limit_unit": "KB/s",
+            "default_upload_limit_value": 0.0,
+            "default_upload_limit_unit": "KB/s",
+            "default_queue_priority": TORRENT_PRIORITY_NORMAL,
+        }
+
+    @classmethod
+    def _normalise_app_settings(cls, value: object) -> dict:
+        defaults = cls._default_app_settings()
+        data = dict(value) if isinstance(value, dict) else {}
+        out = dict(defaults)
+
+        raw_dir = str(data.get("download_dir") or defaults["download_dir"]).strip()
+        out["download_dir"] = os.path.abspath(os.path.expanduser(raw_dir))
+
+        try:
+            out["default_max_peers"] = max(1, min(500, int(data.get("default_max_peers", 25))))
+        except (TypeError, ValueError):
+            out["default_max_peers"] = 25
+
+        try:
+            out["max_active_downloads"] = max(0, int(data.get("max_active_downloads", cls.DEFAULT_MAX_ACTIVE_DOWNLOADS)))
+        except (TypeError, ValueError):
+            out["max_active_downloads"] = cls.DEFAULT_MAX_ACTIVE_DOWNLOADS
+
+        out["auto_resume_active"] = bool(data.get("auto_resume_active", True))
+        out["completion_notifications"] = bool(data.get("completion_notifications", True))
+
+        for key in ("default_download_limit_value", "default_upload_limit_value"):
+            try:
+                out[key] = max(0.0, float(data.get(key, 0.0)))
+            except (TypeError, ValueError):
+                out[key] = 0.0
+
+        valid_units = {"KB/s", "MB/s", "kbps", "Mbps"}
+        for key in ("default_download_limit_unit", "default_upload_limit_unit"):
+            unit = str(data.get(key) or "KB/s")
+            out[key] = unit if unit in valid_units else "KB/s"
+
+        priority = str(data.get("default_queue_priority") or TORRENT_PRIORITY_NORMAL).strip().title()
+        out["default_queue_priority"] = (
+            priority if priority in TORRENT_PRIORITIES else TORRENT_PRIORITY_NORMAL
+        )
+        return out
+
+    def _load_app_settings(self) -> dict:
+        defaults = self._default_app_settings()
+        try:
+            if not self._settings_file.exists():
+                return defaults
+            raw = json.loads(self._settings_file.read_text(encoding="utf-8"))
+            return self._normalise_app_settings(raw)
+        except (OSError, json.JSONDecodeError, TypeError, ValueError):
+            return defaults
+
+    def save_app_settings(self):
+        try:
+            self._ensure_state_directories()
+            temp_path = self._settings_file.with_suffix(".json.tmp")
+            temp_path.write_text(
+                json.dumps(self._settings, indent=2, sort_keys=True),
+                encoding="utf-8",
+            )
+            os.replace(temp_path, self._settings_file)
+        except OSError as exc:
+            print(f"[Salix_T Notice] Could not save settings: {exc}")
+
+    def get_app_settings(self) -> dict:
+        return dict(self._settings)
+
+    def update_app_settings(self, values: dict) -> dict:
+        merged = dict(self._settings)
+        if isinstance(values, dict):
+            merged.update(values)
+        self._settings = self._normalise_app_settings(merged)
+        self.save_app_settings()
+
+        queue_limit = int(self._settings.get("max_active_downloads", self.DEFAULT_MAX_ACTIVE_DOWNLOADS))
+        if queue_limit != self._max_active_downloads:
+            self.set_max_active_downloads(queue_limit)
+        return self.get_app_settings()
+
+    def reset_app_settings(self) -> dict:
+        self._settings = self._default_app_settings()
+        self.save_app_settings()
+        self.set_max_active_downloads(self._settings["max_active_downloads"])
+        return self.get_app_settings()
+
+    def completion_notifications_enabled(self) -> bool:
+        return bool(self._settings.get("completion_notifications", True))
+
     @property
     def session_state_path(self) -> str:
         return str(self._state_file)
+
+    @property
+    def settings_path(self) -> str:
+        return str(self._settings_file)
 
     def _ensure_state_directories(self):
         self._state_dir.mkdir(parents=True, exist_ok=True)
@@ -203,6 +317,7 @@ class TorrentManager:
                     "torrent_path": source_path,
                     "cached_torrent_path": cache_path,
                     "max_peers": int(session.max_peers),
+                    "download_dir": os.path.abspath(session.piece_mgr.download_dir),
                     "intent": intent,
                     "paused_from_state": paused_from_state,
                     "download_limit_value": float(session.download_limit_value),
@@ -257,7 +372,7 @@ class TorrentManager:
 
         if not isinstance(data, dict):
             return None
-        if data.get("version") not in (1, 2, 3, self.SESSION_STATE_VERSION):
+        if data.get("version") not in (1, 2, 3, 4, self.SESSION_STATE_VERSION):
             print("[Salix_T Notice] Previous session uses an unsupported format.")
             return None
         if not isinstance(data.get("torrents", []), list):
@@ -305,6 +420,8 @@ class TorrentManager:
             )
         except (TypeError, ValueError):
             self._max_active_downloads = self.DEFAULT_MAX_ACTIVE_DOWNLOADS
+        self._settings["max_active_downloads"] = int(self._max_active_downloads)
+        self.save_app_settings()
 
         restored_order: List[str] = []
         active_hashes: List[str] = []
@@ -322,16 +439,22 @@ class TorrentManager:
                     continue
 
                 try:
-                    max_peers = max(1, int(entry.get("max_peers", 25)))
+                    max_peers = max(1, int(entry.get("max_peers", self._settings.get("default_max_peers", 25))))
                 except (TypeError, ValueError):
-                    max_peers = 25
+                    max_peers = int(self._settings.get("default_max_peers", 25))
 
                 try:
                     seed_source_path = str(entry.get("seed_source_path") or "")
+                    download_dir = str(
+                        entry.get("download_dir")
+                        or self._settings.get("download_dir")
+                        or os.path.abspath("downloads")
+                    )
                     session = TorrentSession(
                         restore_path,
                         ui_queue=self.ui_queue,
                         max_peers=max_peers,
+                        download_dir=download_dir,
                         seed_source_path=seed_source_path or None,
                     )
                 except Exception as exc:
@@ -348,6 +471,8 @@ class TorrentManager:
                     continue
 
                 intent = self._normalise_intent(entry.get("intent"))
+                if intent == SessionIntent.ACTIVE and not self._settings.get("auto_resume_active", True):
+                    intent = SessionIntent.STOPPED
                 source_path = str(entry.get("torrent_path") or restore_path)
 
                 with self._sessions_lock:
@@ -448,6 +573,8 @@ class TorrentManager:
             value = self.DEFAULT_MAX_ACTIVE_DOWNLOADS
 
         self._max_active_downloads = value
+        self._settings["max_active_downloads"] = value
+        self.save_app_settings()
         self.save_session_state()
         self._send_cmd(
             TorrentCommand.SET_QUEUE_LIMIT,
@@ -736,6 +863,67 @@ class TorrentManager:
                 self._explicit_start_requests.discard(info_hash)
                 available_slots -= 1
 
+    async def _run_force_recheck(
+        self,
+        info_hash: str,
+        session: TorrentSession,
+    ):
+        """Run a potentially long disk recheck without blocking engine commands."""
+        try:
+            if session.is_running:
+                session.stop()
+                await asyncio.sleep(0)
+                main_task = getattr(session, "_main_task", None)
+                if (
+                    main_task
+                    and main_task is not asyncio.current_task()
+                    and not main_task.done()
+                ):
+                    try:
+                        await asyncio.wait_for(
+                            asyncio.shield(main_task),
+                            timeout=2.0,
+                        )
+                    except (asyncio.TimeoutError, asyncio.CancelledError):
+                        pass
+
+            await asyncio.to_thread(session.piece_mgr.invalidate_verification)
+            success = await session.force_recheck()
+            if not success:
+                return
+
+            with self._sessions_lock:
+                current_intent = self._desired_states.get(
+                    info_hash, SessionIntent.STOPPED
+                )
+
+            if current_intent == SessionIntent.ACTIVE:
+                self._explicit_start_requests.add(info_hash)
+                self._rebalance_queue()
+            elif current_intent == SessionIntent.PAUSED:
+                session.state = SessionState.PAUSED
+                session._paused_from_state = SessionState.DOWNLOADING
+                session.emit_snapshot()
+            elif current_intent == SessionIntent.IDLE:
+                session.state = SessionState.IDLE
+                session.emit_snapshot()
+            else:
+                session.state = SessionState.STOPPED
+                session.emit_snapshot()
+
+            self.save_session_state()
+        except asyncio.CancelledError:
+            pass
+        except Exception as exc:
+            try:
+                session.error_message = f"Force recheck failed: {exc}"
+                session.state = SessionState.ERROR
+                session.emit_snapshot()
+            except Exception:
+                pass
+        finally:
+            self._maintenance_tasks.pop(info_hash, None)
+
     async def _engine_main(self):
         self._cmd_queue = asyncio.Queue()
         self._engine_ready.set()
@@ -858,6 +1046,18 @@ class TorrentManager:
                     )
                     self._rebalance_queue()
 
+                elif action == TorrentCommand.FORCE_RECHECK:
+                    existing_task = self._maintenance_tasks.get(info_hash)
+                    if not existing_task or existing_task.done():
+                        task = asyncio.create_task(
+                            self._run_force_recheck(info_hash, session)
+                        )
+                        self._maintenance_tasks[info_hash] = task
+
+                elif action == TorrentCommand.ANNOUNCE:
+                    if session.state in (SessionState.DOWNLOADING, SessionState.SEEDING):
+                        asyncio.create_task(session.manual_announce())
+
                 elif action == TorrentCommand.SET_LIMITS:
                     payload = payload or {}
                     session.set_transfer_limits(
@@ -896,9 +1096,10 @@ class TorrentManager:
     def add_torrent(
         self,
         torrent_path: str,
-        max_peers: int = 25,
+        max_peers: Optional[int] = None,
         persist: bool = True,
         seed_source_path: Optional[str] = None,
+        download_dir: Optional[str] = None,
     ) -> TorrentSession:
         torrent_path = os.path.abspath(os.path.expanduser(torrent_path))
         seed_source_path = (
@@ -906,6 +1107,14 @@ class TorrentManager:
             if seed_source_path
             else ""
         )
+
+        if max_peers is None:
+            max_peers = int(self._settings.get("default_max_peers", 25))
+        else:
+            max_peers = max(1, int(max_peers))
+        if download_dir is None:
+            download_dir = str(self._settings.get("download_dir") or os.path.abspath("downloads"))
+        download_dir = os.path.abspath(os.path.expanduser(download_dir))
 
         # TorrentSession construction is lightweight: it parses .torrent
         # metadata and creates Piece descriptors, but does not hash the payload
@@ -915,6 +1124,7 @@ class TorrentManager:
             torrent_path,
             ui_queue=self.ui_queue,
             max_peers=max_peers,
+            download_dir=download_dir,
             seed_source_path=seed_source_path or None,
         )
         info_hash = new_session.torrent.hex_info_hash
@@ -995,7 +1205,19 @@ class TorrentManager:
             new_session.set_transfer_limits(*replacement_limits)
         if replacement_priorities:
             new_session.set_file_priorities(replacement_priorities, emit=False)
-        new_session.set_queue_priority(replacement_queue_priority, emit=False)
+        if replaced_existing:
+            new_session.set_queue_priority(replacement_queue_priority, emit=False)
+        else:
+            new_session.set_queue_priority(
+                self._settings.get("default_queue_priority", TORRENT_PRIORITY_NORMAL),
+                emit=False,
+            )
+            new_session.set_transfer_limits(
+                self._settings.get("default_download_limit_value", 0.0),
+                self._settings.get("default_download_limit_unit", "KB/s"),
+                self._settings.get("default_upload_limit_value", 0.0),
+                self._settings.get("default_upload_limit_unit", "KB/s"),
+            )
 
         self._cache_torrent_file(info_hash, torrent_path)
 
@@ -1011,7 +1233,7 @@ class TorrentManager:
         self,
         torrent_path: str,
         seed_source_path: str,
-        max_peers: int = 25,
+        max_peers: Optional[int] = None,
     ) -> TorrentSession:
         """Attach a locally-created torrent to its original payload read-only."""
         return self.add_torrent(
@@ -1124,6 +1346,23 @@ class TorrentManager:
             info_hash,
             {"priority": value},
         )
+
+    def force_recheck(self, info_hash: str):
+        """Discard fast-resume trust and hash the existing payload again."""
+        with self._sessions_lock:
+            if info_hash not in self.sessions:
+                return False
+        self._send_cmd(TorrentCommand.FORCE_RECHECK, info_hash)
+        return True
+
+    def update_trackers(self, info_hash: str):
+        """Request an immediate tracker announce for an active torrent."""
+        with self._sessions_lock:
+            session = self.sessions.get(info_hash)
+            if not session or session.state not in (SessionState.DOWNLOADING, SessionState.SEEDING):
+                return False
+        self._send_cmd(TorrentCommand.ANNOUNCE, info_hash)
+        return True
 
     def shutdown(self, timeout: float = 5.0):
         """Persist intent, then cleanly stop the async engine before process exit."""

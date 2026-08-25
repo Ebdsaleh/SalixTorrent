@@ -2,6 +2,7 @@
 
 import hashlib
 import os
+from urllib.parse import quote
 from typing import Any, Dict, List
 
 from app.logic.bencode import Bencode
@@ -31,6 +32,7 @@ class TorrentFile:
         self.files: List[Dict[str, Any]] = []
         self.comment: str = ""
         self.created_by: str = ""
+        self.creation_date: int = 0
         self.private: bool = False
 
         self._load_and_parse()
@@ -100,6 +102,11 @@ class TorrentFile:
             self.comment = self._decode_text(raw_dict[b"comment"])
         if b"created by" in raw_dict:
             self.created_by = self._decode_text(raw_dict[b"created by"])
+        if b"creation date" in raw_dict:
+            try:
+                self.creation_date = max(0, int(raw_dict[b"creation date"] or 0))
+            except (TypeError, ValueError):
+                self.creation_date = 0
 
         info_dict = raw_dict.get(b"info")
         if not info_dict or not isinstance(info_dict, dict):
@@ -205,3 +212,15 @@ class TorrentFile:
     @property
     def hex_info_hash(self) -> str:
         return self.info_hash.hex()
+
+    @property
+    def magnet_uri(self) -> str:
+        """Return a standard BitTorrent v1 magnet URI for this torrent."""
+        parts = [f"magnet:?xt=urn:btih:{self.hex_info_hash}"]
+        if self.name:
+            parts.append(f"dn={quote(self.name, safe='')}")
+        for tracker in self.announce_list:
+            url = str(tracker or "").strip()
+            if url:
+                parts.append(f"tr={quote(url, safe='')}")
+        return "&".join(parts)

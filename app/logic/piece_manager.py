@@ -901,6 +901,26 @@ class PieceManager:
         except OSError:
             pass
 
+    def invalidate_verification(self):
+        """Forget cached piece verification without deleting payload data.
+
+        This is used by the user-facing Force Recheck action. Existing files are
+        left untouched; only trusted resume metadata and in-memory verification
+        state are cleared so the next prepare/check hashes the payload again.
+        """
+        with self._prepare_lock:
+            self._delete_resume_state()
+            self._storage_prepared = False
+            self.fast_resume_used = False
+            self.downloaded_bytes = 0
+            self.last_error = ""
+            self._set_check_progress(0, 0)
+
+            for piece in self.pieces:
+                piece.is_complete = False
+                if piece.blocks_initialized:
+                    piece.reset()
+
     def get_next_request(self, peer_bitfield: bytearray) -> Optional[Block]:
         """Return the next block this peer can provide, honoring file priority.
 
