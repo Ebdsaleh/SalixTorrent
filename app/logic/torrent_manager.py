@@ -10,7 +10,14 @@ import threading
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from app.logic.session import TorrentSession, SessionState
+from app.logic.session import (
+    TorrentSession,
+    SessionState,
+    TORRENT_PRIORITY_HIGH,
+    TORRENT_PRIORITY_NORMAL,
+    TORRENT_PRIORITY_LOW,
+    TORRENT_PRIORITIES,
+)
 
 
 class TorrentCommand:
@@ -21,6 +28,9 @@ class TorrentCommand:
     REMOVE = "REMOVE"
     SET_LIMITS = "SET_LIMITS"
     SET_FILE_PRIORITY = "SET_FILE_PRIORITY"
+    SET_TORRENT_PRIORITY = "SET_TORRENT_PRIORITY"
+    SET_QUEUE_LIMIT = "SET_QUEUE_LIMIT"
+    REBALANCE_QUEUE = "REBALANCE_QUEUE"
     SHUTDOWN = "SHUTDOWN"
 
 
@@ -37,7 +47,13 @@ class SessionIntent:
 
 class TorrentManager:
     _instance: Optional["TorrentManager"] = None
-    SESSION_STATE_VERSION = 3
+    SESSION_STATE_VERSION = 4
+    DEFAULT_MAX_ACTIVE_DOWNLOADS = 2
+    PRIORITY_RANK = {
+        TORRENT_PRIORITY_HIGH: 0,
+        TORRENT_PRIORITY_NORMAL: 1,
+        TORRENT_PRIORITY_LOW: 2,
+    }
 
     def __new__(cls, ui_queue: Optional[queue.Queue] = None):
         if cls._instance is None:
@@ -61,6 +77,11 @@ class TorrentManager:
             cls._instance._selected_info_hash: str = ""
             cls._instance._source_paths: Dict[str, str] = {}
             cls._instance._restoring_state = False
+
+            # Queue scheduler. 0 means unlimited active downloads. Completed
+            # torrents that are seeding do not consume download slots.
+            cls._instance._max_active_downloads: int = cls.DEFAULT_MAX_ACTIVE_DOWNLOADS
+            cls._instance._explicit_start_requests = set()
 
             cls._instance._state_dir = cls._instance._get_state_directory()
             cls._instance._state_file = cls._instance._state_dir / "session.json"
@@ -142,6 +163,7 @@ class TorrentManager:
             SessionState.FAST_RESUME,
             SessionState.DOWNLOADING,
             SessionState.SEEDING,
+            SessionState.QUEUED,
         ):
             return SessionIntent.ACTIVE
         if session.state == SessionState.PAUSED:
@@ -190,6 +212,7 @@ class TorrentManager:
                     "uploaded_bytes": int(session.uploaded_bytes),
                     "seed_source_path": session.seed_source_path,
                     "file_priorities": session.piece_mgr.get_file_priorities(),
+                    "queue_priority": session.queue_priority,
                 }
             )
 
@@ -199,6 +222,7 @@ class TorrentManager:
         return {
             "version": self.SESSION_STATE_VERSION,
             "selected_info_hash": selected_info_hash,
+            "max_active_downloads": int(self._max_active_downloads),
             "torrents": entries,
         }
 
@@ -233,7 +257,7 @@ class TorrentManager:
 
         if not isinstance(data, dict):
             return None
-        if data.get("version") not in (1, 2, self.SESSION_STATE_VERSION):
+        if data.get("version") not in (1, 2, 3, self.SESSION_STATE_VERSION):
             print("[Salix_T Notice] Previous session uses an unsupported format.")
             return None
         if not isinstance(data.get("torrents", []), list):
@@ -273,6 +297,14 @@ class TorrentManager:
         entries = data.get("torrents", [])
         if not entries:
             return 0
+
+        try:
+            self._max_active_downloads = max(
+                0,
+                int(data.get("max_active_downloads", self.DEFAULT_MAX_ACTIVE_DOWNLOADS)),
+            )
+        except (TypeError, ValueError):
+            self._max_active_downloads = self.DEFAULT_MAX_ACTIVE_DOWNLOADS
 
         restored_order: List[str] = []
         active_hashes: List[str] = []
@@ -338,6 +370,8 @@ class TorrentManager:
                         session._paused_from_state = paused_from
                 elif intent == SessionIntent.STOPPED:
                     session.state = SessionState.STOPPED
+                elif intent == SessionIntent.ACTIVE:
+                    session.state = SessionState.QUEUED
                 else:
                     session.state = SessionState.IDLE
 
@@ -349,6 +383,10 @@ class TorrentManager:
 
                 session.set_file_priorities(
                     entry.get("file_priorities", []),
+                    emit=False,
+                )
+                session.set_queue_priority(
+                    entry.get("queue_priority", TORRENT_PRIORITY_NORMAL),
                     emit=False,
                 )
 
@@ -397,6 +435,25 @@ class TorrentManager:
             valid.extend(h for h in self.sessions if h not in valid)
             self._queue_order = valid
         self.save_session_state()
+        if self._running:
+            self._send_cmd(TorrentCommand.REBALANCE_QUEUE, "")
+
+    def get_max_active_downloads(self) -> int:
+        return int(self._max_active_downloads)
+
+    def set_max_active_downloads(self, value: int):
+        try:
+            value = max(0, int(value))
+        except (TypeError, ValueError):
+            value = self.DEFAULT_MAX_ACTIVE_DOWNLOADS
+
+        self._max_active_downloads = value
+        self.save_session_state()
+        self._send_cmd(
+            TorrentCommand.SET_QUEUE_LIMIT,
+            "",
+            {"max_active_downloads": value},
+        )
 
     def set_selected_torrent(self, info_hash: str):
         with self._sessions_lock:
@@ -517,6 +574,7 @@ class TorrentManager:
             self.sessions.pop(info_hash, None)
             self._desired_states.pop(info_hash, None)
             self._source_paths.pop(info_hash, None)
+            self._explicit_start_requests.discard(info_hash)
             self._queue_order = [h for h in self._queue_order if h != info_hash]
 
             if self._selected_info_hash == info_hash:
@@ -578,12 +636,122 @@ class TorrentManager:
             self._cmd_queue = None
             self._loop = None
 
+    def _queue_sort_key(self, info_hash: str, order_index: Dict[str, int]):
+        session = self.sessions.get(info_hash)
+        priority = (
+            session.queue_priority
+            if session is not None
+            else TORRENT_PRIORITY_NORMAL
+        )
+        return (
+            self.PRIORITY_RANK.get(priority, self.PRIORITY_RANK[TORRENT_PRIORITY_NORMAL]),
+            order_index.get(info_hash, 10**9),
+        )
+
+    def _rebalance_queue(self):
+        """Start waiting torrents when download slots become available.
+
+        Running downloads are intentionally not pre-empted when the user
+        changes order or priority. Queue position decides who starts *next*.
+        Completed torrents that are seeding do not consume download slots.
+        """
+        with self._sessions_lock:
+            sessions = dict(self.sessions)
+            desired = dict(self._desired_states)
+            order = [h for h in self._queue_order if h in sessions]
+            order.extend(h for h in sessions if h not in order)
+
+        order_index = {info_hash: index for index, info_hash in enumerate(order)}
+        active_downloads = 0
+        candidates: List[str] = []
+
+        for info_hash in order:
+            if desired.get(info_hash) != SessionIntent.ACTIVE:
+                continue
+
+            session = sessions[info_hash]
+
+            # A fully complete torrent is a seeding candidate and does not
+            # consume one of the download slots. Start it whenever requested.
+            if session.piece_mgr.is_finished:
+                can_retry_error = info_hash in self._explicit_start_requests
+                if (
+                    not session.is_running
+                    and (session.state != SessionState.ERROR or can_retry_error)
+                ):
+                    asyncio.create_task(session.start())
+                    self._explicit_start_requests.discard(info_hash)
+                continue
+
+            # Selective-download completion has no remaining wanted work.
+            if session.piece_mgr.wanted_is_finished and session.piece_mgr.storage_prepared:
+                continue
+
+            if session.is_running and session.state in (
+                SessionState.CHECKING,
+                SessionState.FAST_RESUME,
+                SessionState.DOWNLOADING,
+            ):
+                active_downloads += 1
+                continue
+
+            # Errors are not automatically retried every scheduler tick. A
+            # fresh explicit Start/Resume request grants one retry attempt.
+            if (
+                session.state == SessionState.ERROR
+                and info_hash not in self._explicit_start_requests
+            ):
+                continue
+
+            candidates.append(info_hash)
+
+        candidates.sort(key=lambda h: self._queue_sort_key(h, order_index))
+
+        if self._max_active_downloads <= 0:
+            available_slots = len(candidates)
+        else:
+            available_slots = max(0, self._max_active_downloads - active_downloads)
+
+        for info_hash in candidates:
+            session = sessions[info_hash]
+
+            if available_slots <= 0:
+                # Fresh/stopped sessions become visibly queued. A paused live
+                # coroutine can also remain suspended in Queued until promoted.
+                session.mark_queued()
+                continue
+
+            promoted = False
+            if session.is_running:
+                if session.state == SessionState.QUEUED:
+                    promoted = session.resume_from_queue()
+                elif session.state == SessionState.PAUSED:
+                    session.resume()
+                    promoted = True
+            else:
+                asyncio.create_task(session.start())
+                promoted = True
+
+            if promoted:
+                self._explicit_start_requests.discard(info_hash)
+                available_slots -= 1
+
     async def _engine_main(self):
         self._cmd_queue = asyncio.Queue()
         self._engine_ready.set()
 
         while self._running:
-            command = await self._cmd_queue.get()
+            try:
+                command = await asyncio.wait_for(
+                    self._cmd_queue.get(),
+                    timeout=0.5,
+                )
+            except asyncio.TimeoutError:
+                # Completion/seeding transitions happen inside TorrentSession,
+                # so a light periodic rebalance lets the next queued download
+                # start without waiting for another UI command.
+                self._rebalance_queue()
+                continue
 
             if len(command) == 2:
                 action, info_hash = command
@@ -593,9 +761,9 @@ class TorrentManager:
 
             try:
                 if action == TorrentCommand.SHUTDOWN:
-                    # save_session_state() is called before this command.  Stop
-                    # only tears down live network/storage work; it must not alter
-                    # the already-persisted ACTIVE/PAUSED/STOPPED user intent.
+                    # save_session_state() is called before this command. Stop
+                    # only tears down live work; it must not alter persisted
+                    # ACTIVE/PAUSED/STOPPED intent.
                     with self._sessions_lock:
                         sessions = list(self.sessions.values())
 
@@ -609,6 +777,23 @@ class TorrentManager:
                     await asyncio.sleep(0)
                     break
 
+                if action == TorrentCommand.SET_QUEUE_LIMIT:
+                    payload = payload or {}
+                    try:
+                        self._max_active_downloads = max(
+                            0,
+                            int(payload.get("max_active_downloads", self.DEFAULT_MAX_ACTIVE_DOWNLOADS)),
+                        )
+                    except (TypeError, ValueError):
+                        self._max_active_downloads = self.DEFAULT_MAX_ACTIVE_DOWNLOADS
+                    self.save_session_state()
+                    self._rebalance_queue()
+                    continue
+
+                if action == TorrentCommand.REBALANCE_QUEUE:
+                    self._rebalance_queue()
+                    continue
+
                 with self._sessions_lock:
                     session = self.sessions.get(info_hash)
 
@@ -616,24 +801,21 @@ class TorrentManager:
                     continue
 
                 if action == TorrentCommand.START:
-                    if not session.is_running:
-                        asyncio.create_task(session.start())
+                    self._explicit_start_requests.add(info_hash)
+                    self._rebalance_queue()
 
                 elif action == TorrentCommand.PAUSE:
                     session.pause()
+                    self._rebalance_queue()
 
                 elif action == TorrentCommand.RESUME:
-                    if session.state == SessionState.PAUSED:
-                        session.resume()
-
-                    # A paused session can outlive its main coroutine (for
-                    # example after every peer disconnects). In that case,
-                    # Resume must both restore the state and start a new run.
-                    if not session.is_running:
-                        asyncio.create_task(session.start())
+                    self._explicit_start_requests.add(info_hash)
+                    self._rebalance_queue()
 
                 elif action == TorrentCommand.STOP:
+                    self._explicit_start_requests.discard(info_hash)
                     session.stop()
+                    self._rebalance_queue()
 
                 elif action == TorrentCommand.REMOVE:
                     payload = payload or {}
@@ -641,6 +823,7 @@ class TorrentManager:
 
                     # Stop the live session first so sockets, peer tasks and
                     # disk-check cancellation are triggered before cleanup.
+                    self._explicit_start_requests.discard(info_hash)
                     session.stop()
                     await asyncio.sleep(0)
 
@@ -673,6 +856,7 @@ class TorrentManager:
                             "selected_info_hash": selected,
                         }
                     )
+                    self._rebalance_queue()
 
                 elif action == TorrentCommand.SET_LIMITS:
                     payload = payload or {}
@@ -692,6 +876,15 @@ class TorrentManager:
                     )
                     if changed:
                         self.save_session_state()
+
+                elif action == TorrentCommand.SET_TORRENT_PRIORITY:
+                    payload = payload or {}
+                    changed = session.set_queue_priority(
+                        payload.get("priority", TORRENT_PRIORITY_NORMAL),
+                    )
+                    if changed:
+                        self.save_session_state()
+                    self._rebalance_queue()
 
             finally:
                 self._cmd_queue.task_done()
@@ -735,6 +928,7 @@ class TorrentManager:
         replacement_limits = None
         replacement_uploaded = 0
         replacement_priorities = None
+        replacement_queue_priority = TORRENT_PRIORITY_NORMAL
         replaced_existing = False
 
         with self._sessions_lock:
@@ -767,6 +961,7 @@ class TorrentManager:
                     )
                     replacement_uploaded = existing_session.uploaded_bytes
                     replacement_priorities = existing_session.piece_mgr.get_file_priorities()
+                    replacement_queue_priority = existing_session.queue_priority
                     self.sessions[info_hash] = new_session
                     self._desired_states[info_hash] = SessionIntent.IDLE
                     self._source_paths[info_hash] = torrent_path
@@ -800,6 +995,7 @@ class TorrentManager:
             new_session.set_transfer_limits(*replacement_limits)
         if replacement_priorities:
             new_session.set_file_priorities(replacement_priorities, emit=False)
+        new_session.set_queue_priority(replacement_queue_priority, emit=False)
 
         self._cache_torrent_file(info_hash, torrent_path)
 
@@ -916,6 +1112,17 @@ class TorrentManager:
                 "file_index": int(file_index),
                 "priority": str(priority),
             },
+        )
+
+    def set_torrent_priority(self, info_hash: str, priority: str):
+        """Set High / Normal / Low queue priority for one torrent."""
+        value = str(priority or TORRENT_PRIORITY_NORMAL).strip().title()
+        if value not in TORRENT_PRIORITIES:
+            value = TORRENT_PRIORITY_NORMAL
+        self._send_cmd(
+            TorrentCommand.SET_TORRENT_PRIORITY,
+            info_hash,
+            {"priority": value},
         )
 
     def shutdown(self, timeout: float = 5.0):

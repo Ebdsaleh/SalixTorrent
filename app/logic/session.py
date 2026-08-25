@@ -27,6 +27,15 @@ SPEED_HISTORY_SECONDS = 120.0
 SPEED_SAMPLE_INTERVAL = 0.5
 SPEED_HISTORY_MAX_SAMPLES = int(SPEED_HISTORY_SECONDS / SPEED_SAMPLE_INTERVAL) + 8
 
+TORRENT_PRIORITY_HIGH = "High"
+TORRENT_PRIORITY_NORMAL = "Normal"
+TORRENT_PRIORITY_LOW = "Low"
+TORRENT_PRIORITIES = (
+    TORRENT_PRIORITY_HIGH,
+    TORRENT_PRIORITY_NORMAL,
+    TORRENT_PRIORITY_LOW,
+)
+
 
 class AsyncBandwidthLimiter:
     """
@@ -95,6 +104,7 @@ def _rate_to_bps(value: float, unit: str) -> int:
 
 class SessionState:
     IDLE = "Idle"
+    QUEUED = "Queued"
     CHECKING = "Checking"
     FAST_RESUME = "Fast Resume"
     DOWNLOADING = "Downloading"
@@ -180,6 +190,11 @@ class TorrentSession:
         self.state = SessionState.IDLE
         self.is_running = False
 
+        # Torrent-level queue priority. The manager combines this with the
+        # visible Move Up / Move Down order when choosing the next queued
+        # download to start. Seeding is not limited by download queue slots.
+        self.queue_priority: str = TORRENT_PRIORITY_NORMAL
+
         self._pause_event = asyncio.Event()
         self._pause_event.set()
 
@@ -224,6 +239,62 @@ class TorrentSession:
         self._download_limiter.set_rate(self.download_limit_bps)
         self._upload_limiter.set_rate(self.upload_limit_bps)
         self._emit_snapshot()
+
+    def set_queue_priority(self, priority: object, emit: bool = True) -> bool:
+        """Set this torrent's queue priority (High / Normal / Low)."""
+        value = str(priority or TORRENT_PRIORITY_NORMAL).strip().title()
+        if value not in TORRENT_PRIORITIES:
+            value = TORRENT_PRIORITY_NORMAL
+
+        if self.queue_priority == value:
+            return False
+
+        self.queue_priority = value
+        if emit:
+            self._emit_snapshot()
+        return True
+
+    def mark_queued(self):
+        """Show that an ACTIVE torrent is waiting for a download slot.
+
+        A user-resumed paused coroutine can remain alive while queued; its
+        pause events stay cleared, so it consumes no download bandwidth until
+        the queue scheduler promotes it again. Fresh/stopped torrents simply
+        wait in the Queued state without creating network tasks.
+        """
+        if self.state == SessionState.QUEUED:
+            return
+
+        if self.state == SessionState.PAUSED and self.is_running:
+            # pause() already cleared the relevant events. Keep
+            # _paused_from_state so promotion can continue the same operation.
+            self.state = SessionState.QUEUED
+        elif not self.is_running:
+            self.state = SessionState.QUEUED
+        else:
+            # Never pre-empt a currently active download just because the user
+            # moved another item above it. Queue ordering controls who starts
+            # next when a slot becomes free.
+            return
+
+        self._record_speed_sample(0.0, 0.0)
+        self._emit_snapshot()
+
+    def resume_from_queue(self) -> bool:
+        """Resume a still-alive paused coroutine promoted from the queue."""
+        if self.state != SessionState.QUEUED or not self.is_running:
+            return False
+
+        resume_state = self._paused_from_state or SessionState.DOWNLOADING
+        self._paused_from_state = None
+        self.state = resume_state
+
+        if resume_state == SessionState.CHECKING and self._prepare_pause_event:
+            self._prepare_pause_event.set()
+
+        self._pause_event.set()
+        self._emit_snapshot()
+        return True
 
     def set_file_priority(self, file_index: int, priority: object) -> bool:
         """Apply one file priority live and refresh the selected-torrent views."""
@@ -735,6 +806,7 @@ class TorrentSession:
             "upload_limit_value": self.upload_limit_value,
             "upload_limit_unit": self.upload_limit_unit,
             "upload_limit_bps": self.upload_limit_bps,
+            "queue_priority": self.queue_priority,
         }
 
     def _emit_snapshot(self):

@@ -19,6 +19,7 @@ class DownloadView:
     ACTIVE_PAUSABLE_STATES = {"Checking", "Downloading", "Seeding"}
     STARTABLE_STATES = {"Idle", "Stopped", "Completed", "Error"}
     STOPPABLE_STATES = {
+        "Queued",
         "Checking",
         "Fast Resume",
         "Downloading",
@@ -47,6 +48,7 @@ class DownloadView:
         self.file_view = FileView()
         self.source_view = SourceView()
         self.speed_view = SpeedView()
+        self._queue_slots_value = self.manager.get_max_active_downloads()
 
     def build_view(self, parent_tag: str | int = "primary_window"):
         with dpg.group(parent=parent_tag):
@@ -69,6 +71,19 @@ class DownloadView:
                     label=" Stop ",
                     callback=self._on_stop_clicked,
                 )
+                dpg.add_spacer(width=18)
+                dpg.add_text("Active DL Slots")
+                self.queue_slots_input = dpg.add_input_int(
+                    default_value=self._queue_slots_value,
+                    min_value=0,
+                    min_clamped=True,
+                    width=70,
+                )
+                dpg.add_button(
+                    label=" Apply Queue ",
+                    callback=self._on_apply_queue_slots_clicked,
+                )
+                dpg.add_text("0 = Unlimited", color=(140, 140, 140))
 
             dpg.add_spacer(height=5)
 
@@ -97,6 +112,11 @@ class DownloadView:
                         label="Progress",
                         width_fixed=True,
                         init_width_or_weight=120,
+                    )
+                    dpg.add_table_column(
+                        label="Priority",
+                        width_fixed=True,
+                        init_width_or_weight=90,
                     )
                     dpg.add_table_column(
                         label="Status",
@@ -321,6 +341,12 @@ class DownloadView:
         dpg.set_value(self.upload_limit_input, 0.0)
         self._on_apply_limits_clicked()
 
+    def _on_apply_queue_slots_clicked(self):
+        value = max(0, int(dpg.get_value(self.queue_slots_input) or 0))
+        dpg.set_value(self.queue_slots_input, value)
+        self._queue_slots_value = value
+        self.manager.set_max_active_downloads(value)
+
     # ------------------------------------------------------------------
     # Torrent row context menu
     # ------------------------------------------------------------------
@@ -348,6 +374,24 @@ class DownloadView:
                 label="Move Down",
                 user_data=info_hash,
                 callback=lambda s, a, u: self._move_torrent_down(u),
+            )
+
+            dpg.add_separator()
+
+            priority_high_item = dpg.add_menu_item(
+                label="Priority: High",
+                user_data=info_hash,
+                callback=lambda s, a, u: self._context_set_priority(u, "High"),
+            )
+            priority_normal_item = dpg.add_menu_item(
+                label="Priority: Normal",
+                user_data=info_hash,
+                callback=lambda s, a, u: self._context_set_priority(u, "Normal"),
+            )
+            priority_low_item = dpg.add_menu_item(
+                label="Priority: Low",
+                user_data=info_hash,
+                callback=lambda s, a, u: self._context_set_priority(u, "Low"),
             )
 
             dpg.add_separator()
@@ -401,6 +445,9 @@ class DownloadView:
             "popup": popup_id,
             "move_up": move_up_item,
             "move_down": move_down_item,
+            "priority_high": priority_high_item,
+            "priority_normal": priority_normal_item,
+            "priority_low": priority_low_item,
             "start": start_item,
             "pause": pause_item,
             "resume": resume_item,
@@ -413,6 +460,10 @@ class DownloadView:
         self._select_torrent(info_hash)
         self._refresh_context_menu_states()
         dpg.configure_item(popup_id, show=True)
+
+    def _context_set_priority(self, info_hash: str, priority: str):
+        self._select_torrent(info_hash)
+        self.manager.set_torrent_priority(info_hash, priority)
 
     def _context_start(self, info_hash: str):
         self._select_torrent(info_hash)
@@ -559,9 +610,13 @@ class DownloadView:
         can_pause = state in self.ACTIVE_PAUSABLE_STATES
         can_resume = state == "Paused"
         can_stop = state in self.STOPPABLE_STATES
+        queue_priority = stats.get("queue_priority", "Normal")
 
         dpg.configure_item(menu["move_up"], enabled=can_move_up)
         dpg.configure_item(menu["move_down"], enabled=can_move_down)
+        dpg.configure_item(menu["priority_high"], enabled=queue_priority != "High")
+        dpg.configure_item(menu["priority_normal"], enabled=queue_priority != "Normal")
+        dpg.configure_item(menu["priority_low"], enabled=queue_priority != "Low")
         dpg.configure_item(menu["start"], enabled=can_start)
         dpg.configure_item(menu["pause"], enabled=can_pause)
         dpg.configure_item(menu["resume"], enabled=can_resume)
@@ -691,18 +746,20 @@ class DownloadView:
                 )
                 size_cell = dpg.add_text(size_str)
                 prog_cell = dpg.add_text(prog_str)
+                priority_cell = dpg.add_text(msg.get("queue_priority", "Normal"))
                 status_cell = dpg.add_text(state_label)
                 speed_cell = dpg.add_text(speed_str)
 
             menu = self._build_row_context_menu(
                 h,
-                (name_cell, size_cell, prog_cell, status_cell, speed_cell),
+                (name_cell, size_cell, prog_cell, priority_cell, status_cell, speed_cell),
             )
             self.torrent_rows[h] = {
                 "row": row_id,
                 "name": name_cell,
                 "size": size_cell,
                 "progress": prog_cell,
+                "priority": priority_cell,
                 "status": status_cell,
                 "speed": speed_cell,
                 "menu": menu,
@@ -714,6 +771,7 @@ class DownloadView:
             row = self.torrent_rows[h]
             dpg.set_value(row["size"], size_str)
             dpg.set_value(row["progress"], prog_str)
+            dpg.set_value(row["priority"], msg.get("queue_priority", "Normal"))
             dpg.set_value(row["status"], state_label)
             dpg.set_value(row["speed"], speed_str)
             dpg.set_value(row["name"], self.active_info_hash == h)
