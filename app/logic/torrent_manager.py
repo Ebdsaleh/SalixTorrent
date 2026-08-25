@@ -11,6 +11,7 @@ import threading
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from app.logic.connectivity import ConnectivityManager
 from app.logic.magnet import (
     MagnetCancelled,
     MagnetError,
@@ -25,6 +26,8 @@ from app.logic.session import (
     TORRENT_PRIORITY_NORMAL,
     TORRENT_PRIORITY_LOW,
     TORRENT_PRIORITIES,
+    AsyncBandwidthLimiter,
+    RATE_UNIT_MULTIPLIERS,
 )
 
 
@@ -43,6 +46,7 @@ class TorrentCommand:
     ANNOUNCE = "ANNOUNCE"
     ADD_MAGNET = "ADD_MAGNET"
     CANCEL_MAGNET = "CANCEL_MAGNET"
+    APPLY_APP_SETTINGS = "APPLY_APP_SETTINGS"
     SHUTDOWN = "SHUTDOWN"
 
 
@@ -98,6 +102,12 @@ class TorrentManager:
             cls._instance._magnet_tasks: Dict[str, asyncio.Task] = {}
             cls._instance._magnet_fetchers: Dict[str, MagnetMetadataFetcher] = {}
 
+            # Application-wide bandwidth limiters are shared by every torrent
+            # session, unlike the existing per-torrent limiters.
+            cls._instance._global_download_limiter = AsyncBandwidthLimiter()
+            cls._instance._global_upload_limiter = AsyncBandwidthLimiter()
+            cls._instance._connectivity = ConnectivityManager()
+
             cls._instance._state_dir = cls._instance._get_state_directory()
             cls._instance._state_file = cls._instance._state_dir / "session.json"
             cls._instance._torrent_cache_dir = cls._instance._state_dir / "torrents"
@@ -108,6 +118,7 @@ class TorrentManager:
                     "max_active_downloads", cls.DEFAULT_MAX_ACTIVE_DOWNLOADS
                 )
             )
+            cls._instance._apply_global_bandwidth_settings()
         elif ui_queue is not None:
             # Keep the singleton attached to the application's real UI queue.
             cls._instance.ui_queue = ui_queue
@@ -156,6 +167,19 @@ class TorrentManager:
             "max_active_downloads": cls.DEFAULT_MAX_ACTIVE_DOWNLOADS,
             "auto_resume_active": True,
             "completion_notifications": True,
+            "native_notifications": True,
+            "system_tray_enabled": True,
+            "minimize_to_tray": True,
+            "listen_port": 6881,
+            "enable_dht": True,
+            "enable_pex": True,
+            "enable_lan_discovery": True,
+            "enable_upnp": True,
+            "enable_natpmp": True,
+            "global_download_limit_value": 0.0,
+            "global_download_limit_unit": "KB/s",
+            "global_upload_limit_value": 0.0,
+            "global_upload_limit_unit": "KB/s",
             "default_download_limit_value": 0.0,
             "default_download_limit_unit": "KB/s",
             "default_upload_limit_value": 0.0,
@@ -184,15 +208,39 @@ class TorrentManager:
 
         out["auto_resume_active"] = bool(data.get("auto_resume_active", True))
         out["completion_notifications"] = bool(data.get("completion_notifications", True))
+        out["native_notifications"] = bool(data.get("native_notifications", True))
+        out["system_tray_enabled"] = bool(data.get("system_tray_enabled", True))
+        out["minimize_to_tray"] = bool(data.get("minimize_to_tray", True))
+        out["enable_dht"] = bool(data.get("enable_dht", True))
+        out["enable_pex"] = bool(data.get("enable_pex", True))
+        out["enable_lan_discovery"] = bool(data.get("enable_lan_discovery", True))
+        out["enable_upnp"] = bool(data.get("enable_upnp", True))
+        out["enable_natpmp"] = bool(data.get("enable_natpmp", True))
 
-        for key in ("default_download_limit_value", "default_upload_limit_value"):
+        try:
+            listen_port = int(data.get("listen_port", 6881))
+        except (TypeError, ValueError):
+            listen_port = 6881
+        out["listen_port"] = max(1, min(65535, listen_port))
+
+        for key in (
+            "global_download_limit_value",
+            "global_upload_limit_value",
+            "default_download_limit_value",
+            "default_upload_limit_value",
+        ):
             try:
                 out[key] = max(0.0, float(data.get(key, 0.0)))
             except (TypeError, ValueError):
                 out[key] = 0.0
 
         valid_units = {"KB/s", "MB/s", "kbps", "Mbps"}
-        for key in ("default_download_limit_unit", "default_upload_limit_unit"):
+        for key in (
+            "global_download_limit_unit",
+            "global_upload_limit_unit",
+            "default_download_limit_unit",
+            "default_upload_limit_unit",
+        ):
             unit = str(data.get(key) or "KB/s")
             out[key] = unit if unit in valid_units else "KB/s"
 
@@ -227,22 +275,70 @@ class TorrentManager:
     def get_app_settings(self) -> dict:
         return dict(self._settings)
 
+    @staticmethod
+    def _rate_to_bps(value: object, unit: object) -> int:
+        try:
+            numeric = max(0.0, float(value or 0.0))
+        except (TypeError, ValueError):
+            numeric = 0.0
+        multiplier = RATE_UNIT_MULTIPLIERS.get(str(unit or "KB/s"), 1024.0)
+        return int(numeric * multiplier)
+
+    def _apply_global_bandwidth_settings(self):
+        self._global_download_limiter.set_rate(
+            self._rate_to_bps(
+                self._settings.get("global_download_limit_value", 0.0),
+                self._settings.get("global_download_limit_unit", "KB/s"),
+            )
+        )
+        self._global_upload_limiter.set_rate(
+            self._rate_to_bps(
+                self._settings.get("global_upload_limit_value", 0.0),
+                self._settings.get("global_upload_limit_unit", "KB/s"),
+            )
+        )
+
+    def get_connectivity_snapshot(self) -> dict:
+        return self._connectivity.snapshot()
+
+    def refresh_connectivity(self):
+        self._connectivity.request_refresh(self._settings)
+
+    def _on_session_listen_port(self, port: int):
+        # A real bound port is better than the configured preference. Re-map
+        # the router if the session had to fall back because the preferred port
+        # was occupied.
+        if port:
+            self._connectivity.request_refresh(self._settings, actual_port=int(port))
+
+    def _on_incoming_peer(self, port: int, remote_ip: str):
+        self._connectivity.mark_incoming(port, remote_ip)
+
     def update_app_settings(self, values: dict) -> dict:
         merged = dict(self._settings)
         if isinstance(values, dict):
             merged.update(values)
         self._settings = self._normalise_app_settings(merged)
         self.save_app_settings()
+        self._apply_global_bandwidth_settings()
 
         queue_limit = int(self._settings.get("max_active_downloads", self.DEFAULT_MAX_ACTIVE_DOWNLOADS))
         if queue_limit != self._max_active_downloads:
             self.set_max_active_downloads(queue_limit)
+
+        self._connectivity.request_refresh(self._settings)
+        if self._running:
+            self._send_cmd(TorrentCommand.APPLY_APP_SETTINGS, "", dict(self._settings))
         return self.get_app_settings()
 
     def reset_app_settings(self) -> dict:
         self._settings = self._default_app_settings()
         self.save_app_settings()
+        self._apply_global_bandwidth_settings()
         self.set_max_active_downloads(self._settings["max_active_downloads"])
+        self._connectivity.request_refresh(self._settings)
+        if self._running:
+            self._send_cmd(TorrentCommand.APPLY_APP_SETTINGS, "", dict(self._settings))
         return self.get_app_settings()
 
     def completion_notifications_enabled(self) -> bool:
@@ -468,6 +564,14 @@ class TorrentManager:
                         max_peers=max_peers,
                         download_dir=download_dir,
                         seed_source_path=seed_source_path or None,
+                        listen_port=self._settings.get("listen_port", 6881),
+                        enable_dht=self._settings.get("enable_dht", True),
+                        enable_pex=self._settings.get("enable_pex", True),
+                        enable_lan_discovery=self._settings.get("enable_lan_discovery", True),
+                        global_download_limiter=self._global_download_limiter,
+                        global_upload_limiter=self._global_upload_limiter,
+                        listen_port_callback=self._on_session_listen_port,
+                        incoming_peer_callback=self._on_incoming_peer,
                     )
                 except Exception as exc:
                     print(f"[Salix_T Notice] Could not restore '{restore_path}': {exc}")
@@ -757,6 +861,7 @@ class TorrentManager:
         # before _loop/_cmd_queue existed.
         if not self._engine_ready.wait(timeout=5.0):
             raise RuntimeError("Salix_T async engine did not become ready.")
+        self._connectivity.request_refresh(self._settings)
 
     def _run_event_loop(self):
         self._loop = asyncio.new_event_loop()
@@ -1196,6 +1301,22 @@ class TorrentManager:
                         task.cancel()
                     continue
 
+                if action == TorrentCommand.APPLY_APP_SETTINGS:
+                    settings = dict(payload or self._settings)
+                    with self._sessions_lock:
+                        sessions = list(self.sessions.values())
+                    for live_session in sessions:
+                        try:
+                            await live_session.apply_runtime_preferences(
+                                listen_port=settings.get("listen_port", 6881),
+                                enable_dht=settings.get("enable_dht", True),
+                                enable_pex=settings.get("enable_pex", True),
+                                enable_lan_discovery=settings.get("enable_lan_discovery", True),
+                            )
+                        except Exception as exc:
+                            print(f"[Salix_T Notice] Could not apply live network preferences: {exc}")
+                    continue
+
                 with self._sessions_lock:
                     session = self.sessions.get(info_hash)
 
@@ -1369,6 +1490,14 @@ class TorrentManager:
             max_peers=max_peers,
             download_dir=download_dir,
             seed_source_path=seed_source_path or None,
+            listen_port=self._settings.get("listen_port", 6881),
+            enable_dht=self._settings.get("enable_dht", True),
+            enable_pex=self._settings.get("enable_pex", True),
+            enable_lan_discovery=self._settings.get("enable_lan_discovery", True),
+            global_download_limiter=self._global_download_limiter,
+            global_upload_limiter=self._global_upload_limiter,
+            listen_port_callback=self._on_session_listen_port,
+            incoming_peer_callback=self._on_incoming_peer,
         )
         info_hash = new_session.torrent.hex_info_hash
 
@@ -1607,6 +1736,27 @@ class TorrentManager:
         self._send_cmd(TorrentCommand.ANNOUNCE, info_hash)
         return True
 
+    def pause_all(self):
+        with self._sessions_lock:
+            hashes = [
+                h for h, session in self.sessions.items()
+                if session.state in (
+                    SessionState.QUEUED, SessionState.CHECKING, SessionState.FAST_RESUME,
+                    SessionState.DOWNLOADING, SessionState.SEEDING,
+                )
+            ]
+        for info_hash in hashes:
+            self.pause_torrent(info_hash)
+
+    def resume_all(self):
+        with self._sessions_lock:
+            hashes = [
+                h for h, session in self.sessions.items()
+                if session.state in (SessionState.PAUSED, SessionState.STOPPED, SessionState.ERROR)
+            ]
+        for info_hash in hashes:
+            self.start_torrent(info_hash)
+
     def shutdown(self, timeout: float = 5.0):
         """Persist intent, then cleanly stop the async engine before process exit."""
         # This snapshot is the important one: it captures ACTIVE before the
@@ -1614,6 +1764,7 @@ class TorrentManager:
         self.save_session_state(force=True)
 
         if not self._running:
+            self._connectivity.close()
             return
 
         if self._engine_ready.wait(timeout=2.0):
@@ -1631,3 +1782,5 @@ class TorrentManager:
 
         if thread and thread.is_alive():
             print("[Salix_T Notice] Async engine did not finish shutdown before timeout.")
+
+        self._connectivity.close()

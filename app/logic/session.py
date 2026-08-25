@@ -8,12 +8,12 @@ import struct
 import threading
 import time
 from collections import deque
-from typing import Deque, Dict, List, Optional, Set, Tuple
+from typing import Callable, Deque, Dict, List, Optional, Set, Tuple
 
 from app.logic.dht import DHTClient, DHT_REFRESH_INTERVAL
 from app.logic.local_peer_discovery import LocalPeerDiscovery
 from app.logic.peer import (
-    EXTENSION_RESERVED_BYTES,
+    build_reserved_bytes,
     LOCAL_UT_METADATA_ID,
     LOCAL_UT_PEX_ID,
     METADATA_BLOCK_SIZE,
@@ -151,6 +151,14 @@ class TorrentSession:
         max_peers: int = 25,
         download_dir: str = "downloads",
         seed_source_path: Optional[str] = None,
+        listen_port: int = 6881,
+        enable_dht: bool = True,
+        enable_pex: bool = True,
+        enable_lan_discovery: bool = True,
+        global_download_limiter: Optional[AsyncBandwidthLimiter] = None,
+        global_upload_limiter: Optional[AsyncBandwidthLimiter] = None,
+        listen_port_callback: Optional[Callable[[int], None]] = None,
+        incoming_peer_callback: Optional[Callable[[int, str], None]] = None,
     ):
         self.torrent_path = torrent_path
         self.torrent = TorrentFile(torrent_path)
@@ -185,12 +193,23 @@ class TorrentSession:
         self._inbound_peer_records: Dict[int, dict] = {}
         self._seed_outbound_endpoints: Set[Tuple[str, int]] = set()
         self._download_endpoints: Set[Tuple[str, int]] = set()
-        self._seed_port: int = 6881
+        try:
+            requested_listen_port = int(listen_port or 6881)
+        except (TypeError, ValueError):
+            requested_listen_port = 6881
+        self.preferred_listen_port: int = max(1, min(65535, requested_listen_port))
+        self._seed_port: int = self.preferred_listen_port
+        self.enable_dht: bool = bool(enable_dht) and not self.torrent.private
+        self.enable_pex: bool = bool(enable_pex) and not self.torrent.private
+        self.enable_lan_discovery: bool = bool(enable_lan_discovery)
+        self._listen_port_callback = listen_port_callback
+        self._incoming_peer_callback = incoming_peer_callback
 
         self._lpd = LocalPeerDiscovery(self.torrent.info_hash)
         self._dht = DHTClient(
             self.torrent.info_hash,
-            private=self.torrent.private,
+            private=self.torrent.private or not self.enable_dht,
+            preferred_port=self.preferred_listen_port,
         )
         self.local_peers_discovered: int = 0
         self.error_message: str = ""
@@ -235,6 +254,10 @@ class TorrentSession:
         self.upload_limit_bps: int = 0
         self._download_limiter = AsyncBandwidthLimiter()
         self._upload_limiter = AsyncBandwidthLimiter()
+        # Manager-owned limiters are shared across every torrent session and
+        # therefore implement *true aggregate* application bandwidth limits.
+        self._global_download_limiter = global_download_limiter
+        self._global_upload_limiter = global_upload_limiter
 
         self.state = SessionState.IDLE
         self.is_running = False
@@ -307,6 +330,71 @@ class TorrentSession:
         self._download_limiter.set_rate(self.download_limit_bps)
         self._upload_limiter.set_rate(self.upload_limit_bps)
         self._emit_snapshot()
+
+    async def apply_runtime_preferences(
+        self,
+        *,
+        listen_port: int,
+        enable_dht: bool,
+        enable_pex: bool,
+        enable_lan_discovery: bool,
+    ):
+        """Apply networking preferences to a live session.
+
+        DHT/LPD can be started or stopped without tearing down peer workers. A
+        changed TCP listen port is rebound while seeding; existing outbound
+        peers remain untouched. PEX is toggled immediately for future exchange.
+        """
+        try:
+            port = int(listen_port or 6881)
+        except (TypeError, ValueError):
+            port = 6881
+        port = max(1, min(65535, port))
+
+        port_changed = port != self.preferred_listen_port
+        self.preferred_listen_port = port
+        self.enable_dht = bool(enable_dht) and not self.torrent.private
+        self.enable_pex = bool(enable_pex) and not self.torrent.private
+        self.enable_lan_discovery = bool(enable_lan_discovery)
+
+        for peer in list(self.active_peers):
+            peer.enable_pex = self.enable_pex
+            peer.advertise_dht = self.enable_dht
+
+        # DHT's private flag is also used as its hard-disable switch.
+        self._dht.private = bool(self.torrent.private or not self.enable_dht)
+        self._dht.set_preferred_port(self.preferred_listen_port)
+
+        if not self.enable_lan_discovery:
+            await self._lpd.close()
+        elif self.is_running and self.state in (SessionState.DOWNLOADING, SessionState.SEEDING):
+            await self._lpd.start(
+                listen_port=self._seed_port if self.state == SessionState.SEEDING else 0
+            )
+
+        if not self.enable_dht:
+            await self._dht.close()
+            self._dht.status = "Disabled"
+            self._dht.last_error = "Disabled in Preferences"
+        elif self.is_running and self.state in (SessionState.DOWNLOADING, SessionState.SEEDING):
+            await self._dht.start(
+                announce_port=self._seed_port if self.state == SessionState.SEEDING else 0
+            )
+
+        if (
+            port_changed
+            and self.is_running
+            and self.state in (SessionState.DOWNLOADING, SessionState.SEEDING)
+        ):
+            await self._close_seed_server()
+            await self._open_seed_server(self._run_token)
+            if self.enable_lan_discovery:
+                self._lpd.update_listen_port(self._seed_port)
+            if self.enable_dht:
+                self._dht.update_announce_port(self._seed_port)
+
+        self._detail_telemetry_cached_at = 0.0
+        self._emit_snapshot(force_detail_refresh=True)
 
     def set_queue_priority(self, priority: object, emit: bool = True) -> bool:
         """Set this torrent's queue priority (High / Normal / Low)."""
@@ -861,6 +949,9 @@ class TorrentSession:
         if self.torrent.private:
             status = "Disabled"
             detail = "Private torrent: BEP-10/11 PEX disabled"
+        elif not self.enable_pex:
+            status = "Disabled"
+            detail = "Disabled in Preferences"
         else:
             compatible = sum(1 for peer in self.active_peers if peer.pex_supported)
             compatible += sum(
@@ -904,8 +995,22 @@ class TorrentSession:
     def _build_sources_view_snapshot(self) -> dict:
         tracker_sources = self.tracker.get_source_snapshots()
         dht_source = self._dht.get_source_snapshot()
+        if not self.enable_dht and not self.torrent.private:
+            dht_source = dict(dht_source)
+            dht_source.update(
+                status="Disabled",
+                last_error="Disabled in Preferences",
+                detail="Disabled in Preferences",
+            )
         pex_source = self._build_pex_source_snapshot()
         lan_source = self._lpd.get_source_snapshot()
+        if not self.enable_lan_discovery:
+            lan_source = dict(lan_source)
+            lan_source.update(
+                status="Disabled",
+                last_error="Disabled in Preferences",
+                detail="Disabled in Preferences",
+            )
         sources = list(tracker_sources) + [dht_source, pex_source, lan_source]
 
         active_statuses = {"Active", "No Peers"}
@@ -958,7 +1063,7 @@ class TorrentSession:
         return out
 
     def _record_pex_payload(self, payload: dict) -> List[Tuple[str, int]]:
-        if self.torrent.private or not isinstance(payload, dict):
+        if self.torrent.private or not self.enable_pex or not isinstance(payload, dict):
             return []
         added = self._normalise_peer_endpoints(payload.get("added", []))
         if added:
@@ -971,7 +1076,7 @@ class TorrentSession:
         self,
         exclude: Optional[Tuple[str, int]] = None,
     ) -> List[Tuple[str, int]]:
-        if self.torrent.private:
+        if self.torrent.private or not self.enable_pex:
             return []
 
         endpoints: List[Tuple[str, int]] = []
@@ -1001,7 +1106,7 @@ class TorrentSession:
         return endpoints
 
     async def _maybe_send_pex(self, peer: PeerConnection):
-        if self.torrent.private or not peer.pex_supported:
+        if self.torrent.private or not self.enable_pex or not peer.pex_supported:
             return
         now = time.monotonic()
         if peer.last_pex_sent_at and now - peer.last_pex_sent_at < PEX_SEND_INTERVAL:
@@ -1058,6 +1163,14 @@ class TorrentSession:
             "peak_upload_kbps": peak_upload,
             "download_limit_kbps": self.download_limit_bps / 1024.0,
             "upload_limit_kbps": self.upload_limit_bps / 1024.0,
+            "global_download_limit_kbps": (
+                self._global_download_limiter.rate_bps / 1024.0
+                if self._global_download_limiter is not None else 0.0
+            ),
+            "global_upload_limit_kbps": (
+                self._global_upload_limiter.rate_bps / 1024.0
+                if self._global_upload_limiter is not None else 0.0
+            ),
         }
 
     def _build_snapshot(
@@ -1155,6 +1268,10 @@ class TorrentSession:
             "total_pieces": len(self.piece_mgr.pieces),
             "piece_length": int(self.torrent.piece_length),
             "listen_port": self._seed_port if self._seed_server else 0,
+            "preferred_listen_port": self.preferred_listen_port,
+            "dht_enabled": bool(self.enable_dht),
+            "pex_enabled": bool(self.enable_pex),
+            "lan_discovery_enabled": bool(self.enable_lan_discovery),
             "storage_mode": self.piece_mgr.storage_mode,
             "storage_path": os.path.abspath(self.piece_mgr.backing_path),
             "download_dir": os.path.abspath(self.piece_mgr.download_dir),
@@ -1352,8 +1469,20 @@ class TorrentSession:
         """
         self.state = SessionState.DOWNLOADING
         self._pause_event.set()
-        await self._lpd.start(listen_port=0)
-        await self._dht.start(announce_port=0)
+
+        # Accept inbound BitTorrent peers while downloading as well as while
+        # seeding. This makes automatic port mapping useful during the entire
+        # transfer lifecycle and lets us upload already-verified pieces to the
+        # swarm instead of remaining an outbound-only downloader.
+        await self._open_seed_server(run_token)
+        listen_port = self._seed_port if self._seed_server else 0
+
+        if self.enable_lan_discovery:
+            await self._lpd.start(listen_port=listen_port)
+            self._lpd.update_listen_port(listen_port)
+        if self.enable_dht:
+            await self._dht.start(announce_port=listen_port)
+            self._dht.update_announce_port(listen_port)
         self._emit_snapshot()
 
         tracker_task: Optional[asyncio.Task] = None
@@ -1372,7 +1501,7 @@ class TorrentSession:
                     self.state = SessionState.DOWNLOADING
 
                 # Local peers are available without Internet tracker access.
-                local_peers = self._lpd.drain_peers()
+                local_peers = self._lpd.drain_peers() if self.enable_lan_discovery else []
                 if local_peers:
                     self.local_peers_discovered += len(local_peers)
                     self._start_download_workers(run_token, local_peers, source="LAN")
@@ -1380,7 +1509,7 @@ class TorrentSession:
 
                 # Our minimal DHT listener can also receive direct announce_peer
                 # traffic while an iterative lookup is not currently running.
-                announced_dht_peers = self._dht.drain_peers()
+                announced_dht_peers = self._dht.drain_peers() if self.enable_dht else []
                 if announced_dht_peers:
                     self._start_download_workers(
                         run_token,
@@ -1403,12 +1532,13 @@ class TorrentSession:
                     )
 
                 if (
-                    not self.torrent.private
+                    self.enable_dht
+                    and not self.torrent.private
                     and dht_task is None
                     and now >= next_dht_lookup
                 ):
                     dht_task = asyncio.create_task(
-                        self._dht.discover_peers(announce_port=0)
+                        self._dht.discover_peers(announce_port=listen_port)
                     )
 
                 if tracker_task is not None and tracker_task.done():
@@ -1511,6 +1641,8 @@ class TorrentSession:
         owned_requests.append(block)
 
         try:
+            if self._global_download_limiter is not None:
+                await self._global_download_limiter.throttle(block.length)
             await self._download_limiter.throttle(block.length)
 
             if (
@@ -1576,6 +1708,8 @@ class TorrentSession:
             self.peer_id,
             source=source,
             direction="Outgoing",
+            advertise_dht=self.enable_dht,
+            enable_pex=self.enable_pex,
         )
         owned_requests: List[Block] = []
 
@@ -1596,7 +1730,8 @@ class TorrentSession:
                 )
                 if not peer.is_connected:
                     return
-                await peer.send_port(self._dht.local_udp_port)
+                if self.enable_dht:
+                    await peer.send_port(self._dht.local_udp_port)
                 if not peer.is_connected:
                     return
 
@@ -1671,7 +1806,7 @@ class TorrentSession:
                     await self._maybe_send_pex(peer)
 
                 elif msg_type == "PORT":
-                    if not self.torrent.private:
+                    if self.enable_dht and not self.torrent.private:
                         self._dht.add_known_node((str(peer.ip), int(data)))
 
         except asyncio.CancelledError:
@@ -1697,10 +1832,12 @@ class TorrentSession:
         self._pause_event.set()
         await self._open_seed_server(run_token)
         listen_port = self._seed_port if self._seed_server else 0
-        await self._lpd.start(listen_port=listen_port)
-        self._lpd.update_listen_port(listen_port)
-        await self._dht.start(announce_port=listen_port)
-        self._dht.update_announce_port(listen_port)
+        if self.enable_lan_discovery:
+            await self._lpd.start(listen_port=listen_port)
+            self._lpd.update_listen_port(listen_port)
+        if self.enable_dht:
+            await self._dht.start(announce_port=listen_port)
+            self._dht.update_announce_port(listen_port)
         self._emit_snapshot()
 
         first_event = "completed" if completion_event else "started"
@@ -1718,13 +1855,13 @@ class TorrentSession:
                 if self.state != SessionState.PAUSED:
                     self.state = SessionState.SEEDING
 
-                local_peers = self._lpd.drain_peers()
+                local_peers = self._lpd.drain_peers() if self.enable_lan_discovery else []
                 if local_peers:
                     self.local_peers_discovered += len(local_peers)
                     self._start_outbound_seed_workers(run_token, local_peers, source="LAN")
                     self._emit_snapshot()
 
-                announced_dht_peers = self._dht.drain_peers()
+                announced_dht_peers = self._dht.drain_peers() if self.enable_dht else []
                 if announced_dht_peers:
                     self._start_outbound_seed_workers(
                         run_token,
@@ -1752,7 +1889,8 @@ class TorrentSession:
                     self._start_outbound_seed_workers(run_token, peers, source="Tracker")
 
                 if (
-                    not self.torrent.private
+                    self.enable_dht
+                    and not self.torrent.private
                     and dht_task is None
                     and now >= next_dht_lookup
                 ):
@@ -1785,9 +1923,16 @@ class TorrentSession:
         if self._seed_server:
             return
 
-        # Try the conventional BitTorrent port first, then a small fallback
-        # range in case another application already owns it.
-        for port in range(6881, 6892):
+        # Try the user-configured listening port first, then ten consecutive
+        # fallbacks if another application already owns it.
+        preferred = max(1, min(65535, int(self.preferred_listen_port or 6881)))
+        candidates = [preferred]
+        for offset in range(1, 11):
+            candidate = preferred + offset
+            if candidate <= 65535:
+                candidates.append(candidate)
+
+        for port in candidates:
             try:
                 server = await asyncio.start_server(
                     lambda reader, writer: asyncio.create_task(
@@ -1802,11 +1947,21 @@ class TorrentSession:
             self._seed_server = server
             self._seed_port = port
             self.tracker.port = port
+            if self._listen_port_callback:
+                try:
+                    self._listen_port_callback(port)
+                except Exception:
+                    pass
             return
 
-        # Outbound seeding can still work even if no inbound listening port is
-        # available. Keep the conventional announce port as a fallback value.
-        self._seed_port = self.tracker.port
+        # Outbound seeding can still work if no inbound listener is available.
+        self._seed_port = preferred
+        self.tracker.port = preferred
+        if self._listen_port_callback:
+            try:
+                self._listen_port_callback(0)
+            except Exception:
+                pass
 
     async def _close_seed_server(self):
         if self._seed_server:
@@ -1865,6 +2020,8 @@ class TorrentSession:
             self.peer_id,
             source=source,
             direction="Outgoing",
+            advertise_dht=self.enable_dht,
+            enable_pex=self.enable_pex,
         )
 
         try:
@@ -1881,7 +2038,8 @@ class TorrentSession:
                 )
                 if not peer.is_connected:
                     return
-                await peer.send_port(self._dht.local_udp_port)
+                if self.enable_dht:
+                    await peer.send_port(self._dht.local_udp_port)
                 if not peer.is_connected:
                     return
 
@@ -1930,7 +2088,7 @@ class TorrentSession:
                     continue
 
                 if msg_type == "PORT":
-                    if not self.torrent.private:
+                    if self.enable_dht and not self.torrent.private:
                         self._dht.add_known_node((str(peer.ip), int(data)))
                     continue
 
@@ -1943,6 +2101,8 @@ class TorrentSession:
                         length,
                     )
                     if block_data:
+                        if self._global_upload_limiter is not None:
+                            await self._global_upload_limiter.throttle(len(block_data))
                         await self._upload_limiter.throttle(len(block_data))
 
                         if (
@@ -1994,13 +2154,14 @@ class TorrentSession:
 
             if protocol != b"BitTorrent protocol" or info_hash != self.torrent.info_hash:
                 return
-            if not self._is_current_run(run_token) or not self.piece_mgr.is_finished:
+            if not self._is_current_run(run_token):
+                return
+            if self.state not in {SessionState.DOWNLOADING, SessionState.SEEDING}:
                 return
 
-            response_reserved = (
-                EXTENSION_RESERVED_BYTES
-                if not self.torrent.private
-                else (b"\x00" * 8)
+            response_reserved = build_reserved_bytes(
+                enable_extensions=not self.torrent.private,
+                enable_dht=self.enable_dht and not self.torrent.private,
             )
             response = (
                 bytes([19])
@@ -2024,11 +2185,13 @@ class TorrentSession:
                         build_extended_handshake_payload(
                             listen_port=self._seed_port,
                             metadata_size=len(self.torrent.raw_info_bytes),
+                            enable_pex=self.enable_pex,
                         ),
                     )
                 )
             if (
                 remote_supports_dht
+                and self.enable_dht
                 and not self.torrent.private
                 and self._dht.local_udp_port
             ):
@@ -2049,6 +2212,12 @@ class TorrentSession:
             else:
                 peer_ip = "?"
                 peer_port = 0
+
+            if self._incoming_peer_callback:
+                try:
+                    self._incoming_peer_callback(self._seed_port, peer_ip)
+                except Exception:
+                    pass
 
             record_key = id(writer)
             inbound_record = {
@@ -2131,6 +2300,7 @@ class TorrentSession:
                 if (
                     msg_id == PeerMessageID.PORT
                     and len(body) == 2
+                    and self.enable_dht
                     and not self.torrent.private
                 ):
                     (remote_dht_port,) = struct.unpack(">H", body)
@@ -2166,7 +2336,7 @@ class TorrentSession:
                             remote_pex_id = int(remote_extensions.get(b"ut_pex", 0))
                         except (TypeError, ValueError):
                             remote_pex_id = 0
-                        inbound_record["pex_supported"] = remote_pex_id > 0
+                        inbound_record["pex_supported"] = self.enable_pex and remote_pex_id > 0
                         try:
                             remote_metadata_id = int(
                                 remote_extensions.get(b"ut_metadata", 0)
@@ -2175,7 +2345,7 @@ class TorrentSession:
                             remote_metadata_id = 0
                         inbound_record["metadata_extension_id"] = remote_metadata_id
 
-                        if remote_pex_id > 0:
+                        if self.enable_pex and remote_pex_id > 0:
                             pex_payload = encode_pex_payload(
                                 self._pex_export_endpoints(
                                     exclude=(peer_ip, peer_port) if peer_port else None
@@ -2191,18 +2361,25 @@ class TorrentSession:
                         self._emit_snapshot()
                         continue
 
-                    if extension_id == LOCAL_UT_PEX_ID:
+                    if extension_id == LOCAL_UT_PEX_ID and self.enable_pex:
                         pex_payload = parse_pex_payload(extension_payload)
                         inbound_record["pex_messages_received"] = int(
                             inbound_record.get("pex_messages_received", 0)
                         ) + 1
                         pex_peers = self._record_pex_payload(pex_payload)
                         if pex_peers:
-                            self._start_outbound_seed_workers(
-                                run_token,
-                                pex_peers,
-                                source="PEX",
-                            )
+                            if self.state == SessionState.DOWNLOADING:
+                                self._start_download_workers(
+                                    run_token,
+                                    pex_peers,
+                                    source="PEX",
+                                )
+                            else:
+                                self._start_outbound_seed_workers(
+                                    run_token,
+                                    pex_peers,
+                                    source="PEX",
+                                )
                         self._emit_snapshot()
                         continue
 
@@ -2260,7 +2437,7 @@ class TorrentSession:
                 await self._pause_event.wait()
                 if not self._is_current_run(run_token):
                     break
-                if self.state != SessionState.SEEDING:
+                if self.state not in {SessionState.DOWNLOADING, SessionState.SEEDING}:
                     continue
 
                 piece_index, begin, length = struct.unpack(">III", body)
@@ -2276,9 +2453,14 @@ class TorrentSession:
                 if not block_data:
                     continue
 
+                if self._global_upload_limiter is not None:
+                    await self._global_upload_limiter.throttle(len(block_data))
                 await self._upload_limiter.throttle(len(block_data))
 
-                if not self._is_current_run(run_token) or self.state != SessionState.SEEDING:
+                if (
+                    not self._is_current_run(run_token)
+                    or self.state not in {SessionState.DOWNLOADING, SessionState.SEEDING}
+                ):
                     continue
 
                 piece_payload = struct.pack(">II", piece_index, begin) + block_data

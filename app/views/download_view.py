@@ -12,6 +12,7 @@ from tkinter import filedialog
 import dearpygui.dearpygui as dpg
 
 from app.logic.torrent_manager import TorrentManager
+from app.engine.desktop_integration import DesktopIntegration
 from app.views.peer_view import PeerView
 from app.views.piece_view import PieceView
 from app.views.file_view import FileView
@@ -47,6 +48,9 @@ class DownloadView:
     def __init__(self, ui_queue: queue.Queue):
         self.ui_queue = ui_queue
         self.manager = TorrentManager.get_instance()
+        self.desktop = DesktopIntegration.get_instance()
+        self._sort_specs = None
+        self._sort_column_ids = {}
         # Restore the previously selected torrent before telemetry starts
         # rebuilding the rows. If the saved selection is unavailable the
         # manager returns an empty string and the first restored row wins.
@@ -139,6 +143,7 @@ class DownloadView:
                     callback=self._on_queue_filter_changed,
                 )
                 dpg.add_button(label=" Clear Filter ", callback=self._clear_queue_filter)
+                dpg.add_button(label=" Queue Order ", callback=self._clear_queue_sort)
                 self.queue_filter_summary = dpg.add_text("Showing 0 / 0")
 
             dpg.add_spacer(height=5)
@@ -149,41 +154,39 @@ class DownloadView:
                 with dpg.table(
                     header_row=True,
                     resizable=True,
+                    sortable=True,
+                    callback=self._on_queue_sort,
                     policy=dpg.mvTable_SizingStretchProp,
                     borders_outerH=True,
                     borders_innerV=True,
                     tag="torrent_queue_table",
-                ):
-                    dpg.add_table_column(
-                        label="Name",
-                        width_stretch=True,
-                        init_width_or_weight=0.4,
+                ) as self.queue_table:
+                    name_col = dpg.add_table_column(
+                        label="Name", width_stretch=True, init_width_or_weight=0.4
                     )
-                    dpg.add_table_column(
-                        label="Size",
-                        width_fixed=True,
-                        init_width_or_weight=90,
+                    size_col = dpg.add_table_column(
+                        label="Size", width_fixed=True, init_width_or_weight=90
                     )
-                    dpg.add_table_column(
-                        label="Progress",
-                        width_fixed=True,
-                        init_width_or_weight=120,
+                    progress_col = dpg.add_table_column(
+                        label="Progress", width_fixed=True, init_width_or_weight=120
                     )
-                    dpg.add_table_column(
-                        label="Priority",
-                        width_fixed=True,
-                        init_width_or_weight=90,
+                    priority_col = dpg.add_table_column(
+                        label="Priority", width_fixed=True, init_width_or_weight=90
                     )
-                    dpg.add_table_column(
-                        label="Status",
-                        width_fixed=True,
-                        init_width_or_weight=150,
+                    status_col = dpg.add_table_column(
+                        label="Status", width_fixed=True, init_width_or_weight=150
                     )
-                    dpg.add_table_column(
-                        label="Down / Up",
-                        width_fixed=True,
-                        init_width_or_weight=135,
+                    speed_col = dpg.add_table_column(
+                        label="Down / Up", width_fixed=True, init_width_or_weight=135
                     )
+                    self._sort_column_ids = {
+                        name_col: "name",
+                        size_col: "size",
+                        progress_col: "progress",
+                        priority_col: "priority",
+                        status_col: "status",
+                        speed_col: "speed",
+                    }
 
             dpg.add_spacer(height=10)
 
@@ -244,6 +247,8 @@ class DownloadView:
                             self.availability_text = dpg.add_text("Availability: --")
                             self.discovery_text = dpg.add_text("Discovery: --")
                             self.listen_port_text = dpg.add_text("Listen Port: --")
+                            self.connectivity_text = dpg.add_text("Incoming: --")
+                            self.external_port_text = dpg.add_text("External: --")
                             self.storage_text = dpg.add_text("Storage: Downloads")
                             self.lpd_text = dpg.add_text("LAN Discovery: --")
                             self.health_text = dpg.add_text("Swarm Health: --")
@@ -749,6 +754,62 @@ class DownloadView:
         self._state_filter = "All"
         self._apply_queue_filters()
 
+    def _on_queue_sort(self, sender, sort_specs):
+        del sender
+        self._sort_specs = sort_specs
+        self._apply_queue_sort()
+        self._apply_queue_filters()
+
+    def _clear_queue_sort(self):
+        self._sort_specs = None
+        self._apply_queue_sort()
+        self._apply_queue_filters()
+
+    def _queue_sort_value(self, info_hash: str, key: str):
+        stats = self.latest_stats.get(info_hash, {})
+        if key == "name":
+            return str(stats.get("torrent_name") or "").lower()
+        if key == "size":
+            return int(stats.get("total_bytes") or 0)
+        if key == "progress":
+            return float(stats.get("progress") or 0.0)
+        if key == "priority":
+            rank = {"High": 0, "Normal": 1, "Low": 2}
+            return rank.get(str(stats.get("queue_priority") or "Normal"), 1)
+        if key == "status":
+            return str(stats.get("state_label") or stats.get("state") or "").lower()
+        if key == "speed":
+            return (
+                float(stats.get("speed_kbps") or 0.0),
+                float(stats.get("upload_speed_kbps") or 0.0),
+            )
+        return 0
+
+    def _apply_queue_sort(self):
+        if not hasattr(self, "queue_table") or not dpg.does_item_exist(self.queue_table):
+            return
+
+        order = [h for h in self.torrent_order if h in self.torrent_rows]
+        specs = self._sort_specs
+        if specs:
+            # Dear PyGui supports multi-column sort specs. Apply them in reverse
+            # order so Python's stable sort preserves the higher-priority key.
+            for column_id, direction in reversed(list(specs)):
+                key = self._sort_column_ids.get(column_id)
+                if not key:
+                    continue
+                order.sort(
+                    key=lambda h, k=key: self._queue_sort_value(h, k),
+                    reverse=int(direction) < 0,
+                )
+
+        row_ids = [self.torrent_rows[h]["row"] for h in order]
+        if row_ids:
+            try:
+                dpg.reorder_items(self.queue_table, 1, row_ids)
+            except Exception:
+                pass
+
     def _row_matches_filter(self, info_hash: str) -> bool:
         stats = self.latest_stats.get(info_hash, {})
         name = str(stats.get("torrent_name") or "").lower()
@@ -772,9 +833,18 @@ class DownloadView:
             if show:
                 visible += 1
         if hasattr(self, "queue_filter_summary") and dpg.does_item_exist(self.queue_filter_summary):
+            sort_suffix = ""
+            if self._sort_specs:
+                try:
+                    column_id, direction = self._sort_specs[0]
+                    key = self._sort_column_ids.get(column_id, "")
+                    if key:
+                        sort_suffix = f" | Sort: {key.title()} {'ASC' if int(direction) > 0 else 'DESC'}"
+                except Exception:
+                    sort_suffix = ""
             dpg.set_value(
                 self.queue_filter_summary,
-                f"Showing {visible} / {len(self.torrent_rows)}",
+                f"Showing {visible} / {len(self.torrent_rows)}{sort_suffix}",
             )
 
     @staticmethod
@@ -884,17 +954,31 @@ class DownloadView:
             self._open_folder_for_hash(self._completion_notice_info_hash)
 
     def _show_completion_notice(self, info_hash: str, stats: dict):
+        settings = self.manager.get_app_settings()
+        torrent_name = stats.get("torrent_name", "Torrent")
+        state = stats.get("state_label", stats.get("state", "Completed"))
+        downloaded = self._format_bytes(stats.get("downloaded_bytes"))
+
+        # Native desktop notifications are independent from the in-app popup.
+        # This lets users keep Windows notifications while disabling the modal,
+        # or vice versa. The Windows backend uses the native shell tray API.
+        if settings.get("native_notifications", True):
+            self.desktop.notify(
+                "SalixTorrent — Download complete",
+                f"{torrent_name} — {state} ({downloaded})",
+            )
+
         if not self.manager.completion_notifications_enabled():
             return
+
         self._completion_notice_info_hash = info_hash
         dpg.set_value(
             self.completion_notice_title,
-            f"Download completed — {stats.get('torrent_name', 'Torrent')}",
+            f"Download completed — {torrent_name}",
         )
-        state = stats.get("state_label", stats.get("state", "Completed"))
         dpg.set_value(
             self.completion_notice_text,
-            f"{state}. Downloaded {self._format_bytes(stats.get('downloaded_bytes'))}. "
+            f"{state}. Downloaded {downloaded}. "
             "You can open the payload folder now or dismiss this notice.",
         )
         dpg.show_item(self.completion_notice_modal)
@@ -1207,6 +1291,8 @@ class DownloadView:
             self.torrent_order[index - 1],
         )
         self.manager.set_queue_order(self.torrent_order)
+        if self._sort_specs:
+            self._apply_queue_sort()
         self._refresh_context_menu_states()
 
     def _move_torrent_down(self, info_hash: str):
@@ -1230,6 +1316,8 @@ class DownloadView:
             self.torrent_order[index],
         )
         self.manager.set_queue_order(self.torrent_order)
+        if self._sort_specs:
+            self._apply_queue_sort()
         self._refresh_context_menu_states()
 
     def _refresh_context_menu_state(self, info_hash: str):
@@ -1303,6 +1391,8 @@ class DownloadView:
         dpg.set_value(self.availability_text, "Availability: --")
         dpg.set_value(self.discovery_text, "Discovery: --")
         dpg.set_value(self.listen_port_text, "Listen Port: --")
+        dpg.set_value(self.connectivity_text, "Incoming: --")
+        dpg.set_value(self.external_port_text, "External: --")
         dpg.set_value(self.storage_text, "Storage: Downloads")
         dpg.set_value(self.lpd_text, "LAN Discovery: --")
         dpg.set_value(self.health_text, "Swarm Health: --")
@@ -1451,6 +1541,9 @@ class DownloadView:
             dpg.set_value(row["name"], self.active_info_hash == h)
             self._refresh_context_menu_state(h)
 
+        if self._sort_specs:
+            self._apply_queue_sort()
+
     def _select_torrent(self, info_hash: str):
         self.active_info_hash = info_hash
         self._limit_controls_hash = ""
@@ -1596,11 +1689,33 @@ class DownloadView:
             f"Limits: Down {download_limit_text} | Up {upload_limit_text}",
         )
 
-        listen_port = msg.get("listen_port", 0)
+        listen_port = int(msg.get("listen_port", 0) or 0)
+        preferred_port = int(msg.get("preferred_listen_port", 0) or 0)
+        shown_port = listen_port or preferred_port
+        port_suffix = "" if listen_port or not preferred_port else " (configured)"
         dpg.set_value(
             self.listen_port_text,
-            f"Listen Port: {listen_port if listen_port else '--'}",
+            f"Listen Port: {shown_port if shown_port else '--'}{port_suffix}",
         )
+
+        connectivity = self.manager.get_connectivity_snapshot()
+        connectivity_status = str(connectivity.get("status") or "Waiting")
+        mapping_method = str(connectivity.get("method") or "").strip()
+        if mapping_method and mapping_method not in {"--", "None"}:
+            incoming_value = f"Incoming: {connectivity_status} ({mapping_method})"
+        else:
+            incoming_value = f"Incoming: {connectivity_status}"
+        dpg.set_value(self.connectivity_text, incoming_value)
+
+        external_ip = str(connectivity.get("external_ip") or "").strip()
+        external_port = int(connectivity.get("external_port") or 0)
+        if external_ip and external_port:
+            external_value = f"External: {external_ip}:{external_port}"
+        elif external_port:
+            external_value = f"External: port {external_port}"
+        else:
+            external_value = "External: --"
+        dpg.set_value(self.external_port_text, external_value)
 
         storage_mode = msg.get("storage_mode", "Download")
         if storage_mode == "External Seed":
@@ -1609,13 +1724,16 @@ class DownloadView:
             dpg.set_value(self.storage_text, "Storage: Downloads")
 
         local_count = int(msg.get("local_peers_discovered", 0))
-        if msg.get("local_discovery_enabled"):
+        lan_enabled = bool(msg.get("lan_discovery_enabled", msg.get("local_discovery_enabled", False)))
+        if not lan_enabled:
+            dpg.set_value(self.lpd_text, "LAN Discovery: Disabled")
+        elif msg.get("local_discovery_enabled"):
             dpg.set_value(
                 self.lpd_text,
                 f"LAN Discovery: Active ({local_count} peer(s) found)",
             )
         else:
-            dpg.set_value(self.lpd_text, "LAN Discovery: --")
+            dpg.set_value(self.lpd_text, "LAN Discovery: Starting")
 
         if error_message:
             dpg.set_value(self.health_text, "Swarm Health: Attention required")

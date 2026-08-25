@@ -60,12 +60,18 @@ class DHTClient:
         *,
         private: bool = False,
         bootstrap_nodes: Optional[Tuple[Tuple[str, int], ...]] = None,
+        preferred_port: int = 0,
     ):
         self.info_hash = bytes(info_hash)
         if len(self.info_hash) != 20:
             raise ValueError("DHT info hash must be exactly 20 bytes.")
 
         self.private = bool(private)
+        try:
+            requested_port = int(preferred_port or 0)
+        except (TypeError, ValueError):
+            requested_port = 0
+        self.preferred_port = requested_port if 0 < requested_port <= 65535 else 0
         self.bootstrap_nodes = tuple(bootstrap_nodes or DHT_BOOTSTRAP_NODES)
         self.node_id = secrets.token_bytes(20)
         self._token_secret = secrets.token_bytes(20)
@@ -116,11 +122,21 @@ class DHTClient:
         self._closed = False
         loop = asyncio.get_running_loop()
         try:
-            transport, protocol = await loop.create_datagram_endpoint(
-                lambda: _DHTProtocol(self),
-                local_addr=("0.0.0.0", 0),
-                family=socket.AF_INET,
-            )
+            try:
+                transport, protocol = await loop.create_datagram_endpoint(
+                    lambda: _DHTProtocol(self),
+                    local_addr=("0.0.0.0", self.preferred_port),
+                    family=socket.AF_INET,
+                )
+            except OSError:
+                # TCP and UDP may share the same numeric port. If another UDP
+                # application already owns the configured port, keep DHT
+                # functional by falling back to an ephemeral UDP port.
+                transport, protocol = await loop.create_datagram_endpoint(
+                    lambda: _DHTProtocol(self),
+                    local_addr=("0.0.0.0", 0),
+                    family=socket.AF_INET,
+                )
         except (OSError, RuntimeError) as exc:
             self.enabled = False
             self.status = "Error"
@@ -144,6 +160,13 @@ class DHTClient:
 
     def update_announce_port(self, announce_port: int):
         self.announce_port = max(0, min(65535, int(announce_port or 0)))
+
+    def set_preferred_port(self, preferred_port: int):
+        try:
+            port = int(preferred_port or 0)
+        except (TypeError, ValueError):
+            port = 0
+        self.preferred_port = port if 0 < port <= 65535 else 0
 
     def _next_transaction_id(self) -> bytes:
         for _ in range(65536):

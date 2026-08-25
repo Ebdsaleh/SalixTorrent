@@ -172,13 +172,19 @@ class SpeedView:
 
         down_limit = float(speed_view.get("download_limit_kbps", 0.0) or 0.0)
         up_limit = float(speed_view.get("upload_limit_kbps", 0.0) or 0.0)
+        global_down = float(speed_view.get("global_download_limit_kbps", 0.0) or 0.0)
+        global_up = float(speed_view.get("global_upload_limit_kbps", 0.0) or 0.0)
         dpg.set_value(
             self.limit_text,
             (
-                "Limits: Down "
+                "Per-torrent: Down "
                 + (self._format_rate(down_limit) if down_limit > 0 else "Unlimited")
                 + " | Up "
                 + (self._format_rate(up_limit) if up_limit > 0 else "Unlimited")
+                + "    Global: Down "
+                + (self._format_rate(global_down) if global_down > 0 else "Unlimited")
+                + " | Up "
+                + (self._format_rate(global_up) if global_up > 0 else "Unlimited")
             ),
         )
 

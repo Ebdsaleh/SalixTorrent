@@ -27,8 +27,18 @@ class PeerMessageID:
 
 # BEP-10 uses bit 0x10 in reserved byte 5 to advertise the extension protocol.
 # BEP-5 uses bit 0x01 in the final reserved byte to advertise DHT support.
-# SalixTorrent supports both, so every normal peer handshake can advertise both.
+# Extensions remain enabled because BEP-9 magnet metadata uses BEP-10 even when
+# the user disables PEX. DHT can be advertised independently.
 EXTENSION_RESERVED_BYTES = b"\x00\x00\x00\x00\x00\x10\x00\x01"
+
+
+def build_reserved_bytes(*, enable_extensions: bool = True, enable_dht: bool = True) -> bytes:
+    reserved = bytearray(8)
+    if enable_extensions:
+        reserved[5] |= 0x10
+    if enable_dht:
+        reserved[7] |= 0x01
+    return bytes(reserved)
 UT_PEX_EXTENSION_NAME = b"ut_pex"
 UT_METADATA_EXTENSION_NAME = b"ut_metadata"
 LOCAL_UT_PEX_ID = 1
@@ -132,12 +142,13 @@ def build_extended_message(extension_id: int, payload: bytes) -> bytes:
 def build_extended_handshake_payload(
     listen_port: int = 0,
     metadata_size: int = 0,
+    enable_pex: bool = True,
 ) -> bytes:
+    extension_map = {UT_METADATA_EXTENSION_NAME: LOCAL_UT_METADATA_ID}
+    if enable_pex:
+        extension_map[UT_PEX_EXTENSION_NAME] = LOCAL_UT_PEX_ID
     payload = {
-        b"m": {
-            UT_PEX_EXTENSION_NAME: LOCAL_UT_PEX_ID,
-            UT_METADATA_EXTENSION_NAME: LOCAL_UT_METADATA_ID,
-        },
+        b"m": extension_map,
         b"v": b"Salix_T 1.0",
         b"reqq": 64,
     }
@@ -285,6 +296,8 @@ class PeerConnection:
         peer_id: bytes,
         source: str = "Unknown",
         direction: str = "Outgoing",
+        advertise_dht: bool = True,
+        enable_pex: bool = True,
     ):
         self.ip = ip
         self.port = port
@@ -294,6 +307,8 @@ class PeerConnection:
 
         self.source = source
         self.direction = direction
+        self.advertise_dht = bool(advertise_dht)
+        self.enable_pex = bool(enable_pex)
 
         self.reader: Optional[asyncio.StreamReader] = None
         self.writer: Optional[asyncio.StreamWriter] = None
@@ -337,6 +352,8 @@ class PeerConnection:
 
     @property
     def pex_supported(self) -> bool:
+        if not self.enable_pex:
+            return False
         try:
             return int(self.remote_extensions.get(UT_PEX_EXTENSION_NAME, 0)) > 0
         except (TypeError, ValueError):
@@ -394,7 +411,7 @@ class PeerConnection:
             handshake = (
                 bytes([len(pstr)])
                 + pstr
-                + EXTENSION_RESERVED_BYTES
+                + build_reserved_bytes(enable_extensions=True, enable_dht=self.advertise_dht)
                 + self.info_hash
                 + self.peer_id
             )
@@ -518,6 +535,7 @@ class PeerConnection:
                 build_extended_handshake_payload(
                     listen_port=listen_port,
                     metadata_size=metadata_size,
+                    enable_pex=self.enable_pex,
                 ),
             )
         )

@@ -9,6 +9,7 @@ from pathlib import Path
 
 import dearpygui.dearpygui as dpg
 from app.engine.scene_manager import SceneManager
+from app.engine.desktop_integration import DesktopIntegration
 
 
 class GuiEngine:
@@ -65,6 +66,8 @@ class GuiEngine:
         self.scene_mgr.engine = self
         self._last_ui_error_signature = None
         self._last_ui_error_at = 0.0
+        self.desktop = DesktopIntegration.get_instance()
+        self._last_minimize_check = 0.0
         self._initialized = True
 
     @classmethod
@@ -113,45 +116,83 @@ class GuiEngine:
 
     def run(self):
         """Starts the native Dear PyGui render loop."""
+        from app.logic.torrent_manager import TorrentManager
+
+        manager = TorrentManager.get_instance()
+        self.desktop.configure(manager.get_app_settings())
         dpg.show_viewport()
 
-        while dpg.is_dearpygui_running():
-            # Run queued callbacks on this same main thread before touching
-            # scene widgets when manual callback management is available.
-            if self._manual_callbacks:
-                try:
-                    jobs = dpg.get_callback_queue()
-                except Exception as exc:
-                    jobs = None
-                    self._report_ui_exception("DearPyGui callback queue", exc)
+        # Dear PyGui 2.x exposes the native platform handle. On older builds the
+        # tray still exists, but automatic minimize-to-tray is simply skipped.
+        try:
+            platform_handle = dpg.get_viewport_platform_handle()
+        except Exception:
+            platform_handle = 0
+        self.desktop.set_viewport_handle(platform_handle)
 
-                if jobs:
-                    for job in jobs:
-                        try:
-                            dpg.run_callbacks([job])
-                        except Exception as exc:
-                            callback_name = (
-                                getattr(job[0], "__name__", repr(job[0]))
-                                if job else "unknown"
-                            )
-                            self._report_ui_exception(
-                                f"DearPyGui callback {callback_name}", exc
-                            )
-
-            if self.scene_mgr.current_scene:
-                active_scene = self.scene_mgr.scenes.get(self.scene_mgr.current_scene)
-                if active_scene and hasattr(active_scene, "update"):
+        try:
+            while dpg.is_dearpygui_running():
+                # Tray callbacks are produced on a tiny native message thread,
+                # then consumed here so all Dear PyGui/window operations remain
+                # serialized onto the application's main UI thread.
+                for action in self.desktop.poll_actions():
                     try:
-                        active_scene.update(0.016)
+                        if action == "restore":
+                            self.desktop.show_viewport()
+                        elif action == "pause_all":
+                            manager.pause_all()
+                        elif action == "resume_all":
+                            manager.resume_all()
+                        elif action == "exit":
+                            dpg.stop_dearpygui()
                     except Exception as exc:
-                        self._report_ui_exception(
-                            f"{self.scene_mgr.current_scene}.update", exc
-                        )
+                        self._report_ui_exception(f"desktop action {action}", exc)
 
-            try:
-                dpg.render_dearpygui_frame()
-            except Exception as exc:
-                self._report_ui_exception("DearPyGui render", exc)
+                now = time.monotonic()
+                if (
+                    now - self._last_minimize_check >= 0.20
+                    and self.desktop.should_minimize_to_tray()
+                ):
+                    self._last_minimize_check = now
+                    if self.desktop.is_native_viewport_minimized():
+                        self.desktop.hide_viewport()
 
-        dpg.destroy_context()
+                # Run queued callbacks on this same main thread before touching
+                # scene widgets when manual callback management is available.
+                if self._manual_callbacks:
+                    try:
+                        jobs = dpg.get_callback_queue()
+                    except Exception as exc:
+                        jobs = None
+                        self._report_ui_exception("DearPyGui callback queue", exc)
 
+                    if jobs:
+                        for job in jobs:
+                            try:
+                                dpg.run_callbacks([job])
+                            except Exception as exc:
+                                callback_name = (
+                                    getattr(job[0], "__name__", repr(job[0]))
+                                    if job else "unknown"
+                                )
+                                self._report_ui_exception(
+                                    f"DearPyGui callback {callback_name}", exc
+                                )
+
+                if self.scene_mgr.current_scene:
+                    active_scene = self.scene_mgr.scenes.get(self.scene_mgr.current_scene)
+                    if active_scene and hasattr(active_scene, "update"):
+                        try:
+                            active_scene.update(0.016)
+                        except Exception as exc:
+                            self._report_ui_exception(
+                                f"{self.scene_mgr.current_scene}.update", exc
+                            )
+
+                try:
+                    dpg.render_dearpygui_frame()
+                except Exception as exc:
+                    self._report_ui_exception("DearPyGui render", exc)
+        finally:
+            self.desktop.stop()
+            dpg.destroy_context()
