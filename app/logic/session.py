@@ -1694,6 +1694,101 @@ class TorrentSession:
             return
         await peer.send_metadata_piece(piece_index, self.torrent.raw_info_bytes)
 
+    async def _serve_piece_request(
+        self,
+        peer: PeerConnection,
+        run_token: int,
+        piece_index: int,
+        begin: int,
+        length: int,
+    ) -> bool:
+        """Serve a verified block on any established peer connection.
+
+        BitTorrent TCP connections are bidirectional: a socket SalixTorrent
+        opened for downloading can also carry upload requests from that same
+        peer.  Restrict uploads to already-verified pieces and apply both the
+        global and per-torrent upload limiters.
+        """
+        try:
+            piece_index = int(piece_index)
+            begin = int(begin)
+            length = int(length)
+        except (TypeError, ValueError):
+            return False
+
+        if length <= 0 or length > BLOCK_SIZE:
+            return False
+        if not self._is_current_run(run_token):
+            return False
+        if self.state not in {SessionState.DOWNLOADING, SessionState.SEEDING}:
+            return False
+
+        block_data = await asyncio.to_thread(
+            self.piece_mgr.read_block,
+            piece_index,
+            begin,
+            length,
+        )
+        if not block_data:
+            return False
+
+        if self._global_upload_limiter is not None:
+            await self._global_upload_limiter.throttle(len(block_data))
+        await self._upload_limiter.throttle(len(block_data))
+
+        if (
+            not self._is_current_run(run_token)
+            or self.state not in {SessionState.DOWNLOADING, SessionState.SEEDING}
+            or not peer.is_connected
+        ):
+            return False
+
+        if await peer.send_piece(piece_index, begin, block_data):
+            self.uploaded_bytes += len(block_data)
+            return True
+        return False
+
+    async def _broadcast_have(
+        self,
+        piece_index: int,
+        exclude_peer: Optional[PeerConnection] = None,
+    ):
+        """Tell connected peers when a newly verified piece becomes available.
+
+        Initial bitfields only describe pieces available at connection time.
+        HAVE keeps both outgoing and incoming peers current as downloading
+        continues, enabling sustained upload activity before completion.
+        """
+        try:
+            piece_index = int(piece_index)
+        except (TypeError, ValueError):
+            return
+        if piece_index < 0:
+            return
+
+        tasks = [
+            peer.send_have(piece_index)
+            for peer in list(self.active_peers)
+            if peer is not exclude_peer and peer.is_connected
+        ]
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+        frame = struct.pack(">IBI", 5, PeerMessageID.HAVE, piece_index)
+        stale_writers = []
+        for writer in list(self._seed_client_writers):
+            try:
+                writer.write(frame)
+                await writer.drain()
+            except (ConnectionError, OSError, RuntimeError):
+                stale_writers.append(writer)
+            except Exception:
+                stale_writers.append(writer)
+
+        for writer in stale_writers:
+            self._seed_client_writers.discard(writer)
+            self._inbound_peer_records.pop(id(writer), None)
+
     async def _peer_worker(
         self,
         run_token: int,
@@ -1723,9 +1818,16 @@ class TorrentSession:
         self.active_peers.append(peer)
 
         try:
+            # A download connection is still a bidirectional BitTorrent
+            # connection. Advertise pieces we already possess and unchoke the
+            # remote side so it can request them while we continue downloading.
+            # BITFIELD is sent first, as required by the peer-wire protocol.
+            if not await peer.send_bitfield(self.piece_mgr.completed_bitfield()):
+                return
+
             if not self.torrent.private:
                 await peer.send_extended_handshake(
-                    listen_port=0,
+                    listen_port=self._seed_port if self._seed_server else 0,
                     metadata_size=len(self.torrent.raw_info_bytes),
                 )
                 if not peer.is_connected:
@@ -1735,6 +1837,8 @@ class TorrentSession:
                 if not peer.is_connected:
                     return
 
+            if not await peer.send_unchoke():
+                return
             if not await peer.send_interested():
                 return
 
@@ -1761,11 +1865,13 @@ class TorrentSession:
 
                 if msg_type == "PIECE":
                     piece_idx, offset, block_bytes = data
-                    self.piece_mgr.handle_block_received(
+                    piece_completed = self.piece_mgr.handle_block_received(
                         piece_idx,
                         offset,
                         block_bytes,
                     )
+                    if piece_completed:
+                        await self._broadcast_have(piece_idx, exclude_peer=peer)
 
                     owned_requests[:] = [
                         block
@@ -1788,6 +1894,22 @@ class TorrentSession:
                             break
                         if not await self._request_one_block(peer, owned_requests):
                             break
+
+                elif msg_type == "REQUEST":
+                    piece_index, begin, length = data
+                    await self._serve_piece_request(
+                        peer,
+                        run_token,
+                        piece_index,
+                        begin,
+                        length,
+                    )
+
+                elif msg_type == "INTERESTED":
+                    # We unchoke download peers proactively, but honour the
+                    # state transition in case a future choking policy changes.
+                    if peer.am_choking:
+                        await peer.send_unchoke()
 
                 elif msg_type == "METADATA":
                     await self._handle_metadata_message(peer, data)
@@ -2094,28 +2216,13 @@ class TorrentSession:
 
                 if msg_type == "REQUEST" and self.state == SessionState.SEEDING:
                     piece_index, begin, length = data
-                    block_data = await asyncio.to_thread(
-                        self.piece_mgr.read_block,
+                    await self._serve_piece_request(
+                        peer,
+                        run_token,
                         piece_index,
                         begin,
                         length,
                     )
-                    if block_data:
-                        if self._global_upload_limiter is not None:
-                            await self._global_upload_limiter.throttle(len(block_data))
-                        await self._upload_limiter.throttle(len(block_data))
-
-                        if (
-                            self._is_current_run(run_token)
-                            and self.state == SessionState.SEEDING
-                            and peer.is_connected
-                        ):
-                            if await peer.send_piece(
-                                piece_index,
-                                begin,
-                                block_data,
-                            ):
-                                self.uploaded_bytes += len(block_data)
 
         except asyncio.CancelledError:
             pass
@@ -2510,7 +2617,7 @@ class TorrentSession:
                 else:
                     download_speed_bps = 0.0
 
-                if self.state == SessionState.SEEDING:
+                if self.state in {SessionState.DOWNLOADING, SessionState.SEEDING}:
                     upload_speed_bps = max(
                         0.0,
                         (current_uploaded - last_uploaded) / SPEED_SAMPLE_INTERVAL,

@@ -488,6 +488,19 @@ class PeerConnection:
             self.am_choking = False
         return sent
 
+    async def send_have(self, piece_index: int) -> bool:
+        if not self.is_connected or not self.writer:
+            return False
+        try:
+            piece_index = int(piece_index)
+        except (TypeError, ValueError):
+            return False
+        if piece_index < 0:
+            return False
+        return await self._write_and_drain(
+            struct.pack(">IBI", 5, PeerMessageID.HAVE, piece_index)
+        )
+
     async def send_piece(
         self,
         piece_index: int,

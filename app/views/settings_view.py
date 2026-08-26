@@ -104,7 +104,7 @@ class SettingsView:
                     self.connectivity_protocols = dpg.add_text("Mapped protocols: --")
                     self.connectivity_incoming = dpg.add_text("Last incoming peer: --")
                     self.connectivity_error = dpg.add_text(
-                        "", color=(255, 120, 120), wrap=480
+                        "", color=(220, 180, 100), wrap=480
                     )
                     dpg.add_spacer(height=6)
                     dpg.add_button(
@@ -364,7 +364,13 @@ class SettingsView:
             self.connectivity_incoming,
             f"Last incoming peer: {incoming_peer} ({incoming_age})",
         )
-        dpg.set_value(self.connectivity_error, str(snap.get("last_error") or ""))
+        mapping_notice = str(snap.get("last_error") or "")
+        if mapping_notice:
+            if str(snap.get("status") or "") == "Unmapped":
+                mapping_notice = f"Port mapping notice: {mapping_notice}"
+            else:
+                mapping_notice = f"Connectivity notice: {mapping_notice}"
+        dpg.set_value(self.connectivity_error, mapping_notice)
 
     def _refresh_connectivity(self):
         self.manager.refresh_connectivity()

@@ -631,6 +631,17 @@ class ApplicationMenu:
         selected_name = selected_stats.get("torrent_name", "--")
         selected_state = selected_stats.get("state_label", selected_stats.get("state", "--"))
 
+        external_ip = str(connectivity.get("external_ip") or "")
+        try:
+            external_port = int(connectivity.get("external_port") or 0)
+        except (TypeError, ValueError):
+            external_port = 0
+        external_endpoint = (
+            f"{external_ip}:{external_port}"
+            if external_ip and external_port
+            else "--"
+        )
+
         return (
             f"SalixTorrent: v{self.APP_VERSION}\n"
             f"Python: {platform.python_version()}\n"
@@ -648,8 +659,8 @@ class ApplicationMenu:
             f"Connectivity: {connectivity.get('status', '--')}\n"
             f"Mapping: {connectivity.get('method', '--')}\n"
             f"Local endpoint: {connectivity.get('local_ip', '--')}:{connectivity.get('internal_port', '--')}\n"
-            f"External endpoint: {connectivity.get('external_ip', '--')}:{connectivity.get('external_port', '--')}\n"
-            f"Connectivity error: {connectivity.get('last_error') or '--'}\n\n"
+            f"External endpoint: {external_endpoint}\n"
+            f"Port mapping notice: {connectivity.get('last_error') or '--'}\n\n"
             f"Settings: {self.manager.settings_path}\n"
             f"Session state: {self.manager.session_state_path}\n"
             f"UI error log: {self.gui._ui_error_log_path()}\n"
