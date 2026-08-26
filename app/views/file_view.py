@@ -5,6 +5,7 @@ from __future__ import annotations
 import dearpygui.dearpygui as dpg
 
 from app.logic.torrent_manager import TorrentManager
+from app.views.help_terms import add_help_tooltip, add_text_tooltip, contextual_text
 
 
 class FileView:
@@ -44,14 +45,17 @@ class FileView:
                 "Files: select a torrent to inspect payload files",
                 color=(100, 180, 255),
             )
+            add_text_tooltip(self.summary_text, "Files view\n\nShows the selected torrent's real payload files, SHA-1-verified progress and selective-download priorities. BitTorrent pieces can cross file boundaries, so file progress is derived from verified piece coverage rather than only file length on disk.")
             self.storage_text = dpg.add_text(
                 "Storage Root: --",
                 color=(180, 180, 180),
             )
+            add_help_tooltip(self.storage_text, "STORAGE_ROOT")
             self.note_text = dpg.add_text(
                 "Right-click a file to set High, Normal, Low, or Don't Download.",
                 color=(150, 150, 150),
             )
+            add_help_tooltip(self.note_text, "FILE_PRIORITY")
             dpg.add_separator()
 
             with dpg.table(
@@ -64,36 +68,42 @@ class FileView:
                 scrollY=True,
                 height=225,
             ) as self.table_id:
-                dpg.add_table_column(
+                file_col = dpg.add_table_column(
                     label="File",
                     width_stretch=True,
                     init_width_or_weight=0.45,
                 )
-                dpg.add_table_column(
+                size_col = dpg.add_table_column(
                     label="Size",
                     width_fixed=True,
                     init_width_or_weight=95,
                 )
-                dpg.add_table_column(
+                progress_col = dpg.add_table_column(
                     label="Progress",
                     width_fixed=True,
                     init_width_or_weight=90,
                 )
-                dpg.add_table_column(
+                pieces_col = dpg.add_table_column(
                     label="Pieces",
                     width_fixed=True,
                     init_width_or_weight=90,
                 )
-                dpg.add_table_column(
+                priority_col = dpg.add_table_column(
                     label="Priority",
                     width_fixed=True,
                     init_width_or_weight=125,
                 )
-                dpg.add_table_column(
+                state_col = dpg.add_table_column(
                     label="State",
                     width_fixed=True,
                     init_width_or_weight=115,
                 )
+                add_text_tooltip(file_col, "File\n\nRelative payload path described by the torrent. Right-click a file row to change selective-download priority.")
+                add_text_tooltip(size_col, "File size\n\nPayload bytes assigned to this file by the torrent metadata.")
+                add_help_tooltip(progress_col, "FILE_PROGRESS")
+                add_help_tooltip(pieces_col, "FILE_PIECES")
+                add_help_tooltip(priority_col, "FILE_PRIORITY")
+                add_help_tooltip(state_col, "FILE_STATE")
 
     @staticmethod
     def _format_size(byte_count: int) -> str:
@@ -191,7 +201,8 @@ class FileView:
             autosize=True,
             no_title_bar=True,
         ) as popup_id:
-            dpg.add_text("File Priority", color=(180, 160, 255))
+            priority_title = dpg.add_text("File Priority", color=(180, 160, 255))
+            add_help_tooltip(priority_title, "FILE_PRIORITY")
             dpg.add_separator()
             priority_items = {}
             for priority in self.PRIORITIES:
@@ -200,6 +211,7 @@ class FileView:
                     user_data=(file_index, priority),
                     callback=lambda s, a, u: self._set_priority(u[0], u[1]),
                 )
+                add_help_tooltip(priority_items[priority], "FILE_PRIORITY")
 
         with dpg.item_handler_registry() as right_click_registry:
             dpg.add_item_clicked_handler(
@@ -212,6 +224,28 @@ class FileView:
             dpg.bind_item_handler_registry(cell, right_click_registry)
 
         return popup_id, right_click_registry, priority_items
+
+    @staticmethod
+    def _file_context_text(record: dict) -> str:
+        path = str(record.get("path", "")) or "--"
+        priority = str(record.get("priority", "Normal"))
+        state = str(record.get("state", "Missing"))
+        try:
+            progress = max(0.0, min(1.0, float(record.get("progress", 0.0) or 0.0)))
+        except (TypeError, ValueError):
+            progress = 0.0
+        return contextual_text(
+            "Torrent payload file",
+            "This is one file described by the selected torrent. Its progress is based on verified torrent-piece coverage rather than only the file's physical length on disk.",
+            facts=(
+                f"Path: {path}",
+                f"Progress: {progress * 100:.1f}% verified",
+                f"Piece span: {record.get('piece_span', '--')}",
+                f"Priority: {priority}",
+                f"State: {state}",
+            ),
+            footer="Right-click this row to change file priority. 'Don't Download' can still receive a small amount of boundary data when a wanted file shares the same piece.",
+        )
 
     def _create_row(self, record: dict):
         index = int(record.get("index", 0) or 0)
@@ -239,6 +273,12 @@ class FileView:
             priority_cell,
             state_cell,
         )
+        row_context = self._file_context_text(record)
+        path_tip = add_text_tooltip(path_cell, row_context, wrap=500)
+        progress_tip = add_text_tooltip(progress_cell, row_context, wrap=500)
+        pieces_tip = add_text_tooltip(pieces_cell, row_context, wrap=500)
+        priority_tip = add_text_tooltip(priority_cell, row_context, wrap=500)
+        state_tip = add_text_tooltip(state_cell, row_context, wrap=500)
         popup_id, registry, priority_items = self._build_priority_menu(index, cells)
 
         self._rows[index] = {
@@ -253,6 +293,9 @@ class FileView:
             "right_click_registry": registry,
             "priority_items": priority_items,
             "priority_value": priority,
+            "tooltip_items": tuple(
+                item for item in (path_tip, progress_tip, pieces_tip, priority_tip, state_tip) if item
+            ),
         }
         self._refresh_priority_menu(self._rows[index], priority)
         return self._rows[index]
@@ -339,7 +382,13 @@ class FileView:
             dpg.configure_item(row["state"], color=state_color)
             row["priority_value"] = priority
             self._refresh_priority_menu(row, priority)
+            context_text = self._file_context_text(record)
+            for tooltip_item in row.get("tooltip_items", ()):
+                if dpg.does_item_exist(tooltip_item):
+                    dpg.set_value(tooltip_item, context_text)
 
         for index in list(self._rows):
             if index not in visible_indices:
                 self._delete_row(index)
+
+

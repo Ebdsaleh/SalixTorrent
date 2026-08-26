@@ -18,7 +18,7 @@ from app.views.piece_view import PieceView
 from app.views.file_view import FileView
 from app.views.source_view import SourceView
 from app.views.speed_view import SpeedView
-from app.views.help_terms import add_help_tooltip
+from app.views.help_terms import add_help_tooltip, add_text_tooltip
 from app.views.transfer_rate import (
     TRANSFER_RATE_UNITS,
     format_transfer_rate,
@@ -101,50 +101,62 @@ class DownloadView:
         with dpg.group(parent=parent_tag):
             # Top Controls
             with dpg.group(horizontal=True):
-                dpg.add_button(
+                open_torrent_button = dpg.add_button(
                     label=" + Open Torrent ",
                     callback=self._open_native_file_dialog,
                 )
-                dpg.add_button(
+                add_help_tooltip(open_torrent_button, "OPEN_TORRENT")
+                open_magnet_button = dpg.add_button(
                     label=" + Open Magnet ",
                     callback=self._show_magnet_dialog,
                 )
+                add_help_tooltip(open_magnet_button, "OPEN_MAGNET")
                 dpg.add_spacer(width=10)
-                dpg.add_button(
+                start_resume_button = dpg.add_button(
                     label=" Start / Resume ",
                     callback=self._on_resume_clicked,
                 )
-                dpg.add_button(
+                add_help_tooltip(start_resume_button, "START_RESUME")
+                pause_button = dpg.add_button(
                     label=" Pause ",
                     callback=self._on_pause_clicked,
                 )
-                dpg.add_button(
+                add_help_tooltip(pause_button, "PAUSE_TORRENT")
+                stop_button = dpg.add_button(
                     label=" Stop ",
                     callback=self._on_stop_clicked,
                 )
+                add_help_tooltip(stop_button, "STOP_TORRENT")
                 dpg.add_spacer(width=18)
-                dpg.add_text("Active DL Slots")
+                slots_label = dpg.add_text("Active DL Slots")
+                add_help_tooltip(slots_label, "ACTIVE_DL_SLOTS")
                 self.queue_slots_input = dpg.add_input_int(
                     default_value=self._queue_slots_value,
                     min_value=0,
                     min_clamped=True,
                     width=70,
                 )
-                dpg.add_button(
+                add_help_tooltip(self.queue_slots_input, "ACTIVE_DL_SLOTS")
+                apply_queue_button = dpg.add_button(
                     label=" Apply Queue ",
                     callback=self._on_apply_queue_slots_clicked,
                 )
-                dpg.add_text("0 = Unlimited", color=(140, 140, 140))
+                add_help_tooltip(apply_queue_button, "ACTIVE_DL_SLOTS")
+                unlimited_slots = dpg.add_text("0 = Unlimited", color=(140, 140, 140))
+                add_help_tooltip(unlimited_slots, "ACTIVE_DL_SLOTS")
 
             with dpg.group(horizontal=True):
-                dpg.add_text("Search")
+                search_label = dpg.add_text("Search")
+                add_help_tooltip(search_label, "QUEUE_SEARCH")
                 self.queue_search_input = dpg.add_input_text(
                     hint="Filter torrent names...",
                     width=260,
                     callback=self._on_queue_filter_changed,
                 )
+                add_help_tooltip(self.queue_search_input, "QUEUE_SEARCH")
                 dpg.add_spacer(width=8)
-                dpg.add_text("Status")
+                status_filter_label = dpg.add_text("Status")
+                add_help_tooltip(status_filter_label, "QUEUE_STATUS_FILTER")
                 self.queue_state_filter = dpg.add_combo(
                     items=[
                         "All", "Active", "Downloading", "Seeding", "Checking",
@@ -154,9 +166,13 @@ class DownloadView:
                     width=135,
                     callback=self._on_queue_filter_changed,
                 )
-                dpg.add_button(label=" Clear Filter ", callback=self._clear_queue_filter)
-                dpg.add_button(label=" Queue Order ", callback=self._clear_queue_sort)
+                add_help_tooltip(self.queue_state_filter, "QUEUE_STATUS_FILTER")
+                clear_filter_button = dpg.add_button(label=" Clear Filter ", callback=self._clear_queue_filter)
+                add_text_tooltip(clear_filter_button, "Clear filters\n\nRemoves the torrent-name search and status filter. This changes only what is visible in the queue and never changes transfer state.")
+                queue_order_button = dpg.add_button(label=" Queue Order ", callback=self._clear_queue_sort)
+                add_help_tooltip(queue_order_button, "QUEUE_ORDER")
                 self.queue_filter_summary = dpg.add_text("Showing 0 / 0")
+                add_help_tooltip(self.queue_filter_summary, "QUEUE_SORT")
 
             dpg.add_spacer(height=5)
 
@@ -199,6 +215,12 @@ class DownloadView:
                         status_col: "status",
                         speed_col: "speed",
                     }
+                    add_text_tooltip(name_col, "Name\n\nThe torrent payload name. Click a column header to sort the visible table; click a row to select it. Right-click any row cell for torrent actions.")
+                    add_text_tooltip(size_col, "Size\n\nTotal payload size described by the torrent metadata. This is not the size of the .torrent metadata file itself.")
+                    add_text_tooltip(progress_col, "Progress\n\nVerified completion of the torrent payload. During selective downloading, the selected-files completion state can finish before the full torrent reaches 100%.")
+                    add_help_tooltip(priority_col, "QUEUE_PRIORITY")
+                    add_help_tooltip(status_col, "TORRENT_STATUS")
+                    add_text_tooltip(speed_col, "Down / Up\n\nThe selected display unit is used for both the torrent's current download and upload rates. Right-click a torrent row to change Transfer Rate Units.")
 
             dpg.add_spacer(height=10)
 
@@ -208,10 +230,12 @@ class DownloadView:
                     "Torrent: Waiting for selection...",
                     color=(0, 255, 128),
                 )
+                add_text_tooltip(self.title_text, "Selected torrent\n\nThis inspector and the detail tabs below always describe the torrent currently selected in the transfer queue.")
                 self.status_text = dpg.add_text(
                     "Status: Idle",
                     color=(180, 180, 180),
                 )
+                add_help_tooltip(self.status_text, "TORRENT_STATUS")
                 dpg.add_spacer(height=5)
 
                 self.progress_bar = dpg.add_progress_bar(
@@ -219,10 +243,12 @@ class DownloadView:
                     width=-1,
                     height=22,
                 )
+                add_help_tooltip(self.progress_bar, "PIECE")
                 self.progress_label = dpg.add_text(
                     "0.0% Complete (0 / 0 Pieces)",
                     color=(200, 200, 200),
                 )
+                add_help_tooltip(self.progress_label, "PIECE")
 
             dpg.add_spacer(height=10)
 
@@ -232,33 +258,44 @@ class DownloadView:
                 with dpg.tab(label="General") as general_tab:
                     with dpg.group(horizontal=True):
                         with dpg.child_window(width=410, height=355, border=True):
-                            dpg.add_text("TRANSFER", color=(100, 180, 255))
+                            transfer_heading = dpg.add_text("TRANSFER", color=(100, 180, 255))
+                            add_text_tooltip(transfer_heading, "Transfer metrics\n\nLive payload rates, byte totals, remaining data, ETA, elapsed active time, share ratio and current connected-peer count for the selected torrent.")
                             dpg.add_separator()
                             self.speed_text = dpg.add_text("Download Speed: 0.0 KB/s")
                             self.upload_speed_text = dpg.add_text("Upload Speed: 0.0 KB/s")
                             add_help_tooltip(self.speed_text, "TRANSFER_RATE")
                             add_help_tooltip(self.upload_speed_text, "TRANSFER_RATE")
                             self.downloaded_text = dpg.add_text("Downloaded: 0 B / 0 B")
+                            add_help_tooltip(self.downloaded_text, "DOWNLOADED")
                             self.remaining_text = dpg.add_text("Remaining: 0 B")
+                            add_help_tooltip(self.remaining_text, "REMAINING")
                             self.uploaded_text = dpg.add_text("Uploaded: 0 B")
+                            add_help_tooltip(self.uploaded_text, "UPLOADED")
                             self.eta_text = dpg.add_text("ETA: --")
                             add_help_tooltip(self.eta_text, "ETA")
                             self.elapsed_text = dpg.add_text("Elapsed: 00:00")
+                            add_help_tooltip(self.elapsed_text, "ELAPSED")
                             self.ratio_text = dpg.add_text("Share Ratio: --")
                             add_help_tooltip(self.ratio_text, "SHARE_RATIO")
                             self.peers_text = dpg.add_text("Connected Peers: 0")
+                            add_help_tooltip(self.peers_text, "CONNECTED_PEERS")
                             self.error_text = dpg.add_text("", color=(255, 105, 105), wrap=390)
+                            add_text_tooltip(self.error_text, "Error / Notice\n\nWhen SalixTorrent encounters a recoverable problem, the human-readable reason appears here. Use it to understand what failed before choosing Retry.")
                             self.retry_button = dpg.add_button(
                                 label=" Retry Torrent ",
                                 enabled=False,
                                 callback=lambda: self._on_resume_clicked(),
                             )
+                            add_help_tooltip(self.retry_button, "RETRY_TORRENT")
 
                         with dpg.child_window(width=430, height=355, border=True):
-                            dpg.add_text("SWARM STATUS", color=(255, 200, 100))
+                            swarm_heading = dpg.add_text("SWARM STATUS", color=(255, 200, 100))
+                            add_text_tooltip(swarm_heading, "Swarm status\n\nHow the selected torrent is participating in the BitTorrent swarm: lifecycle state, discovery, peers, availability, connectivity and storage mode.")
                             dpg.add_separator()
                             self.state_text = dpg.add_text("Session State: Idle")
+                            add_help_tooltip(self.state_text, "SESSION_STATE")
                             self.client_id_text = dpg.add_text("Client ID: Salix_T 1.0")
+                            add_text_tooltip(self.client_id_text, "Client ID\n\nThe peer identity prefix SalixTorrent presents during BitTorrent handshakes. Remote clients can use peer IDs and extension metadata to identify the software they are connected to.")
                             self.seed_leech_text = dpg.add_text("Seeds / Leechers: -- / --")
                             add_help_tooltip(self.seed_leech_text, "SEEDS_LEECHERS")
                             self.availability_text = dpg.add_text("Availability: --")
@@ -270,15 +307,20 @@ class DownloadView:
                             self.connectivity_text = dpg.add_text("Incoming: --")
                             add_help_tooltip(self.connectivity_text, "PORT_MAPPING")
                             self.external_port_text = dpg.add_text("External: --")
+                            add_help_tooltip(self.external_port_text, "EXTERNAL_ENDPOINT")
                             self.storage_text = dpg.add_text("Storage: Downloads")
+                            add_help_tooltip(self.storage_text, "STORAGE_MODE")
                             self.lpd_text = dpg.add_text("LAN Discovery: --")
                             add_help_tooltip(self.lpd_text, "LPD")
                             self.health_text = dpg.add_text("Swarm Health: --")
+                            add_help_tooltip(self.health_text, "SWARM_HEALTH")
 
                             dpg.add_spacer(height=5)
                             dpg.add_separator()
-                            dpg.add_text("TRANSFER LIMITS", color=(180, 160, 255))
-                            dpg.add_text("0 = Unlimited", color=(150, 150, 150))
+                            limits_heading = dpg.add_text("TRANSFER LIMITS", color=(180, 160, 255))
+                            add_help_tooltip(limits_heading, "TRANSFER_LIMITS")
+                            limits_unlimited = dpg.add_text("0 = Unlimited", color=(150, 150, 150))
+                            add_help_tooltip(limits_unlimited, "TRANSFER_LIMITS")
 
                             with dpg.group(horizontal=True):
                                 dpg.add_text("Down")
@@ -294,6 +336,8 @@ class DownloadView:
                                     default_value="KB/s",
                                     width=80,
                                 )
+                                add_help_tooltip(self.download_limit_input, "TRANSFER_LIMITS")
+                                add_help_tooltip(self.download_limit_unit, "TRANSFER_LIMITS")
 
                             with dpg.group(horizontal=True):
                                 dpg.add_text("Up  ")
@@ -309,37 +353,51 @@ class DownloadView:
                                     default_value="KB/s",
                                     width=80,
                                 )
+                                add_help_tooltip(self.upload_limit_input, "TRANSFER_LIMITS")
+                                add_help_tooltip(self.upload_limit_unit, "TRANSFER_LIMITS")
 
                             with dpg.group(horizontal=True):
-                                dpg.add_button(label=" Apply Limits ", callback=self._on_apply_limits_clicked)
-                                dpg.add_button(label=" Unlimited ", callback=self._on_unlimited_limits_clicked)
+                                apply_limits_button = dpg.add_button(label=" Apply Limits ", callback=self._on_apply_limits_clicked)
+                                add_help_tooltip(apply_limits_button, "TRANSFER_LIMITS")
+                                unlimited_limits_button = dpg.add_button(label=" Unlimited ", callback=self._on_unlimited_limits_clicked)
+                                add_help_tooltip(unlimited_limits_button, "TRANSFER_LIMITS")
 
                             self.limit_status_text = dpg.add_text(
                                 "Limits: Down Unlimited | Up Unlimited",
                                 color=(170, 170, 170),
                             )
+                            add_help_tooltip(self.limit_status_text, "TRANSFER_LIMITS")
 
                         with dpg.child_window(width=-1, height=355, border=True):
-                            dpg.add_text("TORRENT INFO", color=(0, 255, 128))
+                            torrent_info_heading = dpg.add_text("TORRENT INFO", color=(0, 255, 128))
+                            add_text_tooltip(torrent_info_heading, "Torrent metadata\n\nDescriptive and protocol metadata read from the .torrent or resolved magnet, plus the local storage and cached metadata paths used by SalixTorrent.")
                             dpg.add_separator()
                             self.info_hash_text = dpg.add_text("Info Hash: --", wrap=500)
                             add_help_tooltip(self.info_hash_text, "INFO_HASH")
                             self.piece_info_text = dpg.add_text("Pieces: --")
                             add_help_tooltip(self.piece_info_text, "PIECE")
                             self.file_info_text = dpg.add_text("Files: --")
+                            add_help_tooltip(self.file_info_text, "FILE_COUNT")
                             self.private_text = dpg.add_text("Private: --")
                             add_help_tooltip(self.private_text, "PRIVATE_TORRENT")
                             self.created_by_text = dpg.add_text("Created By: --", wrap=500)
+                            add_help_tooltip(self.created_by_text, "CREATED_BY")
                             self.created_date_text = dpg.add_text("Created: --")
+                            add_help_tooltip(self.created_date_text, "CREATION_DATE")
                             self.comment_text = dpg.add_text("Comment: --", wrap=500)
+                            add_help_tooltip(self.comment_text, "TORRENT_COMMENT")
                             dpg.add_spacer(height=4)
                             dpg.add_separator()
                             self.storage_path_text = dpg.add_text("Storage Path: --", wrap=500)
+                            add_help_tooltip(self.storage_path_text, "STORAGE_PATH")
                             self.torrent_path_text = dpg.add_text(".torrent: --", wrap=500)
+                            add_help_tooltip(self.torrent_path_text, "TORRENT_PATH")
                             dpg.add_spacer(height=6)
                             with dpg.group(horizontal=True):
-                                dpg.add_button(label=" Open Folder ", callback=self._on_open_folder_clicked)
-                                dpg.add_button(label=" Properties... ", callback=self._on_properties_clicked)
+                                open_folder_button = dpg.add_button(label=" Open Folder ", callback=self._on_open_folder_clicked)
+                                add_help_tooltip(open_folder_button, "OPEN_FOLDER")
+                                properties_button = dpg.add_button(label=" Properties... ", callback=self._on_properties_clicked)
+                                add_help_tooltip(properties_button, "PROPERTIES")
 
                 with dpg.tab(label="Peers") as peers_tab:
                     self.peer_view.build_view(parent_tag=peers_tab)
@@ -364,6 +422,12 @@ class DownloadView:
                 sources_tab: "Sources",
                 speed_tab: "Speed",
             }
+            add_text_tooltip(general_tab, "General\n\nOverall transfer, swarm, connectivity and torrent metadata for the selected torrent.")
+            add_text_tooltip(peers_tab, "Peers\n\nLive BitTorrent peer connections: client identity, discovery source, direction, piece completion, per-peer rates and protocol state.")
+            add_text_tooltip(pieces_tab, "Pieces\n\nA compact map and focused table showing piece verification, requests, blocks and current swarm availability.")
+            add_text_tooltip(files_tab, "Files\n\nPer-file verified progress, storage paths and selective-download priority controls for the selected torrent.")
+            add_text_tooltip(sources_tab, "Sources\n\nTrackers, DHT, PEX and Local Peer Discovery with live status and discovery diagnostics.")
+            add_text_tooltip(speed_tab, "Speed\n\nRolling download/upload history, recent averages, peaks and transfer-limit reference lines.")
 
         with dpg.window(
             label="Open Magnet Link",
@@ -387,17 +451,21 @@ class DownloadView:
                 width=-1,
                 hint="magnet:?xt=urn:btih:...",
             )
+            add_help_tooltip(self.magnet_input, "MAGNET_LINK")
             with dpg.group(horizontal=True):
                 self.magnet_add_button = dpg.add_button(
                     label=" Add Magnet ",
                     callback=self._submit_magnet,
                 )
-                dpg.add_button(label=" Paste ", callback=self._paste_magnet)
+                add_help_tooltip(self.magnet_add_button, "OPEN_MAGNET")
+                paste_magnet_button = dpg.add_button(label=" Paste ", callback=self._paste_magnet)
+                add_text_tooltip(paste_magnet_button, "Paste magnet link\n\nCopies the current clipboard text into the magnet field. SalixTorrent does not begin network activity until Add Magnet is pressed.")
                 self.magnet_cancel_button = dpg.add_button(
                     label=" Cancel Lookup ",
                     enabled=False,
                     callback=self._cancel_magnet,
                 )
+                add_help_tooltip(self.magnet_cancel_button, "BEP9")
                 dpg.add_button(
                     label=" Close ",
                     callback=self._close_magnet_dialog,
@@ -407,10 +475,12 @@ class DownloadView:
                 width=-1,
                 overlay="Idle",
             )
+            add_help_tooltip(self.magnet_progress, "BEP9")
             self.magnet_status_text = dpg.add_text(
                 "Paste a magnet link to begin.",
                 wrap=630,
             )
+            add_help_tooltip(self.magnet_status_text, "BEP9")
 
         # Shared confirmation dialog for destructive queue actions.
         with dpg.window(
@@ -434,18 +504,21 @@ class DownloadView:
             dpg.add_separator()
             dpg.add_spacer(height=8)
             with dpg.group(horizontal=True):
-                dpg.add_button(
+                remove_only_button = dpg.add_button(
                     label=" Remove from SalixTorrent ",
                     callback=lambda: self._confirm_remove_torrent(False),
                 )
-                dpg.add_button(
+                add_help_tooltip(remove_only_button, "REMOVE_TORRENT")
+                remove_delete_button = dpg.add_button(
                     label=" Remove + Delete Data ",
                     callback=lambda: self._confirm_remove_torrent(True),
                 )
-                dpg.add_button(
+                add_help_tooltip(remove_delete_button, "DELETE_DATA")
+                cancel_remove_button = dpg.add_button(
                     label=" Cancel ",
                     callback=lambda: dpg.hide_item(self.remove_torrent_modal),
                 )
+                add_text_tooltip(cancel_remove_button, "Cancel removal\n\nCloses this confirmation window without changing the torrent, payload, resume data or queue.")
 
         with dpg.window(
             label="Removal Notice",
@@ -471,6 +544,7 @@ class DownloadView:
             height=190,
         ) as self.recheck_modal:
             self.recheck_title = dpg.add_text("Force recheck?", color=(255, 200, 100))
+            add_help_tooltip(self.recheck_title, "FORCE_RECHECK")
             dpg.add_spacer(height=4)
             dpg.add_text(
                 "This discards SalixTorrent's fast-resume trust and SHA-1 checks the "
@@ -480,8 +554,10 @@ class DownloadView:
             )
             dpg.add_spacer(height=10)
             with dpg.group(horizontal=True):
-                dpg.add_button(label=" Force Recheck ", callback=self._confirm_force_recheck)
-                dpg.add_button(label=" Cancel ", callback=lambda: dpg.hide_item(self.recheck_modal))
+                force_recheck_button = dpg.add_button(label=" Force Recheck ", callback=self._confirm_force_recheck)
+                add_help_tooltip(force_recheck_button, "FORCE_RECHECK")
+                cancel_recheck_button = dpg.add_button(label=" Cancel ", callback=lambda: dpg.hide_item(self.recheck_modal))
+                add_text_tooltip(cancel_recheck_button, "Cancel recheck\n\nCloses this confirmation window without invalidating fast-resume state or starting a verification pass.")
 
         with dpg.window(
             label="Torrent Properties",
@@ -496,9 +572,12 @@ class DownloadView:
                 self.properties_text = dpg.add_text("", wrap=660)
             dpg.add_spacer(height=8)
             with dpg.group(horizontal=True):
-                dpg.add_button(label=" Copy Info Hash ", callback=self._properties_copy_info_hash)
-                dpg.add_button(label=" Copy Magnet Link ", callback=self._properties_copy_magnet)
-                dpg.add_button(label=" Open Folder ", callback=self._properties_open_folder)
+                properties_hash_button = dpg.add_button(label=" Copy Info Hash ", callback=self._properties_copy_info_hash)
+                add_help_tooltip(properties_hash_button, "COPY_INFO_HASH")
+                properties_magnet_button = dpg.add_button(label=" Copy Magnet Link ", callback=self._properties_copy_magnet)
+                add_help_tooltip(properties_magnet_button, "COPY_MAGNET")
+                properties_folder_button = dpg.add_button(label=" Open Folder ", callback=self._properties_open_folder)
+                add_help_tooltip(properties_folder_button, "OPEN_FOLDER")
                 dpg.add_button(label=" Close ", callback=lambda: dpg.hide_item(self.properties_modal))
 
         with dpg.window(
@@ -514,7 +593,8 @@ class DownloadView:
             self.completion_notice_text = dpg.add_text("", wrap=440)
             dpg.add_spacer(height=8)
             with dpg.group(horizontal=True):
-                dpg.add_button(label=" Open Folder ", callback=self._completion_open_folder)
+                completion_folder_button = dpg.add_button(label=" Open Folder ", callback=self._completion_open_folder)
+                add_help_tooltip(completion_folder_button, "OPEN_FOLDER")
                 dpg.add_button(label=" Dismiss ", callback=lambda: dpg.hide_item(self.completion_notice_modal))
 
     def _on_detail_tab_changed(self, sender=None, app_data=None, user_data=None):
@@ -1074,7 +1154,7 @@ class DownloadView:
                 callback=lambda s, a, u: self._context_set_priority(u, "Low"),
             )
 
-            with dpg.menu(label="Transfer Rate Units"):
+            with dpg.menu(label="Transfer Rate Units") as rate_menu:
                 rate_items = {}
                 rate_labels = {
                     "Auto": "Automatic",
@@ -1090,6 +1170,8 @@ class DownloadView:
                         user_data=unit,
                         callback=lambda s, a, u: self._context_set_transfer_rate_unit(u),
                     )
+                    add_help_tooltip(rate_items[unit], "TRANSFER_RATE")
+            add_help_tooltip(rate_menu, "TRANSFER_RATE")
 
             dpg.add_separator()
 
@@ -1162,6 +1244,24 @@ class DownloadView:
                 user_data=info_hash,
                 callback=lambda s, a, u: self._context_remove(u),
             )
+
+        add_help_tooltip(move_up_item, "QUEUE_ORDER")
+        add_help_tooltip(move_down_item, "QUEUE_ORDER")
+        add_help_tooltip(priority_high_item, "QUEUE_PRIORITY")
+        add_help_tooltip(priority_normal_item, "QUEUE_PRIORITY")
+        add_help_tooltip(priority_low_item, "QUEUE_PRIORITY")
+        add_help_tooltip(start_item, "START_RESUME")
+        add_help_tooltip(pause_item, "PAUSE_TORRENT")
+        add_help_tooltip(resume_item, "START_RESUME")
+        add_help_tooltip(stop_item, "STOP_TORRENT")
+        add_help_tooltip(retry_item, "RETRY_TORRENT")
+        add_help_tooltip(open_folder_item, "OPEN_FOLDER")
+        add_help_tooltip(announce_item, "UPDATE_TRACKERS")
+        add_help_tooltip(recheck_item, "FORCE_RECHECK")
+        add_help_tooltip(copy_hash_item, "COPY_INFO_HASH")
+        add_help_tooltip(copy_magnet_item, "COPY_MAGNET")
+        add_help_tooltip(properties_item, "PROPERTIES")
+        add_help_tooltip(remove_item, "REMOVE_TORRENT")
 
         # Use ONE handler registry for the entire row.  This is important:
         # dpg.popup() also uses an item-handler registry internally, and an item
@@ -1607,6 +1707,13 @@ class DownloadView:
                 status_cell = dpg.add_text(state_label)
                 speed_cell = dpg.add_text(speed_str)
 
+            add_text_tooltip(name_cell, "Torrent row\n\nClick to select this torrent and populate the inspector below. Right-click any cell in this row for queue, transfer, recheck, copy, properties and removal actions.")
+            add_text_tooltip(size_cell, "Payload size\n\nTotal size described by this torrent's metadata, not the size of the .torrent file itself.")
+            add_help_tooltip(prog_cell, "PIECE")
+            add_help_tooltip(priority_cell, "QUEUE_PRIORITY")
+            add_help_tooltip(status_cell, "TORRENT_STATUS")
+            add_help_tooltip(speed_cell, "TRANSFER_RATE")
+
             menu = self._build_row_context_menu(
                 h,
                 (name_cell, size_cell, prog_cell, priority_cell, status_cell, speed_cell),
@@ -1996,3 +2103,5 @@ class DownloadView:
             snapshot = self.latest_stats.get(self.active_info_hash)
             if snapshot:
                 self._render_inspector(snapshot, force_detail=True)
+
+

@@ -9,6 +9,7 @@ from app.views.application_menu import ApplicationMenu
 from app.views.create_torrent_view import CreateTorrentView
 from app.views.download_view import DownloadView
 from app.views.settings_view import SettingsView
+from app.views.help_terms import add_help_tooltip, add_text_tooltip
 
 
 class MasterViewport:
@@ -41,20 +42,27 @@ class MasterViewport:
             # It acts like a small application toolbar while File/Edit/View/...
             # provide the complete desktop-style command surface.
             with dpg.group(horizontal=True, tag="salix_toolbar"):
-                dpg.add_text("SALIX_T // BITTORRENT CLIENT", color=(0, 255, 128))
+                brand_item = dpg.add_text("SALIX_T // BITTORRENT CLIENT", color=(0, 255, 128))
+                add_text_tooltip(
+                    brand_item,
+                    "SalixTorrent (Salix_T)\n\nA BitTorrent v1 desktop client. Hover technical labels, table cells and controls throughout the application for contextual explanations of what SalixTorrent is doing.",
+                )
                 dpg.add_spacer(width=20)
-                dpg.add_button(
+                active_button = dpg.add_button(
                     label=" Active Transfers ",
                     callback=lambda: self.gui.switch_scene("DownloadView"),
                 )
-                dpg.add_button(
+                add_help_tooltip(active_button, "ACTIVE_TRANSFERS_VIEW")
+                create_button = dpg.add_button(
                     label=" Create Torrent ",
                     callback=lambda: self.gui.switch_scene("CreateTorrentView"),
                 )
-                dpg.add_button(
+                add_help_tooltip(create_button, "CREATE_TORRENT")
+                preferences_button = dpg.add_button(
                     label=" Preferences ",
                     callback=lambda: self.gui.switch_scene("SettingsView"),
                 )
+                add_help_tooltip(preferences_button, "PREFERENCES_VIEW")
 
             dpg.add_separator()
             dpg.add_spacer(height=5)
@@ -85,3 +93,5 @@ class MasterViewport:
 
     def run(self):
         self.gui.run()
+
+

@@ -2,7 +2,7 @@
 
 import dearpygui.dearpygui as dpg
 
-from app.views.help_terms import add_help_tooltip
+from app.views.help_terms import add_help_tooltip, add_text_tooltip
 from app.views.transfer_rate import format_transfer_rate, normalize_transfer_rate_unit
 
 
@@ -21,6 +21,7 @@ class PeerView:
                 "Peers: select a torrent to inspect its connections",
                 color=(100, 180, 255),
             )
+            add_help_tooltip(self.summary_text, "CONNECTED_PEERS")
             flags_help = dpg.add_text(
                 "Flags: I = we are interested | i = peer interested | "
                 "C = peer chokes us | c = we choke peer",
@@ -39,56 +40,66 @@ class PeerView:
                 scrollY=True,
                 height=215,
             ) as self.table_id:
-                dpg.add_table_column(
+                address_col = dpg.add_table_column(
                     label="Address",
                     width_stretch=True,
                     init_width_or_weight=0.18,
                 )
-                dpg.add_table_column(
+                client_col = dpg.add_table_column(
                     label="Client",
                     width_stretch=True,
                     init_width_or_weight=0.16,
                 )
-                dpg.add_table_column(
+                source_col = dpg.add_table_column(
                     label="Source",
                     width_fixed=True,
                     init_width_or_weight=85,
                 )
-                dpg.add_table_column(
+                direction_col = dpg.add_table_column(
                     label="Direction",
                     width_fixed=True,
                     init_width_or_weight=85,
                 )
-                dpg.add_table_column(
+                pieces_col = dpg.add_table_column(
                     label="Pieces",
                     width_fixed=True,
                     init_width_or_weight=75,
                 )
-                dpg.add_table_column(
+                down_col = dpg.add_table_column(
                     label="Down",
                     width_fixed=True,
                     init_width_or_weight=95,
                 )
-                dpg.add_table_column(
+                up_col = dpg.add_table_column(
                     label="Up",
                     width_fixed=True,
                     init_width_or_weight=95,
                 )
-                dpg.add_table_column(
+                state_col = dpg.add_table_column(
                     label="State",
                     width_fixed=True,
                     init_width_or_weight=95,
                 )
-                dpg.add_table_column(
+                flags_col = dpg.add_table_column(
                     label="Flags",
                     width_fixed=True,
                     init_width_or_weight=70,
                 )
-                dpg.add_table_column(
+                age_col = dpg.add_table_column(
                     label="Age",
                     width_fixed=True,
                     init_width_or_weight=70,
                 )
+                add_help_tooltip(address_col, "PEER_ADDRESS")
+                add_help_tooltip(client_col, "PEER_CLIENT")
+                add_help_tooltip(source_col, "PEER_SOURCE")
+                add_help_tooltip(direction_col, "PEER_DIRECTION")
+                add_help_tooltip(pieces_col, "PEER_PROGRESS")
+                add_help_tooltip(down_col, "TRANSFER_RATE")
+                add_help_tooltip(up_col, "TRANSFER_RATE")
+                add_help_tooltip(state_col, "PEER_STATE")
+                add_help_tooltip(flags_col, "PEER_FLAGS")
+                add_help_tooltip(age_col, "PEER_AGE")
 
     @staticmethod
     def _format_age(seconds: float) -> str:
@@ -154,8 +165,16 @@ class PeerView:
 
         for peer in peers:
             with dpg.table_row(parent=self.table_id) as row_id:
-                dpg.add_text(str(peer.get("address", "?")))
-                dpg.add_text(str(peer.get("client", "Unknown")))
+                address_item = dpg.add_text(str(peer.get("address", "?")))
+                client_item = dpg.add_text(str(peer.get("client", "Unknown")))
+                add_text_tooltip(
+                    address_item,
+                    f"Peer address\n\nRemote endpoint for this live connection: {peer.get('address', '?')}\n\nThis is a network endpoint, not a user identity. BitTorrent peers can disconnect and reconnect on different ports.",
+                )
+                add_text_tooltip(
+                    client_item,
+                    f"Peer client\n\nThe remote peer identifies itself as: {peer.get('client', 'Unknown')}\n\nClient identification is decoded from self-reported BitTorrent peer/extension metadata and should be treated as informative rather than cryptographically authenticated.",
+                )
                 source_name = str(peer.get("source", "Unknown"))
                 source_item = dpg.add_text(source_name)
                 source_term = {
@@ -166,8 +185,10 @@ class PeerView:
                 }.get(source_name)
                 if source_term:
                     add_help_tooltip(source_item, source_term)
-                dpg.add_text(str(peer.get("direction", "--")))
-                dpg.add_text(self._format_progress(peer.get("progress")))
+                direction_item = dpg.add_text(str(peer.get("direction", "--")))
+                progress_item = dpg.add_text(self._format_progress(peer.get("progress")))
+                add_help_tooltip(direction_item, "PEER_DIRECTION")
+                add_help_tooltip(progress_item, "PEER_PROGRESS")
                 down_item = dpg.add_text(
                     format_transfer_rate(
                         peer.get("download_speed_kbps", 0.0),
@@ -182,8 +203,13 @@ class PeerView:
                 )
                 add_help_tooltip(down_item, "TRANSFER_RATE")
                 add_help_tooltip(up_item, "TRANSFER_RATE")
-                dpg.add_text(str(peer.get("state", "Connected")))
-                dpg.add_text(str(peer.get("flags", "--")))
-                dpg.add_text(self._format_age(peer.get("connected_seconds", 0.0)))
+                state_item = dpg.add_text(str(peer.get("state", "Connected")))
+                flags_item = dpg.add_text(str(peer.get("flags", "--")))
+                age_item = dpg.add_text(self._format_age(peer.get("connected_seconds", 0.0)))
+                add_help_tooltip(state_item, "PEER_STATE")
+                add_help_tooltip(flags_item, "PEER_FLAGS")
+                add_help_tooltip(age_item, "PEER_AGE")
 
             self._row_ids.append(row_id)
+
+

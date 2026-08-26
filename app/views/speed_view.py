@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import dearpygui.dearpygui as dpg
 
-from app.views.help_terms import add_help_tooltip
+from app.views.help_terms import add_help_tooltip, add_text_tooltip
 from app.views.transfer_rate import (
     choose_plot_unit,
     format_transfer_rate,
@@ -46,22 +46,26 @@ class SpeedView:
                 )
                 add_help_tooltip(self.summary_text, "TRANSFER_RATE")
                 dpg.add_spacer(width=20)
-                dpg.add_text("Window", color=(160, 160, 160))
+                window_label = dpg.add_text("Window", color=(160, 160, 160))
+                add_help_tooltip(window_label, "SPEED_WINDOW")
                 self.window_combo = dpg.add_combo(
                     items=list(self.WINDOW_OPTIONS.keys()),
                     default_value="1 minute",
                     width=115,
                     callback=self._on_window_changed,
                 )
+                add_help_tooltip(self.window_combo, "SPEED_WINDOW")
 
             self.stats_text = dpg.add_text(
                 "Average: Down 0.0 KB/s | Up 0.0 KB/s   Peak: Down 0.0 KB/s | Up 0.0 KB/s",
                 color=(170, 170, 170),
             )
+            add_help_tooltip(self.stats_text, "AVERAGE_PEAK")
             self.limit_text = dpg.add_text(
                 "Limits: Down Unlimited | Up Unlimited",
                 color=(170, 170, 170),
             )
+            add_help_tooltip(self.limit_text, "TRANSFER_LIMITS")
             dpg.add_separator()
 
             with dpg.plot(height=230, width=-1) as self.plot_id:
@@ -100,10 +104,18 @@ class SpeedView:
                     parent=self.y_axis,
                 )
 
-            dpg.add_text(
+            add_text_tooltip(self.download_series, "Download history\n\nMeasured payload download rate for the selected torrent across the visible time window.")
+            add_text_tooltip(self.upload_series, "Upload history\n\nMeasured payload upload rate for the selected torrent across the visible time window. Upload can occur while downloading as soon as verified pieces are available.")
+            add_text_tooltip(self.download_limit_series, "Download limit line\n\nReference line showing the selected torrent's configured download ceiling when one is active. The global shared limit is reported in the text summary above.")
+            add_text_tooltip(self.upload_limit_series, "Upload limit line\n\nReference line showing the selected torrent's configured upload ceiling when one is active. The global shared limit is reported in the text summary above.")
+            add_help_tooltip(self.plot_id, "SPEED_HISTORY")
+            add_text_tooltip(self.x_axis, "Time axis\n\nThe graph runs from older samples on the left toward the current moment at 0 seconds on the right.")
+            add_help_tooltip(self.y_axis, "TRANSFER_RATE")
+            history_note = dpg.add_text(
                 "Rolling session history sampled every 0.5 seconds. History resets when SalixTorrent restarts.",
                 color=(140, 140, 145),
             )
+            add_help_tooltip(history_note, "SPEED_HISTORY")
 
     def set_rate_unit(self, unit: object):
         normalized = normalize_transfer_rate_unit(unit)
@@ -270,3 +282,5 @@ class SpeedView:
         minimum_scale = 0.125 if plot_unit in {"MB/s", "Mbps"} else 128.0
         y_max = max(minimum_scale, peak * 1.15)
         dpg.set_axis_limits(self.y_axis, 0.0, y_max)
+
+

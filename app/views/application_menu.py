@@ -14,6 +14,7 @@ from typing import Optional
 import dearpygui.dearpygui as dpg
 
 from app.logic.torrent_manager import TorrentManager
+from app.views.help_terms import add_help_tooltip, add_text_tooltip
 
 
 class ApplicationMenu:
@@ -74,22 +75,25 @@ class ApplicationMenu:
 
     def _build_file_menu(self):
         with dpg.menu(label="File"):
-            dpg.add_menu_item(
+            open_torrent_item = dpg.add_menu_item(
                 label="Open Torrent...",
                 shortcut="Ctrl+O",
                 callback=self._open_torrent,
             )
-            dpg.add_menu_item(
+            add_help_tooltip(open_torrent_item, "OPEN_TORRENT")
+            open_magnet_item = dpg.add_menu_item(
                 label="Open Magnet Link...",
                 shortcut="Ctrl+M",
                 callback=self._open_magnet,
             )
+            add_help_tooltip(open_magnet_item, "OPEN_MAGNET")
             dpg.add_separator()
-            dpg.add_menu_item(
+            create_torrent_item = dpg.add_menu_item(
                 label="Create Torrent...",
                 shortcut="Ctrl+N",
                 callback=lambda: self._switch_scene("CreateTorrentView"),
             )
+            add_help_tooltip(create_torrent_item, "CREATE_TORRENT")
             dpg.add_separator()
             dpg.add_menu_item(
                 label="Exit",
@@ -107,20 +111,25 @@ class ApplicationMenu:
                 label="Copy Magnet Link",
                 callback=self._copy_magnet,
             )
+            add_help_tooltip(self._torrent_action_items["copy_hash"], "COPY_INFO_HASH")
+            add_help_tooltip(self._torrent_action_items["copy_magnet"], "COPY_MAGNET")
             dpg.add_separator()
-            dpg.add_menu_item(
+            find_item = dpg.add_menu_item(
                 label="Find Torrents...",
                 shortcut="Ctrl+F",
                 callback=self._focus_torrent_search,
             )
-            dpg.add_menu_item(
+            add_help_tooltip(find_item, "QUEUE_SEARCH")
+            clear_item = dpg.add_menu_item(
                 label="Clear Search / Filter",
                 callback=self._clear_filters,
             )
-            dpg.add_menu_item(
+            add_help_tooltip(clear_item, "QUEUE_STATUS_FILTER")
+            restore_order_item = dpg.add_menu_item(
                 label="Restore Queue Order",
                 callback=self._restore_queue_order,
             )
+            add_help_tooltip(restore_order_item, "QUEUE_ORDER")
 
     def _build_view_menu(self):
         with dpg.menu(label="View"):
@@ -142,6 +151,9 @@ class ApplicationMenu:
                 check=True,
                 callback=lambda: self._switch_scene("SettingsView"),
             )
+            add_help_tooltip(self._scene_items["DownloadView"], "ACTIVE_TRANSFERS_VIEW")
+            add_help_tooltip(self._scene_items["CreateTorrentView"], "CREATE_TORRENT")
+            add_help_tooltip(self._scene_items["SettingsView"], "PREFERENCES_VIEW")
 
             dpg.add_separator()
             with dpg.menu(label="Torrent Details"):
@@ -151,6 +163,16 @@ class ApplicationMenu:
                         check=True,
                         callback=lambda s, a, u=name: self._show_detail_tab(u),
                     )
+            detail_help = {
+                "General": "Overall transfer, swarm, connectivity and torrent metadata for the selected torrent.",
+                "Peers": "Live peer connections, client identity, discovery source, direction, rates and protocol state.",
+                "Pieces": "Piece verification map, block progress and per-piece availability from connected peers.",
+                "Files": "Per-file verified progress, storage information and selective-download priorities.",
+                "Sources": "Trackers, DHT, PEX and Local Peer Discovery with live discovery diagnostics.",
+                "Speed": "Rolling download/upload history with averages, peaks and transfer-limit reference lines.",
+            }
+            for name, item in self._detail_items.items():
+                add_text_tooltip(item, f"{name} details\n\n{detail_help.get(name, '')}")
 
     def _build_transfers_menu(self):
         with dpg.menu(label="Transfers"):
@@ -201,27 +223,43 @@ class ApplicationMenu:
                 label="Properties...",
                 callback=self._show_properties,
             )
+            add_help_tooltip(self._torrent_action_items["start"], "START_RESUME")
+            add_help_tooltip(self._torrent_action_items["pause"], "PAUSE_TORRENT")
+            add_help_tooltip(self._torrent_action_items["resume"], "START_RESUME")
+            add_help_tooltip(self._torrent_action_items["stop"], "STOP_TORRENT")
+            add_help_tooltip(self._torrent_action_items["retry"], "RETRY_TORRENT")
+            for priority_item in self._priority_items.values():
+                add_help_tooltip(priority_item, "QUEUE_PRIORITY")
+            add_help_tooltip(self._torrent_action_items["announce"], "UPDATE_TRACKERS")
+            add_help_tooltip(self._torrent_action_items["recheck"], "FORCE_RECHECK")
+            add_help_tooltip(self._torrent_action_items["open_folder"], "OPEN_FOLDER")
+            add_help_tooltip(self._torrent_action_items["properties"], "PROPERTIES")
 
             dpg.add_separator()
-            dpg.add_menu_item(label="Pause All", callback=self.manager.pause_all)
-            dpg.add_menu_item(label="Resume All", callback=self.manager.resume_all)
+            pause_all_item = dpg.add_menu_item(label="Pause All", callback=self.manager.pause_all)
+            resume_all_item = dpg.add_menu_item(label="Resume All", callback=self.manager.resume_all)
+            add_text_tooltip(pause_all_item, "Pause All\n\nRequests a paused state for every currently active torrent without removing them or deleting data.")
+            add_text_tooltip(resume_all_item, "Resume All\n\nRequests that paused/eligible torrents become active again, still respecting the configured active-download slot limit and queue priorities.")
 
     def _build_tools_menu(self):
         with dpg.menu(label="Tools"):
-            dpg.add_menu_item(
+            preferences_item = dpg.add_menu_item(
                 label="Preferences...",
                 shortcut="Ctrl+,",
                 callback=lambda: self._switch_scene("SettingsView"),
             )
+            add_help_tooltip(preferences_item, "PREFERENCES_VIEW")
             dpg.add_separator()
-            dpg.add_menu_item(
+            remap_item = dpg.add_menu_item(
                 label="Refresh / Remap Connectivity",
                 callback=self._refresh_connectivity,
             )
-            dpg.add_menu_item(
+            add_help_tooltip(remap_item, "PORT_MAPPING")
+            app_data_item = dpg.add_menu_item(
                 label="Open Application Data Folder",
                 callback=self._open_application_data_folder,
             )
+            add_text_tooltip(app_data_item, "Application data folder\n\nOpens SalixTorrent's persistent state directory containing files such as settings.json, session.json, cached .torrent metadata and ui_errors.log. This is separate from payload downloads.")
 
     def _build_help_menu(self):
         with dpg.menu(label="Help"):
@@ -230,10 +268,11 @@ class ApplicationMenu:
                 shortcut="F1",
                 callback=self._show_shortcuts,
             )
-            dpg.add_menu_item(
+            diagnostics_item = dpg.add_menu_item(
                 label="Diagnostics...",
                 callback=self._show_diagnostics,
             )
+            add_help_tooltip(diagnostics_item, "DIAGNOSTICS")
             dpg.add_separator()
             dpg.add_menu_item(
                 label="About SalixTorrent",
@@ -677,3 +716,5 @@ class ApplicationMenu:
             dpg.set_clipboard_text(self._diagnostics_string())
         except Exception:
             pass
+
+

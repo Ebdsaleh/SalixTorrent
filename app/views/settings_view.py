@@ -9,7 +9,7 @@ import dearpygui.dearpygui as dpg
 
 from app.engine.desktop_integration import DesktopIntegration
 from app.logic.torrent_manager import TorrentManager
-from app.views.help_terms import add_help_tooltip
+from app.views.help_terms import add_help_tooltip, add_text_tooltip
 from app.views.transfer_rate import TRANSFER_RATE_UNITS
 
 
@@ -27,24 +27,29 @@ class SettingsView:
 
     def build_view(self, parent_tag):
         with dpg.group(parent=parent_tag):
-            dpg.add_text("PREFERENCES", color=(0, 255, 128))
-            dpg.add_text(
+            preferences_heading = dpg.add_text("PREFERENCES", color=(0, 255, 128))
+            add_help_tooltip(preferences_heading, "PREFERENCES_VIEW")
+            preferences_intro = dpg.add_text(
                 "Network toggles and global limits apply to active sessions immediately. "
                 "New-torrent defaults only affect torrents added later.",
                 color=(155, 155, 160),
                 wrap=1000,
             )
+            add_help_tooltip(preferences_intro, "PREFERENCES_VIEW")
             dpg.add_spacer(height=6)
 
             with dpg.child_window(height=112, border=True):
                 dpg.add_text("DOWNLOADS", color=(100, 180, 255))
                 dpg.add_separator()
                 with dpg.group(horizontal=True):
-                    dpg.add_text("Default download directory")
+                    download_dir_label = dpg.add_text("Default download directory")
+                    add_help_tooltip(download_dir_label, "DEFAULT_DOWNLOAD_DIR")
                     self.download_dir_input = dpg.add_input_text(
                         default_value=self.settings["download_dir"], width=700
                     )
-                    dpg.add_button(label=" Choose Folder ", callback=self._choose_download_dir)
+                    add_help_tooltip(self.download_dir_input, "DEFAULT_DOWNLOAD_DIR")
+                    choose_download_dir_button = dpg.add_button(label=" Choose Folder ", callback=self._choose_download_dir)
+                    add_help_tooltip(choose_download_dir_button, "DEFAULT_DOWNLOAD_DIR")
 
             dpg.add_spacer(height=7)
             with dpg.group(horizontal=True):
@@ -62,10 +67,13 @@ class SettingsView:
                             max_clamped=True,
                             width=100,
                         )
-                        dpg.add_text("Fallback: next 10 ports", color=(140, 140, 145))
+                        add_help_tooltip(self.listen_port_input, "LISTEN_PORT")
+                        fallback_ports = dpg.add_text("Fallback: next 10 ports", color=(140, 140, 145))
+                        add_text_tooltip(fallback_ports, "Listen-port fallback\n\nIf the preferred TCP port is already occupied, SalixTorrent tries the next ten port numbers rather than failing the entire torrent subsystem.")
 
                     with dpg.group(horizontal=True):
-                        dpg.add_text("Default max peers")
+                        max_peers_label = dpg.add_text("Default max peers")
+                        add_help_tooltip(max_peers_label, "MAX_PEERS")
                         self.max_peers_input = dpg.add_input_int(
                             default_value=int(self.settings["default_max_peers"]),
                             min_value=1,
@@ -74,6 +82,7 @@ class SettingsView:
                             max_clamped=True,
                             width=90,
                         )
+                        add_help_tooltip(self.max_peers_input, "MAX_PEERS")
 
                     self.enable_dht_checkbox = dpg.add_checkbox(
                         label="Enable DHT (BEP-5)",
@@ -110,23 +119,30 @@ class SettingsView:
                     self.connectivity_method = dpg.add_text("Mapping: --")
                     add_help_tooltip(self.connectivity_method, "PORT_MAPPING")
                     self.connectivity_local = dpg.add_text("Local: --")
+                    add_help_tooltip(self.connectivity_local, "LOCAL_ENDPOINT")
                     self.connectivity_external = dpg.add_text("External: --")
+                    add_help_tooltip(self.connectivity_external, "EXTERNAL_ENDPOINT")
                     self.connectivity_protocols = dpg.add_text("Mapped protocols: --")
+                    add_help_tooltip(self.connectivity_protocols, "MAPPED_PROTOCOLS")
                     self.connectivity_incoming = dpg.add_text("Last incoming peer: --")
+                    add_help_tooltip(self.connectivity_incoming, "LAST_INCOMING")
                     self.connectivity_error = dpg.add_text(
                         "", color=(220, 180, 100), wrap=480
                     )
+                    add_help_tooltip(self.connectivity_error, "PORT_MAPPING")
                     dpg.add_spacer(height=6)
-                    dpg.add_button(
+                    refresh_connectivity_button = dpg.add_button(
                         label=" Refresh / Remap Now ",
                         callback=self._refresh_connectivity,
                     )
-                    dpg.add_text(
+                    add_help_tooltip(refresh_connectivity_button, "PORT_MAPPING")
+                    connectivity_note = dpg.add_text(
                         "'Mapped' means the router accepted a mapping. 'Incoming Confirmed' "
                         "means a real remote peer has reached SalixTorrent.",
                         color=(145, 145, 150),
                         wrap=480,
                     )
+                    add_help_tooltip(connectivity_note, "PORT_MAPPING")
 
             dpg.add_spacer(height=7)
             with dpg.group(horizontal=True):
@@ -134,33 +150,40 @@ class SettingsView:
                     dpg.add_text("QUEUE", color=(180, 160, 255))
                     dpg.add_separator()
                     with dpg.group(horizontal=True):
-                        dpg.add_text("Active download slots")
+                        active_slots_label = dpg.add_text("Active download slots")
+                        add_help_tooltip(active_slots_label, "ACTIVE_DL_SLOTS")
                         self.active_slots_input = dpg.add_input_int(
                             default_value=int(self.settings["max_active_downloads"]),
                             min_value=0,
                             min_clamped=True,
                             width=90,
                         )
-                        dpg.add_text("0 = Unlimited", color=(150, 150, 150))
+                        add_help_tooltip(self.active_slots_input, "ACTIVE_DL_SLOTS")
+                        active_slots_unlimited = dpg.add_text("0 = Unlimited", color=(150, 150, 150))
+                        add_help_tooltip(active_slots_unlimited, "ACTIVE_DL_SLOTS")
                     with dpg.group(horizontal=True):
-                        dpg.add_text("Default queue priority")
+                        default_priority_label = dpg.add_text("Default queue priority")
+                        add_help_tooltip(default_priority_label, "QUEUE_PRIORITY")
                         self.default_priority_combo = dpg.add_combo(
                             items=["High", "Normal", "Low"],
                             default_value=self.settings["default_queue_priority"],
                             width=130,
                         )
+                        add_help_tooltip(self.default_priority_combo, "QUEUE_PRIORITY")
                     self.auto_resume_checkbox = dpg.add_checkbox(
                         label="Resume torrents that were active when SalixTorrent closed",
                         default_value=bool(self.settings["auto_resume_active"]),
                     )
+                    add_help_tooltip(self.auto_resume_checkbox, "AUTO_RESUME")
 
                 with dpg.child_window(width=-1, height=225, border=True):
                     dpg.add_text("GLOBAL BANDWIDTH", color=(255, 170, 100))
                     dpg.add_separator()
-                    dpg.add_text(
+                    global_bandwidth_note = dpg.add_text(
                         "Aggregate limit shared by every active torrent. 0 = Unlimited.",
                         color=(150, 150, 150),
                     )
+                    add_help_tooltip(global_bandwidth_note, "GLOBAL_BANDWIDTH")
                     with dpg.group(horizontal=True):
                         dpg.add_text("Download")
                         self.global_download_limit_input = dpg.add_input_float(
@@ -175,6 +198,8 @@ class SettingsView:
                             default_value=self.settings["global_download_limit_unit"],
                             width=90,
                         )
+                        add_help_tooltip(self.global_download_limit_input, "GLOBAL_BANDWIDTH")
+                        add_help_tooltip(self.global_download_limit_unit, "GLOBAL_BANDWIDTH")
                     with dpg.group(horizontal=True):
                         dpg.add_text("Upload   ")
                         self.global_upload_limit_input = dpg.add_input_float(
@@ -189,13 +214,16 @@ class SettingsView:
                             default_value=self.settings["global_upload_limit_unit"],
                             width=90,
                         )
+                        add_help_tooltip(self.global_upload_limit_input, "GLOBAL_BANDWIDTH")
+                        add_help_tooltip(self.global_upload_limit_unit, "GLOBAL_BANDWIDTH")
 
             dpg.add_spacer(height=7)
             with dpg.group(horizontal=True):
                 with dpg.child_window(width=530, height=205, border=True):
                     dpg.add_text("NEW TORRENT DEFAULTS", color=(100, 180, 255))
                     dpg.add_separator()
-                    dpg.add_text("Per-torrent limits assigned when a torrent is added.")
+                    new_torrent_defaults_note = dpg.add_text("Per-torrent limits assigned when a torrent is added.")
+                    add_help_tooltip(new_torrent_defaults_note, "NEW_TORRENT_LIMITS")
                     with dpg.group(horizontal=True):
                         dpg.add_text("Download")
                         self.download_limit_input = dpg.add_input_float(
@@ -210,6 +238,8 @@ class SettingsView:
                             default_value=self.settings["default_download_limit_unit"],
                             width=90,
                         )
+                        add_help_tooltip(self.download_limit_input, "NEW_TORRENT_LIMITS")
+                        add_help_tooltip(self.download_limit_unit, "NEW_TORRENT_LIMITS")
                     with dpg.group(horizontal=True):
                         dpg.add_text("Upload   ")
                         self.upload_limit_input = dpg.add_input_float(
@@ -224,6 +254,8 @@ class SettingsView:
                             default_value=self.settings["default_upload_limit_unit"],
                             width=90,
                         )
+                        add_help_tooltip(self.upload_limit_input, "NEW_TORRENT_LIMITS")
+                        add_help_tooltip(self.upload_limit_unit, "NEW_TORRENT_LIMITS")
 
                 with dpg.child_window(width=-1, height=225, border=True):
                     dpg.add_text("DESKTOP", color=(0, 255, 128))
@@ -241,18 +273,22 @@ class SettingsView:
                         label="Show in-app completion notices",
                         default_value=bool(self.settings["completion_notifications"]),
                     )
+                    add_help_tooltip(self.completion_notifications_checkbox, "COMPLETION_NOTICE")
                     self.native_notifications_checkbox = dpg.add_checkbox(
                         label="Show native Windows completion notifications (uses tray API)",
                         default_value=bool(self.settings["native_notifications"]),
                     )
+                    add_help_tooltip(self.native_notifications_checkbox, "NATIVE_NOTIFICATION")
                     self.system_tray_checkbox = dpg.add_checkbox(
                         label="Enable system tray icon / controls",
                         default_value=bool(self.settings["system_tray_enabled"]),
                     )
+                    add_help_tooltip(self.system_tray_checkbox, "SYSTEM_TRAY")
                     self.minimize_to_tray_checkbox = dpg.add_checkbox(
                         label="Minimize to system tray",
                         default_value=bool(self.settings["minimize_to_tray"]),
                     )
+                    add_help_tooltip(self.minimize_to_tray_checkbox, "MINIMIZE_TRAY")
                     if not self.desktop.supported:
                         dpg.add_text(
                             "Native tray/notification backend is currently available on Windows.",
@@ -261,15 +297,18 @@ class SettingsView:
 
             dpg.add_spacer(height=10)
             with dpg.group(horizontal=True):
-                dpg.add_button(label=" Save Preferences ", callback=self._save)
-                dpg.add_button(label=" Restore Defaults ", callback=self._restore_defaults)
+                save_preferences_button = dpg.add_button(label=" Save Preferences ", callback=self._save)
+                add_text_tooltip(save_preferences_button, "Save Preferences\n\nValidates, persists and applies the values shown on this page. Networking toggles and global limits can affect active sessions immediately.")
+                restore_defaults_button = dpg.add_button(label=" Restore Defaults ", callback=self._restore_defaults)
+                add_text_tooltip(restore_defaults_button, "Restore Defaults\n\nReplaces the current application preferences with SalixTorrent's built-in defaults and applies them. This does not delete torrents or payload data.")
                 self.status_text = dpg.add_text("", color=(0, 255, 128))
 
             dpg.add_spacer(height=7)
-            dpg.add_text(
+            settings_path_text = dpg.add_text(
                 f"Settings file: {self.manager.settings_path}",
                 color=(130, 130, 135),
             )
+            add_help_tooltip(settings_path_text, "SETTINGS_FILE")
 
     def _choose_download_dir(self):
         root = tk.Tk()
@@ -427,3 +466,5 @@ class SettingsView:
         if now - self._last_connectivity_refresh >= 1.0:
             self._last_connectivity_refresh = now
             self._render_connectivity()
+
+

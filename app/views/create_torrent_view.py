@@ -17,6 +17,7 @@ from app.logic.torrent_creator import (
 )
 from app.logic.torrent_file import FALLBACK_TRACKERS
 from app.logic.torrent_manager import TorrentManager
+from app.views.help_terms import add_help_tooltip, add_text_tooltip
 
 
 class CreateTorrentView:
@@ -51,11 +52,13 @@ class CreateTorrentView:
 
     def build_view(self, parent_tag: str | int = "primary_window"):
         with dpg.group(parent=parent_tag):
-            dpg.add_text("CREATE TORRENT", color=(0, 255, 128))
-            dpg.add_text(
+            create_heading = dpg.add_text("CREATE TORRENT", color=(0, 255, 128))
+            add_help_tooltip(create_heading, "CREATE_TORRENT")
+            create_intro = dpg.add_text(
                 "Create a shareable BitTorrent v1 .torrent from a file, archive, or folder.",
                 color=(170, 170, 170),
             )
+            add_help_tooltip(create_intro, "CREATE_TORRENT")
             dpg.add_spacer(height=8)
 
             with dpg.child_window(height=155, border=True):
@@ -66,16 +69,23 @@ class CreateTorrentView:
                         label=" Select File / Archive ",
                         callback=self._select_file_source,
                     )
+                    add_help_tooltip(self.select_file_button, "TORRENT_SOURCE_FILE")
                     self.select_folder_button = dpg.add_button(
                         label=" Select Folder ",
                         callback=self._select_folder_source,
                     )
+                    add_help_tooltip(self.select_folder_button, "TORRENT_SOURCE_FOLDER")
                 self.source_text = dpg.add_text("No source selected", wrap=1000)
+                add_text_tooltip(
+                    self.source_text,
+                    "Selected source path\n\nThis is the file or folder whose bytes will be hashed into the new torrent. Torrent creation reads this source; it does not modify or move it.",
+                )
                 self.source_summary = dpg.add_text(
                     "Files such as .zip, .7z and .iso are normal single-file torrents.",
                     color=(160, 160, 160),
                     wrap=1000,
                 )
+                add_text_tooltip(self.source_summary, "Source summary\n\nDescribes whether the current source will become a single-file or multi-file torrent and, when known, its payload size. The source itself remains untouched during torrent creation.")
 
             dpg.add_spacer(height=8)
 
@@ -87,40 +97,48 @@ class CreateTorrentView:
                         label=" Choose Save Location ",
                         callback=self._choose_output,
                     )
+                    add_help_tooltip(self.choose_output_button, "TORRENT_OUTPUT")
                     self.output_text = dpg.add_text("No output selected", wrap=830)
+                    add_help_tooltip(self.output_text, "TORRENT_OUTPUT")
 
                 with dpg.group(horizontal=True):
-                    dpg.add_text("Piece Size")
+                    piece_size_label = dpg.add_text("Piece Size")
+                    add_help_tooltip(piece_size_label, "PIECE_SIZE")
                     self.piece_size_combo = dpg.add_combo(
                         items=list(self.PIECE_SIZE_OPTIONS.keys()),
                         default_value="Auto",
                         width=130,
                     )
+                    add_help_tooltip(self.piece_size_combo, "PIECE_SIZE")
                     self.private_checkbox = dpg.add_checkbox(
                         label="Private torrent",
                         default_value=False,
                     )
+                    add_help_tooltip(self.private_checkbox, "PRIVATE_TORRENT")
 
                 self.comment_input = dpg.add_input_text(
                     label="Comment",
                     hint="Optional comment stored in the .torrent metadata",
                     width=-1,
                 )
+                add_help_tooltip(self.comment_input, "TORRENT_COMMENT")
 
             dpg.add_spacer(height=8)
 
             with dpg.child_window(height=175, border=True):
                 dpg.add_text("TRACKERS", color=(255, 200, 100))
-                dpg.add_text(
+                trackers_note = dpg.add_text(
                     "One tracker URL per line. Blank lines and lines beginning with # are ignored.",
                     color=(160, 160, 160),
                 )
+                add_help_tooltip(trackers_note, "TRACKER_LIST")
                 self.trackers_input = dpg.add_input_text(
                     multiline=True,
                     width=-1,
                     height=105,
                     default_value="\n".join(FALLBACK_TRACKERS),
                 )
+                add_help_tooltip(self.trackers_input, "TRACKER_LIST")
 
             dpg.add_spacer(height=8)
 
@@ -132,18 +150,26 @@ class CreateTorrentView:
                     width=-1,
                     height=22,
                 )
+                add_help_tooltip(self.progress_bar, "CREATION_PROGRESS")
                 self.status_text = dpg.add_text("Ready")
+                add_help_tooltip(self.status_text, "CREATION_PROGRESS")
                 self.detail_text = dpg.add_text("", wrap=1000)
+                add_help_tooltip(self.detail_text, "CREATION_PROGRESS")
 
                 with dpg.group(horizontal=True):
                     self.create_button = dpg.add_button(
                         label=" Create Torrent ",
                         callback=self._start_creation,
                     )
+                    add_help_tooltip(self.create_button, "CREATE_TORRENT")
                     self.cancel_button = dpg.add_button(
                         label=" Cancel ",
                         callback=self._cancel_creation,
                         enabled=False,
+                    )
+                    add_text_tooltip(
+                        self.cancel_button,
+                        "Cancel torrent creation\n\nRequests cancellation of the background hashing job. SalixTorrent does not replace the chosen output with a half-written .torrent file.",
                     )
                     self.start_seeding_button = dpg.add_button(
                         label=" Start Seeding ",
@@ -151,6 +177,7 @@ class CreateTorrentView:
                         enabled=False,
                         show=False,
                     )
+                    add_help_tooltip(self.start_seeding_button, "START_SEEDING")
 
     def _set_source(self, path: str):
         if not path:
@@ -431,5 +458,7 @@ class CreateTorrentView:
                 dpg.set_value(self.status_text, "Creation failed")
                 dpg.set_value(self.detail_text, str(payload))
                 self._set_creation_controls_busy(False)
+
+
 
 

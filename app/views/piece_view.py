@@ -6,6 +6,8 @@ import math
 
 import dearpygui.dearpygui as dpg
 
+from app.views.help_terms import add_help_tooltip, add_text_tooltip
+
 
 class PieceView:
     """Compact torrent piece map plus a focused detailed piece table."""
@@ -34,26 +36,31 @@ class PieceView:
                 "Pieces: select a torrent to inspect piece state",
                 color=(100, 180, 255),
             )
-            dpg.add_text(
+            add_help_tooltip(self.summary_text, "PIECE")
+            map_legend = dpg.add_text(
                 "Map: Verified | Downloading | Requested | Mixed | Missing | No known source",
                 color=(150, 150, 150),
             )
+            add_help_tooltip(map_legend, "PIECE_STATE")
             self.map_info_text = dpg.add_text(
                 "Piece map waiting for torrent telemetry",
                 color=(150, 150, 150),
             )
+            add_help_tooltip(self.map_info_text, "PIECE_MAP")
             dpg.add_separator()
 
             self.map_drawlist = dpg.add_drawlist(
                 width=-1,
                 height=self.MAP_HEIGHT,
             )
+            add_help_tooltip(self.map_drawlist, "PIECE_MAP")
 
             dpg.add_separator()
-            dpg.add_text(
+            details_heading = dpg.add_text(
                 "DETAILS — active pieces and the next incomplete range",
                 color=(180, 160, 255),
             )
+            add_text_tooltip(details_heading, "Focused piece details\n\nTo keep the interface responsive on torrents with thousands of pieces, SalixTorrent shows active/requested pieces plus useful nearby incomplete context rather than continuously rendering every piece as a table row.")
 
             with dpg.table(
                 header_row=True,
@@ -65,36 +72,42 @@ class PieceView:
                 scrollY=True,
                 height=120,
             ) as self.table_id:
-                dpg.add_table_column(
+                piece_col = dpg.add_table_column(
                     label="Piece",
                     width_fixed=True,
                     init_width_or_weight=75,
                 )
-                dpg.add_table_column(
+                size_col = dpg.add_table_column(
                     label="Size",
                     width_fixed=True,
                     init_width_or_weight=85,
                 )
-                dpg.add_table_column(
+                progress_col = dpg.add_table_column(
                     label="Progress",
                     width_fixed=True,
                     init_width_or_weight=90,
                 )
-                dpg.add_table_column(
+                blocks_col = dpg.add_table_column(
                     label="Blocks",
                     width_stretch=True,
                     init_width_or_weight=0.28,
                 )
-                dpg.add_table_column(
+                availability_col = dpg.add_table_column(
                     label="Availability",
                     width_fixed=True,
                     init_width_or_weight=95,
                 )
-                dpg.add_table_column(
+                state_col = dpg.add_table_column(
                     label="State",
                     width_fixed=True,
                     init_width_or_weight=110,
                 )
+                add_help_tooltip(piece_col, "PIECE")
+                add_help_tooltip(size_col, "PIECE_SIZE")
+                add_text_tooltip(progress_col, "Piece progress\n\nHow much of this piece's block payload has arrived. A piece at 100% is not trusted until its SHA-1 hash passes verification.")
+                add_help_tooltip(blocks_col, "BLOCK")
+                add_help_tooltip(availability_col, "PIECE_AVAILABILITY")
+                add_help_tooltip(state_col, "PIECE_STATE")
 
     @staticmethod
     def _format_size(byte_count: int) -> str:
@@ -239,3 +252,5 @@ class PieceView:
                 dpg.add_text(str(piece.get("state", "Missing")))
 
             self._row_ids.append(row_id)
+
+
