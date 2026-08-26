@@ -758,17 +758,35 @@ def contextual_text(
 
 
 def add_text_tooltip(item, text: str, wrap: int = 450):
-    """Attach arbitrary explanatory text to a Dear PyGui item.
+    """Attach arbitrary explanatory text to a Dear PyGui item safely.
 
-    Tooltips are intentionally non-essential. If a particular Dear PyGui item
-    type/version refuses a tooltip parent, view construction must still succeed.
+    Some Dear PyGui item types (notably table columns and a few container-like
+    items) cannot own a tooltip.  Using the ``with dpg.tooltip(...)`` context
+    manager for one of those items can raise during ``__enter__`` after Dear
+    PyGui has already touched its internal container stack.  Catching that
+    exception is therefore not enough: later widgets may be parented to the
+    wrong container.
+
+    Create the tooltip and its text with explicit parent IDs instead.  Failed
+    tooltip attachment then remains non-fatal *and* cannot disturb the active
+    layout/container stack.  Tooltips are help-only, so unsupported targets are
+    intentionally skipped.
     """
     if not item or not str(text or "").strip():
         return None
+
+    tooltip_id = None
     try:
-        with dpg.tooltip(parent=item):
-            return dpg.add_text(str(text), wrap=wrap)
+        tooltip_id = dpg.add_tooltip(parent=item)
+        return dpg.add_text(str(text), parent=tooltip_id, wrap=wrap)
     except Exception:
+        # If the tooltip container itself was accepted but adding its content
+        # failed, clean it up so no empty/orphan help item is left behind.
+        try:
+            if tooltip_id and dpg.does_item_exist(tooltip_id):
+                dpg.delete_item(tooltip_id)
+        except Exception:
+            pass
         return None
 
 
@@ -791,3 +809,4 @@ def add_context_tooltip(
         contextual_text(title, body, facts=facts, footer=footer),
         wrap=wrap,
     )
+

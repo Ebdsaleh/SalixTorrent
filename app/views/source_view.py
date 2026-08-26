@@ -73,7 +73,6 @@ class SourceView:
                 "Sources: select a torrent to inspect peer discovery",
                 color=(100, 180, 255),
             )
-            add_help_tooltip(self.summary_text, "DISCOVERY")
             self.note_text = dpg.add_text(
                 "Tracker / DHT / PEX / LAN discovery telemetry. "
                 "Waiting = source available but no result yet.",
@@ -92,54 +91,46 @@ class SourceView:
                 scrollY=True,
                 height=235,
             ) as self.table_id:
-                source_col = dpg.add_table_column(
+                dpg.add_table_column(
                     label="Source",
                     width_stretch=True,
                     init_width_or_weight=0.38,
                 )
-                type_col = dpg.add_table_column(
+                dpg.add_table_column(
                     label="Type",
                     width_fixed=True,
                     init_width_or_weight=65,
                 )
-                status_col = dpg.add_table_column(
+                dpg.add_table_column(
                     label="Status",
                     width_fixed=True,
                     init_width_or_weight=95,
                 )
-                peers_col = dpg.add_table_column(
+                dpg.add_table_column(
                     label="Peers",
                     width_fixed=True,
                     init_width_or_weight=65,
                 )
-                swarm_col = dpg.add_table_column(
+                dpg.add_table_column(
                     label="Swarm S/L",
                     width_fixed=True,
                     init_width_or_weight=95,
                 )
-                response_col = dpg.add_table_column(
+                dpg.add_table_column(
                     label="Response",
                     width_fixed=True,
                     init_width_or_weight=90,
                 )
-                update_col = dpg.add_table_column(
+                dpg.add_table_column(
                     label="Last Update",
                     width_fixed=True,
                     init_width_or_weight=90,
                 )
-                detail_col = dpg.add_table_column(
+                dpg.add_table_column(
                     label="Detail",
                     width_stretch=True,
                     init_width_or_weight=0.22,
                 )
-                add_help_tooltip(source_col, "DISCOVERY")
-                add_text_tooltip(type_col, "Discovery type\n\nThe protocol family used by this row: HTTP/HTTPS/UDP tracker, DHT, PEX or LAN Local Peer Discovery.")
-                add_text_tooltip(status_col, "Discovery status\n\nWhether this exact source is active, waiting, announcing, returning no peers, timing out, disabled, unsupported or reporting an error.")
-                add_help_tooltip(peers_col, "SOURCE_PEERS")
-                add_help_tooltip(swarm_col, "SWARM_SL")
-                add_help_tooltip(response_col, "SOURCE_RESPONSE")
-                add_help_tooltip(update_col, "SOURCE_LAST_UPDATE")
-                add_help_tooltip(detail_col, "SOURCE_DETAIL")
 
     @staticmethod
     def _format_age(seconds) -> str:
@@ -470,5 +461,3 @@ class SourceView:
                 add_help_tooltip(detail_item, "SOURCE_DETAIL")
 
             self._row_ids.append(row_id)
-
-
