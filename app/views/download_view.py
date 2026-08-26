@@ -18,6 +18,13 @@ from app.views.piece_view import PieceView
 from app.views.file_view import FileView
 from app.views.source_view import SourceView
 from app.views.speed_view import SpeedView
+from app.views.help_terms import add_help_tooltip
+from app.views.transfer_rate import (
+    TRANSFER_RATE_UNITS,
+    format_transfer_rate,
+    format_transfer_rate_pair,
+    normalize_transfer_rate_unit,
+)
 
 
 class DownloadView:
@@ -76,6 +83,11 @@ class DownloadView:
         self.file_view = FileView()
         self.source_view = SourceView()
         self.speed_view = SpeedView()
+        self._transfer_rate_unit = normalize_transfer_rate_unit(
+            self.manager.get_transfer_rate_display_unit()
+        )
+        self.peer_view.set_rate_unit(self._transfer_rate_unit)
+        self.speed_view.set_rate_unit(self._transfer_rate_unit)
         self._queue_slots_value = self.manager.get_max_active_downloads()
 
         # Only the currently visible detail tab is rendered. Previously every
@@ -177,7 +189,7 @@ class DownloadView:
                         label="Status", width_fixed=True, init_width_or_weight=150
                     )
                     speed_col = dpg.add_table_column(
-                        label="Down / Up", width_fixed=True, init_width_or_weight=135
+                        label="Down / Up", width_fixed=True, init_width_or_weight=190
                     )
                     self._sort_column_ids = {
                         name_col: "name",
@@ -224,12 +236,16 @@ class DownloadView:
                             dpg.add_separator()
                             self.speed_text = dpg.add_text("Download Speed: 0.0 KB/s")
                             self.upload_speed_text = dpg.add_text("Upload Speed: 0.0 KB/s")
+                            add_help_tooltip(self.speed_text, "TRANSFER_RATE")
+                            add_help_tooltip(self.upload_speed_text, "TRANSFER_RATE")
                             self.downloaded_text = dpg.add_text("Downloaded: 0 B / 0 B")
                             self.remaining_text = dpg.add_text("Remaining: 0 B")
                             self.uploaded_text = dpg.add_text("Uploaded: 0 B")
                             self.eta_text = dpg.add_text("ETA: --")
+                            add_help_tooltip(self.eta_text, "ETA")
                             self.elapsed_text = dpg.add_text("Elapsed: 00:00")
                             self.ratio_text = dpg.add_text("Share Ratio: --")
+                            add_help_tooltip(self.ratio_text, "SHARE_RATIO")
                             self.peers_text = dpg.add_text("Connected Peers: 0")
                             self.error_text = dpg.add_text("", color=(255, 105, 105), wrap=390)
                             self.retry_button = dpg.add_button(
@@ -244,13 +260,19 @@ class DownloadView:
                             self.state_text = dpg.add_text("Session State: Idle")
                             self.client_id_text = dpg.add_text("Client ID: Salix_T 1.0")
                             self.seed_leech_text = dpg.add_text("Seeds / Leechers: -- / --")
+                            add_help_tooltip(self.seed_leech_text, "SEEDS_LEECHERS")
                             self.availability_text = dpg.add_text("Availability: --")
+                            add_help_tooltip(self.availability_text, "AVAILABILITY")
                             self.discovery_text = dpg.add_text("Discovery: --")
+                            add_help_tooltip(self.discovery_text, "DISCOVERY")
                             self.listen_port_text = dpg.add_text("Listen Port: --")
+                            add_help_tooltip(self.listen_port_text, "LISTEN_PORT")
                             self.connectivity_text = dpg.add_text("Incoming: --")
+                            add_help_tooltip(self.connectivity_text, "PORT_MAPPING")
                             self.external_port_text = dpg.add_text("External: --")
                             self.storage_text = dpg.add_text("Storage: Downloads")
                             self.lpd_text = dpg.add_text("LAN Discovery: --")
+                            add_help_tooltip(self.lpd_text, "LPD")
                             self.health_text = dpg.add_text("Swarm Health: --")
 
                             dpg.add_spacer(height=5)
@@ -301,9 +323,12 @@ class DownloadView:
                             dpg.add_text("TORRENT INFO", color=(0, 255, 128))
                             dpg.add_separator()
                             self.info_hash_text = dpg.add_text("Info Hash: --", wrap=500)
+                            add_help_tooltip(self.info_hash_text, "INFO_HASH")
                             self.piece_info_text = dpg.add_text("Pieces: --")
+                            add_help_tooltip(self.piece_info_text, "PIECE")
                             self.file_info_text = dpg.add_text("Files: --")
                             self.private_text = dpg.add_text("Private: --")
+                            add_help_tooltip(self.private_text, "PRIVATE_TORRENT")
                             self.created_by_text = dpg.add_text("Created By: --", wrap=500)
                             self.created_date_text = dpg.add_text("Created: --")
                             self.comment_text = dpg.add_text("Comment: --", wrap=500)
@@ -1049,6 +1074,23 @@ class DownloadView:
                 callback=lambda s, a, u: self._context_set_priority(u, "Low"),
             )
 
+            with dpg.menu(label="Transfer Rate Units"):
+                rate_items = {}
+                rate_labels = {
+                    "Auto": "Automatic",
+                    "KB/s": "KB/s — Kilobytes per second",
+                    "MB/s": "MB/s — Megabytes per second",
+                    "kbps": "kbps — Kilobits per second",
+                    "Mbps": "Mbps — Megabits per second",
+                }
+                for unit in TRANSFER_RATE_UNITS:
+                    rate_items[unit] = dpg.add_menu_item(
+                        label=rate_labels[unit],
+                        check=True,
+                        user_data=unit,
+                        callback=lambda s, a, u: self._context_set_transfer_rate_unit(u),
+                    )
+
             dpg.add_separator()
 
             start_item = dpg.add_menu_item(
@@ -1144,6 +1186,7 @@ class DownloadView:
             "priority_high": priority_high_item,
             "priority_normal": priority_normal_item,
             "priority_low": priority_low_item,
+            "rate_items": rate_items,
             "start": start_item,
             "pause": pause_item,
             "resume": resume_item,
@@ -1167,6 +1210,44 @@ class DownloadView:
     def _context_set_priority(self, info_hash: str, priority: str):
         self._select_torrent(info_hash)
         self.manager.set_torrent_priority(info_hash, priority)
+
+    def _context_set_transfer_rate_unit(self, unit: str):
+        self._set_transfer_rate_unit(unit, persist=True)
+
+    def _set_transfer_rate_unit(self, unit: object, persist: bool = False):
+        normalized = normalize_transfer_rate_unit(unit)
+        if persist:
+            normalized = self.manager.set_transfer_rate_display_unit(normalized)
+
+        if normalized == self._transfer_rate_unit:
+            self._refresh_context_menu_states()
+            return
+
+        self._transfer_rate_unit = normalized
+        self.peer_view.set_rate_unit(normalized)
+        self.speed_view.set_rate_unit(normalized)
+
+        # This setting changes presentation only. Reformat cached rows locally
+        # without touching torrent sessions, peer workers or bandwidth limits.
+        for info_hash, row in self.torrent_rows.items():
+            stats = self.latest_stats.get(info_hash, {})
+            if not stats:
+                continue
+            dpg.set_value(
+                row["speed"],
+                format_transfer_rate_pair(
+                    stats.get("speed_kbps", 0.0),
+                    stats.get("upload_speed_kbps", 0.0),
+                    normalized,
+                ),
+            )
+
+        if self.active_info_hash in self.latest_stats:
+            self._render_inspector(
+                self.latest_stats[self.active_info_hash],
+                force_detail=self._active_detail_tab == "Speed",
+            )
+        self._refresh_context_menu_states()
 
     def _context_start(self, info_hash: str):
         self._select_torrent(info_hash)
@@ -1350,6 +1431,8 @@ class DownloadView:
         dpg.configure_item(menu["priority_high"], enabled=queue_priority != "High")
         dpg.configure_item(menu["priority_normal"], enabled=queue_priority != "Normal")
         dpg.configure_item(menu["priority_low"], enabled=queue_priority != "Low")
+        for unit, item in menu.get("rate_items", {}).items():
+            dpg.set_value(item, unit == self._transfer_rate_unit)
         dpg.configure_item(menu["start"], enabled=can_start and state != "Error")
         dpg.configure_item(menu["pause"], enabled=can_pause)
         dpg.configure_item(menu["resume"], enabled=can_resume)
@@ -1375,8 +1458,14 @@ class DownloadView:
         dpg.set_value(self.status_text, "Status: Idle")
         dpg.set_value(self.progress_bar, 0.0)
         dpg.set_value(self.progress_label, "0.0% Complete (0 / 0 Pieces)")
-        dpg.set_value(self.speed_text, "Download Speed: 0.0 KB/s")
-        dpg.set_value(self.upload_speed_text, "Upload Speed: 0.0 KB/s")
+        dpg.set_value(
+            self.speed_text,
+            f"Download Speed: {format_transfer_rate(0.0, self._transfer_rate_unit)}",
+        )
+        dpg.set_value(
+            self.upload_speed_text,
+            f"Upload Speed: {format_transfer_rate(0.0, self._transfer_rate_unit)}",
+        )
         dpg.set_value(self.downloaded_text, "Downloaded: 0 B / 0 B")
         dpg.set_value(self.remaining_text, "Remaining: 0 B")
         dpg.set_value(self.uploaded_text, "Uploaded: 0 B")
@@ -1497,7 +1586,11 @@ class DownloadView:
         prog_str = f"{msg['progress'] * 100:.1f}%"
         down_kbps = msg.get("speed_kbps", 0.0)
         up_kbps = msg.get("upload_speed_kbps", 0.0)
-        speed_str = f"{down_kbps:.1f} / {up_kbps:.1f} KB/s"
+        speed_str = format_transfer_rate_pair(
+            down_kbps,
+            up_kbps,
+            self._transfer_rate_unit,
+        )
         state_label = msg.get("state_label", msg["state"])
 
         if h not in self.torrent_rows:
@@ -1622,11 +1715,19 @@ class DownloadView:
 
         dpg.set_value(
             self.speed_text,
-            f"Download Speed: {msg.get('speed_kbps', 0.0):,.1f} KB/s",
+            "Download Speed: "
+            + format_transfer_rate(
+                msg.get("speed_kbps", 0.0),
+                self._transfer_rate_unit,
+            ),
         )
         dpg.set_value(
             self.upload_speed_text,
-            f"Upload Speed: {msg.get('upload_speed_kbps', 0.0):,.1f} KB/s",
+            "Upload Speed: "
+            + format_transfer_rate(
+                msg.get("upload_speed_kbps", 0.0),
+                self._transfer_rate_unit,
+            ),
         )
         dpg.set_value(
             self.downloaded_text,
@@ -1777,6 +1878,15 @@ class DownloadView:
 
     def update(self, delta_time: float):
         del delta_time
+
+        # Presentation preferences can be changed from Preferences while this
+        # view is hidden. Apply them locally on return without waiting for a new
+        # network telemetry snapshot.
+        configured_rate_unit = normalize_transfer_rate_unit(
+            self.manager.get_transfer_rate_display_unit()
+        )
+        if configured_rate_unit != self._transfer_rate_unit:
+            self._set_transfer_rate_unit(configured_rate_unit, persist=False)
 
         # Keep the toolbar synchronized when queue settings are changed from
         # the Preferences view.

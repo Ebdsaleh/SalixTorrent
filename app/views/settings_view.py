@@ -9,6 +9,8 @@ import dearpygui.dearpygui as dpg
 
 from app.engine.desktop_integration import DesktopIntegration
 from app.logic.torrent_manager import TorrentManager
+from app.views.help_terms import add_help_tooltip
+from app.views.transfer_rate import TRANSFER_RATE_UNITS
 
 
 RATE_UNITS = ["KB/s", "MB/s", "kbps", "Mbps"]
@@ -50,7 +52,8 @@ class SettingsView:
                     dpg.add_text("NETWORKING", color=(255, 200, 100))
                     dpg.add_separator()
                     with dpg.group(horizontal=True):
-                        dpg.add_text("BitTorrent listen port")
+                        listen_port_label = dpg.add_text("BitTorrent listen port")
+                        add_help_tooltip(listen_port_label, "LISTEN_PORT")
                         self.listen_port_input = dpg.add_input_int(
                             default_value=int(self.settings["listen_port"]),
                             min_value=1,
@@ -76,29 +79,36 @@ class SettingsView:
                         label="Enable DHT (BEP-5)",
                         default_value=bool(self.settings["enable_dht"]),
                     )
+                    add_help_tooltip(self.enable_dht_checkbox, "DHT")
                     self.enable_pex_checkbox = dpg.add_checkbox(
                         label="Enable Peer Exchange / PEX (BEP-10/11)",
                         default_value=bool(self.settings["enable_pex"]),
                     )
+                    add_help_tooltip(self.enable_pex_checkbox, "PEX")
                     self.enable_lan_checkbox = dpg.add_checkbox(
                         label="Enable Local Peer Discovery / LAN (BEP-14)",
                         default_value=bool(self.settings["enable_lan_discovery"]),
                     )
+                    add_help_tooltip(self.enable_lan_checkbox, "LPD")
                     with dpg.group(horizontal=True):
                         self.enable_upnp_checkbox = dpg.add_checkbox(
                             label="UPnP port mapping",
                             default_value=bool(self.settings["enable_upnp"]),
                         )
+                        add_help_tooltip(self.enable_upnp_checkbox, "UPNP")
                         self.enable_natpmp_checkbox = dpg.add_checkbox(
                             label="NAT-PMP fallback",
                             default_value=bool(self.settings["enable_natpmp"]),
                         )
+                        add_help_tooltip(self.enable_natpmp_checkbox, "NATPMP")
 
                 with dpg.child_window(width=-1, height=250, border=True):
                     dpg.add_text("INCOMING CONNECTIVITY", color=(0, 255, 128))
                     dpg.add_separator()
                     self.connectivity_status = dpg.add_text("Status: Waiting")
+                    add_help_tooltip(self.connectivity_status, "PORT_MAPPING")
                     self.connectivity_method = dpg.add_text("Mapping: --")
+                    add_help_tooltip(self.connectivity_method, "PORT_MAPPING")
                     self.connectivity_local = dpg.add_text("Local: --")
                     self.connectivity_external = dpg.add_text("External: --")
                     self.connectivity_protocols = dpg.add_text("Mapped protocols: --")
@@ -215,9 +225,18 @@ class SettingsView:
                             width=90,
                         )
 
-                with dpg.child_window(width=-1, height=205, border=True):
+                with dpg.child_window(width=-1, height=225, border=True):
                     dpg.add_text("DESKTOP", color=(0, 255, 128))
                     dpg.add_separator()
+                    with dpg.group(horizontal=True):
+                        rate_display_label = dpg.add_text("Transfer rate display")
+                        self.transfer_rate_display_combo = dpg.add_combo(
+                            items=list(TRANSFER_RATE_UNITS),
+                            default_value=self.settings.get("transfer_rate_display_unit", "Auto"),
+                            width=105,
+                        )
+                        add_help_tooltip(rate_display_label, "TRANSFER_RATE")
+                        add_help_tooltip(self.transfer_rate_display_combo, "TRANSFER_RATE")
                     self.completion_notifications_checkbox = dpg.add_checkbox(
                         label="Show in-app completion notices",
                         default_value=bool(self.settings["completion_notifications"]),
@@ -275,6 +294,9 @@ class SettingsView:
             "native_notifications": bool(dpg.get_value(self.native_notifications_checkbox)),
             "system_tray_enabled": bool(dpg.get_value(self.system_tray_checkbox)),
             "minimize_to_tray": bool(dpg.get_value(self.minimize_to_tray_checkbox)),
+            "transfer_rate_display_unit": str(
+                dpg.get_value(self.transfer_rate_display_combo) or "Auto"
+            ),
             "listen_port": int(dpg.get_value(self.listen_port_input) or 6881),
             "enable_dht": bool(dpg.get_value(self.enable_dht_checkbox)),
             "enable_pex": bool(dpg.get_value(self.enable_pex_checkbox)),
@@ -303,6 +325,7 @@ class SettingsView:
             self.native_notifications_checkbox: settings["native_notifications"],
             self.system_tray_checkbox: settings["system_tray_enabled"],
             self.minimize_to_tray_checkbox: settings["minimize_to_tray"],
+            self.transfer_rate_display_combo: settings.get("transfer_rate_display_unit", "Auto"),
             self.listen_port_input: settings["listen_port"],
             self.enable_dht_checkbox: settings["enable_dht"],
             self.enable_pex_checkbox: settings["enable_pex"],

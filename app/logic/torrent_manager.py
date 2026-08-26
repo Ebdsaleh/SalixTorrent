@@ -185,6 +185,7 @@ class TorrentManager:
             "default_upload_limit_value": 0.0,
             "default_upload_limit_unit": "KB/s",
             "default_queue_priority": TORRENT_PRIORITY_NORMAL,
+            "transfer_rate_display_unit": "Auto",
         }
 
     @classmethod
@@ -247,6 +248,12 @@ class TorrentManager:
         priority = str(data.get("default_queue_priority") or TORRENT_PRIORITY_NORMAL).strip().title()
         out["default_queue_priority"] = (
             priority if priority in TORRENT_PRIORITIES else TORRENT_PRIORITY_NORMAL
+        )
+
+        valid_display_units = {"Auto", "KB/s", "MB/s", "kbps", "Mbps"}
+        display_unit = str(data.get("transfer_rate_display_unit") or "Auto").strip()
+        out["transfer_rate_display_unit"] = (
+            display_unit if display_unit in valid_display_units else "Auto"
         )
         return out
 
@@ -343,6 +350,21 @@ class TorrentManager:
 
     def completion_notifications_enabled(self) -> bool:
         return bool(self._settings.get("completion_notifications", True))
+
+    def get_transfer_rate_display_unit(self) -> str:
+        unit = str(self._settings.get("transfer_rate_display_unit") or "Auto")
+        if unit not in {"Auto", "KB/s", "MB/s", "kbps", "Mbps"}:
+            return "Auto"
+        return unit
+
+    def set_transfer_rate_display_unit(self, unit: object) -> str:
+        value = str(unit or "Auto").strip()
+        if value not in {"Auto", "KB/s", "MB/s", "kbps", "Mbps"}:
+            value = "Auto"
+        if self._settings.get("transfer_rate_display_unit") != value:
+            self._settings["transfer_rate_display_unit"] = value
+            self.save_app_settings()
+        return value
 
     @property
     def session_state_path(self) -> str:

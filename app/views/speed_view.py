@@ -4,6 +4,14 @@ from __future__ import annotations
 
 import dearpygui.dearpygui as dpg
 
+from app.views.help_terms import add_help_tooltip
+from app.views.transfer_rate import (
+    choose_plot_unit,
+    format_transfer_rate,
+    normalize_transfer_rate_unit,
+    transfer_rate_value,
+)
+
 
 class SpeedView:
     """Rolling aggregate download/upload history for the selected torrent."""
@@ -27,6 +35,7 @@ class SpeedView:
         self.download_limit_series = None
         self.upload_limit_series = None
         self._latest_snapshot = None
+        self._rate_unit = "Auto"
 
     def build_view(self, parent_tag):
         with dpg.child_window(parent=parent_tag, height=315, border=True):
@@ -35,6 +44,7 @@ class SpeedView:
                     "Speed: select a torrent to inspect transfer history",
                     color=(100, 180, 255),
                 )
+                add_help_tooltip(self.summary_text, "TRANSFER_RATE")
                 dpg.add_spacer(width=20)
                 dpg.add_text("Window", color=(160, 160, 160))
                 self.window_combo = dpg.add_combo(
@@ -95,16 +105,16 @@ class SpeedView:
                 color=(140, 140, 145),
             )
 
-    @staticmethod
-    def _format_rate(kbps: float) -> str:
-        try:
-            value = max(0.0, float(kbps or 0.0))
-        except (TypeError, ValueError):
-            value = 0.0
+    def set_rate_unit(self, unit: object):
+        normalized = normalize_transfer_rate_unit(unit)
+        if normalized == self._rate_unit:
+            return
+        self._rate_unit = normalized
+        if self._latest_snapshot:
+            self.render(self._latest_snapshot)
 
-        if value >= 1024.0:
-            return f"{value / 1024.0:,.2f} MB/s"
-        return f"{value:,.1f} KB/s"
+    def _format_rate(self, kib_per_second: object) -> str:
+        return format_transfer_rate(kib_per_second, self._rate_unit)
 
     def _window_seconds(self) -> float:
         if not self.window_combo or not dpg.does_item_exist(self.window_combo):
@@ -211,14 +221,27 @@ class SpeedView:
         # Backend samples arrive oldest -> newest. Negating age produces an
         # intuitive left-to-right timeline from -window seconds to now (0).
         x_values = [-item[0] for item in filtered]
-        download_values = [item[1] for item in filtered]
-        upload_values = [item[2] for item in filtered]
+        raw_download_values = [item[1] for item in filtered]
+        raw_upload_values = [item[2] for item in filtered]
 
+        down_limit_raw = max(0.0, float(speed_view.get("download_limit_kbps", 0.0) or 0.0))
+        up_limit_raw = max(0.0, float(speed_view.get("upload_limit_kbps", 0.0) or 0.0))
+
+        # A plot needs one consistent Y-axis unit. In Auto mode choose that unit
+        # from the largest visible sample/limit, while text readouts may still
+        # independently switch between KB/s and MB/s for readability.
+        plot_unit = choose_plot_unit(
+            raw_download_values + raw_upload_values + [down_limit_raw, up_limit_raw],
+            self._rate_unit,
+        )
+        download_values = [transfer_rate_value(v, plot_unit) for v in raw_download_values]
+        upload_values = [transfer_rate_value(v, plot_unit) for v in raw_upload_values]
+        down_limit = transfer_rate_value(down_limit_raw, plot_unit) if down_limit_raw > 0 else 0.0
+        up_limit = transfer_rate_value(up_limit_raw, plot_unit) if up_limit_raw > 0 else 0.0
+
+        dpg.configure_item(self.y_axis, label=plot_unit)
         dpg.set_value(self.download_series, [x_values, download_values])
         dpg.set_value(self.upload_series, [x_values, upload_values])
-
-        down_limit = max(0.0, float(speed_view.get("download_limit_kbps", 0.0) or 0.0))
-        up_limit = max(0.0, float(speed_view.get("upload_limit_kbps", 0.0) or 0.0))
 
         if down_limit > 0:
             dpg.set_value(
@@ -244,5 +267,6 @@ class SpeedView:
         if up_limit > 0:
             candidates.append(up_limit)
         peak = max(candidates) if candidates else 0.0
-        y_max = max(128.0, peak * 1.15)
+        minimum_scale = 0.125 if plot_unit in {"MB/s", "Mbps"} else 128.0
+        y_max = max(minimum_scale, peak * 1.15)
         dpg.set_axis_limits(self.y_axis, 0.0, y_max)

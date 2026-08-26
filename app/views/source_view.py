@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import dearpygui.dearpygui as dpg
 
+from app.views.help_terms import add_help_tooltip
+
 
 class SourceView:
     """Live peer-discovery source telemetry for the selected torrent."""
@@ -37,6 +39,7 @@ class SourceView:
                 "Waiting = source available but no result yet.",
                 color=(150, 150, 150),
             )
+            add_help_tooltip(self.note_text, "DISCOVERY")
             dpg.add_separator()
 
             with dpg.table(
@@ -219,8 +222,20 @@ class SourceView:
                 peers = 0
 
             with dpg.table_row(parent=self.table_id) as row_id:
-                dpg.add_text(str(source.get("source", "Unknown")))
-                dpg.add_text(str(source.get("type", "--")))
+                source_name = str(source.get("source", "Unknown"))
+                source_type = str(source.get("type", "--"))
+                source_name_item = dpg.add_text(source_name)
+                source_type_item = dpg.add_text(source_type)
+                term = {
+                    "DHT": "DHT",
+                    "PEX": "PEX",
+                    "LAN": "LPD",
+                    "HTTP": "TRACKER",
+                    "UDP": "TRACKER",
+                }.get(source_type)
+                if term:
+                    add_help_tooltip(source_name_item, term)
+                    add_help_tooltip(source_type_item, term)
                 dpg.add_text(status, color=color)
                 dpg.add_text(str(peers))
                 dpg.add_text(self._format_swarm(source))

@@ -2,6 +2,9 @@
 
 import dearpygui.dearpygui as dpg
 
+from app.views.help_terms import add_help_tooltip
+from app.views.transfer_rate import format_transfer_rate, normalize_transfer_rate_unit
+
 
 class PeerView:
     """Detailed live peer table for the currently selected torrent."""
@@ -10,6 +13,7 @@ class PeerView:
         self.summary_text = None
         self.table_id = None
         self._row_ids = []
+        self._rate_unit = "Auto"
 
     def build_view(self, parent_tag):
         with dpg.child_window(parent=parent_tag, height=285, border=True):
@@ -17,11 +21,12 @@ class PeerView:
                 "Peers: select a torrent to inspect its connections",
                 color=(100, 180, 255),
             )
-            dpg.add_text(
+            flags_help = dpg.add_text(
                 "Flags: I = we are interested | i = peer interested | "
                 "C = peer chokes us | c = we choke peer",
                 color=(150, 150, 150),
             )
+            add_help_tooltip(flags_help, "PEER_FLAGS")
             dpg.add_separator()
 
             with dpg.table(
@@ -98,6 +103,9 @@ class PeerView:
             return f"{hours:d}:{minutes:02d}:{secs:02d}"
         return f"{minutes:02d}:{secs:02d}"
 
+    def set_rate_unit(self, unit: object):
+        self._rate_unit = normalize_transfer_rate_unit(unit)
+
     @staticmethod
     def _format_progress(value) -> str:
         if value is None:
@@ -148,15 +156,32 @@ class PeerView:
             with dpg.table_row(parent=self.table_id) as row_id:
                 dpg.add_text(str(peer.get("address", "?")))
                 dpg.add_text(str(peer.get("client", "Unknown")))
-                dpg.add_text(str(peer.get("source", "Unknown")))
+                source_name = str(peer.get("source", "Unknown"))
+                source_item = dpg.add_text(source_name)
+                source_term = {
+                    "Tracker": "TRACKER",
+                    "DHT": "DHT",
+                    "PEX": "PEX",
+                    "LAN": "LPD",
+                }.get(source_name)
+                if source_term:
+                    add_help_tooltip(source_item, source_term)
                 dpg.add_text(str(peer.get("direction", "--")))
                 dpg.add_text(self._format_progress(peer.get("progress")))
-                dpg.add_text(
-                    f"{float(peer.get('download_speed_kbps', 0.0) or 0.0):,.1f} KB/s"
+                down_item = dpg.add_text(
+                    format_transfer_rate(
+                        peer.get("download_speed_kbps", 0.0),
+                        self._rate_unit,
+                    )
                 )
-                dpg.add_text(
-                    f"{float(peer.get('upload_speed_kbps', 0.0) or 0.0):,.1f} KB/s"
+                up_item = dpg.add_text(
+                    format_transfer_rate(
+                        peer.get("upload_speed_kbps", 0.0),
+                        self._rate_unit,
+                    )
                 )
+                add_help_tooltip(down_item, "TRANSFER_RATE")
+                add_help_tooltip(up_item, "TRANSFER_RATE")
                 dpg.add_text(str(peer.get("state", "Connected")))
                 dpg.add_text(str(peer.get("flags", "--")))
                 dpg.add_text(self._format_age(peer.get("connected_seconds", 0.0)))
