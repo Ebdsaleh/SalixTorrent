@@ -9,6 +9,7 @@ from app.views.application_menu import ApplicationMenu
 from app.views.create_torrent_view import CreateTorrentView
 from app.views.download_view import DownloadView
 from app.views.settings_view import SettingsView
+from app.views.help_topics_view import HelpTopicsView
 from app.views.help_terms import add_help_tooltip, add_text_tooltip
 
 
@@ -25,12 +26,14 @@ class MasterViewport:
         download_view = DownloadView(ui_queue=self.ui_queue)
         create_torrent_view = CreateTorrentView()
         settings_view = SettingsView()
+        help_topics_view = HelpTopicsView()
 
         self.application_menu = ApplicationMenu(
             gui=self.gui,
             download_view=download_view,
             create_torrent_view=create_torrent_view,
             settings_view=settings_view,
+            help_topics_view=help_topics_view,
         )
 
         with dpg.window(tag="primary_window", no_title_bar=True, no_resize=True):
@@ -82,6 +85,10 @@ class MasterViewport:
                 settings_view.build_view(parent_tag="view_container_SettingsView")
                 self.gui.scene_mgr.register_scene("SettingsView", settings_view)
 
+            with dpg.group(tag="view_container_HelpTopicsView"):
+                help_topics_view.build_view(parent_tag="view_container_HelpTopicsView")
+                self.gui.scene_mgr.register_scene("HelpTopicsView", help_topics_view)
+
         # Help/diagnostic windows and global key handlers are created only
         # after the view tree is complete.
         self.application_menu.finish_build()
@@ -93,5 +100,3 @@ class MasterViewport:
 
     def run(self):
         self.gui.run()
-
-

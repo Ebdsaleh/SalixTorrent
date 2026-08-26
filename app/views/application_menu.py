@@ -32,12 +32,13 @@ class ApplicationMenu:
     APP_VERSION = "0.1.0"
     _STATE_REFRESH_INTERVAL = 0.20
 
-    def __init__(self, gui, download_view, create_torrent_view, settings_view):
+    def __init__(self, gui, download_view, create_torrent_view, settings_view, help_topics_view):
         self.gui = gui
         self.manager = TorrentManager.get_instance()
         self.download_view = download_view
         self.create_torrent_view = create_torrent_view
         self.settings_view = settings_view
+        self.help_topics_view = help_topics_view
 
         self._last_state_signature = None
         self._last_state_refresh = 0.0
@@ -263,9 +264,26 @@ class ApplicationMenu:
 
     def _build_help_menu(self):
         with dpg.menu(label="Help"):
+            help_topics_item = dpg.add_menu_item(
+                label="Help Topics...",
+                shortcut="F1",
+                callback=self._show_help_topics,
+            )
+            add_text_tooltip(
+                help_topics_item,
+                "Help Topics\n\nOpens SalixTorrent's built-in CHM-style manual: subjects on the left, detailed explanations on the right, searchable contents, and an A–Z glossary generated from the same definitions used by hover tooltips.",
+            )
+            glossary_item = dpg.add_menu_item(
+                label="Glossary A-Z...",
+                callback=self._show_glossary,
+            )
+            add_text_tooltip(
+                glossary_item,
+                "Glossary A-Z\n\nJumps directly to the alphabetized technical glossary inside Help Topics.",
+            )
+            dpg.add_separator()
             dpg.add_menu_item(
                 label="Keyboard Shortcuts",
-                shortcut="F1",
                 callback=self._show_shortcuts,
             )
             diagnostics_item = dpg.add_menu_item(
@@ -295,7 +313,7 @@ class ApplicationMenu:
             dpg.add_key_press_handler(key=dpg.mvKey_1, callback=lambda: self._ctrl_action(lambda: self._switch_scene("DownloadView")))
             dpg.add_key_press_handler(key=dpg.mvKey_2, callback=lambda: self._ctrl_action(lambda: self._switch_scene("CreateTorrentView")))
             dpg.add_key_press_handler(key=dpg.mvKey_3, callback=lambda: self._ctrl_action(lambda: self._switch_scene("SettingsView")))
-            dpg.add_key_press_handler(key=dpg.mvKey_F1, callback=lambda: self._show_shortcuts())
+            dpg.add_key_press_handler(key=dpg.mvKey_F1, callback=lambda: self._show_help_topics())
 
     @staticmethod
     def _ctrl_down() -> bool:
@@ -396,6 +414,14 @@ class ApplicationMenu:
 
     def _switch_scene(self, scene_name: str):
         self.gui.switch_scene(scene_name)
+        self.update(force=True)
+
+    def _show_help_topics(self):
+        self.gui.switch_scene("HelpTopicsView")
+        self.update(force=True)
+
+    def _show_glossary(self):
+        self.gui.switch_scene("HelpTopicsView", glossary=True)
         self.update(force=True)
 
     def _open_torrent(self):
@@ -568,7 +594,7 @@ class ApplicationMenu:
                 "Ctrl+1    Active Transfers\n"
                 "Ctrl+2    Create Torrent\n"
                 "Ctrl+3    Preferences\n"
-                "F1        Keyboard shortcuts",
+                "F1        Help Topics",
             )
             dpg.add_spacer(height=8)
             dpg.add_text(
@@ -716,5 +742,3 @@ class ApplicationMenu:
             dpg.set_clipboard_text(self._diagnostics_string())
         except Exception:
             pass
-
-
