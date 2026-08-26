@@ -278,19 +278,19 @@ HELP_TOPICS: Tuple[HelpTopic, ...] = (
         ),
         sections=(
             (
-                "DHT — Distributed Hash Table",
+                "DHT - Distributed Hash Table",
                 "BEP-5 DHT is a decentralized peer-discovery network. SalixTorrent queries DHT "
                 "nodes for endpoints associated with the torrent's info hash and can announce its "
                 "own listening endpoint when appropriate.",
             ),
             (
-                "PEX — Peer Exchange",
+                "PEX - Peer Exchange",
                 "BEP-10 extension negotiation allows connected peers to advertise BEP-11 ut_pex. "
                 "Those peers can then introduce SalixTorrent to additional swarm participants. "
                 "PEX grows the peer pool from knowledge already inside the swarm.",
             ),
             (
-                "LPD — Local Peer Discovery",
+                "LPD - Local Peer Discovery",
                 "BEP-14 Local Peer Discovery uses multicast on the local network. It is useful when "
                 "two machines behind the same router participate in the same torrent and can often "
                 "connect directly without relying on Internet discovery.",
@@ -525,10 +525,10 @@ HELP_TOPICS: Tuple[HelpTopic, ...] = (
     ),
     HelpTopic(
         key="glossary",
-        title="Glossary A–Z",
+        title="Glossary A-Z",
         summary=(
             "An alphabetized index of the technical terms used throughout SalixTorrent. Select the "
-            "Glossary A–Z tab on the left to browse individual definitions."
+            "Glossary A-Z tab on the left to browse individual definitions."
         ),
         sections=(
             (
@@ -539,7 +539,7 @@ HELP_TOPICS: Tuple[HelpTopic, ...] = (
             ),
             (
                 "Using the index",
-                "Choose Glossary A–Z in the left panel, then select any term to read its full "
+                "Choose Glossary A-Z in the left panel, then select any term to read its full "
                 "definition on the right. The search field filters both help topics and glossary "
                 "entries, so acronyms such as DHT, PEX, LPD, UPnP and NAT-PMP are easy to locate.",
             ),
@@ -619,9 +619,9 @@ class HelpTopicsView:
         self.search_status = dpg.add_text("", color=(140, 180, 220), parent=search_row)
         add_text_tooltip(
             self.search_input,
-            "Help search\n\nFilters both the subject list and the A–Z glossary. Search by full words, acronyms such as DHT/PEX/LPD, or concepts such as port mapping, pieces, privacy or magnet links.",
+            "Help search\n\nFilters both the subject list and the A-Z glossary. Search by full words, acronyms such as DHT/PEX/LPD, or concepts such as port mapping, pieces, privacy or magnet links.",
         )
-        add_text_tooltip(clear_button, "Clear help search\n\nRestores the complete Contents and Glossary A–Z lists.")
+        add_text_tooltip(clear_button, "Clear help search\n\nRestores the complete Contents and Glossary A-Z lists.")
 
         dpg.add_separator(parent=parent_tag)
         dpg.add_spacer(height=3, parent=parent_tag)
@@ -632,7 +632,7 @@ class HelpTopicsView:
 
         self.left_tab_bar = dpg.add_tab_bar(parent=left)
         self.contents_tab = dpg.add_tab(label="Contents", parent=self.left_tab_bar)
-        self.glossary_tab = dpg.add_tab(label="Glossary A–Z", parent=self.left_tab_bar)
+        self.glossary_tab = dpg.add_tab(label="Glossary A-Z", parent=self.left_tab_bar)
 
         self._build_contents_index()
         self._build_glossary_index()
@@ -669,10 +669,10 @@ class HelpTopicsView:
         return title.casefold()
 
     def _build_glossary_index(self):
-        intro = dpg.add_text("GLOSSARY A–Z", color=(100, 180, 255), parent=self.glossary_tab)
+        intro = dpg.add_text("GLOSSARY A-Z", color=(100, 180, 255), parent=self.glossary_tab)
         add_text_tooltip(
             intro,
-            "Glossary A–Z\n\nAlphabetical index generated from the same definitions used by SalixTorrent's contextual hover help.",
+            "Glossary A-Z\n\nAlphabetical index generated from the same definitions used by SalixTorrent's contextual hover help.",
         )
         dpg.add_separator(parent=self.glossary_tab)
 
@@ -801,11 +801,11 @@ class HelpTopicsView:
         if topic.key == "glossary":
             dpg.add_spacer(height=8, parent=self.content_sections)
             button = dpg.add_button(
-                label=" Open Glossary A–Z ",
+                label=" Open Glossary A-Z ",
                 parent=self.content_sections,
                 callback=self._open_glossary_tab,
             )
-            add_text_tooltip(button, "Open Glossary A–Z\n\nSwitches the left navigator to the alphabetized glossary index.")
+            add_text_tooltip(button, "Open Glossary A-Z\n\nSwitches the left navigator to the alphabetized glossary index.")
 
     def _show_term(self, term_key: str):
         key = str(term_key or "").upper()
@@ -858,7 +858,7 @@ class HelpTopicsView:
         # Keep the right pane on the glossary overview until a term is selected.
 
     def open_glossary(self):
-        """Public helper used by menu commands to jump directly to the A–Z index."""
+        """Public helper used by menu commands to jump directly to the A-Z index."""
         self._open_glossary_tab()
         if self._current_term:
             self._show_term(self._current_term)
@@ -944,5 +944,3 @@ class HelpTopicsView:
         # compatible with GuiEngine's normal scene update loop without adding
         # background redraw work.
         return None
-
-

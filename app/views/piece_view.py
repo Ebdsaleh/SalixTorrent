@@ -57,7 +57,7 @@ class PieceView:
 
             dpg.add_separator()
             details_heading = dpg.add_text(
-                "DETAILS — active pieces and the next incomplete range",
+                "DETAILS - active pieces and the next incomplete range",
                 color=(180, 160, 255),
             )
             add_text_tooltip(details_heading, "Focused piece details\n\nTo keep the interface responsive on torrents with thousands of pieces, SalixTorrent shows active/requested pieces plus useful nearby incomplete context rather than continuously rendering every piece as a table row.")
@@ -177,7 +177,7 @@ class PieceView:
             width = 1000.0
 
         # Keep cells wide enough to remain legible. Large torrents are already
-        # bucketed by the backend, so this usually becomes a compact 6–8 row map.
+        # bucketed by the backend, so this usually becomes a compact 6-8 row map.
         columns = max(24, min(128, int(width // 7)))
         rows = max(1, math.ceil(len(cells) / columns))
         cell_width = width / columns
@@ -228,10 +228,10 @@ class PieceView:
         cell_count = len(piece_view.get("map_cells") or [])
         pieces_per_cell = int(piece_view.get("pieces_per_map_cell", 1) or 1)
         if pieces_per_cell <= 1:
-            map_info = f"Piece Map: {cell_count:,} cells — one cell per piece"
+            map_info = f"Piece Map: {cell_count:,} cells - one cell per piece"
         else:
             map_info = (
-                f"Piece Map: {cell_count:,} cells — up to {pieces_per_cell:,} pieces per cell "
+                f"Piece Map: {cell_count:,} cells - up to {pieces_per_cell:,} pieces per cell "
                 "(large torrents are compacted for performance)"
             )
         dpg.set_value(self.map_info_text, map_info)
@@ -252,5 +252,3 @@ class PieceView:
                 dpg.add_text(str(piece.get("state", "Missing")))
 
             self._row_ids.append(row_id)
-
-

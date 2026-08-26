@@ -16,67 +16,67 @@ HELP_TERMS = {
     # BitTorrent / discovery terminology
     # ------------------------------------------------------------------
     "DHT": (
-        "DHT — Distributed Hash Table",
+        "DHT - Distributed Hash Table",
         "A decentralized BitTorrent peer-discovery network. Instead of relying "
         "on one tracker server, clients ask DHT nodes for peers associated with "
         "a torrent's info hash. SalixTorrent uses BEP-5 DHT only for public "
         "torrents; private torrents deliberately disable it.",
     ),
     "PEX": (
-        "PEX — Peer Exchange",
+        "PEX - Peer Exchange",
         "A BitTorrent extension where already-connected peers introduce one "
         "another to additional peers. SalixTorrent negotiates the extension "
         "through BEP-10 and exchanges peers using BEP-11. Private torrents "
         "deliberately disable PEX.",
     ),
     "LPD": (
-        "LPD — Local Peer Discovery",
+        "LPD - Local Peer Discovery",
         "Local Peer Discovery uses multicast to find compatible BitTorrent peers "
         "on the same local network. It is useful when two computers behind the "
         "same router participate in the same torrent. It does not search the "
         "wider Internet and is disabled for private torrents.",
     ),
     "LAN": (
-        "LAN — Local Area Network",
+        "LAN - Local Area Network",
         "Your nearby private network, such as computers connected to the same "
         "home or office router. LAN peers can often exchange data directly at "
         "local-network speed without sending the payload through the Internet.",
     ),
     "UPNP": (
-        "UPnP — Universal Plug and Play",
+        "UPnP - Universal Plug and Play",
         "A router protocol SalixTorrent can use to request an automatic incoming "
         "port mapping. A successful mapping can make it easier for Internet peers "
         "to initiate connections to you. Failure is not fatal: outbound peer "
         "connections can still download and upload normally.",
     ),
     "NATPMP": (
-        "NAT-PMP — NAT Port Mapping Protocol",
+        "NAT-PMP - NAT Port Mapping Protocol",
         "A lightweight automatic router port-mapping protocol used as a fallback "
         "when UPnP is unavailable. A timeout usually means the gateway does not "
         "support NAT-PMP or does not permit clients to create mappings.",
     ),
     "BEP": (
-        "BEP — BitTorrent Enhancement Proposal",
+        "BEP - BitTorrent Enhancement Proposal",
         "A numbered specification describing a BitTorrent protocol or extension. "
         "Examples: BEP-5 defines DHT, BEP-9 defines metadata exchange used by "
         "magnet links, BEP-11 defines Peer Exchange, and BEP-14 defines Local "
         "Peer Discovery.",
     ),
     "BEP9": (
-        "BEP-9 — Extension for Peers to Send Metadata Files",
+        "BEP-9 - Extension for Peers to Send Metadata Files",
         "The protocol used to retrieve a torrent's metadata from peers when you "
         "start with only a magnet link. SalixTorrent downloads the metadata in "
         "small pieces, reconstructs it, and verifies that its SHA-1 info hash "
         "matches the magnet before accepting it.",
     ),
     "TCP": (
-        "TCP — Transmission Control Protocol",
+        "TCP - Transmission Control Protocol",
         "The reliable, connection-oriented transport used for normal BitTorrent "
         "peer-wire connections. One TCP peer connection is bidirectional: both "
         "clients can upload and download pieces over the same connection.",
     ),
     "UDP": (
-        "UDP — User Datagram Protocol",
+        "UDP - User Datagram Protocol",
         "A lightweight datagram transport used by DHT, UDP trackers, Local Peer "
         "Discovery multicast, and some automatic router-mapping protocols. UDP "
         "does not establish a reliable stream like TCP does.",
@@ -118,7 +118,7 @@ HELP_TERMS = {
         "offline, unreachable, or already-connected endpoints.",
     ),
     "SWARM_SL": (
-        "Swarm S/L — Seeds / Leechers",
+        "Swarm S/L - Seeds / Leechers",
         "Tracker-reported swarm counts. S is the number of seeds and L is the "
         "number of leechers reported by that tracker. '--' means the discovery "
         "source does not provide those figures.",
@@ -338,7 +338,7 @@ HELP_TERMS = {
         "available, and continues naturally when the torrent is seeding.",
     ),
     "ETA": (
-        "ETA — Estimated Time of Arrival",
+        "ETA - Estimated Time of Arrival",
         "An estimate of how long the currently wanted data will take to finish at "
         "the recent download rate. It changes naturally as peer availability and "
         "transfer speed change, and may be unavailable when speed is near zero.",
@@ -809,4 +809,3 @@ def add_context_tooltip(
         contextual_text(title, body, facts=facts, footer=footer),
         wrap=wrap,
     )
-

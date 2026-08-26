@@ -157,7 +157,7 @@ class PeerView:
         else:
             summary = (
                 f"Peers: 0 connected | LAN discoveries: {local_found} | "
-                f"Torrent state: {state_label} — waiting for peer connections"
+                f"Torrent state: {state_label} - waiting for peer connections"
             )
 
         dpg.set_value(self.summary_text, summary)
@@ -211,5 +211,3 @@ class PeerView:
                 add_help_tooltip(age_item, "PEER_AGE")
 
             self._row_ids.append(row_id)
-
-

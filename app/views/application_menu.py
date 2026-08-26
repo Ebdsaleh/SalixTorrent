@@ -271,7 +271,7 @@ class ApplicationMenu:
             )
             add_text_tooltip(
                 help_topics_item,
-                "Help Topics\n\nOpens SalixTorrent's built-in CHM-style manual: subjects on the left, detailed explanations on the right, searchable contents, and an A–Z glossary generated from the same definitions used by hover tooltips.",
+                "Help Topics\n\nOpens SalixTorrent's built-in CHM-style manual: subjects on the left, detailed explanations on the right, searchable contents, and an A-Z glossary generated from the same definitions used by hover tooltips.",
             )
             glossary_item = dpg.add_menu_item(
                 label="Glossary A-Z...",
@@ -652,13 +652,13 @@ class ApplicationMenu:
             dpg.add_spacer(height=8)
             dpg.add_text(
                 "Core capabilities\n"
-                "  • HTTP/UDP trackers, DHT, PEX and LAN peer discovery\n"
-                "  • Multi-peer downloading and seeding\n"
-                "  • Fast resume and SHA-1 piece verification\n"
-                "  • Magnet metadata exchange (BEP-9)\n"
-                "  • Multi-file torrents and torrent creation\n"
-                "  • Queue/file priorities and bandwidth controls\n"
-                "  • UPnP/NAT-PMP connectivity support",
+                "  - HTTP/UDP trackers, DHT, PEX and LAN peer discovery\n"
+                "  - Multi-peer downloading and seeding\n"
+                "  - Fast resume and SHA-1 piece verification\n"
+                "  - Magnet metadata exchange (BEP-9)\n"
+                "  - Multi-file torrents and torrent creation\n"
+                "  - Queue/file priorities and bandwidth controls\n"
+                "  - UPnP/NAT-PMP connectivity support",
                 color=(185, 185, 190),
             )
             dpg.add_spacer(height=10)

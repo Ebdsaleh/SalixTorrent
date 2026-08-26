@@ -1006,7 +1006,7 @@ class DownloadView:
         if not stats:
             return
         self._select_torrent(info_hash)
-        dpg.set_value(self.properties_title, f"Torrent Properties — {stats.get('torrent_name', '')}")
+        dpg.set_value(self.properties_title, f"Torrent Properties - {stats.get('torrent_name', '')}")
 
         trackers = list(stats.get("trackers") or [])
         tracker_text = "\n    ".join(trackers) if trackers else "--"
@@ -1023,7 +1023,7 @@ class DownloadView:
             f"Downloaded: {self._format_bytes(stats.get('downloaded_bytes'))}\n"
             f"Uploaded: {self._format_bytes(stats.get('uploaded_bytes'))}\n"
             f"Share Ratio: {ratio_text}\n"
-            f"Pieces: {stats.get('total_pieces', 0)} × {self._format_bytes(stats.get('piece_length'))}\n"
+            f"Pieces: {stats.get('total_pieces', 0)} x {self._format_bytes(stats.get('piece_length'))}\n"
             f"Files: {stats.get('file_count', 0)}\n"
             f"Seeds / Leechers: {seeders if seeders is not None else '--'} / "
             f"{leechers if leechers is not None else '--'}\n"
@@ -1069,8 +1069,8 @@ class DownloadView:
         # or vice versa. The Windows backend uses the native shell tray API.
         if settings.get("native_notifications", True):
             self.desktop.notify(
-                "SalixTorrent — Download complete",
-                f"{torrent_name} — {state} ({downloaded})",
+                "SalixTorrent - Download complete",
+                f"{torrent_name} - {state} ({downloaded})",
             )
 
         if not self.manager.completion_notifications_enabled():
@@ -1079,7 +1079,7 @@ class DownloadView:
         self._completion_notice_info_hash = info_hash
         dpg.set_value(
             self.completion_notice_title,
-            f"Download completed — {torrent_name}",
+            f"Download completed - {torrent_name}",
         )
         dpg.set_value(
             self.completion_notice_text,
@@ -1096,7 +1096,7 @@ class DownloadView:
         stats = self.latest_stats.get(info_hash, {})
         dpg.set_value(
             self.recheck_title,
-            f"Force Recheck — {stats.get('torrent_name', 'Torrent')}",
+            f"Force Recheck - {stats.get('torrent_name', 'Torrent')}",
         )
         dpg.show_item(self.recheck_modal)
 
@@ -1158,10 +1158,10 @@ class DownloadView:
                 rate_items = {}
                 rate_labels = {
                     "Auto": "Automatic",
-                    "KB/s": "KB/s — Kilobytes per second",
-                    "MB/s": "MB/s — Megabytes per second",
-                    "kbps": "kbps — Kilobits per second",
-                    "Mbps": "Mbps — Megabits per second",
+                    "KB/s": "KB/s - Kilobytes per second",
+                    "MB/s": "MB/s - Megabytes per second",
+                    "kbps": "kbps - Kilobits per second",
+                    "Mbps": "Mbps - Megabits per second",
                 }
                 for unit in TRANSFER_RATE_UNITS:
                     rate_items[unit] = dpg.add_menu_item(
@@ -1790,7 +1790,7 @@ class DownloadView:
             dpg.set_value(
                 self.progress_label,
                 (
-                    "Fast resume restored — "
+                    "Fast resume restored - "
                     f"{msg['completed_pieces']} / {msg['total_pieces']} Pieces Verified"
                 ),
             )
@@ -1803,7 +1803,7 @@ class DownloadView:
                 (
                     f"{wanted_prog * 100:.2f}% Selected Files Complete "
                     f"({msg.get('wanted_completed_pieces', 0)} / "
-                    f"{msg.get('wanted_total_pieces', 0)} Wanted Pieces) — "
+                    f"{msg.get('wanted_total_pieces', 0)} Wanted Pieces) - "
                     f"{total_prog * 100:.2f}% of full torrent"
                 ),
             )
@@ -1811,7 +1811,7 @@ class DownloadView:
             prog = msg["progress"]
             dpg.set_value(self.progress_bar, prog)
 
-            suffix = " — Seeding" if state == "Seeding" else ""
+            suffix = " - Seeding" if state == "Seeding" else ""
             dpg.set_value(
                 self.progress_label,
                 (
@@ -1958,7 +1958,7 @@ class DownloadView:
         dpg.set_value(self.info_hash_text, f"Info Hash: {msg.get('info_hash', '--')}")
         dpg.set_value(
             self.piece_info_text,
-            f"Pieces: {msg.get('total_pieces', 0):,} × {self._format_bytes(msg.get('piece_length'))}",
+            f"Pieces: {msg.get('total_pieces', 0):,} x {self._format_bytes(msg.get('piece_length'))}",
         )
         file_kind = "multi-file" if msg.get("is_multi_file") else "single-file"
         dpg.set_value(
@@ -2103,5 +2103,3 @@ class DownloadView:
             snapshot = self.latest_stats.get(self.active_info_hash)
             if snapshot:
                 self._render_inspector(snapshot, force_detail=True)
-
-

@@ -194,13 +194,13 @@ class CreateTorrentView:
             size = os.path.getsize(self.source_path)
             dpg.set_value(
                 self.source_summary,
-                f"Single-file torrent source — {size / (1024 * 1024):,.2f} MiB",
+                f"Single-file torrent source - {size / (1024 * 1024):,.2f} MiB",
             )
             default_output = f"{self.source_path}.torrent"
         else:
             dpg.set_value(
                 self.source_summary,
-                "Folder selected — files are scanned and hashed in the background when creation starts.",
+                "Folder selected - files are scanned and hashed in the background when creation starts.",
             )
             default_output = os.path.join(
                 os.path.dirname(self.source_path),
@@ -352,7 +352,7 @@ class CreateTorrentView:
 
             dpg.set_value(
                 self.status_text,
-                "Added to Active Transfers — verifying source for seeding",
+                "Added to Active Transfers - verifying source for seeding",
             )
             dpg.set_value(
                 self.detail_text,
@@ -393,7 +393,7 @@ class CreateTorrentView:
             )
             mib_done = progress.bytes_hashed / (1024 * 1024)
             mib_total = progress.total_bytes / (1024 * 1024)
-            current = f" — {progress.current_file}" if progress.current_file else ""
+            current = f" - {progress.current_file}" if progress.current_file else ""
             dpg.set_value(
                 self.detail_text,
                 (
@@ -458,7 +458,3 @@ class CreateTorrentView:
                 dpg.set_value(self.status_text, "Creation failed")
                 dpg.set_value(self.detail_text, str(payload))
                 self._set_creation_controls_busy(False)
-
-
-
-

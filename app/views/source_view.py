@@ -260,7 +260,7 @@ class SourceView:
                 "UDP": "using the compact UDP tracker protocol",
             }[source_type]
             lines = [
-                f"{protocol_name} Tracker — {host}",
+                f"{protocol_name} Tracker - {host}",
                 "",
                 "This server helps SalixTorrent discover other peers participating "
                 "in this torrent. SalixTorrent announces to it " + transport_note + ".",
@@ -287,7 +287,7 @@ class SourceView:
 
         if source_type == "DHT":
             return "\n".join([
-                "DHT — Distributed Hash Table",
+                "DHT - Distributed Hash Table",
                 "",
                 "This is BitTorrent's decentralized peer-discovery network. Instead "
                 "of asking one tracker server, SalixTorrent asks DHT nodes for peers "
@@ -304,7 +304,7 @@ class SourceView:
 
         if source_type == "PEX":
             return "\n".join([
-                "PEX — Peer Exchange",
+                "PEX - Peer Exchange",
                 "",
                 "Connected BitTorrent peers can tell SalixTorrent about other peers "
                 "they already know. This grows the peer pool without requiring every "
@@ -321,7 +321,7 @@ class SourceView:
 
         if source_type == "LAN":
             return "\n".join([
-                "LPD — Local Peer Discovery",
+                "LPD - Local Peer Discovery",
                 "",
                 "SalixTorrent uses local-network multicast to find compatible peers "
                 "on the same LAN. This is useful when two computers behind the same "
@@ -337,7 +337,7 @@ class SourceView:
             ])
 
         return "\n".join([
-            f"Peer Discovery Source — {source_name}",
+            f"Peer Discovery Source - {source_name}",
             "",
             "This entry represents one way SalixTorrent can learn about peers for "
             "the selected torrent.",
@@ -400,7 +400,7 @@ class SourceView:
             summary = (
                 f"Sources: {tracker_count} tracker(s) + DHT + PEX + LAN | "
                 f"Responding: {active_count} | Problems: {problem_count} | "
-                f"Peers seen — Tracker {tracker_peers} | DHT {dht_peers} | "
+                f"Peers seen - Tracker {tracker_peers} | DHT {dht_peers} | "
                 f"PEX {pex_peers} | LAN {lan_peers}"
             )
         else:
