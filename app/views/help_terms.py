@@ -5,9 +5,9 @@ from __future__ import annotations
 import dearpygui.dearpygui as dpg
 
 
-# One glossary powers today's hover help and can later power the planned
-# Help Topics / encyclopedia window. Keeping the text centralized prevents the
-# tooltip and long-form help systems from drifting into contradictory wording.
+# One glossary powers hover help and can later power the planned Help Topics /
+# encyclopedia window. Keeping the text centralized prevents tooltips and
+# long-form help from drifting into contradictory wording.
 HELP_TERMS = {
     "DHT": (
         "DHT — Distributed Hash Table",
@@ -59,6 +59,24 @@ HELP_TERMS = {
         "A lightweight datagram transport used by protocols such as DHT, UDP "
         "trackers and some router-discovery mechanisms.",
     ),
+    "HTTP_TRACKER": (
+        "HTTP Tracker",
+        "A BitTorrent tracker contacted with an HTTP announce request. The tracker "
+        "returns peer addresses and optional swarm statistics. Torrent payload "
+        "data does not pass through the tracker; peers exchange the data directly.",
+    ),
+    "HTTPS_TRACKER": (
+        "HTTPS Tracker",
+        "A BitTorrent tracker contacted with an encrypted HTTPS announce request. "
+        "It returns peer addresses and optional swarm statistics. Torrent payload "
+        "data is still transferred directly between peers, not through the tracker.",
+    ),
+    "UDP_TRACKER": (
+        "UDP Tracker",
+        "A BitTorrent tracker using the compact UDP tracker protocol. It usually "
+        "has less protocol overhead than HTTP. The tracker only helps peers find "
+        "one another; torrent payload data is transferred directly between peers.",
+    ),
     "ETA": (
         "ETA — Estimated Time of Arrival",
         "An estimate of how long the currently wanted data will take to finish at "
@@ -96,6 +114,36 @@ HELP_TERMS = {
         "A server that introduces peers participating in the same torrent. The "
         "tracker coordinates discovery; the actual file data is transferred "
         "directly between peers.",
+    ),
+    "SOURCE_PEERS": (
+        "Peers Reported by This Source",
+        "The number shown here belongs to this discovery source, not necessarily "
+        "the number of peers currently connected to SalixTorrent. Different "
+        "sources may discover the same peer, and some discovered peers may be "
+        "offline, unreachable, duplicated, or already connected.",
+    ),
+    "SWARM_SL": (
+        "Swarm S/L — Seeds / Leechers",
+        "Tracker-reported swarm counts. S is the number of seeds and L is the "
+        "number of leechers reported by that tracker. '--' means this discovery "
+        "source does not provide those counts.",
+    ),
+    "SOURCE_RESPONSE": (
+        "Discovery Response Time",
+        "How long the latest tracker request took to complete. A lower value is a "
+        "faster response, but response time does not measure peer download speed. "
+        "'--' means the source does not use a comparable request/response timing.",
+    ),
+    "SOURCE_LAST_UPDATE": (
+        "Last Discovery Update",
+        "How long ago SalixTorrent last received or recorded activity from this "
+        "discovery source. 'Never' means there has not yet been a result to report.",
+    ),
+    "SOURCE_DETAIL": (
+        "Discovery Detail",
+        "Protocol-specific diagnostic information for this source, such as tracker "
+        "announce intervals, DHT node activity, PEX message counts, or the Local "
+        "Peer Discovery multicast endpoint.",
     ),
     "LISTEN_PORT": (
         "BitTorrent Listen Port",
@@ -143,14 +191,18 @@ def help_text(term: str) -> str:
     return f"{title}\n\n{body}"
 
 
-def add_help_tooltip(item, term: str, wrap: int = 430):
-    """Attach a consistent explanatory tooltip to an existing DPG item."""
-    text = help_text(term)
-    if not item or not text:
+def add_text_tooltip(item, text: str, wrap: int = 430):
+    """Attach arbitrary explanatory text to a Dear PyGui item."""
+    if not item or not str(text or "").strip():
         return None
     try:
         with dpg.tooltip(parent=item):
-            return dpg.add_text(text, wrap=wrap)
+            return dpg.add_text(str(text), wrap=wrap)
     except Exception:
-        # Tooltip support should never be able to prevent a view from building.
+        # Hover help must never be able to prevent a view from building.
         return None
+
+
+def add_help_tooltip(item, term: str, wrap: int = 430):
+    """Attach a consistent glossary tooltip to an existing DPG item."""
+    return add_text_tooltip(item, help_text(term), wrap=wrap)
