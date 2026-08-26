@@ -5,6 +5,7 @@ import queue
 import dearpygui.dearpygui as dpg
 
 from app.engine.gui_engine import GuiEngine
+from app.views.application_menu import ApplicationMenu
 from app.views.create_torrent_view import CreateTorrentView
 from app.views.download_view import DownloadView
 from app.views.settings_view import SettingsView
@@ -14,12 +15,32 @@ class MasterViewport:
     def __init__(self, ui_queue: queue.Queue):
         self.gui = GuiEngine.get_instance()
         self.ui_queue = ui_queue
+        self.application_menu = None
         self._setup_primary_layout()
 
     def _setup_primary_layout(self):
+        # Construct the view objects first so the application menu can route
+        # commands to the same live scene instances.
+        download_view = DownloadView(ui_queue=self.ui_queue)
+        create_torrent_view = CreateTorrentView()
+        settings_view = SettingsView()
+
+        self.application_menu = ApplicationMenu(
+            gui=self.gui,
+            download_view=download_view,
+            create_torrent_view=create_torrent_view,
+            settings_view=settings_view,
+        )
+
         with dpg.window(tag="primary_window", no_title_bar=True, no_resize=True):
-            # Top Navigation Header
-            with dpg.group(horizontal=True):
+            # Build the menu first so it owns its own layout row rather than
+            # overlaying the SALIX_T toolbar beneath the native title bar.
+            self.application_menu.build_menu_bar(parent="primary_window")
+
+            # Fast navigation remains available under the traditional menu bar.
+            # It acts like a small application toolbar while File/Edit/View/...
+            # provide the complete desktop-style command surface.
+            with dpg.group(horizontal=True, tag="salix_toolbar"):
                 dpg.add_text("SALIX_T // BITTORRENT CLIENT", color=(0, 255, 128))
                 dpg.add_spacer(width=20)
                 dpg.add_button(
@@ -39,12 +60,10 @@ class MasterViewport:
             dpg.add_spacer(height=5)
 
             with dpg.group(tag="view_container_DownloadView"):
-                download_view = DownloadView(ui_queue=self.ui_queue)
                 download_view.build_view(parent_tag="view_container_DownloadView")
                 self.gui.scene_mgr.register_scene("DownloadView", download_view)
 
             with dpg.group(tag="view_container_CreateTorrentView"):
-                create_torrent_view = CreateTorrentView()
                 create_torrent_view.build_view(parent_tag="view_container_CreateTorrentView")
                 self.gui.scene_mgr.register_scene(
                     "CreateTorrentView",
@@ -52,12 +71,17 @@ class MasterViewport:
                 )
 
             with dpg.group(tag="view_container_SettingsView"):
-                settings_view = SettingsView()
                 settings_view.build_view(parent_tag="view_container_SettingsView")
                 self.gui.scene_mgr.register_scene("SettingsView", settings_view)
 
+        # Help/diagnostic windows and global key handlers are created only
+        # after the view tree is complete.
+        self.application_menu.finish_build()
+        self.gui.set_application_menu(self.application_menu)
+
         dpg.set_primary_window("primary_window", True)
         self.gui.switch_scene("DownloadView")
+        self.application_menu.update(force=True)
 
     def run(self):
         self.gui.run()

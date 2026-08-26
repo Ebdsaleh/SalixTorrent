@@ -68,6 +68,7 @@ class GuiEngine:
         self._last_ui_error_at = 0.0
         self.desktop = DesktopIntegration.get_instance()
         self._last_minimize_check = 0.0
+        self.application_menu = None
         self._initialized = True
 
     @classmethod
@@ -78,6 +79,15 @@ class GuiEngine:
 
     def switch_scene(self, scene_name: str, **kwargs):
         self.scene_mgr.switch_to(scene_name, **kwargs)
+        if self.application_menu is not None:
+            try:
+                self.application_menu.update(force=True)
+            except Exception as exc:
+                self._report_ui_exception("application menu scene update", exc)
+
+    def set_application_menu(self, application_menu):
+        """Register the viewport-level menu for lightweight state refreshes."""
+        self.application_menu = application_menu
 
     @staticmethod
     def _ui_error_log_path() -> Path:
@@ -178,6 +188,12 @@ class GuiEngine:
                                 self._report_ui_exception(
                                     f"DearPyGui callback {callback_name}", exc
                                 )
+
+                if self.application_menu is not None:
+                    try:
+                        self.application_menu.update()
+                    except Exception as exc:
+                        self._report_ui_exception("application menu update", exc)
 
                 if self.scene_mgr.current_scene:
                     active_scene = self.scene_mgr.scenes.get(self.scene_mgr.current_scene)
