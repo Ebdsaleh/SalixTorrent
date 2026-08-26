@@ -121,11 +121,6 @@ class TorrentFile:
                     if url and url not in self.announce_list:
                         self.announce_list.append(url)
 
-        # Preserve Salix_T's existing convenience for trackerless torrents.
-        if not self.announce_list:
-            self.announce_list.extend(FALLBACK_TRACKERS)
-            self.announce = self.announce_list[0]
-
         if b"comment" in raw_dict:
             self.comment = self._decode_text(raw_dict[b"comment"])
         if b"created by" in raw_dict:
@@ -164,6 +159,14 @@ class TorrentFile:
         ]
 
         self.private = bool(int(info_dict.get(b"private", 0) or 0))
+
+        # Trackerless public torrents may use SalixTorrent's convenience
+        # fallback trackers. Private torrents must never be injected into
+        # arbitrary public trackers: their peer discovery is intentionally
+        # restricted to tracker metadata supplied by the torrent itself.
+        if not self.announce_list and not self.private:
+            self.announce_list.extend(FALLBACK_TRACKERS)
+            self.announce = self.announce_list[0]
 
         if b"files" in info_dict:
             self.is_multi_file = True

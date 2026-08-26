@@ -201,7 +201,12 @@ class TorrentSession:
         self._seed_port: int = self.preferred_listen_port
         self.enable_dht: bool = bool(enable_dht) and not self.torrent.private
         self.enable_pex: bool = bool(enable_pex) and not self.torrent.private
-        self.enable_lan_discovery: bool = bool(enable_lan_discovery)
+        # BEP-27 private torrents must not advertise their info hash through
+        # non-tracker peer-discovery channels. Treat LAN/LPD the same way as
+        # DHT and PEX so private swarm membership stays tracker-controlled.
+        self.enable_lan_discovery: bool = (
+            bool(enable_lan_discovery) and not self.torrent.private
+        )
         self._listen_port_callback = listen_port_callback
         self._incoming_peer_callback = incoming_peer_callback
 

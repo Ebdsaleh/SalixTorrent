@@ -12,10 +12,12 @@
 *.env
 *.bat
 *tree.txt
+test_*.py
 *test_cli_swarm.py
 *test_download.py
 *test_peer.py
 *test_swarm.py
+*test_regressions.py
 *.torrent
 *downloads/
 .salix_resume/
