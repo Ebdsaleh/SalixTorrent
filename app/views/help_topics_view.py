@@ -656,7 +656,8 @@ class HelpTopicsView:
             item = dpg.add_selectable(
                 label=topic.title,
                 parent=self.contents_tab,
-                callback=lambda s, a, u=topic.key: self._show_topic(u),
+                callback=self._on_topic_selected,
+                user_data=topic.key,
             )
             self._topic_items[topic.key] = item
             add_text_tooltip(item, f"{topic.title}\n\n{topic.summary}")
@@ -689,7 +690,8 @@ class HelpTopicsView:
             item = dpg.add_selectable(
                 label=title,
                 parent=current_group or self.glossary_tab,
-                callback=lambda s, a, u=key: self._show_term(u),
+                callback=self._on_term_selected,
+                user_data=key,
             )
             self._term_items[key] = item
             self._term_letters[key] = letter
@@ -703,6 +705,35 @@ class HelpTopicsView:
             if ch.isdigit():
                 return "#"
         return "#"
+
+    # ------------------------------------------------------------------
+    # Dear PyGui callbacks
+    # ------------------------------------------------------------------
+
+    def _on_topic_selected(self, sender=None, app_data=None, user_data=None):
+        """Render the Help Topic selected in the Contents navigator.
+
+        Dear PyGui always supplies ``user_data`` as the third callback argument.
+        Keeping the topic key in the item's explicit ``user_data`` avoids a subtle
+        lambda/default-argument bug where DPG's ``None`` replaced the captured key.
+        """
+        if user_data is not None:
+            self._show_topic(str(user_data))
+
+    def _on_term_selected(self, sender=None, app_data=None, user_data=None):
+        """Render the selected A-Z glossary definition."""
+        if user_data is not None:
+            self._show_term(str(user_data))
+
+    def _on_related_term_clicked(self, sender=None, app_data=None, user_data=None):
+        """Follow a Help Topic -> related glossary cross-reference."""
+        if user_data is not None:
+            self._open_glossary_term(str(user_data))
+
+    def _on_related_topic_clicked(self, sender=None, app_data=None, user_data=None):
+        """Follow a glossary definition -> related Help Topic cross-reference."""
+        if user_data is not None:
+            self._open_contents_topic(str(user_data))
 
     # ------------------------------------------------------------------
     # Rendering
@@ -761,7 +792,8 @@ class HelpTopicsView:
                 button = dpg.add_button(
                     label=f" {entry[0]} ",
                     parent=related_row,
-                    callback=lambda s, a, u=term_key: self._open_glossary_term(u),
+                    callback=self._on_related_term_clicked,
+                    user_data=term_key,
                 )
                 add_text_tooltip(button, f"Open glossary entry\n\n{entry[0]}\n\n{entry[1]}")
                 count_in_row += 1
@@ -799,7 +831,8 @@ class HelpTopicsView:
             button = dpg.add_button(
                 label=f" {topic.title} ",
                 parent=self.content_sections,
-                callback=lambda s, a, u=topic.key: self._open_contents_topic(u),
+                callback=self._on_related_topic_clicked,
+                user_data=topic.key,
             )
             add_text_tooltip(button, f"Open help topic\n\n{topic.title}\n\n{topic.summary}")
 
@@ -817,7 +850,7 @@ class HelpTopicsView:
             pass
         self._show_term(term_key)
 
-    def _open_glossary_tab(self):
+    def _open_glossary_tab(self, sender=None, app_data=None, user_data=None):
         try:
             dpg.set_value(self.left_tab_bar, self.glossary_tab)
         except Exception:
@@ -891,7 +924,7 @@ class HelpTopicsView:
         else:
             dpg.set_value(self.search_status, "")
 
-    def _clear_search(self):
+    def _clear_search(self, sender=None, app_data=None, user_data=None):
         try:
             dpg.set_value(self.search_input, "")
         except Exception:
@@ -911,3 +944,5 @@ class HelpTopicsView:
         # compatible with GuiEngine's normal scene update loop without adding
         # background redraw work.
         return None
+
+
