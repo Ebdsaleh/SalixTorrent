@@ -4,13 +4,17 @@ import argparse
 import asyncio
 import queue
 
-from app.engine.master_viewport import MasterViewport
-from app.logic.torrent_manager import TorrentManager
+from app.version import APP_NAME, APP_VERSION
 
 
 def main():
     parser = argparse.ArgumentParser(
         description="SalixTorrent (Salix_T) BitTorrent Client"
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"{APP_NAME} {APP_VERSION}",
     )
     parser.add_argument(
         "torrent",
@@ -30,6 +34,10 @@ def main():
         help="Maximum concurrent peer connections",
     )
     args = parser.parse_args()
+
+    # Defer engine/UI imports until after argument parsing so lightweight
+    # commands such as --version do not require Dear PyGui to be imported.
+    from app.logic.torrent_manager import TorrentManager
 
     ui_queue = queue.Queue()
     manager = TorrentManager(ui_queue=ui_queue)
@@ -78,7 +86,9 @@ def main():
             except Exception as exc:
                 print(f"[Salix_T Notice] Could not load torrent: {exc}")
 
-        # Run UI on the main thread.
+        # Run UI on the main thread. Import Dear PyGui only for desktop mode.
+        from app.engine.master_viewport import MasterViewport
+
         viewport = MasterViewport(ui_queue=ui_queue)
         viewport.run()
 

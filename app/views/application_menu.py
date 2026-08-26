@@ -14,6 +14,7 @@ from typing import Optional
 import dearpygui.dearpygui as dpg
 
 from app.logic.torrent_manager import TorrentManager
+from app.version import APP_VERSION
 from app.views.help_terms import add_help_tooltip, add_text_tooltip
 
 
@@ -29,7 +30,7 @@ class ApplicationMenu:
     the main-thread callback serialization added to GuiEngine still applies.
     """
 
-    APP_VERSION = "0.1.0"
+    APP_VERSION = APP_VERSION
     _STATE_REFRESH_INTERVAL = 0.20
 
     def __init__(self, gui, download_view, create_torrent_view, settings_view, help_topics_view):
