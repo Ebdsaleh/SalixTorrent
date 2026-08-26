@@ -10,6 +10,7 @@ from pathlib import Path
 import dearpygui.dearpygui as dpg
 from app.engine.scene_manager import SceneManager
 from app.engine.desktop_integration import DesktopIntegration
+from app.engine.ui_typography import UiTypography
 
 
 class GuiEngine:
@@ -26,6 +27,12 @@ class GuiEngine:
             return
 
         dpg.create_context()
+
+        # Register scalable system-font sizes before Dear PyGui builds its font
+        # atlas. The selected size is applied after setup and before any
+        # SalixTorrent view widgets are constructed.
+        self.typography = UiTypography.get_instance()
+        self.typography.register_fonts()
 
         # Dear PyGui normally executes callbacks on an internal worker thread.
         # SalixTorrent callbacks manipulate the same widget tree that our main
@@ -61,6 +68,19 @@ class GuiEngine:
 
         dpg.create_viewport(title="SalixTorrent (Salix_T)", width=1100, height=700)
         dpg.setup_dearpygui()
+
+        # TorrentManager is already created by main.py before the viewport. A
+        # local import avoids turning the engine/settings relationship into a
+        # module-level circular dependency.
+        try:
+            from app.logic.torrent_manager import TorrentManager
+
+            ui_font_size = TorrentManager.get_instance().get_app_settings().get(
+                "ui_font_size", 15
+            )
+        except Exception:
+            ui_font_size = 15
+        self.typography.apply_font_size(ui_font_size)
 
         self.scene_mgr = SceneManager.get_instance()
         self.scene_mgr.engine = self
@@ -212,3 +232,5 @@ class GuiEngine:
         finally:
             self.desktop.stop()
             dpg.destroy_context()
+
+

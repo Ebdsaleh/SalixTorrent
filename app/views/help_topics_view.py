@@ -585,6 +585,9 @@ class HelpTopicsView:
         self._term_letters: Dict[str, str] = {}
         self._current_topic = "basics"
         self._current_term = ""
+        self.right_pane = None
+        self._wrapped_content_items: List[int] = []
+        self._last_wrap_width = 700
 
     # ------------------------------------------------------------------
     # Build
@@ -627,8 +630,9 @@ class HelpTopicsView:
         dpg.add_spacer(height=3, parent=parent_tag)
 
         split = dpg.add_group(horizontal=True, parent=parent_tag)
-        left = dpg.add_child_window(width=315, height=-1, border=True, parent=split)
+        left = dpg.add_child_window(width=340, height=-1, border=True, parent=split)
         right = dpg.add_child_window(width=-1, height=-1, border=True, parent=split)
+        self.right_pane = right
 
         self.left_tab_bar = dpg.add_tab_bar(parent=left)
         self.contents_tab = dpg.add_tab(label="Contents", parent=self.left_tab_bar)
@@ -638,7 +642,10 @@ class HelpTopicsView:
         self._build_glossary_index()
 
         self.content_title = dpg.add_text("", color=(100, 180, 255), parent=right)
-        self.content_summary = dpg.add_text("", color=(180, 180, 185), wrap=700, parent=right)
+        self.content_summary = dpg.add_text(
+            "", color=(180, 180, 185), wrap=self._last_wrap_width, parent=right
+        )
+        self._wrapped_content_items = [self.content_summary]
         dpg.add_separator(parent=right)
         self.content_sections = dpg.add_group(parent=right)
 
@@ -746,6 +753,9 @@ class HelpTopicsView:
             dpg.delete_item(self.content_sections, children_only=True)
         except Exception:
             pass
+        self._wrapped_content_items = (
+            [self.content_summary] if self.content_summary is not None else []
+        )
 
     def _set_selections(self, topic_key: str = "", term_key: str = ""):
         for key, item in self._topic_items.items():
@@ -774,8 +784,11 @@ class HelpTopicsView:
 
         for heading, body in topic.sections:
             dpg.add_text(heading.upper(), color=(255, 200, 100), parent=self.content_sections)
-            dpg.add_text(body, wrap=700, parent=self.content_sections)
-            dpg.add_spacer(height=7, parent=self.content_sections)
+            body_item = dpg.add_text(
+                body, wrap=self._last_wrap_width, parent=self.content_sections
+            )
+            self._wrapped_content_items.append(body_item)
+            dpg.add_spacer(height=9, parent=self.content_sections)
 
         if topic.related_terms:
             dpg.add_separator(parent=self.content_sections)
@@ -820,7 +833,10 @@ class HelpTopicsView:
         dpg.set_value(self.content_summary, "Glossary definition")
         self._clear_content()
 
-        dpg.add_text(body, wrap=700, parent=self.content_sections)
+        body_item = dpg.add_text(
+            body, wrap=self._last_wrap_width, parent=self.content_sections
+        )
+        self._wrapped_content_items.append(body_item)
         dpg.add_spacer(height=10, parent=self.content_sections)
 
         topic_key = TERM_TOPIC_MAP.get(key, "basics")
@@ -864,6 +880,37 @@ class HelpTopicsView:
             self._show_term(self._current_term)
         else:
             self._show_topic("glossary")
+
+    def _update_content_wrap(self, force: bool = False):
+        """Keep Help text readable at both windowed and maximized sizes.
+
+        The content pane may become very wide on a large monitor. A bounded
+        reading measure uses more of that space without creating extremely long
+        lines that are tiring to scan.
+        """
+        if self.right_pane is None:
+            return
+        try:
+            width = float(dpg.get_item_rect_size(self.right_pane)[0])
+        except Exception:
+            return
+        if width <= 1:
+            return
+
+        target = int(max(560, min(1050, width - 36)))
+        if not force and abs(target - self._last_wrap_width) < 8:
+            return
+        self._last_wrap_width = target
+
+        alive = []
+        for item in self._wrapped_content_items:
+            try:
+                if dpg.does_item_exist(item):
+                    dpg.configure_item(item, wrap=target)
+                    alive.append(item)
+            except Exception:
+                continue
+        self._wrapped_content_items = alive
 
     # ------------------------------------------------------------------
     # Search
@@ -934,13 +981,17 @@ class HelpTopicsView:
     # Scene hooks -------------------------------------------------------
 
     def on_show(self, **kwargs):
+        self._update_content_wrap(force=True)
         if kwargs.get("glossary"):
             self.open_glossary()
         elif kwargs.get("topic"):
             self._open_contents_topic(str(kwargs["topic"]))
 
     def update(self, dt: float):
-        # Help is static. Keeping this method intentionally empty makes the view
-        # compatible with GuiEngine's normal scene update loop without adding
-        # background redraw work.
-        return None
+        del dt
+        # This only reconfigures wrapping when the content pane has materially
+        # changed width, so maximizing/restoring the viewport stays polished
+        # without turning Help into a continuously rebuilding view.
+        self._update_content_wrap()
+
+

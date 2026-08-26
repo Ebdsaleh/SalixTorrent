@@ -313,6 +313,14 @@ HELP_TERMS = {
     # ------------------------------------------------------------------
     # Transfer / queue terminology
     # ------------------------------------------------------------------
+    "UI_TEXT_SIZE": (
+        "Interface Text Size",
+        "Controls the font size used throughout SalixTorrent, including menus, "
+        "tables, tooltips, Preferences and Help Topics. Comfortable (15 px) is "
+        "the default. Larger sizes are useful on high-density or physically "
+        "smaller displays. SalixTorrent prefers a scalable system monospace font "
+        "so text remains crisp instead of enlarging Dear PyGui's tiny bitmap font.",
+    ),
     "TRANSFER_RATE": (
         "Transfer Rate Units",
         "Controls how live upload/download speeds are displayed. KB/s and MB/s "
@@ -809,3 +817,5 @@ def add_context_tooltip(
         contextual_text(title, body, facts=facts, footer=footer),
         wrap=wrap,
     )
+
+

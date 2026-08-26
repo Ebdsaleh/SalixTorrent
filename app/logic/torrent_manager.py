@@ -186,6 +186,7 @@ class TorrentManager:
             "default_upload_limit_unit": "KB/s",
             "default_queue_priority": TORRENT_PRIORITY_NORMAL,
             "transfer_rate_display_unit": "Auto",
+            "ui_font_size": 15,
         }
 
     @classmethod
@@ -254,6 +255,17 @@ class TorrentManager:
         display_unit = str(data.get("transfer_rate_display_unit") or "Auto").strip()
         out["transfer_rate_display_unit"] = (
             display_unit if display_unit in valid_display_units else "Auto"
+        )
+
+        # Keep typography choices deliberately discrete so every supported size
+        # is backed by a pre-registered font rather than stretching one bitmap.
+        valid_font_sizes = (13, 15, 17, 20)
+        try:
+            requested_font_size = int(data.get("ui_font_size", 15))
+        except (TypeError, ValueError):
+            requested_font_size = 15
+        out["ui_font_size"] = min(
+            valid_font_sizes, key=lambda size: abs(size - requested_font_size)
         )
         return out
 
@@ -1806,3 +1818,5 @@ class TorrentManager:
             print("[Salix_T Notice] Async engine did not finish shutdown before timeout.")
 
         self._connectivity.close()
+
+

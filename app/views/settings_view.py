@@ -8,6 +8,13 @@ from tkinter import filedialog
 import dearpygui.dearpygui as dpg
 
 from app.engine.desktop_integration import DesktopIntegration
+from app.engine.ui_typography import (
+    UI_FONT_LABELS,
+    UI_FONT_SIZES,
+    UiTypography,
+    ui_font_label,
+    ui_font_size_from_label,
+)
 from app.logic.torrent_manager import TorrentManager
 from app.views.help_terms import add_help_tooltip, add_text_tooltip
 from app.views.transfer_rate import TRANSFER_RATE_UNITS
@@ -22,6 +29,7 @@ class SettingsView:
     def __init__(self):
         self.manager = TorrentManager.get_instance()
         self.desktop = DesktopIntegration.get_instance()
+        self.typography = UiTypography.get_instance()
         self.settings = self.manager.get_app_settings()
         self._last_connectivity_refresh = 0.0
 
@@ -257,9 +265,18 @@ class SettingsView:
                         add_help_tooltip(self.upload_limit_input, "NEW_TORRENT_LIMITS")
                         add_help_tooltip(self.upload_limit_unit, "NEW_TORRENT_LIMITS")
 
-                with dpg.child_window(width=-1, height=225, border=True):
+                with dpg.child_window(width=-1, height=260, border=True):
                     dpg.add_text("DESKTOP", color=(0, 255, 128))
                     dpg.add_separator()
+                    with dpg.group(horizontal=True):
+                        text_size_label = dpg.add_text("Interface text size")
+                        self.ui_font_size_combo = dpg.add_combo(
+                            items=[UI_FONT_LABELS[size] for size in UI_FONT_SIZES],
+                            default_value=ui_font_label(self.settings.get("ui_font_size", 15)),
+                            width=180,
+                        )
+                        add_help_tooltip(text_size_label, "UI_TEXT_SIZE")
+                        add_help_tooltip(self.ui_font_size_combo, "UI_TEXT_SIZE")
                     with dpg.group(horizontal=True):
                         rate_display_label = dpg.add_text("Transfer rate display")
                         self.transfer_rate_display_combo = dpg.add_combo(
@@ -336,6 +353,9 @@ class SettingsView:
             "transfer_rate_display_unit": str(
                 dpg.get_value(self.transfer_rate_display_combo) or "Auto"
             ),
+            "ui_font_size": ui_font_size_from_label(
+                dpg.get_value(self.ui_font_size_combo)
+            ),
             "listen_port": int(dpg.get_value(self.listen_port_input) or 6881),
             "enable_dht": bool(dpg.get_value(self.enable_dht_checkbox)),
             "enable_pex": bool(dpg.get_value(self.enable_pex_checkbox)),
@@ -365,6 +385,7 @@ class SettingsView:
             self.system_tray_checkbox: settings["system_tray_enabled"],
             self.minimize_to_tray_checkbox: settings["minimize_to_tray"],
             self.transfer_rate_display_combo: settings.get("transfer_rate_display_unit", "Auto"),
+            self.ui_font_size_combo: ui_font_label(settings.get("ui_font_size", 15)),
             self.listen_port_input: settings["listen_port"],
             self.enable_dht_checkbox: settings["enable_dht"],
             self.enable_pex_checkbox: settings["enable_pex"],
@@ -441,6 +462,7 @@ class SettingsView:
     def _save(self):
         settings = self.manager.update_app_settings(self._collect())
         self.desktop.configure(settings)
+        self.typography.apply_font_size(settings.get("ui_font_size", 15))
         self._sync_controls(settings)
         dpg.set_value(self.status_text, "Preferences saved and applied")
         self._render_connectivity()
@@ -448,6 +470,7 @@ class SettingsView:
     def _restore_defaults(self):
         settings = self.manager.reset_app_settings()
         self.desktop.configure(settings)
+        self.typography.apply_font_size(settings.get("ui_font_size", 15))
         self._sync_controls(settings)
         dpg.set_value(self.status_text, "Defaults restored and applied")
         self._render_connectivity()
@@ -466,5 +489,7 @@ class SettingsView:
         if now - self._last_connectivity_refresh >= 1.0:
             self._last_connectivity_refresh = now
             self._render_connectivity()
+
+
 
 
