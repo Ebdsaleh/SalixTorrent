@@ -226,13 +226,21 @@ HELP_TOPICS: Tuple[HelpTopic, ...] = (
                 "currently known peer bitfields advertise that needed piece.",
             ),
             (
+                "Rarest-first scheduling",
+                "SalixTorrent maintains piece availability incrementally from BITFIELD, HAVE, "
+                "and peer-disconnect events. High-priority files are considered before Normal, "
+                "then Low. Within the same priority level, the least-available piece this peer "
+                "can provide is preferred. Equal-rarity pieces are chosen randomly so clients "
+                "do not all converge on the same deterministic piece order.",
+            ),
+            (
                 "Force Recheck",
                 "Force Recheck invalidates fast-resume assumptions and hashes the existing payload "
                 "again without deleting it. This is useful after files were changed externally or "
                 "when you want to verify the current disk contents against the torrent metadata.",
             ),
         ),
-        related_terms=("PIECE", "BLOCK", "PIECE_STATE", "PIECE_AVAILABILITY", "FORCE_RECHECK", "FAST_RESUME"),
+        related_terms=("PIECE", "BLOCK", "PIECE_STATE", "PIECE_AVAILABILITY", "RAREST_FIRST", "RANDOM_TIE_BREAKING", "FILE_PRIORITY", "FORCE_RECHECK", "FAST_RESUME"),
     ),
     HelpTopic(
         key="trackers_discovery",
@@ -1054,6 +1062,8 @@ class HelpTopicsView:
         # changed width, so maximizing/restoring the viewport stays polished
         # without turning Help into a continuously rebuilding view.
         self._update_content_wrap()
+
+
 
 
 

@@ -5,9 +5,11 @@ from __future__ import annotations
 import base64
 import bisect
 import hashlib
+import itertools
 import json
 import math
 import os
+import random
 import threading
 import time
 from dataclasses import dataclass
@@ -185,6 +187,19 @@ class PieceManager:
             FILE_PRIORITY_NORMAL for _ in self._storage_files
         ]
         self._piece_priority_ranks: List[int] = []
+
+        # Phase 1 scheduler state. Peer availability is maintained incrementally
+        # from BITFIELD/HAVE/connect/disconnect events. Rarity buckets let the
+        # hot request path avoid rebuilding or sorting a torrent-wide histogram
+        # for every 16 KiB block request.
+        self._piece_availability: List[int] = [0] * len(self.pieces)
+        self._peer_piece_sets: dict[object, set[int]] = {}
+        self._active_piece_indices: set[int] = set()
+        self._rarity_buckets: dict[int, dict[int, set[int]]] = {
+            FILE_PRIORITY_RANK[FILE_PRIORITY_HIGH]: {},
+            FILE_PRIORITY_RANK[FILE_PRIORITY_NORMAL]: {},
+            FILE_PRIORITY_RANK[FILE_PRIORITY_LOW]: {},
+        }
         self._rebuild_piece_priority_cache()
 
     def _initialize_pieces(self):
@@ -282,6 +297,150 @@ class PieceManager:
             )
 
         self._piece_priority_ranks = ranks
+        if hasattr(self, "_rarity_buckets"):
+            self._rebuild_rarity_buckets()
+
+    def _rebuild_rarity_buckets(self):
+        """Rebuild scheduler buckets after bulk priority/completion changes.
+
+        This is intentionally reserved for infrequent operations such as file-
+        priority edits, fast-resume application, and force rechecks. Normal peer
+        churn updates only the affected pieces incrementally.
+        """
+        self._rarity_buckets = {
+            FILE_PRIORITY_RANK[FILE_PRIORITY_HIGH]: {},
+            FILE_PRIORITY_RANK[FILE_PRIORITY_NORMAL]: {},
+            FILE_PRIORITY_RANK[FILE_PRIORITY_LOW]: {},
+        }
+
+        for piece_index, piece in enumerate(self.pieces):
+            if piece.is_complete:
+                continue
+            rank = self.piece_priority_rank(piece_index)
+            if rank <= 0:
+                continue
+            availability = self._piece_availability[piece_index]
+            self._rarity_buckets[rank].setdefault(availability, set()).add(piece_index)
+
+    def _move_rarity_piece(self, piece_index: int, old_availability: int, new_availability: int):
+        """Move one incomplete wanted piece between cached rarity buckets."""
+        if piece_index < 0 or piece_index >= len(self.pieces):
+            return
+        piece = self.pieces[piece_index]
+        if piece.is_complete:
+            return
+        rank = self.piece_priority_rank(piece_index)
+        if rank <= 0:
+            return
+
+        buckets = self._rarity_buckets.setdefault(rank, {})
+        old_bucket = buckets.get(old_availability)
+        if old_bucket is not None:
+            old_bucket.discard(piece_index)
+            if not old_bucket:
+                buckets.pop(old_availability, None)
+
+        buckets.setdefault(new_availability, set()).add(piece_index)
+
+    def _remove_from_rarity_buckets(self, piece_index: int):
+        if piece_index < 0 or piece_index >= len(self.pieces):
+            return
+        rank = self.piece_priority_rank(piece_index)
+        if rank <= 0:
+            return
+        availability = self._piece_availability[piece_index]
+        bucket = self._rarity_buckets.get(rank, {}).get(availability)
+        if bucket is None:
+            return
+        bucket.discard(piece_index)
+        if not bucket:
+            self._rarity_buckets.get(rank, {}).pop(availability, None)
+        self._active_piece_indices.discard(piece_index)
+
+    def _piece_set_from_bitfield(self, bitfield: object) -> set[int]:
+        """Decode one peer bitfield once, without allocating per-piece objects."""
+        if not bitfield or not self.pieces:
+            return set()
+        try:
+            raw = bytes(bitfield)
+        except Exception:
+            return set()
+
+        total_pieces = len(self.pieces)
+        result: set[int] = set()
+        max_bytes = min(len(raw), (total_pieces + 7) // 8)
+        for byte_index in range(max_bytes):
+            value = raw[byte_index]
+            if not value:
+                continue
+            base_piece = byte_index * 8
+            for bit_offset in range(8):
+                piece_index = base_piece + bit_offset
+                if piece_index >= total_pieces:
+                    break
+                if value & (1 << (7 - bit_offset)):
+                    result.add(piece_index)
+        return result
+
+    def register_peer_bitfield(self, peer_key: object, bitfield: object):
+        """Replace one peer's advertised pieces and update rarity incrementally."""
+        if peer_key is None:
+            return
+        new_pieces = self._piece_set_from_bitfield(bitfield)
+        old_pieces = self._peer_piece_sets.get(peer_key, set())
+
+        for piece_index in old_pieces - new_pieces:
+            old_value = self._piece_availability[piece_index]
+            new_value = max(0, old_value - 1)
+            self._piece_availability[piece_index] = new_value
+            self._move_rarity_piece(piece_index, old_value, new_value)
+
+        for piece_index in new_pieces - old_pieces:
+            old_value = self._piece_availability[piece_index]
+            new_value = old_value + 1
+            self._piece_availability[piece_index] = new_value
+            self._move_rarity_piece(piece_index, old_value, new_value)
+
+        self._peer_piece_sets[peer_key] = new_pieces
+
+    def record_peer_have(self, peer_key: object, piece_index: int) -> bool:
+        """Record a BEP-3 HAVE event; duplicate HAVE messages are idempotent."""
+        if peer_key is None or piece_index < 0 or piece_index >= len(self.pieces):
+            return False
+        peer_pieces = self._peer_piece_sets.setdefault(peer_key, set())
+        if piece_index in peer_pieces:
+            return False
+
+        peer_pieces.add(piece_index)
+        old_value = self._piece_availability[piece_index]
+        new_value = old_value + 1
+        self._piece_availability[piece_index] = new_value
+        self._move_rarity_piece(piece_index, old_value, new_value)
+        return True
+
+    def unregister_peer(self, peer_key: object):
+        """Remove one peer's contribution when the connection leaves the swarm."""
+        peer_pieces = self._peer_piece_sets.pop(peer_key, None)
+        if not peer_pieces:
+            return
+        for piece_index in peer_pieces:
+            old_value = self._piece_availability[piece_index]
+            new_value = max(0, old_value - 1)
+            self._piece_availability[piece_index] = new_value
+            self._move_rarity_piece(piece_index, old_value, new_value)
+
+    def clear_peer_availability(self):
+        """Reset transient swarm rarity state when a session is torn down."""
+        if not self._peer_piece_sets and not any(self._piece_availability):
+            return
+        self._peer_piece_sets.clear()
+        self._piece_availability = [0] * len(self.pieces)
+        self._rebuild_rarity_buckets()
+
+    def availability_count(self, piece_index: int) -> int:
+        if piece_index < 0 or piece_index >= len(self._piece_availability):
+            return 0
+        return int(self._piece_availability[piece_index])
 
     def get_file_priorities(self) -> List[str]:
         return list(self.file_priorities)
@@ -744,6 +903,7 @@ class PieceManager:
                 last_reported_percent = percent
 
         self._set_check_progress(len(candidates), len(candidates))
+        self._rebuild_rarity_buckets()
         if progress_callback:
             progress_callback()
         return True
@@ -775,6 +935,7 @@ class PieceManager:
                 downloaded_bytes += piece.length
 
         self.downloaded_bytes = downloaded_bytes
+        self._rebuild_rarity_buckets()
         return True
 
     def _resume_metadata_matches(self, state: dict) -> bool:
@@ -920,35 +1081,86 @@ class PieceManager:
                 piece.is_complete = False
                 if piece.blocks_initialized:
                     piece.reset()
+            self._rebuild_rarity_buckets()
 
-    def get_next_request(self, peer_bitfield: bytearray) -> Optional[Block]:
-        """Return the next block this peer can provide, honoring file priority.
+    def _reserve_random_candidate_block(self, candidates: set[int]) -> Optional[Block]:
+        """Reserve one free block from a randomly ordered candidate set."""
+        while candidates:
+            offset = random.randrange(len(candidates))
+            piece_index = next(itertools.islice(candidates, offset, None))
+            candidates.remove(piece_index)
+            piece = self.pieces[piece_index]
 
-        High-priority files are exhausted before Normal, then Low. Pieces whose
-        overlapping files are all marked Don't Download are never requested.
+            if piece.is_complete:
+                self._remove_from_rarity_buckets(piece_index)
+                continue
+
+            for block in piece.blocks:
+                if not block.is_requested and block.data is None:
+                    block.is_requested = True
+                    self._active_piece_indices.add(piece_index)
+                    return block
+        return None
+
+    def get_next_request(
+        self,
+        peer_bitfield: bytearray,
+        peer_key: object = None,
+    ) -> Optional[Block]:
+        """Return a block using file-priority-preserving rarest-first selection.
+
+        File priority is the primary ordering: High is always considered before
+        Normal, then Low. Inside one priority rank, pieces advertised by fewer
+        currently connected peers are preferred. Equal-rarity pieces are chosen
+        randomly so independent clients do not converge on the same deterministic
+        piece order.
+
+        Availability is maintained by BITFIELD/HAVE/disconnect events; this hot
+        path never rebuilds or sorts a torrent-wide availability histogram.
         """
+        peer_pieces = self._peer_piece_sets.get(peer_key)
+        if peer_pieces is None:
+            # Compatibility fallback for callers/tests without a registered peer
+            # identity. Session workers normally take the cached path.
+            peer_pieces = self._piece_set_from_bitfield(peer_bitfield)
+        if not peer_pieces:
+            return None
+
         for wanted_rank in (
             FILE_PRIORITY_RANK[FILE_PRIORITY_HIGH],
             FILE_PRIORITY_RANK[FILE_PRIORITY_NORMAL],
             FILE_PRIORITY_RANK[FILE_PRIORITY_LOW],
         ):
-            for piece in self.pieces:
-                if piece.is_complete:
-                    continue
-                if self.piece_priority_rank(piece.index) != wanted_rank:
-                    continue
-
-                byte_index = piece.index // 8
-                bit_index = 7 - (piece.index % 8)
-                if byte_index >= len(peer_bitfield):
-                    continue
-                if not (peer_bitfield[byte_index] & (1 << bit_index)):
+            buckets = self._rarity_buckets.get(wanted_rank, {})
+            for availability in sorted(buckets):
+                bucket = buckets.get(availability)
+                if not bucket:
                     continue
 
-                for block in piece.blocks:
-                    if not block.is_requested and block.data is None:
-                        block.is_requested = True
+                # set intersection runs in CPython's C implementation. Only an
+                # equal-rarity candidate group is materialized, not all pieces.
+                # Keep filling an already-started equally rare piece first.
+                # Starting the intersection from the usually tiny active set
+                # avoids allocating a torrent-sized candidate set for each
+                # pipelined block request.
+                active_candidates = self._active_piece_indices.intersection(
+                    bucket,
+                    peer_pieces,
+                )
+                if active_candidates:
+                    block = self._reserve_random_candidate_block(active_candidates)
+                    if block is not None:
                         return block
+
+                # Only when no active candidate can supply another free block do
+                # we materialize the equal-rarity peer intersection and randomly
+                # choose the next piece to start.
+                candidates = bucket.intersection(peer_pieces)
+                if active_candidates:
+                    candidates.difference_update(active_candidates)
+                block = self._reserve_random_candidate_block(candidates)
+                if block is not None:
+                    return block
 
         return None
 
@@ -981,6 +1193,7 @@ class PieceManager:
         if piece.verify_hash():
             self._write_piece_to_disk(piece)
             piece.is_complete = True
+            self._remove_from_rarity_buckets(piece.index)
             self.save_resume_state()
             return True
 
@@ -1224,22 +1437,20 @@ class PieceManager:
         detail_limit = max(1, int(detail_limit))
         map_cell_limit = max(1, int(map_cell_limit))
 
-        availability = [0] * total_pieces
-        usable_bitfields = []
-        for bitfield in peer_bitfields:
-            if not bitfield:
-                continue
-            try:
-                raw = bytes(bitfield)
-            except Exception:
-                continue
-            usable_bitfields.append(raw)
-            for piece_index in range(total_pieces):
-                byte_index = piece_index // 8
-                if byte_index >= len(raw):
-                    break
-                bit_index = 7 - (piece_index % 8)
-                if raw[byte_index] & (1 << bit_index):
+        # Phase 1 keeps availability incrementally from peer events. Copying
+        # this compact integer array is cheaper than rescanning every connected
+        # peer bitfield whenever the cached Pieces view refreshes. The legacy
+        # peer_bitfields argument remains as a compatibility fallback for direct
+        # callers that do not register peer identities.
+        availability = list(self._piece_availability)
+        have_peer_availability = bool(self._peer_piece_sets)
+        if not have_peer_availability and peer_bitfields:
+            availability = [0] * total_pieces
+            for bitfield in peer_bitfields:
+                pieces = self._piece_set_from_bitfield(bitfield)
+                if pieces:
+                    have_peer_availability = True
+                for piece_index in pieces:
                     availability[piece_index] += 1
 
         records = []
@@ -1349,8 +1560,6 @@ class PieceManager:
         map_cells = []
         if total_pieces:
             pieces_per_cell = max(1, math.ceil(total_pieces / map_cell_limit))
-            have_peer_availability = bool(usable_bitfields)
-
             for start in range(0, total_pieces, pieces_per_cell):
                 end = min(total_pieces, start + pieces_per_cell)
                 codes = state_codes[start:end]
@@ -1417,3 +1626,5 @@ class PieceManager:
         if not self.pieces:
             return self.torrent.total_length == 0
         return all(piece.is_complete for piece in self.pieces)
+
+

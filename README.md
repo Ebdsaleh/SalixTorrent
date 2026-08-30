@@ -18,6 +18,7 @@ SalixTorrent is a desktop BitTorrent v1 client written in Python with a custom a
 - Per-torrent and true global upload/download rate limits.
 - Live General, Peers, Pieces, Files, Sources, and Speed views.
 - Compact piece map, peer client identification, source diagnostics, and rolling speed history.
+- Incremental piece-availability accounting with file-priority-preserving rarest-first scheduling and randomized equal-rarity tie-breaking.
 - Torrent creation from a file/archive or directory.
 - Persistent session restoration and application preferences.
 - UPnP / NAT-PMP mapping for each active torrent listener, with per-listener incoming-connectivity reporting, structured failure diagnosis, and automatic lease renewal.
@@ -106,6 +107,8 @@ Private torrents deliberately remain tracker-controlled. SalixTorrent disables D
 ## Downloads, uploads, and seeding
 
 BitTorrent peer connections are bidirectional. While a torrent is still downloading, SalixTorrent can upload pieces that have already passed SHA-1 verification. Unverified or incomplete pieces are never served.
+
+Download scheduling maintains piece availability incrementally from peer `BITFIELD`, `HAVE`, and disconnect events. File priority remains the primary rule (High, then Normal, then Low); within one priority level SalixTorrent requests the rarest piece available from that peer, with randomized tie-breaking between equally rare pieces. This avoids a torrent-wide availability rebuild or full sequential piece scan for every block request.
 
 When all wanted pieces are complete, the session can transition to seeding. Torrents created from local files/directories can also seed directly from the original source in read-only external-seed mode.
 

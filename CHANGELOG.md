@@ -6,6 +6,8 @@ Notable SalixTorrent changes are recorded here.
 
 ### Added
 
+- Incremental per-piece peer-availability accounting driven by BITFIELD, HAVE, and disconnect events.
+- File-priority-preserving rarest-first piece scheduling with randomized equal-rarity tie-breaking.
 - BitTorrent MSE/PE peer transport with `Disabled`, `Prefer Encryption`, and `Require Encryption` policies; `Prefer Encryption` is the default.
 - RC4-protected MSE incoming and outgoing peer streams, with fresh-connection plaintext fallback only under `Prefer Encryption`.
 - Dependency-free internal RC4 stream implementation for MSE/PE; the existing project requirements remain sufficient.
@@ -21,6 +23,8 @@ Notable SalixTorrent changes are recorded here.
 
 ### Changed
 
+- Pieces telemetry now reads the incremental availability cache instead of rebuilding availability by rescanning every connected peer bitfield.
+- Download block selection now uses cached rarity buckets rather than sequentially scanning pieces from index zero.
 - Tracker announces advertise encrypted-peer support and request encrypted peers when `Require Encryption` is selected.
 - Changing the selected network path or peer-encryption policy closes existing torrent sockets so subsequent connections use the new policy.
 - Incoming connectivity now tracks every active torrent listen port independently instead of exposing one global port as if it belonged to every torrent.

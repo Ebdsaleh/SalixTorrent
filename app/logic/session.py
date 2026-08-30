@@ -465,6 +465,7 @@ class TorrentSession:
                     pass
             self._seed_client_writers.clear()
             self._inbound_peer_records.clear()
+            self.piece_mgr.clear_peer_availability()
             await self._close_seed_server()
             await self._lpd.close()
             await self._dht.close()
@@ -683,6 +684,7 @@ class TorrentSession:
         self.active_peers.clear()
         self._seed_client_writers.clear()
         self._inbound_peer_records.clear()
+        self.piece_mgr.clear_peer_availability()
 
         self.piece_mgr.reset_inflight_requests()
         self.piece_mgr.save_resume_state(force=True)
@@ -827,6 +829,8 @@ class TorrentSession:
         total_pieces = len(self.piece_mgr.pieces)
         if piece_index < 0 or piece_index >= total_pieces:
             return
+
+        self.piece_mgr.record_peer_have(id(peer), piece_index)
 
         needed_bytes = (total_pieces + 7) // 8
         if len(peer.bitfield) < needed_bytes:
@@ -1015,26 +1019,8 @@ class TorrentSession:
             record["_last_sample_downloaded"] = downloaded
             record["_last_sample_uploaded"] = uploaded
 
-    def _piece_peer_bitfields(self) -> List[bytes]:
-        bitfields: List[bytes] = []
-
-        for peer in list(self.active_peers):
-            if peer.bitfield:
-                bitfields.append(bytes(peer.bitfield))
-
-        for record in list(self._inbound_peer_records.values()):
-            bitfield = record.get("bitfield", bytearray())
-            if bitfield:
-                try:
-                    bitfields.append(bytes(bitfield))
-                except Exception:
-                    pass
-
-        return bitfields
-
     def _build_piece_view_snapshot(self) -> dict:
         return self.piece_mgr.build_piece_telemetry(
-            peer_bitfields=self._piece_peer_bitfields(),
             detail_limit=80,
             map_cell_limit=384,
         )
@@ -1818,7 +1804,7 @@ class TorrentSession:
         if peer.peer_choking or not peer.bitfield:
             return False
 
-        block = self.piece_mgr.get_next_request(peer.bitfield)
+        block = self.piece_mgr.get_next_request(peer.bitfield, peer_key=id(peer))
         if not block:
             return False
 
@@ -1979,6 +1965,7 @@ class TorrentSession:
                 stale_writers.append(writer)
 
         for writer in stale_writers:
+            self.piece_mgr.unregister_peer(id(writer))
             self._seed_client_writers.discard(writer)
             self._inbound_peer_records.pop(id(writer), None)
 
@@ -2080,6 +2067,9 @@ class TorrentSession:
                     if self.state == SessionState.DOWNLOADING:
                         await self._request_one_block(peer, owned_requests)
 
+                elif msg_type == "BITFIELD":
+                    self.piece_mgr.register_peer_bitfield(id(peer), data)
+
                 elif msg_type == "HAVE":
                     self._apply_have_to_peer(peer, int(data))
 
@@ -2135,6 +2125,7 @@ class TorrentSession:
 
         finally:
             self.piece_mgr.release_requests(owned_requests)
+            self.piece_mgr.unregister_peer(id(peer))
 
             if peer in self.active_peers:
                 self.active_peers.remove(peer)
@@ -2402,6 +2393,10 @@ class TorrentSession:
                     break
 
                 msg_type, data = message
+                if msg_type == "BITFIELD":
+                    self.piece_mgr.register_peer_bitfield(id(peer), data)
+                    continue
+
                 if msg_type == "HAVE":
                     self._apply_have_to_peer(peer, int(data))
                     continue
@@ -2445,6 +2440,7 @@ class TorrentSession:
         except (asyncio.IncompleteReadError, ConnectionError, OSError):
             pass
         finally:
+            self.piece_mgr.unregister_peer(id(peer))
             if peer in self.active_peers:
                 self.active_peers.remove(peer)
             await peer.close()
@@ -2629,11 +2625,13 @@ class TorrentSession:
                     continue
                 if msg_id == PeerMessageID.BITFIELD:
                     inbound_record["bitfield"] = bytearray(body)
+                    self.piece_mgr.register_peer_bitfield(record_key, body)
                     continue
                 if msg_id == PeerMessageID.HAVE and len(body) == 4:
                     (piece_index,) = struct.unpack(">I", body)
                     total_pieces = len(self.piece_mgr.pieces)
                     if 0 <= piece_index < total_pieces:
+                        self.piece_mgr.record_peer_have(record_key, piece_index)
                         needed_bytes = (total_pieces + 7) // 8
                         peer_bits = inbound_record.setdefault("bitfield", bytearray())
                         if len(peer_bits) < needed_bytes:
@@ -2834,6 +2832,7 @@ class TorrentSession:
             pass
         finally:
             if registered:
+                self.piece_mgr.unregister_peer(id(writer))
                 self._seed_client_writers.discard(writer)
                 self._inbound_peer_records.pop(id(writer), None)
                 self._emit_snapshot()
@@ -2894,6 +2893,8 @@ class TorrentSession:
 
         except asyncio.CancelledError:
             pass
+
+
 
 
 

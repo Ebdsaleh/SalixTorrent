@@ -269,8 +269,24 @@ HELP_TERMS = {
     "PIECE_AVAILABILITY": (
         "Piece Availability",
         "How many currently connected peers advertise that they possess this "
-        "specific piece. A value of 0 means SalixTorrent does not currently know "
-        "a connected peer that can supply it.",
+        "specific piece. SalixTorrent updates this count incrementally from peer "
+        "BITFIELD, HAVE, and disconnect events and uses it for rarest-first piece "
+        "selection. A value of 0 means no connected peer is currently known to "
+        "supply the piece.",
+    ),
+    "RAREST_FIRST": (
+        "Rarest-First Piece Selection",
+        "Within the current file-priority level, SalixTorrent prefers incomplete "
+        "pieces advertised by the fewest connected peers. Acquiring scarce pieces "
+        "early reduces the chance of losing access to them and helps redistribute "
+        "rare data through the swarm. File priority remains the stronger rule.",
+    ),
+    "RANDOM_TIE_BREAKING": (
+        "Random Rarity Tie-Breaking",
+        "When several wanted pieces have the same file priority and the same peer "
+        "availability, SalixTorrent chooses between them randomly instead of always "
+        "starting at the lowest piece number. This avoids deterministic piece-order "
+        "clustering between clients while preserving rarest-first behaviour.",
     ),
     "PIECE_STATE": (
         "Piece State",
@@ -287,8 +303,10 @@ HELP_TERMS = {
     "FILE_PRIORITY": (
         "Per-file Download Priority",
         "Controls which wanted files SalixTorrent tries to satisfy first. High "
-        "outranks Normal, which outranks Low. 'Don't Download' skips pieces used "
-        "only by skipped files, while shared boundary pieces may still be needed.",
+        "outranks Normal, which outranks Low. Rarest-first selection is applied "
+        "inside each priority level, so rarity never causes a Low-priority file to "
+        "jump ahead of a wanted High-priority file. 'Don't Download' skips pieces "
+        "used only by skipped files, while shared boundary pieces may still be needed.",
     ),
     "FILE_STATE": (
         "File State",
@@ -988,6 +1006,8 @@ def add_context_tooltip(
         contextual_text(title, body, facts=facts, footer=footer),
         wrap=wrap,
     )
+
+
 
 
 
