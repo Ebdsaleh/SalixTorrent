@@ -349,21 +349,23 @@ HELP_TOPICS: Tuple[HelpTopic, ...] = (
         sections=(
             (
                 "DHT - Distributed Hash Table",
-                "BEP-5 DHT is a decentralized peer-discovery network. SalixTorrent queries DHT "
-                "nodes for endpoints associated with the torrent's info hash and can announce its "
-                "own listening endpoint when appropriate.",
+                "SalixTorrent participates in IPv4 BEP-5 DHT and IPv6 BEP-32 DHT as separate "
+                "address-family spaces sharing one scheduler/transaction layer. With Any interface "
+                "selected it can keep one UDP socket per available family; a specific IPv4 or IPv6 "
+                "bind constrains DHT to that family. Steady-state queries request the matching BEP-32 n4 or n6 node form to avoid unnecessary UDP payload.",
             ),
             (
                 "PEX - Peer Exchange",
                 "BEP-10 extension negotiation allows connected peers to advertise BEP-11 ut_pex. "
-                "Those peers can then introduce SalixTorrent to additional swarm participants. "
-                "PEX grows the peer pool from knowledge already inside the swarm.",
+                "SalixTorrent sends and receives both IPv4 compact added/dropped endpoints and the "
+                "IPv6 added6/dropped6 forms, so peer-assisted discovery remains dual-stack.",
             ),
             (
                 "LPD - Local Peer Discovery",
-                "BEP-14 Local Peer Discovery uses multicast on the local network. It is useful when "
-                "two machines behind the same router participate in the same torrent and can often "
-                "connect directly without relying on Internet discovery.",
+                "BEP-14 Local Peer Discovery uses IPv4 multicast on the local network. It is useful "
+                "when two nearby machines participate in the same torrent. Under an explicit IPv6-"
+                "only bind SalixTorrent disables LPD instead of silently sending multicast through "
+                "an unrelated IPv4 route.",
             ),
             (
                 "Private torrents",
@@ -372,7 +374,7 @@ HELP_TOPICS: Tuple[HelpTopic, ...] = (
                 "avoids injecting public fallback trackers into private trackerless metadata.",
             ),
         ),
-        related_terms=("DHT", "PEX", "LPD", "BEP", "DISCOVERY", "PRIVATE_TORRENT"),
+        related_terms=("DHT", "BEP32", "IPV6", "DUAL_STACK", "PEX", "LPD", "BEP", "DISCOVERY", "PRIVATE_TORRENT"),
     ),
     HelpTopic(
         key="networking",
@@ -384,25 +386,24 @@ HELP_TOPICS: Tuple[HelpTopic, ...] = (
         sections=(
             (
                 "The BitTorrent listen port",
-                "SalixTorrent listens for incoming TCP peer connections on the configured port, "
-                "with a small fallback range if that port is already in use. DHT may use the same "
-                "numeric port over UDP because TCP and UDP are separate transports.",
+                "SalixTorrent opens explicit IPv4 and IPv6 TCP listeners on the configured numeric "
+                "port when Any interface is selected and the platform supports both families. A "
+                "specific address bind opens only that family. DHT may use the same numeric port "
+                "over UDP because TCP and UDP are separate transports.",
             ),
             (
-                "Why routers complicate incoming connections",
-                "Most home networks use NAT. Outbound connections work naturally because the router "
-                "sees the connection being created from inside. A new unsolicited inbound Internet "
-                "connection may require a port-forwarding rule that tells the router which local "
-                "computer should receive it.",
+                "IPv4 NAT versus IPv6 reachability",
+                "Home IPv4 commonly uses NAT, so unsolicited inbound IPv4 connections may require a "
+                "router port-forward. Globally routed IPv6 normally does not need NAT translation: "
+                "reachability instead depends on the IPv6 route and host/router firewall policy. "
+                "SalixTorrent therefore treats IPv6 Direct separately from IPv4 port mapping.",
             ),
             (
                 "UPnP and NAT-PMP",
-                "SalixTorrent can ask a compatible router to create that mapping automatically. It "
-                "tries UPnP and can fall back to NAT-PMP. The interface reports each method separately, "
-                "including the stage and protocol fault/result code when one is available. UPnP routers "
-                "that reject finite leases with OnlyPermanentLeasesSupported are retried correctly with "
-                "a permanent lease. Failure to map is a notice, not a fatal torrent error: outbound "
-                "connections, trackers, DHT and PEX can still work.",
+                "SalixTorrent uses UPnP and NAT-PMP for IPv4 NAT mappings only. A specifically selected "
+                "IPv6 address never triggers an unrelated IPv4 mapping attempt, preserving binding and "
+                "Interface Lock semantics. IPv4 mapping diagnostics still preserve protocol stages and "
+                "fault codes, including permanent-lease fallback where required.",
             ),
             (
                 "Reading the diagnosis",
@@ -432,13 +433,20 @@ HELP_TOPICS: Tuple[HelpTopic, ...] = (
             ),
             (
                 "Binding a specific network path",
-                "Preferences can bind torrent networking to one local IPv4 address, including an address "
-                "owned by a VPN interface. This affects outgoing peer sockets, the incoming listener, "
-                "trackers, DHT, LPD and magnet metadata retrieval. Interface Lock adds monitoring so a "
-                "disappearing selected address fails closed instead of silently changing routes.",
+                "Preferences can bind torrent networking to one local IPv4 or IPv6 address, including a "
+                "VPN address. Peer TCP, listeners, HTTP/UDP trackers, DHT and magnet metadata retrieval "
+                "stay in that address family. Interface Lock monitors that exact address and fails closed "
+                "if it disappears. BEP-14 LPD is deliberately unavailable under IPv6-only binding.",
+            ),
+            (
+                "Tracker and peer IPv6 forms",
+                "HTTP trackers may return the compact peers6 field, UDP trackers can resolve/contact an "
+                "IPv6 tracker and return 18-byte compact peer endpoints, and PEX carries IPv6 peers in "
+                "added6/dropped6. SalixTorrent normalizes all of these into the same family-aware peer "
+                "endpoint model while displaying IPv6 address:port pairs with brackets.",
             ),
         ),
-        related_terms=("LISTEN_PORT", "LISTENER_ENDPOINT", "INCOMING_CONNECTIONS", "PORT_MAPPING", "MAPPING_METHOD_STATUS", "MAPPING_DIAGNOSIS", "CONNECTIVITY_ACTION", "MAPPING_LEASE", "UPNP", "NATPMP", "MANUAL_PORT_FORWARD", "CGNAT", "DOUBLE_NAT", "LOCAL_ENDPOINT", "EXTERNAL_ENDPOINT", "EXTERNAL_ADDRESS_SCOPE", "NETWORK_BINDING", "INTERFACE_LOCK", "VPN", "TCP", "UDP"),
+        related_terms=("LISTEN_PORT", "LISTENER_ENDPOINT", "INCOMING_CONNECTIONS", "PORT_MAPPING", "MAPPING_METHOD_STATUS", "MAPPING_DIAGNOSIS", "CONNECTIVITY_ACTION", "MAPPING_LEASE", "UPNP", "NATPMP", "MANUAL_PORT_FORWARD", "CGNAT", "DOUBLE_NAT", "LOCAL_ENDPOINT", "EXTERNAL_ENDPOINT", "EXTERNAL_ADDRESS_SCOPE", "NETWORK_BINDING", "INTERFACE_LOCK", "VPN", "IPV6", "DUAL_STACK", "BEP32", "TCP", "UDP"),
     ),
     HelpTopic(
         key="queue_priorities",
@@ -1111,3 +1119,5 @@ class HelpTopicsView:
         # changed width, so maximizing/restoring the viewport stays polished
         # without turning Help into a continuously rebuilding view.
         self._update_content_wrap()
+
+

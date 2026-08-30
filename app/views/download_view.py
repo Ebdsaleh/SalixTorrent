@@ -11,6 +11,7 @@ from tkinter import filedialog
 
 import dearpygui.dearpygui as dpg
 
+from app.logic.network_binding import format_endpoint
 from app.logic.torrent_manager import TorrentManager
 from app.engine.desktop_integration import DesktopIntegration
 from app.views.peer_view import PeerView
@@ -310,8 +311,10 @@ class DownloadView:
                             add_help_tooltip(self.discovery_text, "DISCOVERY")
                             self.listen_port_text = dpg.add_text("Listen Port: --")
                             add_help_tooltip(self.listen_port_text, "LISTEN_PORT")
-                            self.listener_endpoint_text = dpg.add_text("Listener: --")
+                            self.listener_endpoint_text = dpg.add_text("Listeners: --")
                             add_help_tooltip(self.listener_endpoint_text, "LISTENER_ENDPOINT")
+                            self.ip_family_text = dpg.add_text("IP Families: --")
+                            add_help_tooltip(self.ip_family_text, "IPV6")
                             self.transport_text = dpg.add_text("Transport: --")
                             add_help_tooltip(self.transport_text, "TRANSPORT_SECURITY")
                             self.network_path_text = dpg.add_text("Network Path: --")
@@ -1629,7 +1632,8 @@ class DownloadView:
         dpg.set_value(self.availability_text, "Availability: --")
         dpg.set_value(self.discovery_text, "Discovery: --")
         dpg.set_value(self.listen_port_text, "Listen Port: --")
-        dpg.set_value(self.listener_endpoint_text, "Listener: --")
+        dpg.set_value(self.listener_endpoint_text, "Listeners: --")
+        dpg.set_value(self.ip_family_text, "IP Families: --")
         dpg.set_value(self.transport_text, "Transport: --")
         dpg.set_value(self.network_path_text, "Network Path: --")
         dpg.set_value(self.connectivity_text, "Incoming: --")
@@ -1974,15 +1978,32 @@ class DownloadView:
             self.listen_port_text,
             f"Listen Port: {shown_port if shown_port else '--'}{port_suffix}",
         )
-        listener_address = str(msg.get("listener_address") or "").strip()
-        if listen_port and listener_address:
-            listener_suffix = " (all IPv4 interfaces)" if listener_address == "0.0.0.0" else ""
-            listener_value = f"Listener: {listener_address}:{listen_port}{listener_suffix}"
+        listener_v4 = str(msg.get("listener_ipv4_endpoint") or "").strip()
+        listener_v6 = str(msg.get("listener_ipv6_endpoint") or "").strip()
+        listener_parts = []
+        if listener_v4:
+            suffix = " (all IPv4 interfaces)" if listener_v4.startswith("0.0.0.0:") else ""
+            listener_parts.append(f"IPv4 {listener_v4}{suffix}")
+        if listener_v6:
+            suffix = " (all IPv6 interfaces)" if listener_v6.startswith("[::]:") else ""
+            listener_parts.append(f"IPv6 {listener_v6}{suffix}")
+        if listener_parts:
+            listener_value = "Listeners: " + " | ".join(listener_parts)
         elif listen_port:
-            listener_value = f"Listener: port {listen_port}"
+            listener_value = f"Listeners: port {listen_port}"
         else:
-            listener_value = "Listener: Not listening"
+            listener_value = "Listeners: Not listening"
         dpg.set_value(self.listener_endpoint_text, listener_value)
+
+        ipv4_peers = int(msg.get("ipv4_peer_count", 0) or 0)
+        ipv6_peers = int(msg.get("ipv6_peer_count", 0) or 0)
+        dht_v4 = int(msg.get("dht_udp_port_ipv4", 0) or 0)
+        dht_v6 = int(msg.get("dht_udp_port_ipv6", 0) or 0)
+        dpg.set_value(
+            self.ip_family_text,
+            f"IP Families: peers IPv4 {ipv4_peers} / IPv6 {ipv6_peers} | "
+            f"DHT UDP IPv4 {dht_v4 or '--'} / IPv6 {dht_v6 or '--'}",
+        )
 
         encrypted_count = int(msg.get("encrypted_peer_count", 0) or 0)
         plaintext_count = int(msg.get("plaintext_peer_count", 0) or 0)
@@ -2050,7 +2071,7 @@ class DownloadView:
         external_scope = str(connectivity.get("external_scope") or "Unknown")
         if external_ip and external_port:
             scope_suffix = f" ({external_scope})" if external_scope != "Unknown" else ""
-            external_value = f"External: {external_ip}:{external_port}{scope_suffix}"
+            external_value = f"External: {format_endpoint(external_ip, external_port)}{scope_suffix}"
         elif external_port:
             external_value = f"External: port {external_port}"
         else:
@@ -2235,6 +2256,8 @@ class DownloadView:
             snapshot = self.latest_stats.get(self.active_info_hash)
             if snapshot:
                 self._render_inspector(snapshot, force_detail=True)
+
+
 
 
 

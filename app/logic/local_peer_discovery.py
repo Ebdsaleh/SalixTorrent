@@ -8,7 +8,7 @@ import struct
 import time
 from typing import List, Optional, Set, Tuple
 
-from app.logic.network_binding import normalise_bind_address
+from app.logic.network_binding import ip_family, normalise_bind_address
 
 
 LPD_MULTICAST_GROUP = "239.192.152.143"
@@ -77,6 +77,11 @@ class LocalPeerDiscovery:
         self.bind_address = normalise_bind_address(bind_address)
 
     def _make_socket(self) -> socket.socket:
+        # BEP-14 defines the IPv4 multicast group 239.192.152.143. When the
+        # user explicitly binds SalixTorrent to an IPv6-only path, do not leak
+        # LPD traffic through an unrelated IPv4 interface.
+        if self.bind_address and ip_family(self.bind_address) == socket.AF_INET6:
+            raise OSError("BEP-14 Local Peer Discovery is IPv4-only; disabled on an IPv6-only bind")
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
@@ -299,3 +304,5 @@ class LocalPeerDiscovery:
             self.transport.close()
             self.transport = None
         self.protocol = None
+
+

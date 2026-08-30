@@ -13,7 +13,7 @@ import time
 from typing import Dict, List, Optional, Set, Tuple
 
 from app.logic.bencode import Bencode
-from app.logic.network_binding import normalise_bind_address
+from app.logic.network_binding import default_route_address, ip_family, normalise_bind_address, wildcard_for_family
 
 
 DHT_BOOTSTRAP_NODES = (
@@ -28,31 +28,25 @@ DHT_BATCH_SIZE = 8
 
 
 class _DHTProtocol(asyncio.DatagramProtocol):
-    def __init__(self, owner: "DHTClient"):
+    def __init__(self, owner: "DHTClient", family: int):
         self.owner = owner
+        self.family = family
 
     def datagram_received(self, data: bytes, addr):
-        self.owner._handle_datagram(data, addr)
+        self.owner._handle_datagram(data, addr, self.family)
 
     def error_received(self, exc):
         self.owner.last_error = str(exc)
 
 
 class DHTClient:
-    """Small dependency-free BEP-5 DHT peer discovery client.
+    """Compact dual-stack BEP-5/BEP-32 DHT peer-discovery client.
 
-    SalixTorrent does not try to be a full long-lived routing-table daemon yet.
-    Instead each torrent session owns a compact iterative lookup engine:
-
-    * bootstrap through well-known public DHT routers;
-    * issue ``get_peers`` queries for the torrent info hash;
-    * follow compact node lists returned by reachable nodes;
-    * consume compact peer values returned by the DHT;
-    * when a TCP listen port exists, use returned tokens to ``announce_peer``;
-    * answer the basic KRPC queries required to behave politely as a DHT node.
-
-    Private torrents disable this object entirely, as required by the private
-    torrent convention.
+    IPv4 and IPv6 are separate DHT address spaces, so an unbound SalixTorrent
+    session owns at most one UDP socket per family. Both sockets share the same
+    transaction table and iterative scheduler; there is no per-family polling
+    loop. A specific Network Interface / VPN address constrains DHT to that
+    address family, matching the application's fail-closed binding semantics.
     """
 
     def __init__(
@@ -79,9 +73,15 @@ class DHTClient:
         self.node_id = secrets.token_bytes(20)
         self._token_secret = secrets.token_bytes(20)
 
+        self._transports: Dict[int, asyncio.DatagramTransport] = {}
+        self._protocols: Dict[int, _DHTProtocol] = {}
+        # Compatibility aliases retained for existing code/tests. Prefer IPv4
+        # when both are active, otherwise expose the available family.
         self.transport: Optional[asyncio.DatagramTransport] = None
         self.protocol: Optional[_DHTProtocol] = None
         self.local_udp_port: int = 0
+        self.local_udp_port_v4: int = 0
+        self.local_udp_port_v6: int = 0
         self.announce_port: int = 0
         self.enabled: bool = False
         self._closed: bool = False
@@ -92,7 +92,6 @@ class DHTClient:
         self._announced_seen: Set[Tuple[str, int]] = set()
         self._extra_bootstrap: Set[Tuple[str, int]] = set()
 
-        # Sources-view telemetry.
         self.status: str = "Disabled" if self.private else "Waiting"
         self.last_error: str = ""
         self.started_at: float = 0.0
@@ -103,12 +102,90 @@ class DHTClient:
         self.query_count: int = 0
         self.nodes_queried: int = 0
         self.nodes_responded: int = 0
+        self.nodes_queried_v4: int = 0
+        self.nodes_queried_v6: int = 0
+        self.nodes_responded_v4: int = 0
+        self.nodes_responded_v6: int = 0
         self.announce_count: int = 0
         self.peers_seen: Set[Tuple[str, int]] = set()
+        self.peers_seen_v4: Set[Tuple[str, int]] = set()
+        self.peers_seen_v6: Set[Tuple[str, int]] = set()
 
     # ------------------------------------------------------------------
     # Socket lifecycle / KRPC framing
     # ------------------------------------------------------------------
+
+    def _desired_families(self) -> Tuple[int, ...]:
+        if self.bind_address:
+            family = ip_family(self.bind_address)
+            return (family,) if family in {socket.AF_INET, socket.AF_INET6} else ()
+        return (socket.AF_INET, socket.AF_INET6)
+
+    def _make_udp_socket(self, family: int, port: int) -> socket.socket:
+        sock = socket.socket(family, socket.SOCK_DGRAM)
+        try:
+            if family == socket.AF_INET6 and hasattr(socket, "IPV6_V6ONLY"):
+                # Keep IPv4 and IPv6 as explicit independent sockets even on
+                # platforms where an IPv6 wildcard would otherwise absorb v4.
+                sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+            if self.bind_address:
+                host = self.bind_address
+            elif family == socket.AF_INET6:
+                # BEP-32 recommends a stable concrete global-unicast source
+                # rather than ::, especially on multi-homed hosts. If the OS
+                # has no routable IPv6 source, skip IPv6 DHT while preserving
+                # the IPv4 DHT instead of opening a misleading wildcard socket.
+                host = default_route_address(socket.AF_INET6)
+                if not host:
+                    raise OSError("No routable IPv6 source address is available for BEP-32 DHT")
+            else:
+                host = wildcard_for_family(family)
+            endpoint = (host, port, 0, 0) if family == socket.AF_INET6 else (host, port)
+            sock.bind(endpoint)
+            sock.setblocking(False)
+            return sock
+        except Exception:
+            sock.close()
+            raise
+
+    async def _start_family(self, family: int) -> bool:
+        if family in self._transports:
+            return True
+        loop = asyncio.get_running_loop()
+        last_error: Optional[BaseException] = None
+        for requested_port in (self.preferred_port, 0):
+            # Avoid making two identical port=0 attempts.
+            if requested_port == 0 and self.preferred_port == 0 and last_error is not None:
+                break
+            try:
+                sock = self._make_udp_socket(family, requested_port)
+                transport, protocol = await loop.create_datagram_endpoint(
+                    lambda: _DHTProtocol(self, family),
+                    sock=sock,
+                )
+            except (OSError, RuntimeError) as exc:
+                last_error = exc
+                continue
+            self._transports[family] = transport
+            self._protocols[family] = protocol
+            sockname = transport.get_extra_info("sockname")
+            port = int(sockname[1]) if isinstance(sockname, tuple) and len(sockname) >= 2 else 0
+            if family == socket.AF_INET6:
+                self.local_udp_port_v6 = port
+            else:
+                self.local_udp_port_v4 = port
+            return True
+        if self.bind_address and ip_family(self.bind_address) == family and last_error:
+            self.last_error = str(last_error)
+        return False
+
+    def _refresh_compat_aliases(self):
+        family = socket.AF_INET if socket.AF_INET in self._transports else socket.AF_INET6
+        self.transport = self._transports.get(family)
+        self.protocol = self._protocols.get(family)
+        self.local_udp_port = (
+            self.local_udp_port_v4 or self.local_udp_port_v6
+        )
 
     async def start(self, announce_port: int = 0) -> bool:
         self.announce_port = max(0, min(65535, int(announce_port or 0)))
@@ -118,42 +195,26 @@ class DHTClient:
             self.last_error = "Private torrent: DHT disabled"
             return False
 
-        if self.transport is not None:
+        desired = self._desired_families()
+        if self._transports and all(family in self._transports for family in desired):
             self.enabled = True
             return True
 
         self._closed = False
-        loop = asyncio.get_running_loop()
-        try:
+        started = []
+        for family in desired:
             try:
-                transport, protocol = await loop.create_datagram_endpoint(
-                    lambda: _DHTProtocol(self),
-                    local_addr=(self.bind_address or "0.0.0.0", self.preferred_port),
-                    family=socket.AF_INET,
-                )
-            except OSError:
-                # TCP and UDP may share the same numeric port. If another UDP
-                # application already owns the configured port, keep DHT
-                # functional by falling back to an ephemeral UDP port.
-                transport, protocol = await loop.create_datagram_endpoint(
-                    lambda: _DHTProtocol(self),
-                    local_addr=(self.bind_address or "0.0.0.0", 0),
-                    family=socket.AF_INET,
-                )
-        except (OSError, RuntimeError) as exc:
+                if await self._start_family(family):
+                    started.append(family)
+            except OSError as exc:
+                self.last_error = str(exc)
+
+        self._refresh_compat_aliases()
+        if not started and not self._transports:
             self.enabled = False
             self.status = "Error"
-            self.last_error = str(exc)
+            self.last_error = self.last_error or "Could not open an IPv4 or IPv6 DHT socket"
             return False
-
-        self.transport = transport
-        self.protocol = protocol
-        sockname = transport.get_extra_info("sockname")
-        if isinstance(sockname, tuple) and len(sockname) >= 2:
-            try:
-                self.local_udp_port = int(sockname[1])
-            except (TypeError, ValueError):
-                self.local_udp_port = 0
 
         self.enabled = True
         self.status = "Waiting"
@@ -183,9 +244,17 @@ class DHTClient:
         return secrets.token_bytes(2)
 
     def _send(self, payload: dict, endpoint: Tuple[str, int]):
-        if not self.transport or self._closed:
+        if self._closed:
             raise RuntimeError("DHT socket is not active.")
-        self.transport.sendto(Bencode.encode(payload), endpoint)
+        family = ip_family(endpoint[0])
+        transport = self._transports.get(family)
+        if transport is None:
+            raise RuntimeError(
+                "IPv6 DHT socket is not active."
+                if family == socket.AF_INET6
+                else "IPv4 DHT socket is not active."
+            )
+        transport.sendto(Bencode.encode(payload), endpoint)
 
     async def _query(
         self,
@@ -194,8 +263,9 @@ class DHTClient:
         arguments: dict,
         timeout: float = DHT_QUERY_TIMEOUT,
     ) -> dict:
-        if not self.transport:
-            raise RuntimeError("DHT socket is not active.")
+        family = ip_family(endpoint[0])
+        if family not in self._transports:
+            raise RuntimeError("DHT socket for endpoint family is not active.")
 
         tid = self._next_transaction_id()
         loop = asyncio.get_running_loop()
@@ -203,15 +273,9 @@ class DHTClient:
         self._pending[tid] = future
         started = time.monotonic()
         self.query_count += 1
-
         try:
             self._send(
-                {
-                    b"t": tid,
-                    b"y": b"q",
-                    b"q": bytes(query_name),
-                    b"a": arguments,
-                },
+                {b"t": tid, b"y": b"q", b"q": bytes(query_name), b"a": arguments},
                 endpoint,
             )
             response = await asyncio.wait_for(future, timeout=timeout)
@@ -220,7 +284,7 @@ class DHTClient:
         finally:
             self._pending.pop(tid, None)
 
-    def _handle_datagram(self, data: bytes, addr):
+    def _handle_datagram(self, data: bytes, addr, family: int):
         try:
             message = Bencode.decode(data)
         except Exception:
@@ -230,7 +294,6 @@ class DHTClient:
 
         transaction = message.get(b"t")
         message_type = message.get(b"y")
-
         if message_type in (b"r", b"e") and isinstance(transaction, bytes):
             future = self._pending.get(transaction)
             if future is not None and not future.done():
@@ -243,7 +306,7 @@ class DHTClient:
             return
 
         if message_type == b"q" and isinstance(transaction, bytes):
-            self._handle_query(message, addr, transaction)
+            self._handle_query(message, addr, transaction, family)
 
     # ------------------------------------------------------------------
     # Minimal server-side KRPC participation
@@ -258,7 +321,7 @@ class DHTClient:
         except Exception:
             pass
 
-    def _handle_query(self, message: dict, addr, transaction: bytes):
+    def _handle_query(self, message: dict, addr, transaction: bytes, family: int):
         query_name = message.get(b"q")
         arguments = message.get(b"a")
         if not isinstance(arguments, dict):
@@ -266,38 +329,45 @@ class DHTClient:
 
         endpoint = (str(addr[0]), int(addr[1]))
         base = {b"id": self.node_id}
-
         if query_name == b"ping":
             self._reply(transaction, endpoint, base)
             return
 
+        def add_requested_node_sets(result: dict):
+            want = arguments.get(b"want")
+            if isinstance(want, list):
+                if b"n4" in want:
+                    result[b"nodes"] = b""
+                if b"n6" in want:
+                    result[b"nodes6"] = b""
+                return
+            # BEP-32 default: reply with the node form matching the transport
+            # family when no explicit want list is present.
+            if family == socket.AF_INET6:
+                result[b"nodes6"] = b""
+            else:
+                result[b"nodes"] = b""
+
         if query_name == b"find_node":
-            base[b"nodes"] = b""
+            add_requested_node_sets(base)
             self._reply(transaction, endpoint, base)
             return
-
         if query_name == b"get_peers":
             base[b"token"] = self._token_for_ip(endpoint[0])
-            base[b"nodes"] = b""
+            add_requested_node_sets(base)
             self._reply(transaction, endpoint, base)
             return
-
         if query_name == b"announce_peer":
             token = arguments.get(b"token")
             if token != self._token_for_ip(endpoint[0]):
                 return
-
             implied = int(arguments.get(b"implied_port", 0) or 0)
             try:
                 peer_port = endpoint[1] if implied else int(arguments.get(b"port", 0) or 0)
             except (TypeError, ValueError):
                 peer_port = 0
-
             remote_hash = arguments.get(b"info_hash")
-            if (
-                remote_hash == self.info_hash
-                and 0 < peer_port <= 65535
-            ):
+            if remote_hash == self.info_hash and 0 < peer_port <= 65535:
                 peer_endpoint = (endpoint[0], peer_port)
                 if peer_endpoint not in self._announced_seen:
                     self._announced_seen.add(peer_endpoint)
@@ -305,7 +375,6 @@ class DHTClient:
                         self._announced_peer_queue.put_nowait(peer_endpoint)
                     except asyncio.QueueFull:
                         pass
-
             self._reply(transaction, endpoint, base)
 
     # ------------------------------------------------------------------
@@ -313,7 +382,14 @@ class DHTClient:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _parse_compact_peers(values) -> List[Tuple[str, int]]:
+    def _parse_compact_peers(values, family: int = socket.AF_INET) -> List[Tuple[str, int]]:
+        """Parse BEP-5/BEP-32 peer values, including legal hybrid lists.
+
+        BEP-32 requires receivers to accept a ``values`` list containing an
+        arbitrary mixture of 6-byte IPv4 and 18-byte IPv6 entries. The family
+        argument is therefore only a fallback for non-standard concatenated
+        blobs; exact entry lengths always determine their own address family.
+        """
         peers: List[Tuple[str, int]] = []
         if isinstance(values, (bytes, bytearray)):
             values = [bytes(values)]
@@ -324,13 +400,21 @@ class DHTClient:
             if not isinstance(value, (bytes, bytearray)):
                 continue
             raw = bytes(value)
-            # BEP-5 values are normally one compact peer per list entry, but
-            # tolerate implementations that concatenate multiple IPv4 peers.
-            for offset in range(0, len(raw) - 5, 6):
-                chunk = raw[offset:offset + 6]
+            if len(raw) == 6:
+                chunks = [(socket.AF_INET, raw)]
+            elif len(raw) == 18:
+                chunks = [(socket.AF_INET6, raw)]
+            else:
+                width = 18 if family == socket.AF_INET6 else 6
+                if not raw or len(raw) % width:
+                    continue
+                chunks = [(family, raw[offset:offset + width]) for offset in range(0, len(raw), width)]
+
+            for chunk_family, chunk in chunks:
+                address_size = 16 if chunk_family == socket.AF_INET6 else 4
                 try:
-                    ip = socket.inet_ntoa(chunk[:4])
-                    port = struct.unpack(">H", chunk[4:])[0]
+                    ip = socket.inet_ntop(chunk_family, chunk[:address_size])
+                    port = struct.unpack(">H", chunk[address_size:])[0]
                 except (OSError, struct.error):
                     continue
                 if port:
@@ -338,17 +422,19 @@ class DHTClient:
         return peers
 
     @staticmethod
-    def _parse_compact_nodes(raw_nodes) -> List[Tuple[bytes, str, int]]:
+    def _parse_compact_nodes(raw_nodes, family: int = socket.AF_INET) -> List[Tuple[bytes, str, int]]:
         nodes: List[Tuple[bytes, str, int]] = []
         if not isinstance(raw_nodes, (bytes, bytearray)):
             return nodes
         raw = bytes(raw_nodes)
-        for offset in range(0, len(raw) - 25, 26):
-            chunk = raw[offset:offset + 26]
+        width = 38 if family == socket.AF_INET6 else 26
+        address_size = 16 if family == socket.AF_INET6 else 4
+        for offset in range(0, len(raw) - (width - 1), width):
+            chunk = raw[offset:offset + width]
             node_id = chunk[:20]
             try:
-                ip = socket.inet_ntoa(chunk[20:24])
-                port = struct.unpack(">H", chunk[24:26])[0]
+                ip = socket.inet_ntop(family, chunk[20:20 + address_size])
+                port = struct.unpack(">H", chunk[20 + address_size:width])[0]
             except (OSError, struct.error):
                 continue
             if port:
@@ -367,7 +453,10 @@ class DHTClient:
             port = int(endpoint[1])
         except (TypeError, ValueError, IndexError):
             return
-        if not ip or port <= 0 or port > 65535:
+        if ip_family(ip) not in {socket.AF_INET, socket.AF_INET6} or not (0 < port <= 65535):
+            return
+        # Ignore a family that cannot be used under a specific source bind.
+        if self.bind_address and ip_family(ip) != ip_family(self.bind_address):
             return
         self._extra_bootstrap.add((ip, port))
 
@@ -375,24 +464,28 @@ class DHTClient:
         loop = asyncio.get_running_loop()
         endpoints: List[Tuple[str, int]] = []
         seen: Set[Tuple[str, int]] = set()
+        active_families = set(self._transports)
 
         for endpoint in sorted(self._extra_bootstrap):
-            if endpoint not in seen:
+            if ip_family(endpoint[0]) in active_families and endpoint not in seen:
                 seen.add(endpoint)
                 endpoints.append(endpoint)
 
+        resolve_family = ip_family(self.bind_address) if self.bind_address else socket.AF_UNSPEC
         for host, port in self.bootstrap_nodes:
             try:
                 infos = await loop.getaddrinfo(
                     host,
                     port,
-                    family=socket.AF_INET,
+                    family=resolve_family,
                     type=socket.SOCK_DGRAM,
                 )
             except OSError:
                 continue
-
             for info in infos:
+                family = info[0]
+                if family not in active_families:
+                    continue
                 sockaddr = info[4]
                 endpoint = (str(sockaddr[0]), int(sockaddr[1]))
                 if endpoint not in seen:
@@ -400,24 +493,24 @@ class DHTClient:
                     endpoints.append(endpoint)
         return endpoints
 
-    async def _get_peers_from_node(
-        self,
-        endpoint: Tuple[str, int],
-    ) -> Tuple[Tuple[str, int], dict, float]:
+    async def _get_peers_from_node(self, endpoint: Tuple[str, int]):
         started = time.monotonic()
         response = await self._query(
             endpoint,
             b"get_peers",
-            {b"id": self.node_id, b"info_hash": self.info_hash},
+            {
+                b"id": self.node_id,
+                b"info_hash": self.info_hash,
+                # BEP-32 steady-state guidance prefers requesting node data
+                # for the same family as the queried DHT. The separately
+                # bootstrapped sockets already cover both address spaces.
+                b"want": [b"n6"] if ip_family(endpoint[0]) == socket.AF_INET6 else [b"n4"],
+            },
         )
         elapsed_ms = max(0.0, (time.monotonic() - started) * 1000.0)
         return endpoint, response, elapsed_ms
 
-    async def _announce_to_node(
-        self,
-        endpoint: Tuple[str, int],
-        token: bytes,
-    ):
+    async def _announce_to_node(self, endpoint: Tuple[str, int], token: bytes):
         if not self.announce_port or not token:
             return
         try:
@@ -435,8 +528,6 @@ class DHTClient:
             )
             self.announce_count += 1
         except Exception:
-            # A failed announce does not invalidate a successful get_peers
-            # response from the same node.
             pass
 
     # ------------------------------------------------------------------
@@ -446,12 +537,10 @@ class DHTClient:
     async def discover_peers(self, announce_port: Optional[int] = None) -> List[Tuple[str, int]]:
         if announce_port is not None:
             self.update_announce_port(announce_port)
-
         if self.private:
             self.status = "Disabled"
             self.last_error = "Private torrent: DHT disabled"
             return []
-
         if not await self.start(self.announce_port):
             return []
 
@@ -460,21 +549,22 @@ class DHTClient:
         self.last_attempt_at = time.monotonic()
         self.nodes_queried = 0
         self.nodes_responded = 0
+        self.nodes_queried_v4 = 0
+        self.nodes_queried_v6 = 0
+        self.nodes_responded_v4 = 0
+        self.nodes_responded_v6 = 0
 
         bootstrap = await self._resolve_bootstrap()
         if not bootstrap:
             self.status = "Error"
-            self.last_error = "Could not resolve any DHT bootstrap node"
+            self.last_error = "Could not resolve any IPv4/IPv6 DHT bootstrap node"
             self.last_update_at = time.monotonic()
             return []
 
-        # Priority queue entries are (distance, tie-breaker, endpoint). Bootstrap
-        # nodes have no node ID yet, so they begin at maximum distance.
         candidates: List[Tuple[int, int, Tuple[str, int]]] = []
         queued: Set[Tuple[str, int]] = set()
         queried: Set[Tuple[str, int]] = set()
         tie_breaker = 0
-
         for endpoint in bootstrap:
             heapq.heappush(candidates, ((1 << 160) - 1, tie_breaker, endpoint))
             tie_breaker += 1
@@ -492,57 +582,68 @@ class DHTClient:
                     continue
                 queried.add(endpoint)
                 batch.append(endpoint)
-
             if not batch:
                 break
 
             self.nodes_queried += len(batch)
+            for endpoint in batch:
+                if ip_family(endpoint[0]) == socket.AF_INET6:
+                    self.nodes_queried_v6 += 1
+                else:
+                    self.nodes_queried_v4 += 1
+
             results = await asyncio.gather(
                 *(self._get_peers_from_node(endpoint) for endpoint in batch),
                 return_exceptions=True,
             )
-
             for result in results:
                 if isinstance(result, Exception):
                     continue
-
                 endpoint, response, elapsed_ms = result
+                family = ip_family(endpoint[0])
                 self.nodes_responded += 1
+                if family == socket.AF_INET6:
+                    self.nodes_responded_v6 += 1
+                else:
+                    self.nodes_responded_v4 += 1
                 response_latencies.append(elapsed_ms)
 
-                for peer_endpoint in self._parse_compact_peers(response.get(b"values")):
+                for peer_endpoint in self._parse_compact_peers(response.get(b"values"), family):
                     try:
                         ipaddress.ip_address(peer_endpoint[0])
                     except ValueError:
                         continue
                     found_peers.add(peer_endpoint)
                     self.peers_seen.add(peer_endpoint)
+                    if ip_family(peer_endpoint[0]) == socket.AF_INET6:
+                        self.peers_seen_v6.add(peer_endpoint)
+                    else:
+                        self.peers_seen_v4.add(peer_endpoint)
 
                 token = response.get(b"token")
                 if self.announce_port and isinstance(token, bytes) and token:
-                    announce_jobs.append(
-                        asyncio.create_task(self._announce_to_node(endpoint, token))
-                    )
+                    announce_jobs.append(asyncio.create_task(self._announce_to_node(endpoint, token)))
 
-                for node_id, ip, port in self._parse_compact_nodes(response.get(b"nodes")):
-                    node_endpoint = (ip, port)
-                    if node_endpoint in queued or node_endpoint in queried:
+                for node_family, key in (
+                    (socket.AF_INET, b"nodes"),
+                    (socket.AF_INET6, b"nodes6"),
+                ):
+                    if node_family not in self._transports:
                         continue
-                    queued.add(node_endpoint)
-                    distance = self._xor_distance(node_id, self.info_hash)
-                    heapq.heappush(candidates, (distance, tie_breaker, node_endpoint))
-                    tie_breaker += 1
+                    for node_id, ip, port in self._parse_compact_nodes(response.get(key), node_family):
+                        node_endpoint = (ip, port)
+                        if node_endpoint in queued or node_endpoint in queried:
+                            continue
+                        queued.add(node_endpoint)
+                        distance = self._xor_distance(node_id, self.info_hash)
+                        heapq.heappush(candidates, (distance, tie_breaker, node_endpoint))
+                        tie_breaker += 1
 
-            # Once peers have been found, a few extra batches improve diversity
-            # without traversing the entire reachable DHT for every refresh.
             if found_peers and self.nodes_queried >= 24:
                 break
 
         if announce_jobs:
             await asyncio.gather(*announce_jobs, return_exceptions=True)
-
-        # Peers that directly announce to our minimal KRPC listener are valid
-        # discoveries too.
         found_peers.update(self.drain_peers())
 
         now = time.monotonic()
@@ -555,8 +656,7 @@ class DHTClient:
             self.last_error = ""
         else:
             self.status = "Error"
-            self.last_error = "No DHT nodes responded"
-
+            self.last_error = "No IPv4/IPv6 DHT nodes responded"
         return sorted(found_peers)
 
     def drain_peers(self) -> List[Tuple[str, int]]:
@@ -568,17 +668,29 @@ class DHTClient:
                 break
             peers.append(endpoint)
             self.peers_seen.add(endpoint)
+            if ip_family(endpoint[0]) == socket.AF_INET6:
+                self.peers_seen_v6.add(endpoint)
+            else:
+                self.peers_seen_v4.add(endpoint)
         return peers
 
     def get_source_snapshot(self) -> dict:
         now = time.monotonic()
         last_update = self.last_update_at or self.last_attempt_at
+        if self.private:
+            detail = "Private torrent: BEP-5/BEP-32 disabled"
+        else:
+            v4 = f"IPv4 UDP {self.local_udp_port_v4 or '--'} nodes {self.nodes_responded_v4}/{self.nodes_queried_v4}"
+            v6 = f"IPv6 UDP {self.local_udp_port_v6 or '--'} nodes {self.nodes_responded_v6}/{self.nodes_queried_v6}"
+            detail = f"BEP-5/BEP-32 | {v4} | {v6} | announces {self.announce_count}"
         return {
             "id": "dht",
             "source": "Distributed Hash Table",
             "type": "DHT",
             "status": self.status,
             "peers": len(self.peers_seen),
+            "ipv4_peers": len(self.peers_seen_v4),
+            "ipv6_peers": len(self.peers_seen_v6),
             "seeders": None,
             "leechers": None,
             "interval": DHT_REFRESH_INTERVAL,
@@ -586,36 +698,26 @@ class DHTClient:
             "last_error": str(self.last_error or ""),
             "last_event": "get_peers",
             "query_count": int(self.query_count),
-            "last_update_seconds": (
-                max(0.0, now - last_update) if last_update else None
-            ),
-            "last_success_seconds": (
-                max(0.0, now - self.last_success_at) if self.last_success_at else None
-            ),
-            "detail": (
-                "Private torrent: BEP-5 disabled"
-                if self.private
-                else (
-                    f"BEP-5 | nodes {self.nodes_responded}/{self.nodes_queried} | "
-                    f"UDP {self.local_udp_port or '--'} | announces {self.announce_count}"
-                )
-            ),
+            "last_update_seconds": max(0.0, now - last_update) if last_update else None,
+            "last_success_seconds": max(0.0, now - self.last_success_at) if self.last_success_at else None,
+            "detail": detail,
         }
 
     async def close(self):
         self._closed = True
         self.enabled = False
-
         for future in list(self._pending.values()):
             if not future.done():
                 future.cancel()
         self._pending.clear()
-
-        if self.transport:
-            self.transport.close()
-            self.transport = None
+        for transport in list(self._transports.values()):
+            transport.close()
+        self._transports.clear()
+        self._protocols.clear()
+        self.transport = None
         self.protocol = None
         self.local_udp_port = 0
-
+        self.local_udp_port_v4 = 0
+        self.local_udp_port_v6 = 0
         if not self.private:
             self.status = "Disabled"

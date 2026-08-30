@@ -10,7 +10,11 @@ from typing import Dict, Iterable, List, Optional, Tuple
 
 from app.logic.bencode import Bencode
 from app.logic.mse import MSEError, PeerWireStream, mse_initiator_handshake
-from app.logic.network_binding import normalise_bind_address
+from app.logic.network_binding import (
+    format_endpoint,
+    ip_family,
+    normalise_bind_address,
+)
 
 
 class PeerMessageID:
@@ -220,7 +224,19 @@ def parse_metadata_payload(payload: bytes) -> dict:
 def _compact_ipv4(endpoint: Tuple[str, int]) -> bytes:
     ip, port = endpoint
     try:
-        packed_ip = socket.inet_aton(str(ip))
+        packed_ip = socket.inet_pton(socket.AF_INET, str(ip))
+        packed_port = struct.pack(">H", int(port))
+    except (OSError, TypeError, ValueError, struct.error):
+        return b""
+    if int(port) <= 0 or int(port) > 65535:
+        return b""
+    return packed_ip + packed_port
+
+
+def _compact_ipv6(endpoint: Tuple[str, int]) -> bytes:
+    ip, port = endpoint
+    try:
+        packed_ip = socket.inet_pton(socket.AF_INET6, str(ip))
         packed_port = struct.pack(">H", int(port))
     except (OSError, TypeError, ValueError, struct.error):
         return b""
@@ -230,10 +246,18 @@ def _compact_ipv4(endpoint: Tuple[str, int]) -> bytes:
 
 
 def encode_pex_payload(endpoints: Iterable[Tuple[str, int]]) -> bytes:
-    compact_parts: List[bytes] = []
+    """Encode BEP-11 PEX endpoints for both address families.
+
+    IPv4 peers use ``added`` (6-byte compact endpoints) while IPv6 peers use
+    ``added6`` (18-byte endpoints). The total advertised set remains bounded
+    to avoid oversized extension messages.
+    """
+    compact_v4: List[bytes] = []
+    compact_v6: List[bytes] = []
     seen = set()
+    accepted = 0
     for endpoint in endpoints:
-        if len(compact_parts) >= PEX_MAX_PEERS_PER_MESSAGE:
+        if accepted >= PEX_MAX_PEERS_PER_MESSAGE:
             break
         try:
             normalized = (str(endpoint[0]), int(endpoint[1]))
@@ -241,20 +265,30 @@ def encode_pex_payload(endpoints: Iterable[Tuple[str, int]]) -> bytes:
             continue
         if normalized in seen:
             continue
-        raw = _compact_ipv4(normalized)
+        family = ip_family(normalized[0])
+        raw = (
+            _compact_ipv6(normalized)
+            if family == socket.AF_INET6
+            else _compact_ipv4(normalized)
+            if family == socket.AF_INET
+            else b""
+        )
         if not raw:
             continue
         seen.add(normalized)
-        compact_parts.append(raw)
+        accepted += 1
+        if family == socket.AF_INET6:
+            compact_v6.append(raw)
+        else:
+            compact_v4.append(raw)
 
-    added = b"".join(compact_parts)
-    # ``added.f`` has one flag byte per compact peer. SalixTorrent currently
-    # sends zero flags rather than claiming encryption/seed status it cannot
-    # prove for arbitrary peers.
     payload = {
-        b"added": added,
-        b"added.f": b"\x00" * len(compact_parts),
+        b"added": b"".join(compact_v4),
+        b"added.f": b"\x00" * len(compact_v4),
+        b"added6": b"".join(compact_v6),
+        b"added6.f": b"\x00" * len(compact_v6),
         b"dropped": b"",
+        b"dropped6": b"",
     }
     return Bencode.encode(payload)
 
@@ -450,8 +484,17 @@ class PeerConnection:
 
     async def _open_tcp(self, timeout: float):
         kwargs = {}
+        remote_family = ip_family(self.ip)
+        bind_family = ip_family(self.bind_address) if self.bind_address else socket.AF_UNSPEC
+
+        # A selected interface is a hard routing choice. Do not silently escape
+        # through the other address family if the remote endpoint is incompatible.
         if self.bind_address:
             kwargs["local_addr"] = (self.bind_address, 0)
+            kwargs["family"] = bind_family
+        elif remote_family in {socket.AF_INET, socket.AF_INET6}:
+            kwargs["family"] = remote_family
+
         return await asyncio.wait_for(
             asyncio.open_connection(self.ip, self.port, **kwargs),
             timeout=timeout,
@@ -915,5 +958,7 @@ class PeerConnection:
         self.reader = None
         self.writer = None
         self.stream = None
+
+
 
 

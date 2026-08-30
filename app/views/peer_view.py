@@ -157,15 +157,17 @@ class PeerView:
         encrypted = int(snapshot.get("encrypted_peer_count", 0) or 0)
         plaintext = int(snapshot.get("plaintext_peer_count", 0) or 0)
         policy = str(snapshot.get("encryption_policy") or "Prefer Encryption")
+        ipv4_count = int(snapshot.get("ipv4_peer_count", 0) or 0)
+        ipv6_count = int(snapshot.get("ipv6_peer_count", 0) or 0)
 
         if connected:
             summary = (
-                f"Peers: {connected} connected | MSE/RC4: {encrypted} | Plaintext: {plaintext} | "
-                f"Policy: {policy} | Torrent state: {state_label}"
+                f"Peers: {connected} connected | IPv4: {ipv4_count} | IPv6: {ipv6_count} | "
+                f"MSE/RC4: {encrypted} | Plaintext: {plaintext} | Policy: {policy} | Torrent state: {state_label}"
             )
         else:
             summary = (
-                f"Peers: 0 connected | MSE/RC4: 0 | Plaintext: 0 | Policy: {policy} | "
+                f"Peers: 0 connected | IPv4: 0 | IPv6: 0 | MSE/RC4: 0 | Plaintext: 0 | Policy: {policy} | "
                 f"Torrent state: {state_label} - waiting for peer connections"
             )
 
@@ -222,3 +224,5 @@ class PeerView:
                 add_help_tooltip(age_item, "PEER_AGE")
 
             self._row_ids.append(row_id)
+
+

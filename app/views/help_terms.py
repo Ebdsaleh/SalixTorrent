@@ -17,24 +17,25 @@ HELP_TERMS = {
     # ------------------------------------------------------------------
     "DHT": (
         "DHT - Distributed Hash Table",
-        "A decentralized BitTorrent peer-discovery network. Instead of relying "
-        "on one tracker server, clients ask DHT nodes for peers associated with "
-        "a torrent's info hash. SalixTorrent uses BEP-5 DHT only for public "
-        "torrents; private torrents deliberately disable it.",
+        "A decentralized BitTorrent peer-discovery network. SalixTorrent participates "
+        "in the IPv4 BEP-5 DHT and the IPv6 BEP-32 DHT when those address families "
+        "are available. A specific network bind restricts DHT to that family. Private "
+        "torrents deliberately disable DHT.",
     ),
     "PEX": (
         "PEX - Peer Exchange",
-        "A BitTorrent extension where already-connected peers introduce one "
-        "another to additional peers. SalixTorrent negotiates the extension "
-        "through BEP-10 and exchanges peers using BEP-11. Private torrents "
-        "deliberately disable PEX.",
+        "A BitTorrent extension where already-connected peers introduce one another "
+        "to additional peers. SalixTorrent negotiates BEP-10 and exchanges BEP-11 "
+        "IPv4 added/dropped endpoints plus IPv6 added6/dropped6 endpoints. Private "
+        "torrents deliberately disable PEX.",
     ),
     "LPD": (
         "LPD - Local Peer Discovery",
-        "Local Peer Discovery uses multicast to find compatible BitTorrent peers "
-        "on the same local network. It is useful when two computers behind the "
-        "same router participate in the same torrent. It does not search the "
-        "wider Internet and is disabled for private torrents.",
+        "BEP-14 Local Peer Discovery uses IPv4 multicast to find compatible peers on "
+        "the same LAN. It does not search the wider Internet. Because BEP-14 is IPv4-"
+        "multicast based, SalixTorrent disables LPD under an explicit IPv6-only bind "
+        "rather than leaking discovery through a different IPv4 interface. Private "
+        "torrents also disable LPD.",
     ),
     "LAN": (
         "LAN - Local Area Network",
@@ -60,9 +61,29 @@ HELP_TERMS = {
     "BEP": (
         "BEP - BitTorrent Enhancement Proposal",
         "A numbered specification describing a BitTorrent protocol or extension. "
-        "Examples: BEP-5 defines DHT, BEP-9 defines metadata exchange used by "
-        "magnet links, BEP-11 defines Peer Exchange, and BEP-14 defines Local "
-        "Peer Discovery.",
+        "Examples: BEP-5 defines IPv4 DHT, BEP-9 defines magnet metadata exchange, "
+        "BEP-11 defines Peer Exchange, BEP-14 defines Local Peer Discovery, and "
+        "BEP-32 extends DHT compact-node/address handling to IPv6.",
+    ),
+    "BEP32": (
+        "BEP-32 - IPv6 Extension for DHT",
+        "The BitTorrent extension that adds IPv6 node/address forms to the DHT. "
+        "SalixTorrent maintains separate IPv4 and IPv6 UDP sockets/address spaces and "
+        "uses family-appropriate n4/n6 node requests without running a duplicate polling loop.",
+    ),
+    "IPV6": (
+        "IPv6",
+        "The 128-bit Internet Protocol address family. SalixTorrent can connect to IPv6 "
+        "peers, accept IPv6 peer TCP connections, consume tracker peers6 responses, "
+        "exchange IPv6 PEX endpoints, and participate in BEP-32 DHT. IPv6 endpoints are "
+        "displayed in brackets when a port follows them, for example [2001:db8::1]:6881.",
+    ),
+    "DUAL_STACK": (
+        "Dual Stack",
+        "Using IPv4 and IPv6 at the same time. With Any interface selected, SalixTorrent "
+        "opens explicit family-specific peer/DHT sockets when the operating system supports "
+        "them. Selecting a specific IPv4 or IPv6 address constrains torrent networking to "
+        "that family instead of silently escaping through the other one.",
     ),
     "BEP9": (
         "BEP-9 - Extension for Peers to Send Metadata Files",
@@ -669,10 +690,11 @@ HELP_TERMS = {
     ),
     "NETWORK_BINDING": (
         "Network Interface / VPN Binding",
-        "Pins SalixTorrent torrent networking to a selected local IPv4 address. "
-        "Peer TCP connections and the incoming listener, HTTP/UDP trackers, DHT, "
-        "Local Peer Discovery and magnet metadata retrieval use that source address. "
-        "Choosing Any interface leaves routing to the operating system.",
+        "Pins SalixTorrent torrent networking to a selected local IPv4 or IPv6 address. "
+        "Peer TCP connections and listeners, HTTP/UDP trackers, DHT and magnet metadata "
+        "retrieval use that source family/address. BEP-14 LPD is IPv4-only and therefore "
+        "stays disabled under an explicit IPv6 bind. Choosing Any interface permits dual-"
+        "stack system routing where supported.",
     ),
     "INTERFACE_LOCK": (
         "Interface Lock / Kill Switch",
@@ -698,16 +720,16 @@ HELP_TERMS = {
     ),
     "PORT_MAPPING": (
         "Incoming Port Mapping",
-        "A router rule forwarding an Internet-facing port to one of SalixTorrent's "
-        "active listen sockets on this computer. When several torrents use different "
-        "listen ports, SalixTorrent keeps their mappings independently. Being unmapped "
-        "is not fatal, but it can reduce the number of peers able to initiate connections.",
+        "An IPv4 NAT-router rule forwarding an Internet-facing port to one of SalixTorrent's "
+        "active listen sockets. UPnP/NAT-PMP are not required for globally routed IPv6; an "
+        "IPv6 listener instead depends on the route and host/router firewall allowing inbound "
+        "traffic. Multiple IPv4 listener mappings remain independent.",
     ),
     "LOCAL_ENDPOINT": (
         "Local Endpoint",
-        "The private LAN address and listen port used by this SalixTorrent instance, "
-        "for example 192.168.x.x:6881. This address is normally meaningful only "
-        "inside your local network.",
+        "The local address and listen port used by SalixTorrent, for example "
+        "192.168.x.x:6881 or [2001:db8::10]:6881. IPv4 private addresses are usually "
+        "LAN-only; IPv6 scope depends on the selected address and network route.",
     ),
     "EXTERNAL_ENDPOINT": (
         "External Endpoint",
@@ -1086,3 +1108,5 @@ def add_context_tooltip(
         contextual_text(title, body, facts=facts, footer=footer),
         wrap=wrap,
     )
+
+

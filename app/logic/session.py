@@ -5,6 +5,7 @@ import math
 import os
 import queue
 import random
+import socket
 import struct
 import threading
 import time
@@ -37,9 +38,12 @@ from app.logic.peer import (
 )
 from app.logic.mse import MSEError, PeerWireStream, mse_responder_handshake
 from app.logic.network_binding import (
+    format_endpoint,
+    ip_family,
     is_bind_address_available,
     mask_ip_for_display,
     normalise_bind_address,
+    wildcard_for_family,
 )
 from app.logic.piece_manager import (
     BLOCK_SIZE,
@@ -268,6 +272,8 @@ class TorrentSession:
         self._paused_from_state: Optional[str] = None
 
         self._seed_server: Optional[asyncio.AbstractServer] = None
+        self._seed_servers: Dict[int, asyncio.AbstractServer] = {}
+        self._seed_listener_addresses: Dict[int, str] = {}
         self._seed_client_writers: Set[asyncio.StreamWriter] = set()
         self._inbound_peer_records: Dict[int, dict] = {}
         self._seed_outbound_endpoints: Set[Tuple[str, int]] = set()
@@ -716,8 +722,8 @@ class TorrentSession:
             if not task.done():
                 task.cancel()
 
-        if self._seed_server:
-            self._seed_server.close()
+        for server in list(self._seed_servers.values()):
+            server.close()
 
         for writer in list(self._seed_client_writers):
             try:
@@ -959,7 +965,12 @@ class TorrentSession:
                 "connection_id": f"out:{id(peer)}",
                 "ip": display_ip,
                 "port": int(peer.port),
-                "address": f"{display_ip}:{peer.port}",
+                "address": (
+                    f"[{display_ip}]:{peer.port}"
+                    if ip_family(peer.ip) == socket.AF_INET6
+                    else format_endpoint(display_ip, peer.port)
+                ),
+                "ip_family": "IPv6" if ip_family(peer.ip) == socket.AF_INET6 else "IPv4",
                 "client": peer.client_name,
                 "transport_security": str(getattr(peer, "transport_security", "Plaintext")),
                 "source": str(getattr(peer, "source", "Unknown")),
@@ -1003,10 +1014,11 @@ class TorrentSession:
                 "ip": display_ip,
                 "port": int(record.get("port", 0) or 0),
                 "address": (
-                    f"{display_ip}:{int(record.get('port', 0) or 0)}"
-                    if int(record.get("port", 0) or 0)
-                    else display_ip
+                    f"[{display_ip}]:{int(record.get('port', 0) or 0)}"
+                    if ip_family(record.get("ip", "")) == socket.AF_INET6 and int(record.get("port", 0) or 0)
+                    else format_endpoint(display_ip, int(record.get("port", 0) or 0))
                 ),
+                "ip_family": "IPv6" if ip_family(record.get("ip", "")) == socket.AF_INET6 else "IPv4",
                 "client": str(record.get("client", "Unknown")),
                 "transport_security": str(record.get("transport_security", "Plaintext")),
                 "source": str(record.get("source", "Incoming")),
@@ -1396,6 +1408,8 @@ class TorrentSession:
             if str(peer.get("transport_security")) == "MSE/RC4"
         )
         plaintext_peer_count = max(0, len(peer_snapshots) - encrypted_peer_count)
+        ipv6_peer_count = sum(1 for peer in peer_snapshots if peer.get("ip_family") == "IPv6")
+        ipv4_peer_count = max(0, len(peer_snapshots) - ipv6_peer_count)
 
         discovery_parts = []
         if int(sources_view.get("tracker_count", 0) or 0):
@@ -1457,6 +1471,8 @@ class TorrentSession:
             "connected_peers": self._connected_peer_count(),
             "encrypted_peer_count": encrypted_peer_count,
             "plaintext_peer_count": plaintext_peer_count,
+            "ipv4_peer_count": ipv4_peer_count,
+            "ipv6_peer_count": ipv6_peer_count,
             "encryption_policy": self.encryption_policy,
             "network_bind_address": self.network_bind_address,
             "interface_lock": bool(self.interface_lock),
@@ -1475,8 +1491,20 @@ class TorrentSession:
             "completed_pieces": self.piece_mgr.completed_pieces,
             "total_pieces": len(self.piece_mgr.pieces),
             "piece_length": int(self.torrent.piece_length),
-            "listen_port": self._seed_port if self._seed_server else 0,
-            "listener_address": self._seed_bind_address if self._seed_server else "",
+            "listen_port": self._seed_port if self._seed_servers else 0,
+            "listener_address": self._seed_bind_address if self._seed_servers else "",
+            "listener_ipv4_address": self._seed_listener_addresses.get(socket.AF_INET, ""),
+            "listener_ipv6_address": self._seed_listener_addresses.get(socket.AF_INET6, ""),
+            "listener_ipv4_endpoint": (
+                format_endpoint(self._seed_listener_addresses.get(socket.AF_INET), self._seed_port)
+                if socket.AF_INET in self._seed_servers else ""
+            ),
+            "listener_ipv6_endpoint": (
+                format_endpoint(self._seed_listener_addresses.get(socket.AF_INET6), self._seed_port)
+                if socket.AF_INET6 in self._seed_servers else ""
+            ),
+            "dht_udp_port_ipv4": int(self._dht.local_udp_port_v4 or 0),
+            "dht_udp_port_ipv6": int(self._dht.local_udp_port_v6 or 0),
             "preferred_listen_port": self.preferred_listen_port,
             "dht_enabled": bool(self.enable_dht),
             "pex_enabled": bool(self.enable_pex),
@@ -2482,7 +2510,7 @@ class TorrentSession:
                 if not peer.is_connected:
                     return
                 if self.enable_dht:
-                    await peer.send_port(self._dht.local_udp_port)
+                    await peer.send_port(self._dht_port_for_peer(peer.ip))
                 if not peer.is_connected:
                     return
 
@@ -2736,45 +2764,113 @@ class TorrentSession:
                 await asyncio.gather(dht_task, return_exceptions=True)
 
 
+    def _dht_port_for_peer(self, peer_ip: object) -> int:
+        """Return the local DHT UDP port matching a peer's address family."""
+        if ip_family(peer_ip) == socket.AF_INET6:
+            return int(self._dht.local_udp_port_v6 or 0)
+        return int(self._dht.local_udp_port_v4 or 0)
+
+    def _listener_specs(self) -> List[Tuple[int, str]]:
+        if self.network_bind_address:
+            family = ip_family(self.network_bind_address)
+            if family in {socket.AF_INET, socket.AF_INET6}:
+                return [(family, self.network_bind_address)]
+            return []
+        return [
+            (socket.AF_INET, wildcard_for_family(socket.AF_INET)),
+            (socket.AF_INET6, wildcard_for_family(socket.AF_INET6)),
+        ]
+
+    async def _open_listener_socket(
+        self,
+        run_token: int,
+        family: int,
+        host: str,
+        port: int,
+    ) -> asyncio.AbstractServer:
+        sock = socket.socket(family, socket.SOCK_STREAM)
+        try:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            if family == socket.AF_INET6 and hasattr(socket, "IPV6_V6ONLY"):
+                sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+            endpoint = (host, port, 0, 0) if family == socket.AF_INET6 else (host, port)
+            sock.bind(endpoint)
+            sock.listen(socket.SOMAXCONN)
+            sock.setblocking(False)
+            return await asyncio.start_server(
+                lambda reader, writer: asyncio.create_task(
+                    self._handle_inbound_seed_peer(run_token, reader, writer)
+                ),
+                sock=sock,
+            )
+        except Exception:
+            sock.close()
+            raise
+
     async def _open_seed_server(self, run_token: int):
-        if self._seed_server:
+        if self._seed_servers:
             return
 
-        # Try the user-configured listening port first, then ten consecutive
-        # fallbacks if another application already owns it.
         preferred = max(1, min(65535, int(self.preferred_listen_port or 6881)))
-        candidates = [preferred]
-        for offset in range(1, 11):
-            candidate = preferred + offset
-            if candidate <= 65535:
-                candidates.append(candidate)
+        candidates = [preferred] + [
+            preferred + offset
+            for offset in range(1, 11)
+            if preferred + offset <= 65535
+        ]
+        specs = self._listener_specs()
 
         for port in candidates:
-            try:
-                server = await asyncio.start_server(
-                    lambda reader, writer: asyncio.create_task(
-                        self._handle_inbound_seed_peer(run_token, reader, writer)
-                    ),
-                    host=self.network_bind_address or "0.0.0.0",
-                    port=port,
-                )
-            except OSError:
+            servers: Dict[int, asyncio.AbstractServer] = {}
+            addresses: Dict[int, str] = {}
+            ipv4_failed = False
+            for family, host in specs:
+                try:
+                    server = await self._open_listener_socket(run_token, family, host, port)
+                except OSError:
+                    # A specific source bind is all-or-nothing. For Any interface,
+                    # preserve IPv4 compatibility if the platform has no IPv6
+                    # stack, but do not accept an IPv6-only fallback when the v4
+                    # port itself is occupied.
+                    if self.network_bind_address or family == socket.AF_INET:
+                        ipv4_failed = family == socket.AF_INET
+                        break
+                    continue
+                except Exception:
+                    if self.network_bind_address or family == socket.AF_INET:
+                        ipv4_failed = family == socket.AF_INET
+                        break
+                    continue
+
+                servers[family] = server
+                try:
+                    sockname = server.sockets[0].getsockname() if server.sockets else None
+                    addresses[family] = str(sockname[0]) if sockname else host
+                except Exception:
+                    addresses[family] = host
+
+            if ipv4_failed or not servers:
+                for server in servers.values():
+                    server.close()
+                    try:
+                        await server.wait_closed()
+                    except Exception:
+                        pass
                 continue
 
-            self._seed_server = server
+            self._seed_servers = servers
+            self._seed_listener_addresses = addresses
+            self._seed_server = servers.get(socket.AF_INET) or next(iter(servers.values()))
             self._seed_port = port
-            try:
-                sockname = server.sockets[0].getsockname() if server.sockets else None
-                self._seed_bind_address = str(sockname[0]) if sockname else (self.network_bind_address or "0.0.0.0")
-            except Exception:
-                self._seed_bind_address = self.network_bind_address or "0.0.0.0"
+            self._seed_bind_address = (
+                addresses.get(ip_family(self.network_bind_address), self.network_bind_address)
+                if self.network_bind_address
+                else addresses.get(socket.AF_INET, addresses.get(socket.AF_INET6, ""))
+            )
             self.tracker.port = port
             if self._listen_port_callback:
                 try:
                     self._listen_port_callback(port, True)
                 except TypeError:
-                    # Backward-compatible fallback for any external one-argument
-                    # callback using TorrentSession directly.
                     try:
                         self._listen_port_callback(port)
                     except Exception:
@@ -2783,27 +2879,30 @@ class TorrentSession:
                     pass
             return
 
-        # Outbound seeding can still work if no inbound listener is available.
+        # Outbound transfers remain possible when no inbound listener is available.
         self._seed_port = preferred
         self.tracker.port = preferred
 
     async def _close_seed_server(self):
-        closed_port = self._seed_port if self._seed_server else 0
-        if self._seed_server:
-            self._seed_server.close()
+        closed_port = self._seed_port if self._seed_servers else 0
+        servers = list(self._seed_servers.values())
+        self._seed_servers.clear()
+        self._seed_listener_addresses.clear()
+        self._seed_server = None
+        self._seed_bind_address = ""
+
+        for server in servers:
+            server.close()
+        for server in servers:
             try:
-                await self._seed_server.wait_closed()
+                await server.wait_closed()
             except Exception:
                 pass
-            self._seed_server = None
-        self._seed_bind_address = ""
 
         if closed_port and self._listen_port_callback:
             try:
                 self._listen_port_callback(closed_port, False)
             except TypeError:
-                # Older one-argument callbacks were only notified when a port
-                # opened, so there is no compatible close notification to send.
                 pass
             except Exception:
                 pass
@@ -2878,7 +2977,7 @@ class TorrentSession:
                 if not peer.is_connected:
                     return
                 if self.enable_dht:
-                    await peer.send_port(self._dht.local_udp_port)
+                    await peer.send_port(self._dht_port_for_peer(peer.ip))
                 if not peer.is_connected:
                     return
 
@@ -3023,6 +3122,17 @@ class TorrentSession:
             if self.state not in {SessionState.DOWNLOADING, SessionState.SEEDING}:
                 return
 
+            peername = writer.get_extra_info("peername")
+            if isinstance(peername, tuple) and len(peername) >= 2:
+                peer_ip = str(peername[0])
+                try:
+                    peer_port = int(peername[1])
+                except (TypeError, ValueError):
+                    peer_port = 0
+            else:
+                peer_ip = "?"
+                peer_port = 0
+
             response_reserved = build_reserved_bytes(
                 enable_extensions=not self.torrent.private,
                 enable_dht=self.enable_dht and not self.torrent.private,
@@ -3056,25 +3166,14 @@ class TorrentSession:
                 remote_supports_dht
                 and self.enable_dht
                 and not self.torrent.private
-                and self._dht.local_udp_port
+                and self._dht_port_for_peer(peer_ip)
             ):
                 stream.write(
-                    struct.pack(">IBH", 3, PeerMessageID.PORT, self._dht.local_udp_port)
+                    struct.pack(">IBH", 3, PeerMessageID.PORT, self._dht_port_for_peer(peer_ip))
                 )
             await stream.drain()
 
             self._seed_client_writers.add(writer)
-
-            peername = writer.get_extra_info("peername")
-            if isinstance(peername, tuple) and len(peername) >= 2:
-                peer_ip = str(peername[0])
-                try:
-                    peer_port = int(peername[1])
-                except (TypeError, ValueError):
-                    peer_port = 0
-            else:
-                peer_ip = "?"
-                peer_port = 0
 
             self.incoming_connections_total += 1
             if self._incoming_peer_callback:
@@ -3088,7 +3187,8 @@ class TorrentSession:
                 "connection_id": f"in:{record_key}",
                 "ip": peer_ip,
                 "port": peer_port,
-                "address": f"{peer_ip}:{peer_port}" if peer_port else peer_ip,
+                "address": format_endpoint(peer_ip, peer_port),
+                "ip_family": "IPv6" if ip_family(peer_ip) == socket.AF_INET6 else "IPv4",
                 "client": identify_peer_client(remote_peer_id),
                 "source": "Incoming",
                 "direction": "Incoming",
@@ -3403,3 +3503,5 @@ class TorrentSession:
 
         except asyncio.CancelledError:
             pass
+
+

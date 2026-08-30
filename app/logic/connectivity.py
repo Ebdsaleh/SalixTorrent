@@ -143,11 +143,20 @@ class ConnectivityManager:
 
     @staticmethod
     def _request_for_port(settings: dict, port: int) -> dict:
+        bind_address = str(settings.get("network_bind_address") or "").strip()
+        ipv6_only = False
+        if bind_address:
+            try:
+                ipv6_only = ipaddress.ip_address(bind_address).version == 6
+            except ValueError:
+                bind_address = ""
         return {
             "port": int(port),
             "enable_upnp": bool(settings.get("enable_upnp", True)),
             "enable_natpmp": bool(settings.get("enable_natpmp", True)),
             "map_udp": bool(settings.get("enable_dht", True)),
+            "network_bind_address": bind_address,
+            "ipv6_only": ipv6_only,
         }
 
     @staticmethod
@@ -219,6 +228,15 @@ class ConnectivityManager:
         if status == "Incoming Confirmed":
             diagnosis = "Inbound BitTorrent connectivity is confirmed by a real remote peer."
             action = "No action is required for incoming reachability."
+        elif status == "IPv6 Direct":
+            diagnosis = (
+                "This torrent is bound to IPv6. UPnP and NAT-PMP are IPv4 NAT mapping mechanisms, "
+                "so no router mapping is required or attempted for this listener."
+            )
+            action = (
+                "IPv6 inbound reachability depends on the host/router firewall and globally routable IPv6. "
+                "Incoming Confirmed appears after a real remote IPv6 peer connects."
+            )
         elif status == "Mapped (refresh failed)":
             diagnosis = "The previous router mapping is being retained, but its latest lease refresh failed."
             action = "SalixTorrent will retry automatically before discarding the still-usable mapping; use Refresh / Remap Now only if you want an immediate retry."
@@ -666,6 +684,8 @@ class ConnectivityManager:
             status = "Mapped"
         elif mapped_ports:
             status = "Partially Mapped"
+        elif snapshots and all(s.get("status") == "IPv6 Direct" for s in snapshots):
+            status = "IPv6 Direct"
         elif snapshots and all(s.get("status") == "Disabled" for s in snapshots):
             status = "Disabled"
         elif any(s.get("status") == "Unmapped" for s in snapshots):
@@ -757,6 +777,35 @@ class ConnectivityManager:
         enable_upnp = bool(request["enable_upnp"])
         enable_natpmp = bool(request["enable_natpmp"])
         map_udp = bool(request["map_udp"])
+        bind_address = str(request.get("network_bind_address") or "").strip()
+
+        if bool(request.get("ipv6_only")):
+            # UPnP IGD and NAT-PMP configure IPv4 NAT. A specifically bound
+            # IPv6 listener must not trigger an unrelated IPv4 mapping that
+            # would violate Network Interface / VPN binding semantics.
+            return ({
+                "status": "IPv6 Direct",
+                "method": "IPv6",
+                "local_ip": bind_address,
+                "external_ip": bind_address,
+                "internal_port": port,
+                "external_port": port,
+                "mapped_tcp": False,
+                "mapped_udp": False,
+                "upnp_status": "Not applicable",
+                "upnp_stage": "IPv6 has no IPv4 NAT mapping",
+                "upnp_code": "IPV6_DIRECT",
+                "upnp_error": "",
+                "upnp_advice": "Use firewall rules rather than IPv4 port mapping for IPv6 inbound reachability.",
+                "natpmp_status": "Not applicable",
+                "natpmp_stage": "IPv6 has no IPv4 NAT mapping",
+                "natpmp_code": "IPV6_DIRECT",
+                "natpmp_error": "",
+                "natpmp_advice": "Use firewall rules rather than IPv4 port mapping for IPv6 inbound reachability.",
+                "last_error": "",
+                "last_refresh_at": time.time(),
+            }, None)
+
         local_ip = self._local_ip()
 
         upnp_status = "Disabled" if not enable_upnp else "Not tried"
@@ -1427,6 +1476,8 @@ class ConnectivityManager:
             "udp_mapping_error": udp_mapping_error,
             "lease_seconds": lease_seconds or MAPPING_LIFETIME_SECONDS,
         }
+
+
 
 
 

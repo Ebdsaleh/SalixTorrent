@@ -16,7 +16,8 @@ from app.engine.ui_typography import (
     ui_font_size_from_label,
 )
 from app.logic.network_binding import (
-    list_ipv4_interfaces,
+    format_endpoint,
+    list_network_interfaces,
     mask_ip_for_display,
     normalise_bind_address,
 )
@@ -101,7 +102,7 @@ class SettingsView:
                         add_help_tooltip(self.max_peers_input, "MAX_PEERS")
 
                     self.enable_dht_checkbox = dpg.add_checkbox(
-                        label="Enable DHT (BEP-5)",
+                        label="Enable DHT (BEP-5 / BEP-32)",
                         default_value=bool(self.settings["enable_dht"]),
                     )
                     add_help_tooltip(self.enable_dht_checkbox, "DHT")
@@ -209,8 +210,9 @@ class SettingsView:
                 )
                 add_help_tooltip(self.mask_peer_ips_checkbox, "IP_MASKING")
                 transport_note = dpg.add_text(
-                    "Binding chooses the source address for torrent traffic. Interface Lock additionally "
-                    "monitors that address and stops torrent networking immediately if it disappears.",
+                    "Binding chooses one local IPv4 or IPv6 source address for torrent traffic. "
+                    "Any interface uses both families when the operating system provides them. Interface Lock "
+                    "additionally monitors the selected address and stops torrent networking immediately if it disappears.",
                     color=(145, 145, 150),
                     wrap=1000,
                 )
@@ -395,7 +397,7 @@ class SettingsView:
         selected_address = normalise_bind_address(selected_address)
         option_to_address = {"Any interface (system routing)": ""}
 
-        for interface in list_ipv4_interfaces():
+        for interface in list_network_interfaces():
             address = normalise_bind_address(interface.address)
             if not address:
                 continue
@@ -564,20 +566,33 @@ class SettingsView:
         mapping_count = int(snap.get("mapping_count") or 0)
         listener_count = int(snap.get("listener_count") or 0)
 
+        ipv6_direct = status == "IPv6 Direct"
         if listener_count > 1:
-            status = f"{status} ({mapping_count}/{listener_count} listener ports mapped)"
+            if ipv6_direct:
+                status = f"IPv6 Direct ({listener_count} active listener ports; IPv4 NAT mapping not applicable)"
+            else:
+                status = f"{status} ({mapping_count}/{listener_count} listener ports mapped)"
             local_value = f"Local: {local_ip} | ports {', '.join(str(p) for p in listener_ports)}"
-            if external_ip:
+            if external_ip not in {"", "--"}:
                 external_scope = str(snap.get("external_scope") or "Unknown")
                 scope_suffix = f" ({external_scope})" if external_scope != "Unknown" else ""
                 external_value = f"External: {external_ip}{scope_suffix} | mapped ports {', '.join(str(p) for p in mapped_ports) or '--'}"
             else:
-                external_value = f"External mapped ports: {', '.join(str(p) for p in mapped_ports) or '--'}"
+                external_value = (
+                    "External: IPv6 route/firewall dependent; no IPv4 NAT mapping"
+                    if ipv6_direct
+                    else f"External mapped ports: {', '.join(str(p) for p in mapped_ports) or '--'}"
+                )
         else:
-            local_value = f"Local: {local_ip}:{internal_port or '--'}"
+            local_value = f"Local: {format_endpoint(local_ip, internal_port) if internal_port else local_ip}"
             external_scope = str(snap.get("external_scope") or "Unknown")
             scope_suffix = f" ({external_scope})" if external_ip not in {"", "--"} and external_scope != "Unknown" else ""
-            external_value = f"External: {external_ip}:{external_port or '--'}{scope_suffix}"
+            if external_ip not in {"", "--"}:
+                external_value = f"External: {format_endpoint(external_ip, external_port)}{scope_suffix}"
+            elif ipv6_direct:
+                external_value = "External: IPv6 route/firewall dependent; no IPv4 NAT mapping"
+            else:
+                external_value = "External: --"
 
         dpg.set_value(self.connectivity_status, f"Status: {status}")
         dpg.set_value(self.connectivity_method, f"Mapping: {method}")
@@ -590,7 +605,7 @@ class SettingsView:
         dpg.set_value(self.connectivity_external, external_value)
         dpg.set_value(
             self.connectivity_protocols,
-            f"Mapped protocols: {' + '.join(protocols) if protocols else '--'}",
+            f"Mapped protocols: {' + '.join(protocols) if protocols else ('not applicable to IPv6 direct' if ipv6_direct else '--')}",
         )
         incoming_peer = str(snap.get("last_incoming_peer") or "--")
         if self.settings.get("mask_peer_ips") and incoming_peer not in {"", "--"}:
@@ -675,6 +690,8 @@ class SettingsView:
         if now - self._last_connectivity_refresh >= 1.0:
             self._last_connectivity_refresh = now
             self._render_connectivity()
+
+
 
 
 

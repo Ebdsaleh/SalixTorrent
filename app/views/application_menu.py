@@ -13,6 +13,7 @@ from typing import Optional
 
 import dearpygui.dearpygui as dpg
 
+from app.logic.network_binding import format_endpoint
 from app.logic.torrent_manager import TorrentManager
 from app.version import APP_VERSION
 from app.views.help_terms import add_help_tooltip, add_text_tooltip
@@ -709,7 +710,7 @@ class ApplicationMenu:
             external_port = 0
         external_scope = str(connectivity.get("external_scope") or "Unknown")
         external_endpoint = (
-            f"{external_ip}:{external_port} ({external_scope})"
+            f"{format_endpoint(external_ip, external_port)} ({external_scope})"
             if external_ip and external_port
             else "--"
         )
@@ -800,3 +801,5 @@ class ApplicationMenu:
             dpg.set_clipboard_text(self._diagnostics_string())
         except Exception:
             pass
+
+

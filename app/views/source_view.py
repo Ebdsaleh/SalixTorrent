@@ -192,6 +192,18 @@ class SourceView:
             return explicit
 
         parts = []
+        try:
+            ipv4_peers = max(0, int(source.get("ipv4_peers", 0) or 0))
+            ipv6_peers = max(0, int(source.get("ipv6_peers", 0) or 0))
+        except (TypeError, ValueError):
+            ipv4_peers = ipv6_peers = 0
+        if ipv4_peers or ipv6_peers:
+            parts.append(f"IPv4 {ipv4_peers} | IPv6 {ipv6_peers}")
+        announce_families = [
+            str(value) for value in source.get("announce_families", []) if value
+        ]
+        if announce_families:
+            parts.append(f"announced via {' + '.join(announce_families)}")
         event = str(source.get("last_event") or "").strip()
         if event:
             parts.append(f"event {event}")
@@ -466,5 +478,7 @@ class SourceView:
                 add_help_tooltip(detail_item, "SOURCE_DETAIL")
 
             self._row_ids.append(row_id)
+
+
 
 

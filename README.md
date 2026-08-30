@@ -154,7 +154,11 @@ Fast-resume metadata records only pieces that have actually reached storage. A p
 
 ## Connectivity, transport security and network binding
 
-SalixTorrent listens for incoming BitTorrent TCP connections and attempts automatic router mapping using UPnP, with NAT-PMP as a fallback where available.
+SalixTorrent is dual-stack. With **Any interface** selected it opens explicit IPv4 and IPv6 BitTorrent TCP listeners on the same numeric port where the platform supports both families. A specific IPv4 or IPv6 bind constrains outgoing peers, listeners, trackers and DHT to that family instead of silently escaping through the other path.
+
+IPv6 peer discovery is supported end-to-end: HTTP trackers consume BEP-7 `peers6`, UDP tracker announces use the BEP-15 18-byte IPv6 response stride, BEP-11 PEX sends/receives `added6`/`dropped6`, and DHT participates in the IPv4 BEP-5 and IPv6 BEP-32 address spaces. Under Any interface, dual-stack tracker announces run concurrently per available family with a stable BEP-7 tracker key; this avoids serial latency while allowing trackers to observe the usable IPv4 and IPv6 sources. BEP-32 DHT uses a concrete route-selected IPv6 source when one exists rather than a wildcard `::` source.
+
+For IPv4 NAT, SalixTorrent attempts automatic router mapping using UPnP, with NAT-PMP as a fallback where available. A specifically bound IPv6 listener is reported as **IPv6 Direct**: UPnP/NAT-PMP are IPv4 NAT mechanisms and are deliberately not invoked through some unrelated IPv4 interface. IPv6 incoming reachability instead depends on the route and host/router firewall.
 
 Peer transport has three policies:
 
@@ -164,7 +168,7 @@ Peer transport has three policies:
 
 MSE/PE is the legacy interoperable BitTorrent peer-encryption mechanism. It obscures/encrypts the peer stream for compatible peers, but it is not modern authenticated encryption, does not hide IP addresses, and should not be treated as a guarantee that an ISP cannot classify or block BitTorrent traffic. SalixTorrent implements the MSE-required RC4 stream internally, so no additional cryptography package is required.
 
-Preferences can also bind torrent networking to a specific local IPv4 address, including an address owned by a VPN interface. Peer TCP connections, the incoming listener, HTTP/UDP trackers, DHT, LPD, and magnet metadata retrieval all use the selected source address. **Interface Lock** is an additional fail-closed guard: if that selected address disappears, the torrent enters Error and its torrent networking is closed immediately instead of allowing later activity to use another path.
+Preferences can also bind torrent networking to a specific local IPv4 or IPv6 address, including an address owned by a VPN interface. Peer TCP connections, listeners, HTTP/UDP trackers, DHT, and magnet metadata retrieval use the selected source address/family. **Interface Lock** is an additional fail-closed guard: if that selected address disappears, the torrent enters Error and its torrent networking is closed immediately instead of allowing later activity to use another path. BEP-14 Local Peer Discovery is IPv4 multicast, so an explicit IPv6-only bind disables LPD rather than leaking discovery through another IPv4 route.
 
 Peer IP masking is a display-only option intended for screenshots/recordings. It is **off by default** and does not change real socket endpoints or provide anonymity.
 
@@ -190,10 +194,14 @@ The project currently includes a small foundation suite and focused regression c
 
 ```bash
 python foundation_test.py
+python test_piece_selection.py
+python test_request_scheduling.py
+python test_disk_io.py
 python test_transport_security.py
+python test_ipv6.py
 ```
 
-The release-critical regression coverage includes MSE/RC4 interoperability, source binding, encryption fallback rules, multi-torrent port mappings, finite/permanent mapping-lease handling, structured UPnP/NAT-PMP diagnostics, source-severity accounting, Interface Lock, and real inbound seeding uploads with telemetry counters.
+The release-critical regression coverage includes MSE/RC4 interoperability, rarest-first/endgame scheduling, bounded request pipelines, asynchronous disk backpressure/caching, source binding, encryption fallback rules, multi-torrent port mappings, finite/permanent mapping-lease handling, structured UPnP/NAT-PMP diagnostics, source-severity accounting, Interface Lock, real inbound seeding uploads, IPv6 peer TCP, BEP-7/BEP-15 tracker peers, BEP-11 IPv6 PEX, and BEP-32 DHT behavior.
 
 ## Current scope
 
