@@ -13,6 +13,7 @@ from typing import Dict, List, Optional
 
 from app.logic.connectivity import ConnectivityManager
 from app.logic.network_binding import normalise_bind_address
+from app.logic.tracker_scrape import TrackerScrapeCoordinator
 from app.logic.magnet import (
     MagnetCancelled,
     MagnetError,
@@ -120,6 +121,10 @@ class TorrentManager:
                 )
             )
             cls._instance._apply_global_bandwidth_settings()
+            cls._instance._scrape_coordinator = TrackerScrapeCoordinator(
+                cls._instance._scrape_sessions_snapshot,
+                bind_address=cls._instance._settings.get("network_bind_address", ""),
+            )
         elif ui_queue is not None:
             # Keep the singleton attached to the application's real UI queue.
             cls._instance.ui_queue = ui_queue
@@ -902,6 +907,32 @@ class TorrentManager:
     # Background asyncio engine
     # ------------------------------------------------------------------
 
+    def _scrape_sessions_snapshot(self):
+        with self._sessions_lock:
+            return list(self.sessions.values())
+
+    @staticmethod
+    def _is_expected_transport_reset(context: dict) -> bool:
+        """Return True for ordinary Windows peer resets surfaced by Proactor.
+
+        A BitTorrent peer can disappear at any time. Windows sometimes reports
+        WSAECONNRESET (10054) from Proactor's connection_lost callback itself,
+        outside the coroutine that was already shutting the stream down. This
+        is normal remote-peer behavior, not an application crash.
+        """
+        exc = (context or {}).get("exception")
+        if not isinstance(exc, ConnectionResetError):
+            return False
+        return (
+            getattr(exc, "winerror", None) == 10054
+            or getattr(exc, "errno", None) == 10054
+        )
+
+    def _event_loop_exception_handler(self, loop, context):
+        if self._is_expected_transport_reset(context):
+            return
+        loop.default_exception_handler(context)
+
     def start_engine(self):
         if self._running:
             self._engine_ready.wait(timeout=5.0)
@@ -926,10 +957,13 @@ class TorrentManager:
     def _run_event_loop(self):
         self._loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self._loop)
+        self._loop.set_exception_handler(self._event_loop_exception_handler)
+        self._scrape_coordinator.start(self._loop)
 
         try:
             self._loop.run_until_complete(self._engine_main())
         finally:
+            self._scrape_coordinator.close()
             pending = asyncio.all_tasks(self._loop)
             for task in pending:
                 task.cancel()
@@ -989,6 +1023,7 @@ class TorrentManager:
                     and (session.state != SessionState.ERROR or can_retry_error)
                 ):
                     asyncio.create_task(session.start())
+                    self._scrape_coordinator.request_refresh(delay=2.0)
                     self._explicit_start_requests.discard(info_hash)
                 continue
 
@@ -1042,6 +1077,7 @@ class TorrentManager:
                 promoted = True
 
             if promoted:
+                self._scrape_coordinator.request_refresh(delay=2.0)
                 self._explicit_start_requests.discard(info_hash)
                 available_slots -= 1
 
@@ -1368,6 +1404,9 @@ class TorrentManager:
                     settings = dict(payload or self._settings)
                     with self._sessions_lock:
                         sessions = list(self.sessions.values())
+                    self._scrape_coordinator.set_bind_address(
+                        settings.get("network_bind_address", "")
+                    )
                     for live_session in sessions:
                         try:
                             await live_session.apply_runtime_preferences(
@@ -1459,6 +1498,7 @@ class TorrentManager:
                 elif action == TorrentCommand.ANNOUNCE:
                     if session.state in (SessionState.DOWNLOADING, SessionState.SEEDING):
                         asyncio.create_task(session.manual_announce())
+                        self._scrape_coordinator.request_refresh(delay=0.5)
 
                 elif action == TorrentCommand.SET_LIMITS:
                     payload = payload or {}
@@ -1835,6 +1875,7 @@ class TorrentManager:
         self.save_session_state(force=True)
 
         if not self._running:
+            self._scrape_coordinator.close()
             self._connectivity.close()
             return
 
@@ -1855,5 +1896,3 @@ class TorrentManager:
             print("[Salix_T Notice] Async engine did not finish shutdown before timeout.")
 
         self._connectivity.close()
-
-

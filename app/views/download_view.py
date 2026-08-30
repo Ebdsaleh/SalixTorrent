@@ -305,6 +305,8 @@ class DownloadView:
                             add_text_tooltip(self.client_id_text, "Client ID\n\nThe peer identity prefix SalixTorrent presents during BitTorrent handshakes. Remote clients can use peer IDs and extension metadata to identify the software they are connected to.")
                             self.seed_leech_text = dpg.add_text("Seeds / Leechers: -- / --")
                             add_help_tooltip(self.seed_leech_text, "SEEDS_LEECHERS")
+                            self.tracker_scrape_text = dpg.add_text("Tracker Scrape S/L/C: -- / -- / --")
+                            add_help_tooltip(self.tracker_scrape_text, "TRACKER_SCRAPE")
                             self.availability_text = dpg.add_text("Availability: --")
                             add_help_tooltip(self.availability_text, "AVAILABILITY")
                             self.discovery_text = dpg.add_text("Discovery: --")
@@ -1057,6 +1059,11 @@ class DownloadView:
         ratio_text = f"{float(ratio):.3f}" if ratio is not None else "--"
         seeders = stats.get("swarm_seeders")
         leechers = stats.get("swarm_leechers")
+        scrape_seeders = stats.get("scrape_seeders")
+        scrape_leechers = stats.get("scrape_leechers")
+        scrape_completed = stats.get("scrape_completed")
+        scrape_age = self._format_age(stats.get("scrape_age_seconds"))
+        scrape_source = stats.get("scrape_source") or "--"
         properties = (
             f"Name: {stats.get('torrent_name', '--')}\n"
             f"State: {stats.get('state_label', stats.get('state', '--'))}\n"
@@ -1074,6 +1081,10 @@ class DownloadView:
             f"Files: {stats.get('file_count', 0)}\n"
             f"Seeds / Leechers: {seeders if seeders is not None else '--'} / "
             f"{leechers if leechers is not None else '--'}\n"
+            f"Tracker Scrape S/L/C: {scrape_seeders if scrape_seeders is not None else '--'} / "
+            f"{scrape_leechers if scrape_leechers is not None else '--'} / "
+            f"{scrape_completed if scrape_completed is not None else '--'}\n"
+            f"Tracker Scrape Source: {scrape_source} | {scrape_age}\n"
             f"Availability: {float(stats.get('swarm_availability', 0.0) or 0.0):.2f}\n"
             f"Discovery: {stats.get('discovery_summary', '--')}\n"
             f"Active Time: {self._format_duration(stats.get('elapsed_seconds'))}\n"
@@ -1629,6 +1640,7 @@ class DownloadView:
         dpg.configure_item(self.retry_button, enabled=False)
         dpg.set_value(self.state_text, "Session State: Idle")
         dpg.set_value(self.seed_leech_text, "Seeds / Leechers: -- / --")
+        dpg.set_value(self.tracker_scrape_text, "Tracker Scrape S/L/C: -- / -- / --")
         dpg.set_value(self.availability_text, "Availability: --")
         dpg.set_value(self.discovery_text, "Discovery: --")
         dpg.set_value(self.listen_port_text, "Listen Port: --")
@@ -1949,6 +1961,19 @@ class DownloadView:
             f"Seeds / Leechers: {seeders if seeders is not None else '--'} / "
             f"{leechers if leechers is not None else '--'}",
         )
+        scrape_seeders = msg.get("scrape_seeders")
+        scrape_leechers = msg.get("scrape_leechers")
+        scrape_completed = msg.get("scrape_completed")
+        scrape_age = msg.get("scrape_age_seconds")
+        scrape_text = (
+            f"Tracker Scrape S/L/C: "
+            f"{scrape_seeders if scrape_seeders is not None else '--'} / "
+            f"{scrape_leechers if scrape_leechers is not None else '--'} / "
+            f"{scrape_completed if scrape_completed is not None else '--'}"
+        )
+        if scrape_seeders is not None and scrape_age is not None:
+            scrape_text += f" | {self._format_age(scrape_age)}"
+        dpg.set_value(self.tracker_scrape_text, scrape_text)
         availability = float(msg.get("swarm_availability", 0.0) or 0.0)
         dpg.set_value(self.availability_text, f"Availability: {availability:.2f}")
         dpg.set_value(
@@ -2256,9 +2281,3 @@ class DownloadView:
             snapshot = self.latest_stats.get(self.active_info_hash)
             if snapshot:
                 self._render_inspector(snapshot, force_detail=True)
-
-
-
-
-
-

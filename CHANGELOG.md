@@ -6,6 +6,11 @@ Notable SalixTorrent changes are recorded here.
 
 ### Added
 
+- BEP-48 HTTP/HTTPS tracker scrape support with standards-derived scrape endpoints, repeated `info_hash` parameters, and bounded multi-torrent batching.
+- BEP-15 UDP tracker scrape action support with bounded multi-info-hash datagrams and connection-ID reuse across batches.
+- One application-wide timer-driven scrape coordinator that groups active torrents by tracker, caches results, and avoids UI-driven or per-torrent scrape polling.
+- Per-tracker scrape telemetry for seeds, leechers, cumulative completed downloads, scrape status/age/latency, endpoint, protocol, and batch size.
+- General, Sources, Properties, Diagnostics, Help Topics, and Glossary coverage for scrape S/L/C statistics and batching semantics.
 - Dual-stack BitTorrent peer networking with explicit IPv4/IPv6 listeners, outbound peer TCP, family-aware endpoint telemetry, and bracket-safe IPv6 display formatting.
 - IPv6 tracker support through BEP-7 `peers6`, IPv6 UDP tracker announces/responses, and concurrent per-family tracker announces with one stable session key.
 - IPv6 Peer Exchange using BEP-11 `added6`/`dropped6` compact endpoints.
@@ -34,6 +39,9 @@ Notable SalixTorrent changes are recorded here.
 
 ### Changed
 
+- Tracker announce health and tracker scrape statistics are now represented independently so a scrape timeout/unsupported endpoint cannot make an otherwise healthy discovery source look failed.
+- Sources now exposes scrape S/L/C alongside announce-derived Swarm S/L and summarizes scrape active/pending/warning/error state separately.
+- Manual tracker refresh also schedules a coalesced scrape refresh, while normal scrape refreshes use one shared low-frequency timer.
 - Any-interface torrent sessions now use IPv4 and IPv6 concurrently where available, while a specific address bind remains fail-closed to that address family.
 - BEP-32 DHT selects a concrete route-derived IPv6 source address under Any interface and skips IPv6 DHT cleanly when no routable IPv6 source exists.
 - Tracker Sources telemetry now records returned IPv4/IPv6 peer counts and the address families used for the latest announce cycle.
@@ -54,6 +62,7 @@ Notable SalixTorrent changes are recorded here.
 
 ### Fixed
 
+- Windows Proactor shutdown no longer prints a traceback for the expected `ConnectionResetError` / WinError 10054 case when a remote peer resets its TCP connection during application teardown; unrelated asyncio exceptions remain visible.
 - IPv6 DHT `values` parsing now accepts the BEP-32-required hybrid list containing both 6-byte IPv4 and 18-byte IPv6 peer entries.
 - IPv6-bound sessions no longer attempt unrelated IPv4 UPnP/NAT-PMP mappings that could violate the selected network path.
 - Slow storage can no longer block the peer event loop during verified-piece writes; bounded asynchronous backpressure limits memory growth instead.

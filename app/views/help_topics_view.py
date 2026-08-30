@@ -312,6 +312,22 @@ HELP_TOPICS: Tuple[HelpTopic, ...] = (
                 "the same.",
             ),
             (
+                "Tracker scrape statistics",
+                "Scrape is separate from announce: it asks a tracker for swarm metadata without "
+                "announcing SalixTorrent as a peer or altering swarm participation. SalixTorrent "
+                "implements BEP-48 HTTP scrape and BEP-15 UDP scrape. S/L/C means current complete "
+                "peers (seeds), current incomplete peers (leechers), and the tracker's cumulative "
+                "completed-download count. These values belong to that tracker and should not be "
+                "treated as a mathematically global swarm total.",
+            ),
+            (
+                "Efficient scrape batching",
+                "A single application-wide coordinator groups active torrents that share a tracker. "
+                "HTTP uses bounded repeated-info_hash batches and UDP carries many info hashes under "
+                "one tracker connection. Results are cached into Sources telemetry; opening or "
+                "redrawing the UI does not itself generate scrape traffic.",
+            ),
+            (
                 "Sources table",
                 "Peers is the count reported or learned through that discovery source, not the "
                 "number currently connected. Response is tracker request latency. Swarm S/L is the "
@@ -332,6 +348,9 @@ HELP_TOPICS: Tuple[HelpTopic, ...] = (
             "HTTP_TRACKER",
             "HTTPS_TRACKER",
             "UDP_TRACKER",
+            "TRACKER_SCRAPE",
+            "SCRAPE_BATCHING",
+            "SCRAPE_COMPLETED",
             "SOURCE_PEERS",
             "SOURCE_RESPONSE",
             "SOURCE_LAST_UPDATE",
@@ -1119,5 +1138,3 @@ class HelpTopicsView:
         # changed width, so maximizing/restoring the viewport stays polished
         # without turning Help into a continuously rebuilding view.
         self._update_content_wrap()
-
-

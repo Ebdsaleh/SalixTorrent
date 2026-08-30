@@ -62,8 +62,9 @@ HELP_TERMS = {
         "BEP - BitTorrent Enhancement Proposal",
         "A numbered specification describing a BitTorrent protocol or extension. "
         "Examples: BEP-5 defines IPv4 DHT, BEP-9 defines magnet metadata exchange, "
-        "BEP-11 defines Peer Exchange, BEP-14 defines Local Peer Discovery, and "
-        "BEP-32 extends DHT compact-node/address handling to IPv6.",
+        "BEP-11 defines Peer Exchange, BEP-14 defines Local Peer Discovery, BEP-15 "
+        "defines the UDP tracker protocol including scrape, BEP-32 extends DHT to IPv6, "
+        "and BEP-48 documents HTTP tracker scrape conventions.",
     ),
     "BEP32": (
         "BEP-32 - IPv6 Extension for DHT",
@@ -112,9 +113,10 @@ HELP_TERMS = {
     ),
     "HTTP_TRACKER": (
         "HTTP Tracker",
-        "A BitTorrent tracker contacted with an HTTP announce request. It returns "
-        "peer addresses and may report seed/leecher counts and an announce "
-        "interval. Torrent payload data does not pass through the tracker.",
+        "A BitTorrent tracker contacted with HTTP announce requests for peer discovery. "
+        "When its announce path has a standards-defined scrape counterpart, SalixTorrent "
+        "can also batch BEP-48 scrape statistics for multiple active torrents. Torrent "
+        "payload data does not pass through the tracker.",
     ),
     "HTTPS_TRACKER": (
         "HTTPS Tracker",
@@ -124,9 +126,34 @@ HELP_TERMS = {
     ),
     "UDP_TRACKER": (
         "UDP Tracker",
-        "A tracker using the compact UDP tracker protocol. It generally has less "
-        "protocol overhead than HTTP. Its job is peer discovery only; the torrent "
-        "payload is transferred directly between peers.",
+        "A tracker using BEP-15's compact UDP protocol. In addition to announce, BEP-15 "
+        "defines a scrape action that can return seed, leecher and completed-download counts "
+        "for many info hashes in one datagram. Torrent payload is still exchanged directly "
+        "between peers.",
+    ),
+    "TRACKER_SCRAPE": (
+        "Tracker Scrape - S / L / C",
+        "A tracker scrape asks for swarm statistics without announcing SalixTorrent as a peer "
+        "and without changing swarm participation. S is complete peers (seeds), L is incomplete "
+        "peers (leechers), and C is the tracker's cumulative completed-download counter. "
+        "SalixTorrent batches multiple active torrents that share a tracker so one scrape can "
+        "return several swarms' statistics efficiently. HTTP uses the BEP-48 scrape endpoint; "
+        "UDP uses BEP-15 action 2.",
+    ),
+    "SCRAPE_BATCHING": (
+        "Tracker Scrape Batching",
+        "Instead of sending one scrape request per torrent, SalixTorrent groups active torrents "
+        "that use the same tracker. HTTP requests carry repeated info_hash parameters in bounded "
+        "batches; UDP requests carry many 20-byte info hashes under one tracker connection. "
+        "The coordinator is shared application-wide and timer-driven, so the UI does not create "
+        "network traffic merely by displaying statistics.",
+    ),
+    "SCRAPE_COMPLETED": (
+        "Scrape Completed Downloads",
+        "The C value from a tracker scrape is the tracker's cumulative count of completed "
+        "downloads for that info hash. It is not the number of current seeds and it is not a "
+        "globally authoritative total: different trackers may maintain different populations "
+        "and historical counters.",
     ),
     "DISCOVERY": (
         "Peer Discovery",
@@ -142,9 +169,10 @@ HELP_TERMS = {
     ),
     "SWARM_SL": (
         "Swarm S/L - Seeds / Leechers",
-        "Tracker-reported swarm counts. S is the number of seeds and L is the "
-        "number of leechers reported by that tracker. '--' means the discovery "
-        "source does not provide those figures.",
+        "Seed/leecher counts reported by a tracker announce result. The Sources view keeps "
+        "these announce figures separate from scrape S/L/C statistics so advanced users can "
+        "see which tracker operation supplied each number. '--' means the source has not "
+        "provided comparable announce counts.",
     ),
     "SOURCE_RESPONSE": (
         "Discovery Response Time",
@@ -1108,5 +1136,3 @@ def add_context_tooltip(
         contextual_text(title, body, facts=facts, footer=footer),
         wrap=wrap,
     )
-
-

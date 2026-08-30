@@ -8,7 +8,7 @@ SalixTorrent is a desktop BitTorrent v1 client written in Python with a custom a
 
 - Load `.torrent` files or BitTorrent v1 magnet links.
 - BEP-9 magnet metadata retrieval with info-hash verification and local metadata caching.
-- HTTP/HTTPS and UDP tracker support, plus DHT, PEX, and Local Peer Discovery for public torrents.
+- HTTP/HTTPS and UDP tracker announce support plus batched tracker scrape statistics, DHT, PEX, and Local Peer Discovery for public torrents.
 - Private-torrent isolation: no public fallback trackers, DHT, PEX, or LPD leakage.
 - Concurrent downloading and uploading over bidirectional peer connections.
 - Incoming peer listener, seeding, and external-source seeding.
@@ -83,11 +83,11 @@ The Active Transfers view contains a persistent queue and a selected-torrent ins
 General | Peers | Pieces | Files | Sources | Speed
 ```
 
-- **General** — transfer totals, ETA, ratio, swarm statistics, metadata, storage, discovery, connectivity, and limits.
+- **General** — transfer totals, ETA, ratio, announce-derived swarm counts, freshest tracker scrape S/L/C statistics, metadata, storage, discovery, connectivity, and limits.
 - **Peers** — live peer address/client/source/direction/piece availability/rates/state/flags.
 - **Pieces** — verification state, active requests, availability, and a compact graphical piece map.
 - **Files** — per-file verified progress, piece span, state, and priority/selective-download controls.
-- **Sources** — trackers, DHT, PEX, and LPD with live status and diagnostic telemetry; neutral Pending, amber Timeout warnings, and red source errors are reported separately.
+- **Sources** — trackers, DHT, PEX, and LPD with live status and diagnostic telemetry; tracker announce health remains separate from scrape S/L/C statistics, while neutral Pending, amber Timeout warnings, and red source errors are reported separately.
 - **Speed** — rolling upload/download history plus per-torrent and global limit references.
 
 Technical labels and values throughout the interface have contextual hover help. `Help -> Help Topics...` opens the built-in searchable manual, while `Help -> Glossary A-Z...` jumps directly to the technical glossary.
@@ -103,6 +103,20 @@ For public torrents SalixTorrent can discover peers through:
 - Local Peer Discovery / LPD (BEP-14)
 
 Private torrents deliberately remain tracker-controlled. SalixTorrent disables DHT, PEX, LPD, and public fallback tracker injection when the torrent metadata declares `private = 1`.
+
+### Tracker scrape statistics
+
+Phase 6 adds tracker scrape as a statistics path that is deliberately separate from announce. HTTP/HTTPS trackers use the BEP-48 convention: SalixTorrent derives a scrape endpoint only when the announce URL contains `announce` in its path and sends repeated `info_hash` parameters. UDP trackers use BEP-15 action `2`. Scrape does not announce SalixTorrent as a peer and does not change participation in the swarm.
+
+The scrape values are displayed as **S / L / C**:
+
+- **S** — current complete peers (seeds) reported by that tracker;
+- **L** — current incomplete peers (leechers) reported by that tracker;
+- **C** — that tracker's cumulative completed-download counter.
+
+These are tracker-local statistics, not mathematically global swarm totals. Different trackers can maintain different peer populations and historical completion counts, so SalixTorrent keeps each tracker's scrape result visible in Sources and labels the freshest individual tracker scrape in General rather than summing incompatible populations.
+
+Scraping is application-wide and batched. Active torrents that share the same tracker are grouped into one bounded HTTP request or one/more bounded UDP scrape datagrams. UDP batches reuse a single tracker connection ID, while HTTP batches reuse one client session. A single timer-driven coordinator refreshes cached scrape state; opening or repainting a Dear PyGui view never initiates tracker traffic.
 
 ## Downloads, uploads, and seeding
 
@@ -178,6 +192,8 @@ When a mapping protocol reports an external IPv4 address, SalixTorrent classifie
 
 Router mapping leases are finite on many devices. SalixTorrent renews successful mappings before expiry with one shared sleeping timer covering all active listen ports. There is no busy connectivity poll and no per-torrent renewal loop. If a renewal attempt fails while an earlier mapping may still be valid, SalixTorrent retains the previous mapping and schedules a later retry rather than tearing the rule down first.
 
+On Windows, a remote BitTorrent peer can reset a TCP connection while the application is closing. Python's Proactor event loop can surface `WSAECONNRESET` / WinError 10054 from its internal `connection_lost` callback even after SalixTorrent has already begun normal socket teardown. SalixTorrent treats only that specific reset as expected peer churn at the event-loop boundary; unrelated asyncio exceptions still use the normal error handler.
+
 ## Create Torrent
 
 The Create Torrent view can build a BitTorrent v1 `.torrent` from:
@@ -199,9 +215,10 @@ python test_request_scheduling.py
 python test_disk_io.py
 python test_transport_security.py
 python test_ipv6.py
+python test_tracker_scrape.py
 ```
 
-The release-critical regression coverage includes MSE/RC4 interoperability, rarest-first/endgame scheduling, bounded request pipelines, asynchronous disk backpressure/caching, source binding, encryption fallback rules, multi-torrent port mappings, finite/permanent mapping-lease handling, structured UPnP/NAT-PMP diagnostics, source-severity accounting, Interface Lock, real inbound seeding uploads, IPv6 peer TCP, BEP-7/BEP-15 tracker peers, BEP-11 IPv6 PEX, and BEP-32 DHT behavior.
+The release-critical regression coverage includes MSE/RC4 interoperability, rarest-first/endgame scheduling, bounded request pipelines, asynchronous disk backpressure/caching, source binding, encryption fallback rules, multi-torrent port mappings, finite/permanent mapping-lease handling, structured UPnP/NAT-PMP diagnostics, source-severity accounting, Interface Lock, real inbound seeding uploads, IPv6 peer TCP, BEP-7/BEP-15 tracker peers, BEP-11 IPv6 PEX, BEP-32 DHT behavior, BEP-48 HTTP scrape batching, BEP-15 UDP scrape batching, scrape/announce telemetry isolation, and Windows Proactor reset handling.
 
 ## Current scope
 
@@ -214,6 +231,7 @@ SalixTorrent/
 ├── main.py
 ├── requirements.txt
 ├── foundation_test.py
+├── test_tracker_scrape.py
 ├── app/
 │   ├── version.py
 │   ├── engine/
@@ -235,7 +253,8 @@ SalixTorrent/
 │   │   ├── torrent_creator.py
 │   │   ├── torrent_file.py
 │   │   ├── torrent_manager.py
-│   │   └── tracker.py
+│   │   ├── tracker.py
+│   │   └── tracker_scrape.py
 │   └── views/
 │       ├── application_menu.py
 │       ├── create_torrent_view.py

@@ -1113,6 +1113,14 @@ class TorrentSession:
             self._sources_view_cache,
         )
 
+    def apply_tracker_scrape_result(self, tracker_url: str, result: dict):
+        """Apply cached scrape telemetry without initiating UI-driven network work."""
+        self.tracker.apply_scrape_result(tracker_url, result)
+        # Detail snapshots are otherwise cached for performance. Invalidation is
+        # O(1) and lets the next ordinary telemetry emission expose new scrape
+        # data without forcing an extra UI message here.
+        self._detail_telemetry_cached_at = 0.0
+
     def _build_pex_source_snapshot(self) -> dict:
         now = time.monotonic()
         if self.torrent.private:
@@ -1191,6 +1199,11 @@ class TorrentSession:
         warning_count = 0
         error_count = 0
         tracker_peer_count = 0
+        scrape_active_count = 0
+        scrape_pending_count = 0
+        scrape_warning_count = 0
+        scrape_error_count = 0
+        freshest_scrape = None
 
         # Sources is deliberately tiny (trackers + DHT + PEX + LAN), but keep
         # classification and tracker-peer accounting in one pass anyway.
@@ -1212,6 +1225,26 @@ class TorrentSession:
                 except (TypeError, ValueError):
                     pass
 
+                scrape_status = str(source.get("scrape_status") or "Waiting")
+                if scrape_status == "Active":
+                    scrape_active_count += 1
+                    age = source.get("scrape_last_success_seconds")
+                    try:
+                        age_value = float(age) if age is not None else float("inf")
+                    except (TypeError, ValueError):
+                        age_value = float("inf")
+                    if freshest_scrape is None or age_value < freshest_scrape[0]:
+                        freshest_scrape = (age_value, source)
+                elif scrape_status in {"Waiting", "Scraping"}:
+                    scrape_pending_count += 1
+                elif scrape_status in {"Timeout", "No Data"}:
+                    scrape_warning_count += 1
+                elif scrape_status == "Error":
+                    scrape_error_count += 1
+                # Unsupported means the tracker has no standards-defined scrape
+                # endpoint; it is informational, not a source failure.
+
+        scrape_source = freshest_scrape[1] if freshest_scrape is not None else {}
         return {
             "sources": sources,
             "tracker_count": tracker_count,
@@ -1221,6 +1254,16 @@ class TorrentSession:
             "error_count": error_count,
             "problem_count": warning_count + error_count,
             "tracker_peers_last_seen": tracker_peer_count,
+            "scrape_active_count": scrape_active_count,
+            "scrape_pending_count": scrape_pending_count,
+            "scrape_warning_count": scrape_warning_count,
+            "scrape_error_count": scrape_error_count,
+            "scrape_seeders": scrape_source.get("scrape_seeders"),
+            "scrape_leechers": scrape_source.get("scrape_leechers"),
+            "scrape_completed": scrape_source.get("scrape_completed"),
+            "scrape_source": scrape_source.get("source", ""),
+            "scrape_age_seconds": scrape_source.get("scrape_last_success_seconds"),
+            "scrape_batch_size": int(scrape_source.get("scrape_batch_size", 0) or 0),
             "dht_peers_seen": int(dht_source.get("peers", 0) or 0),
             "pex_peers_seen": int(pex_source.get("peers", 0) or 0),
             "lan_peers_seen": int(lan_source.get("peers", 0) or 0),
@@ -1382,7 +1425,7 @@ class TorrentSession:
         tracker_sources = [
             source
             for source in list(sources_view.get("sources") or [])
-            if str(source.get("type", "")).upper() in {"HTTP", "UDP"}
+            if str(source.get("type", "")).upper() in {"HTTP", "HTTPS", "UDP"}
         ]
         seed_counts = [
             int(source.get("seeders"))
@@ -1480,6 +1523,16 @@ class TorrentSession:
             "mask_peer_ips": bool(self.mask_peer_ips),
             "swarm_seeders": swarm_seeders,
             "swarm_leechers": swarm_leechers,
+            # Scrape statistics are kept separate from announce-derived counts.
+            # Trackers can represent different swarm populations, so the UI
+            # labels this as the freshest individual tracker scrape rather than
+            # pretending it is a mathematically global count.
+            "scrape_seeders": sources_view.get("scrape_seeders"),
+            "scrape_leechers": sources_view.get("scrape_leechers"),
+            "scrape_completed": sources_view.get("scrape_completed"),
+            "scrape_source": sources_view.get("scrape_source", ""),
+            "scrape_age_seconds": sources_view.get("scrape_age_seconds"),
+            "scrape_batch_size": int(sources_view.get("scrape_batch_size", 0) or 0),
             "swarm_availability": float(piece_view.get("swarm_availability", 0.0) or 0.0),
             "discovery_summary": " + ".join(discovery_parts) if discovery_parts else "None",
             "peers": peer_snapshots,
@@ -3503,5 +3556,3 @@ class TorrentSession:
 
         except asyncio.CancelledError:
             pass
-
-

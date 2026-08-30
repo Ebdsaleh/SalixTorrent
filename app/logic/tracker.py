@@ -98,6 +98,21 @@ class TrackerClient:
             "ipv4_peers": 0,
             "ipv6_peers": 0,
             "announce_families": [],
+            # Phase 6 scrape telemetry is independent from announce health. A
+            # tracker can time out while announcing yet still support scrape,
+            # or vice versa, so do not overload the discovery status fields.
+            "scrape_status": "Waiting",
+            "scrape_seeders": None,
+            "scrape_leechers": None,
+            "scrape_completed": None,
+            "scrape_response_ms": None,
+            "scrape_last_error": "",
+            "scrape_last_update_at": 0.0,
+            "scrape_last_success_at": 0.0,
+            "scrape_query_count": 0,
+            "scrape_batch_size": 0,
+            "scrape_protocol": "",
+            "scrape_endpoint": "",
         }
         self._source_records[tracker_url] = record
         return record
@@ -154,6 +169,39 @@ class TrackerClient:
         if status in {"Active", "No Peers"}:
             record["last_success_at"] = now
 
+    def apply_scrape_result(self, tracker_url: str, result: dict):
+        """Cache one shared-coordinator scrape result for this tracker.
+
+        Scrape is supplemental swarm telemetry and never changes announce
+        success/failure state or torrent lifecycle state.
+        """
+        now = time.monotonic()
+        record = self._ensure_source_record(tracker_url)
+        result = dict(result or {})
+        status = str(result.get("status") or "Error")
+        record["scrape_status"] = status
+        record["scrape_response_ms"] = result.get("response_ms")
+        record["scrape_last_error"] = str(result.get("error") or "")
+        record["scrape_last_update_at"] = now
+        record["scrape_query_count"] = int(record.get("scrape_query_count", 0) or 0) + 1
+        record["scrape_batch_size"] = max(0, int(result.get("batch_size", 0) or 0))
+        record["scrape_protocol"] = str(result.get("protocol") or "")
+        record["scrape_endpoint"] = str(result.get("endpoint") or "")
+
+        if status == "Active":
+            for source_key, target_key in (
+                ("seeders", "scrape_seeders"),
+                ("leechers", "scrape_leechers"),
+                ("completed", "scrape_completed"),
+            ):
+                value = result.get(source_key)
+                if value is not None:
+                    try:
+                        record[target_key] = max(0, int(value))
+                    except (TypeError, ValueError):
+                        pass
+            record["scrape_last_success_at"] = now
+
     def get_source_snapshots(self) -> List[dict]:
         """Return immutable-ish tracker telemetry dictionaries for the UI."""
         now = time.monotonic()
@@ -164,6 +212,8 @@ class TrackerClient:
             record = self._ensure_source_record(tracker_url)
             last_update_at = float(record.get("last_update_at", 0.0) or 0.0)
             last_success_at = float(record.get("last_success_at", 0.0) or 0.0)
+            scrape_last_update_at = float(record.get("scrape_last_update_at", 0.0) or 0.0)
+            scrape_last_success_at = float(record.get("scrape_last_success_at", 0.0) or 0.0)
 
             snapshot = dict(record)
             snapshot["last_update_seconds"] = (
@@ -171,6 +221,12 @@ class TrackerClient:
             )
             snapshot["last_success_seconds"] = (
                 max(0.0, now - last_success_at) if last_success_at else None
+            )
+            snapshot["scrape_last_update_seconds"] = (
+                max(0.0, now - scrape_last_update_at) if scrape_last_update_at else None
+            )
+            snapshot["scrape_last_success_seconds"] = (
+                max(0.0, now - scrape_last_success_at) if scrape_last_success_at else None
             )
             snapshots.append(snapshot)
 
@@ -691,4 +747,3 @@ class TrackerClient:
         if isinstance(raw_peers, list):
             return self._parse_peer_dicts(raw_peers)
         return self._parse_compact_peers(raw_peers, socket.AF_INET)
-

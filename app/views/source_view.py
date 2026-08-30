@@ -119,6 +119,11 @@ class SourceView:
                     init_width_or_weight=95,
                 )
                 dpg.add_table_column(
+                    label="Scrape S/L/C",
+                    width_fixed=True,
+                    init_width_or_weight=125,
+                )
+                dpg.add_table_column(
                     label="Response",
                     width_fixed=True,
                     init_width_or_weight=90,
@@ -182,6 +187,53 @@ class SourceView:
         return f"{seeders_text} / {leechers_text}"
 
     @staticmethod
+    def _format_scrape(source: dict) -> str:
+        if str(source.get("type") or "").upper() not in {"HTTP", "HTTPS", "UDP"}:
+            return "--"
+        status = str(source.get("scrape_status") or "Waiting")
+        if status != "Active":
+            return status
+        values = []
+        for key in ("scrape_seeders", "scrape_leechers", "scrape_completed"):
+            value = source.get(key)
+            try:
+                values.append(str(max(0, int(value))))
+            except (TypeError, ValueError):
+                values.append("?")
+        return " / ".join(values)
+
+    @classmethod
+    def _scrape_tooltip(cls, source: dict) -> str:
+        source_type = str(source.get("type") or "").upper()
+        if source_type not in {"HTTP", "HTTPS", "UDP"}:
+            return "Tracker scrape statistics are available only for tracker sources."
+        status = str(source.get("scrape_status") or "Waiting")
+        lines = [
+            "Tracker Scrape - Seeds / Leechers / Completed",
+            "",
+            "Scrape asks a tracker for swarm statistics without announcing a peer or changing swarm participation.",
+            "",
+            f"Status: {status}",
+        ]
+        if status == "Active":
+            lines.extend([
+                f"Seeds: {source.get('scrape_seeders', '--')}",
+                f"Leechers: {source.get('scrape_leechers', '--')}",
+                f"Completed downloads: {source.get('scrape_completed', '--')}",
+                f"Last scrape: {cls._format_age(source.get('scrape_last_update_seconds'))}",
+                f"Scrape response: {cls._format_response(source.get('scrape_response_ms'))}",
+                f"Protocol: {source.get('scrape_protocol') or '--'}",
+                f"Batch size: {int(source.get('scrape_batch_size', 0) or 0)} torrent(s)",
+            ])
+        error = str(source.get("scrape_last_error") or "").strip()
+        if error:
+            lines.append(f"Detail: {error}")
+        endpoint = str(source.get("scrape_endpoint") or "").strip()
+        if endpoint:
+            lines.append(f"Endpoint: {endpoint}")
+        return "\n".join(lines)
+
+    @staticmethod
     def _detail(source: dict) -> str:
         error = str(source.get("last_error") or "").strip()
         if error:
@@ -222,6 +274,19 @@ class SourceView:
             count = 0
         if count:
             parts.append(f"announces {count}")
+
+        scrape_status = str(source.get("scrape_status") or "")
+        if scrape_status:
+            if scrape_status == "Active":
+                parts.append(
+                    "scrape "
+                    f"{source.get('scrape_seeders', '?')}/"
+                    f"{source.get('scrape_leechers', '?')}/"
+                    f"{source.get('scrape_completed', '?')} "
+                    f"batch {int(source.get('scrape_batch_size', 0) or 0)}"
+                )
+            elif scrape_status != "Waiting":
+                parts.append(f"scrape {scrape_status.lower()}")
 
         return " | ".join(parts) if parts else "--"
 
@@ -287,6 +352,8 @@ class SourceView:
                 f"Tracker-reported seeds / leechers: {swarm}",
                 f"Latest response time: {response}",
                 f"Last update: {age}",
+                f"Scrape S/L/C: {cls._format_scrape(source)}",
+                f"Scrape age: {cls._format_age(source.get('scrape_last_update_seconds'))}",
             ]
             interval = source.get("interval")
             if interval is not None:
@@ -411,12 +478,17 @@ class SourceView:
         dht_peers = int(sources_view.get("dht_peers_seen", 0) or 0)
         pex_peers = int(sources_view.get("pex_peers_seen", 0) or 0)
         lan_peers = int(sources_view.get("lan_peers_seen", 0) or 0)
+        scrape_active = int(sources_view.get("scrape_active_count", 0) or 0)
+        scrape_pending = int(sources_view.get("scrape_pending_count", 0) or 0)
+        scrape_warnings = int(sources_view.get("scrape_warning_count", 0) or 0)
+        scrape_errors = int(sources_view.get("scrape_error_count", 0) or 0)
 
         if sources:
             summary = (
                 f"Sources: {tracker_count} tracker(s) + DHT + PEX + LAN | "
                 f"Responding: {active_count} | Pending: {pending_count} | "
                 f"Warnings: {warning_count} | Errors: {error_count} | "
+                f"Scrape A/P/W/E: {scrape_active}/{scrape_pending}/{scrape_warnings}/{scrape_errors} | "
                 f"Peers seen - Tracker {tracker_peers} | DHT {dht_peers} | "
                 f"PEX {pex_peers} | LAN {lan_peers}"
             )
@@ -464,6 +536,9 @@ class SourceView:
                 swarm_item = dpg.add_text(self._format_swarm(source))
                 add_help_tooltip(swarm_item, "SWARM_SL")
 
+                scrape_item = dpg.add_text(self._format_scrape(source))
+                add_text_tooltip(scrape_item, self._scrape_tooltip(source), wrap=520)
+
                 response_item = dpg.add_text(
                     self._format_response(source.get("response_ms"))
                 )
@@ -478,7 +553,3 @@ class SourceView:
                 add_help_tooltip(detail_item, "SOURCE_DETAIL")
 
             self._row_ids.append(row_id)
-
-
-
-

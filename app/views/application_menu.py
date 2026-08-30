@@ -654,7 +654,7 @@ class ApplicationMenu:
             dpg.add_spacer(height=8)
             dpg.add_text(
                 "Core capabilities\n"
-                "  - HTTP/UDP trackers, DHT, PEX and LAN peer discovery\n"
+                "  - HTTP/UDP trackers with batched scrape statistics, DHT, PEX and LAN discovery\n"
                 "  - Multi-peer downloading and seeding\n"
                 "  - Fast resume and SHA-1 piece verification\n"
                 "  - Magnet metadata exchange (BEP-9)\n"
@@ -737,6 +737,13 @@ class ApplicationMenu:
             f"Selected upload requests: {selected_stats.get('upload_requests_served', 0)} served / "
             f"{selected_stats.get('upload_requests_received', 0)} received\n"
             f"Selected uploaded this session: {selected_stats.get('uploaded_this_session_bytes', 0)} bytes\n"
+            f"Tracker scrape S/L/C: "
+            f"{selected_stats.get('scrape_seeders') if selected_stats.get('scrape_seeders') is not None else '--'} / "
+            f"{selected_stats.get('scrape_leechers') if selected_stats.get('scrape_leechers') is not None else '--'} / "
+            f"{selected_stats.get('scrape_completed') if selected_stats.get('scrape_completed') is not None else '--'}\n"
+            f"Tracker scrape source: {selected_stats.get('scrape_source') or '--'} | "
+            f"age {self.download_view._format_age(selected_stats.get('scrape_age_seconds'))} | "
+            f"batch {selected_stats.get('scrape_batch_size', 0) or 0} torrent(s)\n"
             f"Download scheduler: Rarest-first + bounded adaptive pipeline\n"
             f"Endgame: {'Active' if selected_stats.get('endgame_active') else 'Standby'} "
             f"({selected_stats.get('remaining_wanted_blocks', 0)} wanted blocks remain; "
@@ -801,5 +808,3 @@ class ApplicationMenu:
             dpg.set_clipboard_text(self._diagnostics_string())
         except Exception:
             pass
-
-
