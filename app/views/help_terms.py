@@ -288,6 +288,51 @@ HELP_TERMS = {
         "starting at the lowest piece number. This avoids deterministic piece-order "
         "clustering between clients while preserving rarest-first behaviour.",
     ),
+    "REQUEST_SCHEDULER": (
+        "Download Request Scheduler",
+        "The block-level scheduler that turns rarest-first piece choices into bounded "
+        "peer-wire REQUEST pipelines. SalixTorrent tracks exactly which peer owns each "
+        "outstanding block, expires stalled ownership for reassignment, and activates "
+        "bounded duplicate requests only during endgame. The scheduler is event-driven; "
+        "it does not rescan the entire torrent on every peer message.",
+    ),
+    "REQUEST_PIPELINE": (
+        "Request Pipelining",
+        "Keeping several 16 KiB REQUEST messages outstanding to one unchoked peer so "
+        "network round-trip latency does not leave the connection idle between blocks. "
+        "SalixTorrent adapts the target depth from observed peer throughput and clamps "
+        "it to a strict per-peer range, preventing an unresponsive peer from owning an "
+        "unbounded amount of work.",
+    ),
+    "OUTSTANDING_REQUEST": (
+        "Outstanding Block Request",
+        "A block that SalixTorrent has assigned to a particular peer but has not yet "
+        "received. Normal downloading gives a block one owner. During endgame a small "
+        "number of peers may temporarily own the same final block; ownership is cleared "
+        "when data arrives, a peer disconnects/chokes, or the request times out.",
+    ),
+    "REQUEST_TIMEOUT": (
+        "Block Request Timeout",
+        "A deadline applied after a REQUEST frame is actually transmitted. If the peer "
+        "does not return that block before the deadline, SalixTorrent releases the peer's "
+        "ownership and the scheduler can immediately assign the block elsewhere. A CANCEL "
+        "is also sent to the stale peer when the connection is still alive.",
+    ),
+    "ENDGAME_MODE": (
+        "Endgame Mode",
+        "A completion-latency strategy used only when a small tail of wanted blocks "
+        "remains. SalixTorrent first assigns every still-unrequested tail block normally. "
+        "If all remaining blocks are already outstanding, the oldest lingering requests "
+        "may be duplicated to a bounded number of other peers. The first valid PIECE wins "
+        "and SalixTorrent sends CANCEL to the other owners.",
+    ),
+    "CANCEL_MESSAGE": (
+        "Peer-wire CANCEL Message",
+        "BitTorrent peer-wire message ID 8. A downloader sends CANCEL for a previously "
+        "issued block REQUEST when that work is no longer needed, such as after another "
+        "peer wins an endgame race or a request is reassigned. SalixTorrent both sends "
+        "CANCEL and honours received CANCEL messages for pending uploads.",
+    ),
     "PIECE_STATE": (
         "Piece State",
         "Verified means the piece hash passed. Downloading/Requested means work is "
@@ -1006,6 +1051,8 @@ def add_context_tooltip(
         contextual_text(title, body, facts=facts, footer=footer),
         wrap=wrap,
     )
+
+
 
 
 

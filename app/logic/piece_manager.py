@@ -21,6 +21,14 @@ BLOCK_SIZE = 16384
 RESUME_STATE_VERSION = 1
 MULTI_FILE_RESUME_INTERVAL = 5.0
 
+# Phase 2/3 request scheduling. Endgame only activates once a small tail of
+# wanted blocks remains. Duplicate tail requests are bounded so completion
+# latency improves without turning the final blocks into a bandwidth storm.
+ENDGAME_BLOCK_THRESHOLD = 32
+ENDGAME_MAX_REQUESTERS_PER_BLOCK = 3
+
+_ANONYMOUS_REQUESTER = object()
+
 FILE_PRIORITY_SKIP = "Don't Download"
 FILE_PRIORITY_LOW = "Low"
 FILE_PRIORITY_NORMAL = "Normal"
@@ -45,7 +53,40 @@ class Block:
         self.offset = offset
         self.length = length
         self.data: Optional[bytes] = None
-        self.is_requested: bool = False
+        # requester -> monotonic timestamp of the wire REQUEST. A timestamp of
+        # 0.0 means the block has been reserved by the scheduler but bandwidth
+        # throttling has not yet allowed the REQUEST frame to be transmitted.
+        self.requesters: dict[object, float] = {}
+
+    @property
+    def is_requested(self) -> bool:
+        """Compatibility view for UI/older callers: any owner means requested."""
+        return bool(self.requesters)
+
+    @is_requested.setter
+    def is_requested(self, value: bool):
+        # Keep the historical attribute writable for external callers while the
+        # scheduler itself uses explicit requester ownership. Internal code never
+        # relies on the anonymous owner.
+        if value:
+            if not self.requesters:
+                self.requesters[_ANONYMOUS_REQUESTER] = 0.0
+        else:
+            self.requesters.clear()
+
+    def requested_by(self, peer_key: object) -> bool:
+        owner = _ANONYMOUS_REQUESTER if peer_key is None else peer_key
+        return owner in self.requesters
+
+
+@dataclass(frozen=True)
+class BlockReceiveResult:
+    accepted: bool = False
+    piece_completed: bool = False
+    duplicate: bool = False
+    hash_failed: bool = False
+    cancel_peer_keys: tuple[object, ...] = ()
+    block: Optional[Block] = None
 
 
 class Piece:
@@ -195,6 +236,12 @@ class PieceManager:
         self._piece_availability: List[int] = [0] * len(self.pieces)
         self._peer_piece_sets: dict[object, set[int]] = {}
         self._active_piece_indices: set[int] = set()
+
+        # Explicit block-request ownership. Each peer normally owns a block
+        # exclusively; endgame can add a small bounded set of duplicate owners.
+        # The reverse index means disconnect/timeout cleanup touches only that
+        # peer's small pipeline rather than scanning the torrent.
+        self._requests_by_peer: dict[object, set[Block]] = {}
         self._rarity_buckets: dict[int, dict[int, set[int]]] = {
             FILE_PRIORITY_RANK[FILE_PRIORITY_HIGH]: {},
             FILE_PRIORITY_RANK[FILE_PRIORITY_NORMAL]: {},
@@ -419,7 +466,8 @@ class PieceManager:
         return True
 
     def unregister_peer(self, peer_key: object):
-        """Remove one peer's contribution when the connection leaves the swarm."""
+        """Remove one peer's availability and any outstanding block ownership."""
+        self.release_peer_requests(peer_key)
         peer_pieces = self._peer_piece_sets.pop(peer_key, None)
         if not peer_pieces:
             return
@@ -1076,6 +1124,7 @@ class PieceManager:
             self.downloaded_bytes = 0
             self.last_error = ""
             self._set_check_progress(0, 0)
+            self.reset_inflight_requests()
 
             for piece in self.pieces:
                 piece.is_complete = False
@@ -1083,8 +1132,157 @@ class PieceManager:
                     piece.reset()
             self._rebuild_rarity_buckets()
 
-    def _reserve_random_candidate_block(self, candidates: set[int]) -> Optional[Block]:
-        """Reserve one free block from a randomly ordered candidate set."""
+    @staticmethod
+    def _request_owner(peer_key: object) -> object:
+        return _ANONYMOUS_REQUESTER if peer_key is None else peer_key
+
+    def _reserve_block_request(
+        self,
+        block: Block,
+        peer_key: object,
+        *,
+        allow_duplicate: bool = False,
+    ) -> bool:
+        """Reserve one block for one peer without scanning unrelated requests."""
+        if block.data is not None:
+            return False
+
+        owner = self._request_owner(peer_key)
+        if owner in block.requesters:
+            return False
+
+        if block.requesters:
+            if not allow_duplicate:
+                return False
+            if len(block.requesters) >= ENDGAME_MAX_REQUESTERS_PER_BLOCK:
+                return False
+
+        block.requesters[owner] = 0.0
+        self._requests_by_peer.setdefault(owner, set()).add(block)
+        self._active_piece_indices.add(block.piece_index)
+        return True
+
+    def mark_request_sent(
+        self,
+        block: Block,
+        peer_key: object,
+        *,
+        sent_at: Optional[float] = None,
+    ) -> bool:
+        """Start the timeout clock only after the REQUEST reached the wire."""
+        owner = self._request_owner(peer_key)
+        if owner not in block.requesters:
+            return False
+        block.requesters[owner] = float(sent_at if sent_at is not None else time.monotonic())
+        return True
+
+    def release_request(self, block: Block, peer_key: object) -> bool:
+        """Release one peer's ownership while preserving any endgame duplicates."""
+        owner = self._request_owner(peer_key)
+        if owner not in block.requesters:
+            return False
+        block.requesters.pop(owner, None)
+        owned = self._requests_by_peer.get(owner)
+        if owned is not None:
+            owned.discard(block)
+            if not owned:
+                self._requests_by_peer.pop(owner, None)
+        return True
+
+    def _release_all_block_requests(self, block: Block) -> tuple[object, ...]:
+        owners = tuple(block.requesters)
+        if not owners:
+            return ()
+        block.requesters.clear()
+        for owner in owners:
+            owned = self._requests_by_peer.get(owner)
+            if owned is None:
+                continue
+            owned.discard(block)
+            if not owned:
+                self._requests_by_peer.pop(owner, None)
+        return owners
+
+    def release_peer_requests(self, peer_key: object) -> List[Block]:
+        """Release a disconnected/choked peer in O(size of its request pipeline)."""
+        owner = self._request_owner(peer_key)
+        blocks = list(self._requests_by_peer.pop(owner, ()))
+        for block in blocks:
+            block.requesters.pop(owner, None)
+        return blocks
+
+    def expire_peer_requests(
+        self,
+        peer_key: object,
+        timeout_seconds: float,
+        *,
+        now: Optional[float] = None,
+    ) -> List[Block]:
+        """Release wire requests that have exceeded their response deadline."""
+        owner = self._request_owner(peer_key)
+        owned = self._requests_by_peer.get(owner)
+        if not owned:
+            return []
+
+        current = float(now if now is not None else time.monotonic())
+        timeout = max(0.0, float(timeout_seconds))
+        expired: List[Block] = []
+        for block in tuple(owned):
+            sent_at = float(block.requesters.get(owner, 0.0) or 0.0)
+            # 0.0 is a scheduler reservation still waiting on a bandwidth
+            # limiter; it must not time out before its REQUEST has been sent.
+            if sent_at <= 0.0 or current - sent_at < timeout:
+                continue
+            block.requesters.pop(owner, None)
+            owned.discard(block)
+            expired.append(block)
+
+        if not owned:
+            self._requests_by_peer.pop(owner, None)
+        return expired
+
+    def peer_outstanding_request_count(self, peer_key: object) -> int:
+        owner = self._request_owner(peer_key)
+        return len(self._requests_by_peer.get(owner, ()))
+
+    def outstanding_request_count(self) -> int:
+        """Return wire-request ownership count, including endgame duplicates."""
+        return sum(len(blocks) for blocks in self._requests_by_peer.values())
+
+    def remaining_wanted_block_count(self, limit: Optional[int] = None) -> int:
+        """Count missing wanted blocks without forcing lazy block allocation.
+
+        Far from endgame this exits as soon as ``limit`` is exceeded, so the hot
+        scheduler only inspects enough pieces to prove that the tail is not yet
+        small. Near endgame there are at most a few dozen missing blocks to count.
+        """
+        stop_after = None if limit is None else max(0, int(limit))
+        remaining = 0
+        for piece_index, piece in enumerate(self.pieces):
+            if piece.is_complete or self.piece_priority_rank(piece_index) <= 0:
+                continue
+
+            if piece.blocks_initialized:
+                remaining += sum(1 for block in (piece._blocks or ()) if block.data is None)
+            else:
+                remaining += math.ceil(piece.length / BLOCK_SIZE) if piece.length else 0
+
+            if stop_after is not None and remaining > stop_after:
+                return remaining
+        return remaining
+
+    @property
+    def endgame_active(self) -> bool:
+        remaining = self.remaining_wanted_block_count(limit=ENDGAME_BLOCK_THRESHOLD)
+        return 0 < remaining <= ENDGAME_BLOCK_THRESHOLD
+
+    def _reserve_random_candidate_block(
+        self,
+        candidates: set[int],
+        peer_key: object,
+        excluded_blocks: object = (),
+    ) -> Optional[Block]:
+        """Reserve one previously-unrequested block from a randomized piece set."""
         while candidates:
             offset = random.randrange(len(candidates))
             piece_index = next(itertools.islice(candidates, offset, None))
@@ -1096,36 +1294,70 @@ class PieceManager:
                 continue
 
             for block in piece.blocks:
-                if not block.is_requested and block.data is None:
-                    block.is_requested = True
-                    self._active_piece_indices.add(piece_index)
-                    return block
+                if (block.piece_index, block.offset) in excluded_blocks:
+                    continue
+                if block.data is None and not block.requesters:
+                    if self._reserve_block_request(block, peer_key):
+                        return block
         return None
 
-    def get_next_request(
+    def _reserve_endgame_duplicate(
         self,
-        peer_bitfield: bytearray,
-        peer_key: object = None,
+        candidates: set[int],
+        peer_key: object,
+        excluded_blocks: object = (),
     ) -> Optional[Block]:
-        """Return a block using file-priority-preserving rarest-first selection.
+        """Duplicate the oldest eligible tail request for this peer.
 
-        File priority is the primary ordering: High is always considered before
-        Normal, then Low. Inside one priority rank, pieces advertised by fewer
-        currently connected peers are preferred. Equal-rarity pieces are chosen
-        randomly so independent clients do not converge on the same deterministic
-        piece order.
-
-        Availability is maintained by BITFIELD/HAVE/disconnect events; this hot
-        path never rebuilds or sorts a torrent-wide availability histogram.
+        Endgame is deliberately small (<= ENDGAME_BLOCK_THRESHOLD), so scanning
+        the tail for its oldest outstanding request is bounded and gives better
+        completion latency than randomly duplicating a freshly issued request.
         """
-        peer_pieces = self._peer_piece_sets.get(peer_key)
-        if peer_pieces is None:
-            # Compatibility fallback for callers/tests without a registered peer
-            # identity. Session workers normally take the cached path.
-            peer_pieces = self._piece_set_from_bitfield(peer_bitfield)
-        if not peer_pieces:
-            return None
+        owner = self._request_owner(peer_key)
+        oldest_time: Optional[float] = None
+        oldest_blocks: List[Block] = []
 
+        for piece_index in candidates:
+            piece = self.pieces[piece_index]
+            if piece.is_complete or not piece.blocks_initialized:
+                continue
+            for block in piece._blocks or ():
+                if (block.piece_index, block.offset) in excluded_blocks:
+                    continue
+                if block.data is not None or not block.requesters:
+                    continue
+                if owner in block.requesters:
+                    continue
+                if len(block.requesters) >= ENDGAME_MAX_REQUESTERS_PER_BLOCK:
+                    continue
+
+                sent_times = [
+                    float(value)
+                    for value in block.requesters.values()
+                    if float(value or 0.0) > 0.0
+                ]
+                if not sent_times:
+                    # Do not duplicate a reservation that has not actually been
+                    # transmitted yet; the original peer may still be throttled.
+                    continue
+                request_time = min(sent_times)
+                if oldest_time is None or request_time < oldest_time:
+                    oldest_time = request_time
+                    oldest_blocks = [block]
+                elif request_time == oldest_time:
+                    oldest_blocks.append(block)
+
+        if not oldest_blocks:
+            return None
+        block = random.choice(oldest_blocks)
+        return block if self._reserve_block_request(block, peer_key, allow_duplicate=True) else None
+
+    def _select_unrequested_block(
+        self,
+        peer_pieces: set[int],
+        peer_key: object,
+        excluded_blocks: object = (),
+    ) -> Optional[Block]:
         for wanted_rank in (
             FILE_PRIORITY_RANK[FILE_PRIORITY_HIGH],
             FILE_PRIORITY_RANK[FILE_PRIORITY_NORMAL],
@@ -1137,69 +1369,174 @@ class PieceManager:
                 if not bucket:
                     continue
 
-                # set intersection runs in CPython's C implementation. Only an
-                # equal-rarity candidate group is materialized, not all pieces.
-                # Keep filling an already-started equally rare piece first.
-                # Starting the intersection from the usually tiny active set
-                # avoids allocating a torrent-sized candidate set for each
-                # pipelined block request.
                 active_candidates = self._active_piece_indices.intersection(
                     bucket,
                     peer_pieces,
                 )
                 if active_candidates:
-                    block = self._reserve_random_candidate_block(active_candidates)
+                    block = self._reserve_random_candidate_block(
+                        active_candidates,
+                        peer_key,
+                        excluded_blocks,
+                    )
                     if block is not None:
                         return block
 
-                # Only when no active candidate can supply another free block do
-                # we materialize the equal-rarity peer intersection and randomly
-                # choose the next piece to start.
                 candidates = bucket.intersection(peer_pieces)
                 if active_candidates:
                     candidates.difference_update(active_candidates)
-                block = self._reserve_random_candidate_block(candidates)
+                block = self._reserve_random_candidate_block(
+                    candidates, peer_key, excluded_blocks
+                )
                 if block is not None:
                     return block
-
         return None
 
-    def handle_block_received(self, piece_index: int, offset: int, data: bytes) -> bool:
+    def _select_endgame_duplicate(
+        self,
+        peer_pieces: set[int],
+        peer_key: object,
+        excluded_blocks: object = (),
+    ) -> Optional[Block]:
+        for wanted_rank in (
+            FILE_PRIORITY_RANK[FILE_PRIORITY_HIGH],
+            FILE_PRIORITY_RANK[FILE_PRIORITY_NORMAL],
+            FILE_PRIORITY_RANK[FILE_PRIORITY_LOW],
+        ):
+            buckets = self._rarity_buckets.get(wanted_rank, {})
+            for availability in sorted(buckets):
+                bucket = buckets.get(availability)
+                if not bucket:
+                    continue
+                block = self._reserve_endgame_duplicate(
+                    bucket.intersection(peer_pieces),
+                    peer_key,
+                    excluded_blocks,
+                )
+                if block is not None:
+                    return block
+        return None
+
+    def get_next_request(
+        self,
+        peer_bitfield: bytearray,
+        peer_key: object = None,
+        excluded_blocks: object = (),
+    ) -> Optional[Block]:
+        """Reserve the next block using rarest-first plus bounded endgame mode.
+
+        Normal scheduling never duplicates a block: file priority remains the
+        primary ordering and rarity the secondary ordering. Once <=32 wanted
+        blocks remain, all still-unrequested blocks are assigned first; only
+        then may an already-outstanding tail block gain another peer owner.
+        """
+        peer_pieces = self._peer_piece_sets.get(peer_key)
+        if peer_pieces is None:
+            peer_pieces = self._piece_set_from_bitfield(peer_bitfield)
+        if not peer_pieces:
+            return None
+
+        block = self._select_unrequested_block(
+            peer_pieces, peer_key, excluded_blocks
+        )
+        if block is not None:
+            return block
+
+        if self.endgame_active:
+            return self._select_endgame_duplicate(
+                peer_pieces, peer_key, excluded_blocks
+            )
+        return None
+
+    def receive_block(
+        self,
+        piece_index: int,
+        offset: int,
+        data: bytes,
+        *,
+        peer_key: object = None,
+    ) -> BlockReceiveResult:
+        """Accept one block and return ownership/cancellation information."""
         if piece_index < 0 or piece_index >= len(self.pieces):
-            return False
+            return BlockReceiveResult()
 
         piece = self.pieces[piece_index]
         matched_block: Optional[Block] = None
-
         for block in piece.blocks:
             if block.offset == offset:
                 matched_block = block
                 break
 
         if matched_block is None:
-            return False
-        if len(data) != matched_block.length:
-            matched_block.is_requested = False
-            return False
+            return BlockReceiveResult()
 
-        if matched_block.data is None:
-            matched_block.data = data
-            matched_block.is_requested = False
-            self.downloaded_bytes += len(data)
+        owner = self._request_owner(peer_key)
+        if len(data) != matched_block.length:
+            self.release_request(matched_block, owner)
+            return BlockReceiveResult(block=matched_block)
+
+        # A late PIECE can arrive after an endgame CANCEL. It is valid wire data
+        # but must not be counted or written twice.
+        if matched_block.data is not None:
+            self.release_request(matched_block, owner)
+            return BlockReceiveResult(
+                accepted=False,
+                duplicate=True,
+                block=matched_block,
+            )
+
+        requesters = self._release_all_block_requests(matched_block)
+        cancel_peer_keys = tuple(key for key in requesters if key != owner)
+
+        matched_block.data = data
+        self.downloaded_bytes += len(data)
 
         if not piece.is_all_blocks_received():
-            return False
+            return BlockReceiveResult(
+                accepted=True,
+                cancel_peer_keys=cancel_peer_keys,
+                block=matched_block,
+            )
 
         if piece.verify_hash():
             self._write_piece_to_disk(piece)
             piece.is_complete = True
             self._remove_from_rarity_buckets(piece.index)
             self.save_resume_state()
-            return True
+            return BlockReceiveResult(
+                accepted=True,
+                piece_completed=True,
+                cancel_peer_keys=cancel_peer_keys,
+                block=matched_block,
+            )
 
+        # A failed piece hash invalidates all of its blocks. Clean any remaining
+        # ownership reverse-index entries before Piece.reset clears the blocks.
+        for block in piece.blocks:
+            self._release_all_block_requests(block)
         self.downloaded_bytes = max(0, self.downloaded_bytes - piece.received_byte_count())
         piece.reset()
-        return False
+        return BlockReceiveResult(
+            accepted=True,
+            hash_failed=True,
+            cancel_peer_keys=cancel_peer_keys,
+            block=matched_block,
+        )
+
+    def handle_block_received(
+        self,
+        piece_index: int,
+        offset: int,
+        data: bytes,
+        peer_key: object = None,
+    ) -> bool:
+        """Compatibility wrapper returning only whether the piece completed."""
+        return self.receive_block(
+            piece_index,
+            offset,
+            data,
+            peer_key=peer_key,
+        ).piece_completed
 
     def _write_piece_to_disk(self, piece: Piece):
         file_offset = piece.index * self.torrent.piece_length
@@ -1459,6 +1796,9 @@ class PieceManager:
         downloading_count = 0
         requested_count = 0
         missing_count = 0
+        outstanding_wire_requests = 0
+        duplicate_wire_requests = 0
+        remaining_wanted_blocks = 0
 
         for piece in self.pieces:
             total_blocks = math.ceil(piece.length / BLOCK_SIZE) if piece.length else 0
@@ -1474,6 +1814,12 @@ class PieceManager:
                         received_bytes += len(block.data)
                     elif block.is_requested:
                         requested_blocks += 1
+                        owner_count = len(block.requesters)
+                        outstanding_wire_requests += owner_count
+                        duplicate_wire_requests += max(0, owner_count - 1)
+
+            if not piece.is_complete and self.piece_priority_rank(piece.index) > 0:
+                remaining_wanted_blocks += max(0, total_blocks - received_blocks)
 
             if piece.is_complete:
                 state = "Verified"
@@ -1593,6 +1939,11 @@ class PieceManager:
             "downloading": downloading_count,
             "requested": requested_count,
             "missing": missing_count,
+            "remaining_wanted_blocks": remaining_wanted_blocks,
+            "outstanding_wire_requests": outstanding_wire_requests,
+            "duplicate_wire_requests": duplicate_wire_requests,
+            "endgame_active": bool(0 < remaining_wanted_blocks <= ENDGAME_BLOCK_THRESHOLD),
+            "endgame_threshold_blocks": ENDGAME_BLOCK_THRESHOLD,
             "swarm_availability": swarm_availability,
             "pieces_per_map_cell": pieces_per_cell,
             "map_cells": map_cells,
@@ -1603,13 +1954,19 @@ class PieceManager:
         return self._build_completed_bitfield()
 
     def release_requests(self, blocks: Iterable[Block]):
+        """Compatibility helper: release every owner of the supplied blocks."""
         for block in blocks:
             if block.data is None:
-                block.is_requested = False
+                self._release_all_block_requests(block)
 
     def reset_inflight_requests(self):
+        """Clear all transient request ownership without allocating new blocks."""
+        self._requests_by_peer.clear()
         for piece in self.pieces:
-            piece.reset_requests()
+            if not piece.blocks_initialized:
+                continue
+            for block in piece._blocks or ():
+                block.requesters.clear()
 
     @property
     def completed_pieces(self) -> int:
@@ -1626,5 +1983,7 @@ class PieceManager:
         if not self.pieces:
             return self.torrent.total_length == 0
         return all(piece.is_complete for piece in self.pieces)
+
+
 
 

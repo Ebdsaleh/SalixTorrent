@@ -579,6 +579,34 @@ class PeerConnection:
             )
         )
 
+    async def send_cancel(
+        self,
+        piece_index: int,
+        block_offset: int,
+        length: int = 16384,
+    ) -> bool:
+        """Cancel one previously issued peer-wire REQUEST (message ID 8)."""
+        if not self.is_connected or not self.writer:
+            return False
+        try:
+            piece_index = int(piece_index)
+            block_offset = int(block_offset)
+            length = int(length)
+        except (TypeError, ValueError):
+            return False
+        if piece_index < 0 or block_offset < 0 or length <= 0:
+            return False
+        return await self._write_and_drain(
+            struct.pack(
+                ">IBIII",
+                13,
+                PeerMessageID.CANCEL,
+                piece_index,
+                block_offset,
+                length,
+            )
+        )
+
     async def send_bitfield(self, bitfield: bytes) -> bool:
         if not self.is_connected or not self.writer:
             return False
@@ -850,6 +878,11 @@ class PeerConnection:
                     return ("UNKNOWN", body)
                 index, begin, req_length = struct.unpack(">III", body)
                 return ("REQUEST", (index, begin, req_length))
+            if msg_id == PeerMessageID.CANCEL:
+                if len(body) != 12:
+                    return ("UNKNOWN", body)
+                index, begin, req_length = struct.unpack(">III", body)
+                return ("CANCEL", (index, begin, req_length))
             if msg_id == PeerMessageID.PIECE:
                 if len(body) < 8:
                     return ("UNKNOWN", body)
@@ -882,3 +915,5 @@ class PeerConnection:
         self.reader = None
         self.writer = None
         self.stream = None
+
+

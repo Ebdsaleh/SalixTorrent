@@ -736,6 +736,15 @@ class ApplicationMenu:
             f"Selected upload requests: {selected_stats.get('upload_requests_served', 0)} served / "
             f"{selected_stats.get('upload_requests_received', 0)} received\n"
             f"Selected uploaded this session: {selected_stats.get('uploaded_this_session_bytes', 0)} bytes\n"
+            f"Download scheduler: Rarest-first + bounded adaptive pipeline\n"
+            f"Endgame: {'Active' if selected_stats.get('endgame_active') else 'Standby'} "
+            f"({selected_stats.get('remaining_wanted_blocks', 0)} wanted blocks remain; "
+            f"threshold {selected_stats.get('endgame_threshold_blocks', 32)})\n"
+            f"Outstanding download requests: {selected_stats.get('outstanding_download_requests', 0)} "
+            f"({selected_stats.get('duplicate_download_requests', 0)} endgame duplicates)\n"
+            f"Request pipeline: adaptive {selected_stats.get('request_pipeline_min', 8)}-"
+            f"{selected_stats.get('request_pipeline_max', 64)} per peer; "
+            f"timeout {selected_stats.get('request_timeout_seconds', 30)}s\n"
             f"DHT: {'Enabled' if settings.get('enable_dht') else 'Disabled'}\n"
             f"PEX: {'Enabled' if settings.get('enable_pex') else 'Disabled'}\n"
             f"LAN discovery: {'Enabled' if settings.get('enable_lan_discovery') else 'Disabled'}\n"
@@ -776,6 +785,8 @@ class ApplicationMenu:
             dpg.set_clipboard_text(self._diagnostics_string())
         except Exception:
             pass
+
+
 
 
 

@@ -234,13 +234,38 @@ HELP_TOPICS: Tuple[HelpTopic, ...] = (
                 "do not all converge on the same deterministic piece order.",
             ),
             (
+                "Bounded request pipelines",
+                "An unchoked peer can have several 16 KiB block requests outstanding at once, "
+                "which avoids wasting round-trip time between blocks. SalixTorrent adapts the "
+                "pipeline depth from measured peer throughput but clamps it to a strict per-peer "
+                "minimum/maximum. Request ownership is indexed by peer, so choke/disconnect and "
+                "timeout cleanup touches only that peer's small pipeline rather than scanning "
+                "every piece in the torrent.",
+            ),
+            (
+                "Timeout and reassignment",
+                "The timeout clock begins only after a REQUEST frame is actually sent, not while "
+                "the request is waiting behind a bandwidth limiter. A stalled request is released "
+                "for immediate reassignment; if the old peer is still connected SalixTorrent also "
+                "sends CANCEL so a late response does not waste bandwidth.",
+            ),
+            (
+                "Endgame completion",
+                "When 32 or fewer wanted blocks remain, SalixTorrent enters Endgame Mode. It still "
+                "assigns every unrequested block first. Only when the remaining tail is already "
+                "outstanding can an old lingering block be requested from another peer, with at "
+                "most three owners per block. The first valid PIECE is accepted and targeted CANCEL "
+                "messages retire the other duplicate requests. Received CANCEL messages are also "
+                "honoured for uploads that have not yet been sent.",
+            ),
+            (
                 "Force Recheck",
                 "Force Recheck invalidates fast-resume assumptions and hashes the existing payload "
                 "again without deleting it. This is useful after files were changed externally or "
                 "when you want to verify the current disk contents against the torrent metadata.",
             ),
         ),
-        related_terms=("PIECE", "BLOCK", "PIECE_STATE", "PIECE_AVAILABILITY", "RAREST_FIRST", "RANDOM_TIE_BREAKING", "FILE_PRIORITY", "FORCE_RECHECK", "FAST_RESUME"),
+        related_terms=("PIECE", "BLOCK", "PIECE_STATE", "PIECE_AVAILABILITY", "RAREST_FIRST", "RANDOM_TIE_BREAKING", "REQUEST_SCHEDULER", "REQUEST_PIPELINE", "OUTSTANDING_REQUEST", "REQUEST_TIMEOUT", "ENDGAME_MODE", "CANCEL_MESSAGE", "FILE_PRIORITY", "FORCE_RECHECK", "FAST_RESUME"),
     ),
     HelpTopic(
         key="trackers_discovery",
@@ -1062,6 +1087,8 @@ class HelpTopicsView:
         # changed width, so maximizing/restoring the viewport stays polished
         # without turning Help into a continuously rebuilding view.
         self._update_content_wrap()
+
+
 
 
 

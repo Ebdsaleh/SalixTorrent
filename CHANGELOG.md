@@ -6,6 +6,9 @@ Notable SalixTorrent changes are recorded here.
 
 ### Added
 
+- Explicit per-peer outstanding block-request ownership with a reverse index for O(pipeline-size) cleanup on choke, disconnect and timeout.
+- Bounded Endgame Mode for the final 32 wanted blocks, including duplicate tail requests, targeted peer-wire `CANCEL` frames, and received-CANCEL handling for pending uploads.
+- Adaptive per-peer request pipelines (8-64 blocks) with sent-request timeout and immediate stalled-block reassignment.
 - Incremental per-piece peer-availability accounting driven by BITFIELD, HAVE, and disconnect events.
 - File-priority-preserving rarest-first piece scheduling with randomized equal-rarity tie-breaking.
 - BitTorrent MSE/PE peer transport with `Disabled`, `Prefer Encryption`, and `Require Encryption` policies; `Prefer Encryption` is the default.
@@ -23,6 +26,8 @@ Notable SalixTorrent changes are recorded here.
 
 ### Changed
 
+- Pieces telemetry now exposes scheduler mode, wanted blocks remaining, outstanding wire requests, and endgame duplicate counts without adding a polling loop.
+- Download workers refill bounded pipelines in small bursts and start request timeout clocks only after REQUEST frames are actually transmitted.
 - Pieces telemetry now reads the incremental availability cache instead of rebuilding availability by rescanning every connected peer bitfield.
 - Download block selection now uses cached rarity buckets rather than sequentially scanning pieces from index zero.
 - Tracker announces advertise encrypted-peer support and request encrypted peers when `Require Encryption` is selected.

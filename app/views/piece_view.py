@@ -25,18 +25,24 @@ class PieceView:
 
     def __init__(self):
         self.summary_text = None
+        self.scheduler_text = None
         self.map_info_text = None
         self.map_drawlist = None
         self.table_id = None
         self._row_ids = []
 
     def build_view(self, parent_tag):
-        with dpg.child_window(parent=parent_tag, height=315, border=True):
+        with dpg.child_window(parent=parent_tag, height=335, border=True):
             self.summary_text = dpg.add_text(
                 "Pieces: select a torrent to inspect piece state",
                 color=(100, 180, 255),
             )
             add_help_tooltip(self.summary_text, "PIECE")
+            self.scheduler_text = dpg.add_text(
+                "Scheduler: Rarest-first | Pipeline: adaptive | Endgame: Standby",
+                color=(155, 155, 160),
+            )
+            add_help_tooltip(self.scheduler_text, "REQUEST_SCHEDULER")
             map_legend = dpg.add_text(
                 "Map: Verified | Downloading | Requested | Mixed | Missing | No known source",
                 color=(150, 150, 150),
@@ -151,6 +157,11 @@ class PieceView:
                 self.summary_text,
                 "Pieces: select a torrent to inspect piece state",
             )
+        if self.scheduler_text and dpg.does_item_exist(self.scheduler_text):
+            dpg.set_value(
+                self.scheduler_text,
+                "Scheduler: Rarest-first | Pipeline: adaptive | Endgame: Standby",
+            )
         if self.map_info_text and dpg.does_item_exist(self.map_info_text):
             dpg.set_value(
                 self.map_info_text,
@@ -225,6 +236,29 @@ class PieceView:
             ),
         )
 
+        endgame = bool(snapshot.get("endgame_active", piece_view.get("endgame_active", False)))
+        remaining_blocks = int(snapshot.get("remaining_wanted_blocks", piece_view.get("remaining_wanted_blocks", 0)) or 0)
+        outstanding = int(snapshot.get("outstanding_download_requests", piece_view.get("outstanding_wire_requests", 0)) or 0)
+        duplicates = int(snapshot.get("duplicate_download_requests", piece_view.get("duplicate_wire_requests", 0)) or 0)
+        pipeline_min = int(snapshot.get("request_pipeline_min", 0) or 0)
+        pipeline_max = int(snapshot.get("request_pipeline_max", 0) or 0)
+        timeout_seconds = float(snapshot.get("request_timeout_seconds", 0.0) or 0.0)
+        endgame_label = "ACTIVE" if endgame else "Standby"
+        pipeline_label = (
+            f"adaptive {pipeline_min}-{pipeline_max}/peer"
+            if pipeline_min and pipeline_max else "adaptive"
+        )
+        timeout_label = f"{timeout_seconds:g}s" if timeout_seconds else "--"
+        dpg.set_value(
+            self.scheduler_text,
+            (
+                f"Scheduler: Rarest-first | Pipeline: {pipeline_label} | "
+                f"Timeout: {timeout_label} | Endgame: {endgame_label} | "
+                f"Remaining blocks: {remaining_blocks:,} | "
+                f"Outstanding: {outstanding:,} ({duplicates:,} duplicate)"
+            ),
+        )
+
         cell_count = len(piece_view.get("map_cells") or [])
         pieces_per_cell = int(piece_view.get("pieces_per_map_cell", 1) or 1)
         if pieces_per_cell <= 1:
@@ -252,3 +286,5 @@ class PieceView:
                 dpg.add_text(str(piece.get("state", "Missing")))
 
             self._row_ids.append(row_id)
+
+

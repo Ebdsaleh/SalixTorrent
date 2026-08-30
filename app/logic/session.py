@@ -1,6 +1,7 @@
 # app/logic/session.py
 
 import asyncio
+import math
 import os
 import queue
 import random
@@ -40,7 +41,12 @@ from app.logic.network_binding import (
     mask_ip_for_display,
     normalise_bind_address,
 )
-from app.logic.piece_manager import BLOCK_SIZE, Block, PieceManager
+from app.logic.piece_manager import (
+    BLOCK_SIZE,
+    ENDGAME_BLOCK_THRESHOLD,
+    Block,
+    PieceManager,
+)
 from app.logic.torrent_file import TorrentFile
 from app.logic.tracker import TrackerClient
 
@@ -64,6 +70,33 @@ UI_QUEUE_BACKPRESSURE_LIMIT = 8
 # transfer counters. Cache it briefly so peer churn or other state events do not
 # rebuild thousands of piece/file calculations several times in one second.
 DETAIL_TELEMETRY_INTERVAL = 1.0
+
+# Phase 2/3 download request pipeline. The window grows with measured peer
+# throughput but remains strictly bounded. Request timeout checks piggyback on
+# the existing peer worker; no separate polling task is created.
+REQUEST_PIPELINE_MIN = 8
+REQUEST_PIPELINE_MAX = 64
+REQUEST_PIPELINE_TARGET_SECONDS = 0.25
+REQUEST_REFILL_BURST = 4
+REQUEST_TIMEOUT_SECONDS = 30.0
+REQUEST_TIMEOUT_CHECK_INTERVAL = 1.0
+REQUEST_RETRY_COOLDOWN_SECONDS = 60.0
+MAX_PENDING_UPLOAD_REQUESTS_PER_PEER = 64
+
+
+def request_pipeline_limit(download_speed_kbps: float) -> int:
+    """Return a bounded per-peer pipeline depth from observed throughput."""
+    try:
+        speed_bps = max(0.0, float(download_speed_kbps)) * 1024.0
+    except (TypeError, ValueError):
+        speed_bps = 0.0
+    if speed_bps <= 0.0:
+        return REQUEST_PIPELINE_MIN
+    target_blocks = int(
+        math.ceil((speed_bps * REQUEST_PIPELINE_TARGET_SECONDS) / BLOCK_SIZE)
+    )
+    return max(REQUEST_PIPELINE_MIN, min(REQUEST_PIPELINE_MAX, target_blocks))
+
 
 TORRENT_PRIORITY_HIGH = "High"
 TORRENT_PRIORITY_NORMAL = "Normal"
@@ -153,6 +186,22 @@ class SessionState:
     ERROR = "Error"
 
 
+class _UploadRequestState:
+    """One bounded, sleeping upload queue per connected peer.
+
+    A single worker serializes disk reads and PIECE writes for that connection.
+    CANCEL removes the key from ``active``; queued work is skipped and in-flight
+    work re-checks the key before sending. No task is created per REQUEST.
+    """
+
+    def __init__(self):
+        self.queue: asyncio.Queue = asyncio.Queue(
+            maxsize=MAX_PENDING_UPLOAD_REQUESTS_PER_PEER
+        )
+        self.active: set[Tuple[int, int, int]] = set()
+        self.task: Optional[asyncio.Task] = None
+
+
 class TorrentSession:
     def __init__(
         self,
@@ -206,6 +255,12 @@ class TorrentSession:
 
         self.active_peers: List[PeerConnection] = []
         self._worker_tasks: List[asyncio.Task] = []
+
+        # Outgoing download request ownership mirrors PieceManager's reverse
+        # index so endgame completion can target CANCEL frames directly without
+        # searching every connected peer or block.
+        self._download_peer_connections: Dict[int, PeerConnection] = {}
+        self._download_request_owners: Dict[int, Dict[Tuple[int, int], Block]] = {}
         self._telemetry_task: Optional[asyncio.Task] = None
         self._main_task: Optional[asyncio.Task] = None
         self._prepare_cancel_event: Optional[threading.Event] = None
@@ -1377,6 +1432,15 @@ class TorrentSession:
             "uploaded_this_session_bytes": self.uploaded_this_session_bytes,
             "upload_requests_received": self.upload_requests_received,
             "upload_requests_served": self.upload_requests_served,
+            "endgame_active": bool(piece_view.get("endgame_active", False)),
+            "remaining_wanted_blocks": int(piece_view.get("remaining_wanted_blocks", 0) or 0),
+            "outstanding_download_requests": int(piece_view.get("outstanding_wire_requests", 0) or 0),
+            "duplicate_download_requests": int(piece_view.get("duplicate_wire_requests", 0) or 0),
+            "endgame_threshold_blocks": ENDGAME_BLOCK_THRESHOLD,
+            "request_pipeline_min": REQUEST_PIPELINE_MIN,
+            "request_pipeline_max": REQUEST_PIPELINE_MAX,
+            "request_timeout_seconds": REQUEST_TIMEOUT_SECONDS,
+            "request_retry_cooldown_seconds": REQUEST_RETRY_COOLDOWN_SECONDS,
             "last_upload_seconds": (
                 max(0.0, time.monotonic() - self._last_upload_at)
                 if self._last_upload_at else None
@@ -1794,23 +1858,41 @@ class TorrentSession:
             self._worker_tasks.append(task)
             available_slots -= 1
 
+    @staticmethod
+    def _block_key(block: Block) -> Tuple[int, int]:
+        return int(block.piece_index), int(block.offset)
+
+    @staticmethod
+    def _wire_block_key(piece_index: int, begin: int) -> Tuple[int, int]:
+        return int(piece_index), int(begin)
+
+    def _peer_pipeline_limit(self, peer: PeerConnection) -> int:
+        return request_pipeline_limit(getattr(peer, "download_speed_kbps", 0.0))
+
     async def _request_one_block(
         self,
         peer: PeerConnection,
-        owned_requests: List[Block],
+        owned_requests: Dict[Tuple[int, int], Block],
+        retry_after: Dict[Tuple[int, int], float],
     ) -> bool:
         if self.state != SessionState.DOWNLOADING:
             return False
         if peer.peer_choking or not peer.bitfield:
             return False
+        if len(owned_requests) >= self._peer_pipeline_limit(peer):
+            return False
 
-        block = self.piece_mgr.get_next_request(peer.bitfield, peer_key=id(peer))
+        peer_key = id(peer)
+        block = self.piece_mgr.get_next_request(
+            peer.bitfield,
+            peer_key=peer_key,
+            excluded_blocks=retry_after,
+        )
         if not block:
             return False
 
-        # Reserve ownership before waiting on the shared limiter so cancellation
-        # or Stop cannot leave a throttled block permanently marked requested.
-        owned_requests.append(block)
+        block_key = self._block_key(block)
+        owned_requests[block_key] = block
 
         try:
             if self._global_download_limiter is not None:
@@ -1820,11 +1902,11 @@ class TorrentSession:
             if (
                 self.state != SessionState.DOWNLOADING
                 or not peer.is_connected
+                or peer.peer_choking
                 or not self.piece_mgr.is_piece_wanted(block.piece_index)
             ):
-                block.is_requested = False
-                if block in owned_requests:
-                    owned_requests.remove(block)
+                self.piece_mgr.release_request(block, peer_key)
+                owned_requests.pop(block_key, None)
                 return False
 
             if not await peer.send_request(
@@ -1832,19 +1914,288 @@ class TorrentSession:
                 block.offset,
                 block.length,
             ):
-                block.is_requested = False
-                if block in owned_requests:
-                    owned_requests.remove(block)
+                self.piece_mgr.release_request(block, peer_key)
+                owned_requests.pop(block_key, None)
                 return False
+
+            self.piece_mgr.mark_request_sent(block, peer_key)
         except asyncio.CancelledError:
+            self.piece_mgr.release_request(block, peer_key)
+            owned_requests.pop(block_key, None)
             raise
         except Exception:
-            block.is_requested = False
-            if block in owned_requests:
-                owned_requests.remove(block)
+            self.piece_mgr.release_request(block, peer_key)
+            owned_requests.pop(block_key, None)
             return False
 
         return True
+
+    async def _fill_request_pipeline(
+        self,
+        peer: PeerConnection,
+        owned_requests: Dict[Tuple[int, int], Block],
+        retry_after: Dict[Tuple[int, int], float],
+        *,
+        burst_limit: int = REQUEST_REFILL_BURST,
+    ) -> int:
+        """Fill a bounded peer pipeline without monopolising the read loop."""
+        if self.state != SessionState.DOWNLOADING or peer.peer_choking:
+            return 0
+
+        pipeline_limit = self._peer_pipeline_limit(peer)
+        available = max(0, pipeline_limit - len(owned_requests))
+        to_add = min(max(0, int(burst_limit)), available)
+        added = 0
+        for _ in range(to_add):
+            if not await self._request_one_block(peer, owned_requests, retry_after):
+                break
+            added += 1
+        return added
+
+    async def _expire_peer_download_requests(
+        self,
+        peer: PeerConnection,
+        owned_requests: Dict[Tuple[int, int], Block],
+        retry_after: Dict[Tuple[int, int], float],
+    ) -> int:
+        """Release stale requests so another peer can immediately own them."""
+        expired = self.piece_mgr.expire_peer_requests(
+            id(peer),
+            REQUEST_TIMEOUT_SECONDS,
+        )
+        if not expired:
+            return 0
+
+        retry_until = time.monotonic() + REQUEST_RETRY_COOLDOWN_SECONDS
+        for block in expired:
+            block_key = self._block_key(block)
+            owned_requests.pop(block_key, None)
+            retry_after[block_key] = retry_until
+            if peer.is_connected:
+                await peer.send_cancel(
+                    block.piece_index,
+                    block.offset,
+                    block.length,
+                )
+        return len(expired)
+
+    def _release_peer_download_requests(
+        self,
+        peer: PeerConnection,
+        owned_requests: Dict[Tuple[int, int], Block],
+    ) -> int:
+        """Release a choked/disconnected peer's pipeline for reassignment."""
+        released = self.piece_mgr.release_peer_requests(id(peer))
+        owned_requests.clear()
+        return len(released)
+
+    async def _cancel_duplicate_download_requests(
+        self,
+        piece_index: int,
+        begin: int,
+        length: int,
+        peer_keys: tuple[object, ...],
+    ):
+        """Send targeted endgame CANCELs only to peers that own this block."""
+        if not peer_keys:
+            return
+
+        block_key = self._wire_block_key(piece_index, begin)
+        tasks = []
+        for raw_key in peer_keys:
+            try:
+                peer_key = int(raw_key)
+            except (TypeError, ValueError):
+                continue
+            owned = self._download_request_owners.get(peer_key)
+            if owned is not None:
+                owned.pop(block_key, None)
+            peer = self._download_peer_connections.get(peer_key)
+            if peer is not None and peer.is_connected:
+                tasks.append(peer.send_cancel(piece_index, begin, length))
+
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+    async def _cancel_piece_download_requests(self, piece_index: int):
+        """Cancel residual requests after a failed piece hash (rare slow path)."""
+        tasks = []
+        for peer_key, owned in tuple(self._download_request_owners.items()):
+            peer = self._download_peer_connections.get(peer_key)
+            for key, block in tuple(owned.items()):
+                if block.piece_index != piece_index:
+                    continue
+                self.piece_mgr.release_request(block, peer_key)
+                owned.pop(key, None)
+                if peer is not None and peer.is_connected:
+                    tasks.append(
+                        peer.send_cancel(block.piece_index, block.offset, block.length)
+                    )
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+    @staticmethod
+    def _upload_key(
+        piece_index: int,
+        begin: int,
+        length: int,
+    ) -> Optional[Tuple[int, int, int]]:
+        try:
+            piece_index = int(piece_index)
+            begin = int(begin)
+            length = int(length)
+        except (TypeError, ValueError):
+            return None
+        if piece_index < 0 or begin < 0 or length <= 0 or length > BLOCK_SIZE:
+            return None
+        return piece_index, begin, length
+
+    def _queue_peer_upload(
+        self,
+        peer: PeerConnection,
+        run_token: int,
+        piece_index: int,
+        begin: int,
+        length: int,
+        state: _UploadRequestState,
+    ) -> bool:
+        key = self._upload_key(piece_index, begin, length)
+        if key is None:
+            return False
+
+        # Telemetry counts protocol requests at arrival time, independently of
+        # whether the bounded upload queue can service every duplicate request.
+        self._record_upload_request()
+        if key in state.active or state.queue.full():
+            return False
+
+        state.active.add(key)
+        state.queue.put_nowait(key)
+        if state.task is None or state.task.done():
+            state.task = asyncio.create_task(
+                self._peer_upload_worker(peer, run_token, state)
+            )
+        return True
+
+    def _queue_inbound_upload(
+        self,
+        stream: PeerWireStream,
+        inbound_record: dict,
+        run_token: int,
+        piece_index: int,
+        begin: int,
+        length: int,
+        state: _UploadRequestState,
+    ) -> bool:
+        key = self._upload_key(piece_index, begin, length)
+        if key is None:
+            return False
+        self._record_upload_request()
+        if key in state.active or state.queue.full():
+            return False
+
+        state.active.add(key)
+        state.queue.put_nowait(key)
+        if state.task is None or state.task.done():
+            state.task = asyncio.create_task(
+                self._inbound_upload_worker(
+                    stream,
+                    inbound_record,
+                    run_token,
+                    state,
+                )
+            )
+        return True
+
+    @staticmethod
+    def _cancel_queued_upload(
+        state: _UploadRequestState,
+        piece_index: int,
+        begin: int,
+        length: int,
+    ) -> bool:
+        try:
+            key = (int(piece_index), int(begin), int(length))
+        except (TypeError, ValueError):
+            return False
+        if key not in state.active:
+            return False
+        # Queue entries are tiny tuples. Removing from the active set is O(1);
+        # the one sleeping worker skips the stale tuple when it reaches it. If
+        # the request is already being read/throttled, the worker re-checks the
+        # same set immediately before sending PIECE.
+        state.active.discard(key)
+        return True
+
+    @staticmethod
+    async def _finish_upload_state(state: _UploadRequestState):
+        state.active.clear()
+        task = state.task
+        state.task = None
+        if task is not None and not task.done():
+            task.cancel()
+        if task is not None:
+            await asyncio.gather(task, return_exceptions=True)
+
+    async def _peer_upload_worker(
+        self,
+        peer: PeerConnection,
+        run_token: int,
+        state: _UploadRequestState,
+    ):
+        try:
+            while self._is_current_run(run_token) and peer.is_connected:
+                key = await state.queue.get()
+                try:
+                    if key not in state.active:
+                        continue
+                    piece_index, begin, length = key
+                    await self._serve_piece_request(
+                        peer,
+                        run_token,
+                        piece_index,
+                        begin,
+                        length,
+                        record_request=False,
+                        upload_state=state,
+                        upload_key=key,
+                    )
+                finally:
+                    state.active.discard(key)
+                    state.queue.task_done()
+        except asyncio.CancelledError:
+            pass
+
+    async def _inbound_upload_worker(
+        self,
+        stream: PeerWireStream,
+        inbound_record: dict,
+        run_token: int,
+        state: _UploadRequestState,
+    ):
+        try:
+            while self._is_current_run(run_token):
+                key = await state.queue.get()
+                try:
+                    if key not in state.active:
+                        continue
+                    piece_index, begin, length = key
+                    await self._serve_inbound_piece_request(
+                        stream,
+                        inbound_record,
+                        run_token,
+                        piece_index,
+                        begin,
+                        length,
+                        record_request=False,
+                        upload_state=state,
+                        upload_key=key,
+                    )
+                finally:
+                    state.active.discard(key)
+                    state.queue.task_done()
+        except asyncio.CancelledError:
+            pass
 
     async def _handle_metadata_message(
         self,
@@ -1873,6 +2224,10 @@ class TorrentSession:
         piece_index: int,
         begin: int,
         length: int,
+        *,
+        record_request: bool = True,
+        upload_state: Optional[_UploadRequestState] = None,
+        upload_key: Optional[Tuple[int, int, int]] = None,
     ) -> bool:
         """Serve a verified block on any established peer connection.
 
@@ -1888,12 +2243,15 @@ class TorrentSession:
         except (TypeError, ValueError):
             return False
 
-        self._record_upload_request()
+        if record_request:
+            self._record_upload_request()
         if length <= 0 or length > BLOCK_SIZE:
             return False
         if not self._is_current_run(run_token):
             return False
         if self.state not in {SessionState.DOWNLOADING, SessionState.SEEDING}:
+            return False
+        if upload_state is not None and upload_key not in upload_state.active:
             return False
 
         block_data = await asyncio.to_thread(
@@ -1913,6 +2271,7 @@ class TorrentSession:
             not self._is_current_run(run_token)
             or self.state not in {SessionState.DOWNLOADING, SessionState.SEEDING}
             or not peer.is_connected
+            or (upload_state is not None and upload_key not in upload_state.active)
         ):
             return False
 
@@ -1920,6 +2279,71 @@ class TorrentSession:
             self._record_upload_served(len(block_data))
             return True
         return False
+
+    async def _serve_inbound_piece_request(
+        self,
+        stream: PeerWireStream,
+        inbound_record: dict,
+        run_token: int,
+        piece_index: int,
+        begin: int,
+        length: int,
+        *,
+        record_request: bool = True,
+        upload_state: Optional[_UploadRequestState] = None,
+        upload_key: Optional[Tuple[int, int, int]] = None,
+    ) -> bool:
+        """Serve one inbound REQUEST in a cancellable task."""
+        try:
+            piece_index = int(piece_index)
+            begin = int(begin)
+            length = int(length)
+        except (TypeError, ValueError):
+            return False
+
+        if record_request:
+            self._record_upload_request()
+        if length <= 0 or length > BLOCK_SIZE:
+            return False
+        if not self._is_current_run(run_token):
+            return False
+        if self.state not in {SessionState.DOWNLOADING, SessionState.SEEDING}:
+            return False
+        if upload_state is not None and upload_key not in upload_state.active:
+            return False
+
+        block_data = await asyncio.to_thread(
+            self.piece_mgr.read_block,
+            piece_index,
+            begin,
+            length,
+        )
+        if not block_data:
+            return False
+
+        if self._global_upload_limiter is not None:
+            await self._global_upload_limiter.throttle(len(block_data))
+        await self._upload_limiter.throttle(len(block_data))
+
+        if (
+            not self._is_current_run(run_token)
+            or self.state not in {SessionState.DOWNLOADING, SessionState.SEEDING}
+            or (upload_state is not None and upload_key not in upload_state.active)
+        ):
+            return False
+
+        piece_payload = struct.pack(">II", piece_index, begin) + block_data
+        stream.write(
+            struct.pack(">IB", 1 + len(piece_payload), PeerMessageID.PIECE)
+            + piece_payload
+        )
+        await stream.drain()
+        self._record_upload_served(len(block_data))
+        inbound_record["uploaded_bytes"] = int(
+            inbound_record.get("uploaded_bytes", 0)
+        ) + len(block_data)
+        inbound_record["last_activity_at"] = time.monotonic()
+        return True
 
     async def _broadcast_have(
         self,
@@ -1988,7 +2412,11 @@ class TorrentSession:
             encryption_policy=self.encryption_policy,
             bind_address=self.network_bind_address,
         )
-        owned_requests: List[Block] = []
+        peer_key = id(peer)
+        owned_requests: Dict[Tuple[int, int], Block] = {}
+        retry_after: Dict[Tuple[int, int], float] = {}
+        upload_state = _UploadRequestState()
+        next_timeout_check = time.monotonic() + REQUEST_TIMEOUT_CHECK_INTERVAL
 
         if not await peer.connect(timeout=4.0):
             return
@@ -1998,6 +2426,8 @@ class TorrentSession:
             return
 
         self.active_peers.append(peer)
+        self._download_peer_connections[peer_key] = peer
+        self._download_request_owners[peer_key] = owned_requests
 
         try:
             # A download connection is still a bidirectional BitTorrent
@@ -2030,8 +2460,24 @@ class TorrentSession:
                 if not self._is_current_run(run_token):
                     break
 
-                if self.state == SessionState.DOWNLOADING:
-                    await self._request_one_block(peer, owned_requests)
+                now = time.monotonic()
+                if now >= next_timeout_check:
+                    for block_key, retry_time in tuple(retry_after.items()):
+                        if retry_time <= now:
+                            retry_after.pop(block_key, None)
+                    await self._expire_peer_download_requests(
+                        peer,
+                        owned_requests,
+                        retry_after,
+                    )
+                    next_timeout_check = now + REQUEST_TIMEOUT_CHECK_INTERVAL
+
+                if self.state == SessionState.DOWNLOADING and not peer.peer_choking:
+                    await self._fill_request_pipeline(
+                        peer,
+                        owned_requests,
+                        retry_after,
+                    )
 
                 await self._maybe_send_pex(peer)
 
@@ -2047,25 +2493,25 @@ class TorrentSession:
 
                 if msg_type == "PIECE":
                     piece_idx, offset, block_bytes = data
-                    piece_completed = self.piece_mgr.handle_block_received(
+                    result = self.piece_mgr.receive_block(
                         piece_idx,
                         offset,
                         block_bytes,
+                        peer_key=peer_key,
                     )
-                    if piece_completed:
-                        await self._broadcast_have(piece_idx, exclude_peer=peer)
+                    owned_requests.pop(self._wire_block_key(piece_idx, offset), None)
 
-                    owned_requests[:] = [
-                        block
-                        for block in owned_requests
-                        if not (
-                            block.piece_index == piece_idx
-                            and block.offset == offset
+                    if result.cancel_peer_keys and result.block is not None:
+                        await self._cancel_duplicate_download_requests(
+                            piece_idx,
+                            offset,
+                            result.block.length,
+                            result.cancel_peer_keys,
                         )
-                    ]
-
-                    if self.state == SessionState.DOWNLOADING:
-                        await self._request_one_block(peer, owned_requests)
+                    if result.hash_failed:
+                        await self._cancel_piece_download_requests(piece_idx)
+                    if result.piece_completed:
+                        await self._broadcast_have(piece_idx, exclude_peer=peer)
 
                 elif msg_type == "BITFIELD":
                     self.piece_mgr.register_peer_bitfield(id(peer), data)
@@ -2073,18 +2519,34 @@ class TorrentSession:
                 elif msg_type == "HAVE":
                     self._apply_have_to_peer(peer, int(data))
 
+                elif msg_type == "CHOKE":
+                    # A choke invalidates this peer as a useful owner now; free
+                    # its pipeline immediately instead of waiting 30 seconds.
+                    self._release_peer_download_requests(peer, owned_requests)
+
                 elif msg_type == "UNCHOKE":
-                    for _ in range(4):
-                        if self.state != SessionState.DOWNLOADING:
-                            break
-                        if not await self._request_one_block(peer, owned_requests):
-                            break
+                    if self.state == SessionState.DOWNLOADING:
+                        await self._fill_request_pipeline(
+                            peer,
+                            owned_requests,
+                            retry_after,
+                        )
 
                 elif msg_type == "REQUEST":
                     piece_index, begin, length = data
-                    await self._serve_piece_request(
+                    self._queue_peer_upload(
                         peer,
                         run_token,
+                        piece_index,
+                        begin,
+                        length,
+                        upload_state,
+                    )
+
+                elif msg_type == "CANCEL":
+                    piece_index, begin, length = data
+                    self._cancel_queued_upload(
+                        upload_state,
                         piece_index,
                         begin,
                         length,
@@ -2124,8 +2586,11 @@ class TorrentSession:
             pass
 
         finally:
-            self.piece_mgr.release_requests(owned_requests)
-            self.piece_mgr.unregister_peer(id(peer))
+            await self._finish_upload_state(upload_state)
+            self.piece_mgr.unregister_peer(peer_key)
+            owned_requests.clear()
+            self._download_request_owners.pop(peer_key, None)
+            self._download_peer_connections.pop(peer_key, None)
 
             if peer in self.active_peers:
                 self.active_peers.remove(peer)
@@ -2352,6 +2817,7 @@ class TorrentSession:
             encryption_policy=self.encryption_policy,
             bind_address=self.network_bind_address,
         )
+        upload_state = _UploadRequestState()
 
         try:
             if not await peer.connect(timeout=4.0):
@@ -2427,19 +2893,32 @@ class TorrentSession:
 
                 if msg_type == "REQUEST" and self.state == SessionState.SEEDING:
                     piece_index, begin, length = data
-                    await self._serve_piece_request(
+                    self._queue_peer_upload(
                         peer,
                         run_token,
                         piece_index,
                         begin,
                         length,
+                        upload_state,
                     )
+                    continue
+
+                if msg_type == "CANCEL":
+                    piece_index, begin, length = data
+                    self._cancel_queued_upload(
+                        upload_state,
+                        piece_index,
+                        begin,
+                        length,
+                    )
+                    continue
 
         except asyncio.CancelledError:
             pass
         except (asyncio.IncompleteReadError, ConnectionError, OSError):
             pass
         finally:
+            await self._finish_upload_state(upload_state)
             self.piece_mgr.unregister_peer(id(peer))
             if peer in self.active_peers:
                 self.active_peers.remove(peer)
@@ -2454,6 +2933,7 @@ class TorrentSession:
     ):
         registered = False
         stream: Optional[PeerWireStream] = None
+        upload_state = _UploadRequestState()
 
         try:
             # A normal BitTorrent handshake has a deterministic 20-byte prefix.
@@ -2774,6 +3254,16 @@ class TorrentSession:
                             await stream.drain()
                         continue
 
+                if msg_id == PeerMessageID.CANCEL and len(body) == 12:
+                    piece_index, begin, length = struct.unpack(">III", body)
+                    self._cancel_queued_upload(
+                        upload_state,
+                        piece_index,
+                        begin,
+                        length,
+                    )
+                    continue
+
                 if msg_id != PeerMessageID.REQUEST or len(body) != 12:
                     continue
 
@@ -2785,40 +3275,15 @@ class TorrentSession:
                     continue
 
                 piece_index, begin, length = struct.unpack(">III", body)
-                self._record_upload_request()
-                if length <= 0 or length > BLOCK_SIZE:
-                    continue
-
-                block_data = await asyncio.to_thread(
-                    self.piece_mgr.read_block,
+                self._queue_inbound_upload(
+                    stream,
+                    inbound_record,
+                    run_token,
                     piece_index,
                     begin,
                     length,
+                    upload_state,
                 )
-                if not block_data:
-                    continue
-
-                if self._global_upload_limiter is not None:
-                    await self._global_upload_limiter.throttle(len(block_data))
-                await self._upload_limiter.throttle(len(block_data))
-
-                if (
-                    not self._is_current_run(run_token)
-                    or self.state not in {SessionState.DOWNLOADING, SessionState.SEEDING}
-                ):
-                    continue
-
-                piece_payload = struct.pack(">II", piece_index, begin) + block_data
-                stream.write(
-                    struct.pack(">IB", 1 + len(piece_payload), PeerMessageID.PIECE)
-                    + piece_payload
-                )
-                await stream.drain()
-                self._record_upload_served(len(block_data))
-                inbound_record["uploaded_bytes"] = int(
-                    inbound_record.get("uploaded_bytes", 0)
-                ) + len(block_data)
-                inbound_record["last_activity_at"] = time.monotonic()
 
         except (
             asyncio.IncompleteReadError,
@@ -2831,6 +3296,7 @@ class TorrentSession:
         except asyncio.CancelledError:
             pass
         finally:
+            await self._finish_upload_state(upload_state)
             if registered:
                 self.piece_mgr.unregister_peer(id(writer))
                 self._seed_client_writers.discard(writer)
@@ -2893,6 +3359,8 @@ class TorrentSession:
 
         except asyncio.CancelledError:
             pass
+
+
 
 
 
