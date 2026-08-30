@@ -18,6 +18,9 @@ from app.logic.peer import (
     LOCAL_UT_PEX_ID,
     METADATA_BLOCK_SIZE,
     PEX_SEND_INTERVAL,
+    PEER_ENCRYPTION_DISABLED,
+    PEER_ENCRYPTION_PREFER,
+    PEER_ENCRYPTION_REQUIRE,
     PeerConnection,
     PeerMessageID,
     build_extended_handshake_payload,
@@ -29,6 +32,13 @@ from app.logic.peer import (
     parse_pex_payload,
     reserved_supports_dht,
     reserved_supports_extensions,
+    normalise_peer_encryption_policy,
+)
+from app.logic.mse import MSEError, PeerWireStream, mse_responder_handshake
+from app.logic.network_binding import (
+    is_bind_address_available,
+    mask_ip_for_display,
+    normalise_bind_address,
 )
 from app.logic.piece_manager import BLOCK_SIZE, Block, PieceManager
 from app.logic.torrent_file import TorrentFile
@@ -155,9 +165,13 @@ class TorrentSession:
         enable_dht: bool = True,
         enable_pex: bool = True,
         enable_lan_discovery: bool = True,
+        encryption_policy: str = PEER_ENCRYPTION_PREFER,
+        network_bind_address: str = "",
+        interface_lock: bool = False,
+        mask_peer_ips: bool = False,
         global_download_limiter: Optional[AsyncBandwidthLimiter] = None,
         global_upload_limiter: Optional[AsyncBandwidthLimiter] = None,
-        listen_port_callback: Optional[Callable[[int], None]] = None,
+        listen_port_callback: Optional[Callable[..., None]] = None,
         incoming_peer_callback: Optional[Callable[[int, str], None]] = None,
     ):
         self.torrent_path = torrent_path
@@ -178,7 +192,17 @@ class TorrentSession:
             download_dir=download_dir,
             seed_source_path=self.seed_source_path or None,
         )
-        self.tracker = TrackerClient(self.torrent, self.peer_id)
+        self.encryption_policy = normalise_peer_encryption_policy(encryption_policy)
+        self.network_bind_address = normalise_bind_address(network_bind_address)
+        self.interface_lock = bool(interface_lock)
+        self.mask_peer_ips = bool(mask_peer_ips)
+        self._last_interface_check_at: float = 0.0
+        self.tracker = TrackerClient(
+            self.torrent,
+            self.peer_id,
+            bind_address=self.network_bind_address,
+            encryption_policy=self.encryption_policy,
+        )
 
         self.active_peers: List[PeerConnection] = []
         self._worker_tasks: List[asyncio.Task] = []
@@ -210,11 +234,15 @@ class TorrentSession:
         self._listen_port_callback = listen_port_callback
         self._incoming_peer_callback = incoming_peer_callback
 
-        self._lpd = LocalPeerDiscovery(self.torrent.info_hash)
+        self._lpd = LocalPeerDiscovery(
+            self.torrent.info_hash,
+            bind_address=self.network_bind_address,
+        )
         self._dht = DHTClient(
             self.torrent.info_hash,
             private=self.torrent.private or not self.enable_dht,
             preferred_port=self.preferred_listen_port,
+            bind_address=self.network_bind_address,
         )
         self.local_peers_discovered: int = 0
         self.error_message: str = ""
@@ -226,7 +254,15 @@ class TorrentSession:
         self._pex_messages_received: int = 0
         self._pex_messages_sent: int = 0
 
+        # Persisted cumulative upload total. Lightweight per-run counters below
+        # are intentionally event-driven and are not written to resume state.
         self.uploaded_bytes: int = 0
+        self.uploaded_this_session_bytes: int = 0
+        self.upload_requests_received: int = 0
+        self.upload_requests_served: int = 0
+        self._last_upload_at: float = 0.0
+        self.incoming_connections_total: int = 0
+        self._seed_bind_address: str = ""
 
         # Rolling transfer-rate telemetry used by the Speed detail view.
         # History is intentionally session-local and bounded: 120 seconds at
@@ -301,6 +337,23 @@ class TorrentSession:
     def emit_snapshot(self):
         self._emit_snapshot()
 
+    def _record_upload_request(self):
+        """Record one valid peer-wire REQUEST without any polling/scanning."""
+        self.upload_requests_received += 1
+
+    def _record_upload_served(self, byte_count: int):
+        """Record a successfully transmitted PIECE payload in O(1) time."""
+        try:
+            byte_count = max(0, int(byte_count))
+        except (TypeError, ValueError):
+            byte_count = 0
+        if byte_count <= 0:
+            return
+        self.uploaded_bytes += byte_count
+        self.uploaded_this_session_bytes += byte_count
+        self.upload_requests_served += 1
+        self._last_upload_at = time.monotonic()
+
     def set_transfer_limits(
         self,
         download_value: float,
@@ -343,12 +396,17 @@ class TorrentSession:
         enable_dht: bool,
         enable_pex: bool,
         enable_lan_discovery: bool,
+        encryption_policy: str = PEER_ENCRYPTION_PREFER,
+        network_bind_address: str = "",
+        interface_lock: bool = False,
+        mask_peer_ips: bool = False,
     ):
-        """Apply networking preferences to a live session.
+        """Apply networking/privacy preferences to a live session.
 
-        DHT/LPD can be started or stopped without tearing down peer workers. A
-        changed TCP listen port is rebound while seeding; existing outbound
-        peers remain untouched. PEX is toggled immediately for future exchange.
+        DHT/LPD and PEX can be toggled live. A listen-port change rebinds the
+        incoming listener. Changing the selected network path or peer-encryption
+        policy closes existing torrent sockets so new connections cannot retain
+        the previous routing or transport policy.
         """
         try:
             port = int(listen_port or 6881)
@@ -356,11 +414,25 @@ class TorrentSession:
             port = 6881
         port = max(1, min(65535, port))
 
+        new_encryption_policy = normalise_peer_encryption_policy(encryption_policy)
+        new_bind_address = normalise_bind_address(network_bind_address)
         port_changed = port != self.preferred_listen_port
+        bind_changed = new_bind_address != self.network_bind_address
+        encryption_changed = new_encryption_policy != self.encryption_policy
+
         self.preferred_listen_port = port
         self.enable_dht = bool(enable_dht) and not self.torrent.private
         self.enable_pex = bool(enable_pex) and not self.torrent.private
-        self.enable_lan_discovery = bool(enable_lan_discovery)
+        self.enable_lan_discovery = bool(enable_lan_discovery) and not self.torrent.private
+        self.encryption_policy = new_encryption_policy
+        self.network_bind_address = new_bind_address
+        self.interface_lock = bool(interface_lock)
+        self.mask_peer_ips = bool(mask_peer_ips)
+
+        self.tracker.set_bind_address(self.network_bind_address)
+        self.tracker.set_encryption_policy(self.encryption_policy)
+        self._lpd.set_bind_address(self.network_bind_address)
+        self._dht.set_bind_address(self.network_bind_address)
 
         for peer in list(self.active_peers):
             peer.enable_pex = self.enable_pex
@@ -369,6 +441,33 @@ class TorrentSession:
         # DHT's private flag is also used as its hard-disable switch.
         self._dht.private = bool(self.torrent.private or not self.enable_dht)
         self._dht.set_preferred_port(self.preferred_listen_port)
+
+        if (
+            self.interface_lock
+            and self.network_bind_address
+            and not is_bind_address_available(self.network_bind_address)
+        ):
+            await self._trip_interface_lock()
+            return
+
+        # Existing TCP/UDP sockets cannot be rebound in place. Close them when
+        # the selected path or peer-encryption policy changes so subsequent
+        # discovery/worker activity uses the new policy rather than leaking over
+        # the old interface.
+        if bind_changed or encryption_changed:
+            for peer in list(self.active_peers):
+                await peer.close()
+            for writer in list(self._seed_client_writers):
+                try:
+                    writer.close()
+                    await writer.wait_closed()
+                except Exception:
+                    pass
+            self._seed_client_writers.clear()
+            self._inbound_peer_records.clear()
+            await self._close_seed_server()
+            await self._lpd.close()
+            await self._dht.close()
 
         if not self.enable_lan_discovery:
             await self._lpd.close()
@@ -387,7 +486,7 @@ class TorrentSession:
             )
 
         if (
-            port_changed
+            (port_changed or bind_changed or encryption_changed)
             and self.is_running
             and self.state in (SessionState.DOWNLOADING, SessionState.SEEDING)
         ):
@@ -704,6 +803,10 @@ class TorrentSession:
     def _connected_peer_count(self) -> int:
         return len(self.active_peers) + len(self._seed_client_writers)
 
+    def _display_peer_ip(self, value: object) -> str:
+        text = str(value or "?")
+        return mask_ip_for_display(text) if self.mask_peer_ips else text
+
     @staticmethod
     def _bitfield_progress(bitfield: bytes, total_pieces: int) -> Optional[float]:
         if not bitfield or total_pieces <= 0:
@@ -788,16 +891,18 @@ class TorrentSession:
 
         for peer in list(self.active_peers):
             progress = self._bitfield_progress(peer.bitfield, total_pieces)
+            display_ip = self._display_peer_ip(peer.ip)
             down_kbps = float(getattr(peer, "download_speed_kbps", 0.0))
             up_kbps = float(getattr(peer, "upload_speed_kbps", 0.0))
             connected_at = float(getattr(peer, "connected_at", 0.0) or now)
 
             peers.append({
                 "connection_id": f"out:{id(peer)}",
-                "ip": str(peer.ip),
+                "ip": display_ip,
                 "port": int(peer.port),
-                "address": f"{peer.ip}:{peer.port}",
+                "address": f"{display_ip}:{peer.port}",
                 "client": peer.client_name,
+                "transport_security": str(getattr(peer, "transport_security", "Plaintext")),
                 "source": str(getattr(peer, "source", "Unknown")),
                 "direction": str(getattr(peer, "direction", "Outgoing")),
                 "progress": progress,
@@ -825,6 +930,7 @@ class TorrentSession:
         for record in list(self._inbound_peer_records.values()):
             bitfield = record.get("bitfield", bytearray())
             progress = self._bitfield_progress(bitfield, total_pieces)
+            display_ip = self._display_peer_ip(record.get("ip", "?"))
             down_kbps = float(record.get("download_speed_kbps", 0.0))
             up_kbps = float(record.get("upload_speed_kbps", 0.0))
             connected_at = float(record.get("connected_at", now))
@@ -835,10 +941,15 @@ class TorrentSession:
 
             peers.append({
                 "connection_id": str(record.get("connection_id", "")),
-                "ip": str(record.get("ip", "?")),
+                "ip": display_ip,
                 "port": int(record.get("port", 0) or 0),
-                "address": str(record.get("address", "?")),
+                "address": (
+                    f"{display_ip}:{int(record.get('port', 0) or 0)}"
+                    if int(record.get("port", 0) or 0)
+                    else display_ip
+                ),
                 "client": str(record.get("client", "Unknown")),
+                "transport_security": str(record.get("transport_security", "Plaintext")),
                 "source": str(record.get("source", "Incoming")),
                 "direction": str(record.get("direction", "Incoming")),
                 "progress": progress,
@@ -1019,24 +1130,43 @@ class TorrentSession:
         sources = list(tracker_sources) + [dht_source, pex_source, lan_source]
 
         active_statuses = {"Active", "No Peers"}
-        active_count = sum(
-            1 for source in sources
-            if str(source.get("status", "")) in active_statuses
-        )
-        problem_count = sum(
-            1 for source in sources
-            if str(source.get("status", "")) in {"Timeout", "Error"}
-        )
-        tracker_peer_count = sum(
-            max(0, int(source.get("peers", 0) or 0))
-            for source in tracker_sources
-        )
+        pending_statuses = {"Waiting", "Announcing"}
+        warning_statuses = {"Timeout"}
+        error_statuses = {"Error", "Unsupported"}
+        active_count = 0
+        pending_count = 0
+        warning_count = 0
+        error_count = 0
+        tracker_peer_count = 0
+
+        # Sources is deliberately tiny (trackers + DHT + PEX + LAN), but keep
+        # classification and tracker-peer accounting in one pass anyway.
+        tracker_count = len(tracker_sources)
+        for index, source in enumerate(sources):
+            status = str(source.get("status", ""))
+            if status in active_statuses:
+                active_count += 1
+            elif status in pending_statuses:
+                pending_count += 1
+            elif status in warning_statuses:
+                warning_count += 1
+            elif status in error_statuses:
+                error_count += 1
+
+            if index < tracker_count:
+                try:
+                    tracker_peer_count += max(0, int(source.get("peers", 0) or 0))
+                except (TypeError, ValueError):
+                    pass
 
         return {
             "sources": sources,
-            "tracker_count": len(tracker_sources),
+            "tracker_count": tracker_count,
             "active_count": active_count,
-            "problem_count": problem_count,
+            "pending_count": pending_count,
+            "warning_count": warning_count,
+            "error_count": error_count,
+            "problem_count": warning_count + error_count,
             "tracker_peers_last_seen": tracker_peer_count,
             "dht_peers_seen": int(dht_source.get("peers", 0) or 0),
             "pex_peers_seen": int(pex_source.get("peers", 0) or 0),
@@ -1219,6 +1349,11 @@ class TorrentSession:
         down_bps = max(0.0, float(speed_kbps or 0.0)) * 1024.0
         eta_seconds = (remaining_bytes / down_bps) if remaining_bytes > 0 and down_bps > 1.0 else None
         share_ratio = (self.uploaded_bytes / downloaded_bytes) if downloaded_bytes > 0 else None
+        encrypted_peer_count = sum(
+            1 for peer in peer_snapshots
+            if str(peer.get("transport_security")) == "MSE/RC4"
+        )
+        plaintext_peer_count = max(0, len(peer_snapshots) - encrypted_peer_count)
 
         discovery_parts = []
         if int(sources_view.get("tracker_count", 0) or 0):
@@ -1253,6 +1388,15 @@ class TorrentSession:
             "downloaded_bytes": downloaded_bytes,
             "remaining_bytes": remaining_bytes,
             "uploaded_bytes": self.uploaded_bytes,
+            "uploaded_this_session_bytes": self.uploaded_this_session_bytes,
+            "upload_requests_received": self.upload_requests_received,
+            "upload_requests_served": self.upload_requests_served,
+            "last_upload_seconds": (
+                max(0.0, time.monotonic() - self._last_upload_at)
+                if self._last_upload_at else None
+            ),
+            "incoming_peers": len(self._inbound_peer_records),
+            "incoming_connections_total": self.incoming_connections_total,
             "total_bytes": total_bytes,
             "speed_kbps": speed_kbps,
             "upload_speed_kbps": upload_speed_kbps,
@@ -1260,6 +1404,13 @@ class TorrentSession:
             "elapsed_seconds": self.elapsed_active_seconds,
             "share_ratio": share_ratio,
             "connected_peers": self._connected_peer_count(),
+            "encrypted_peer_count": encrypted_peer_count,
+            "plaintext_peer_count": plaintext_peer_count,
+            "encryption_policy": self.encryption_policy,
+            "network_bind_address": self.network_bind_address,
+            "interface_lock": bool(self.interface_lock),
+            "interface_lock_active": bool(self.interface_lock and self.network_bind_address),
+            "mask_peer_ips": bool(self.mask_peer_ips),
             "swarm_seeders": swarm_seeders,
             "swarm_leechers": swarm_leechers,
             "swarm_availability": float(piece_view.get("swarm_availability", 0.0) or 0.0),
@@ -1273,6 +1424,7 @@ class TorrentSession:
             "total_pieces": len(self.piece_mgr.pieces),
             "piece_length": int(self.torrent.piece_length),
             "listen_port": self._seed_port if self._seed_server else 0,
+            "listener_address": self._seed_bind_address if self._seed_server else "",
             "preferred_listen_port": self.preferred_listen_port,
             "dht_enabled": bool(self.enable_dht),
             "pex_enabled": bool(self.enable_pex),
@@ -1318,6 +1470,27 @@ class TorrentSession:
             self._build_snapshot(force_detail_refresh=force_detail_refresh)
         )
 
+    async def _trip_interface_lock(self):
+        """Fail closed when the explicitly bound interface disappears."""
+        if not self.interface_lock or not self.network_bind_address:
+            return
+
+        self.error_message = (
+            f"Interface Lock: bound address {self.network_bind_address} is no longer "
+            "available. Torrent networking was stopped to prevent fallback to another path."
+        )
+        self.state = SessionState.ERROR
+        self.is_running = False
+        self._pause_event.set()
+
+        for peer in list(self.active_peers):
+            await peer.close()
+        await self._close_seed_server()
+        await self._lpd.close()
+        await self._dht.close()
+        self._record_speed_sample(0.0, 0.0)
+        self._emit_snapshot(force_detail_refresh=True)
+
     async def start(self):
         if self.is_running:
             return
@@ -1336,6 +1509,14 @@ class TorrentSession:
         local_telemetry_task: Optional[asyncio.Task] = None
 
         try:
+            if (
+                self.interface_lock
+                and self.network_bind_address
+                and not is_bind_address_available(self.network_bind_address)
+            ):
+                await self._trip_interface_lock()
+                return
+
             if not self.piece_mgr.storage_prepared:
                 self.state = SessionState.CHECKING
                 self._pause_event.set()
@@ -1721,6 +1902,7 @@ class TorrentSession:
         except (TypeError, ValueError):
             return False
 
+        self._record_upload_request()
         if length <= 0 or length > BLOCK_SIZE:
             return False
         if not self._is_current_run(run_token):
@@ -1749,7 +1931,7 @@ class TorrentSession:
             return False
 
         if await peer.send_piece(piece_index, begin, block_data):
-            self.uploaded_bytes += len(block_data)
+            self._record_upload_served(len(block_data))
             return True
         return False
 
@@ -1783,8 +1965,14 @@ class TorrentSession:
         stale_writers = []
         for writer in list(self._seed_client_writers):
             try:
-                writer.write(frame)
-                await writer.drain()
+                record = self._inbound_peer_records.get(id(writer), {})
+                stream = record.get("stream")
+                if isinstance(stream, PeerWireStream):
+                    stream.write(frame)
+                    await stream.drain()
+                else:
+                    writer.write(frame)
+                    await writer.drain()
             except (ConnectionError, OSError, RuntimeError):
                 stale_writers.append(writer)
             except Exception:
@@ -1810,6 +1998,8 @@ class TorrentSession:
             direction="Outgoing",
             advertise_dht=self.enable_dht,
             enable_pex=self.enable_pex,
+            encryption_policy=self.encryption_policy,
+            bind_address=self.network_bind_address,
         )
         owned_requests: List[Block] = []
 
@@ -2065,7 +2255,7 @@ class TorrentSession:
                     lambda reader, writer: asyncio.create_task(
                         self._handle_inbound_seed_peer(run_token, reader, writer)
                     ),
-                    host="0.0.0.0",
+                    host=self.network_bind_address or "0.0.0.0",
                     port=port,
                 )
             except OSError:
@@ -2073,10 +2263,22 @@ class TorrentSession:
 
             self._seed_server = server
             self._seed_port = port
+            try:
+                sockname = server.sockets[0].getsockname() if server.sockets else None
+                self._seed_bind_address = str(sockname[0]) if sockname else (self.network_bind_address or "0.0.0.0")
+            except Exception:
+                self._seed_bind_address = self.network_bind_address or "0.0.0.0"
             self.tracker.port = port
             if self._listen_port_callback:
                 try:
-                    self._listen_port_callback(port)
+                    self._listen_port_callback(port, True)
+                except TypeError:
+                    # Backward-compatible fallback for any external one-argument
+                    # callback using TorrentSession directly.
+                    try:
+                        self._listen_port_callback(port)
+                    except Exception:
+                        pass
                 except Exception:
                     pass
             return
@@ -2084,13 +2286,9 @@ class TorrentSession:
         # Outbound seeding can still work if no inbound listener is available.
         self._seed_port = preferred
         self.tracker.port = preferred
-        if self._listen_port_callback:
-            try:
-                self._listen_port_callback(0)
-            except Exception:
-                pass
 
     async def _close_seed_server(self):
+        closed_port = self._seed_port if self._seed_server else 0
         if self._seed_server:
             self._seed_server.close()
             try:
@@ -2098,6 +2296,17 @@ class TorrentSession:
             except Exception:
                 pass
             self._seed_server = None
+        self._seed_bind_address = ""
+
+        if closed_port and self._listen_port_callback:
+            try:
+                self._listen_port_callback(closed_port, False)
+            except TypeError:
+                # Older one-argument callbacks were only notified when a port
+                # opened, so there is no compatible close notification to send.
+                pass
+            except Exception:
+                pass
 
         for writer in list(self._seed_client_writers):
             try:
@@ -2149,6 +2358,8 @@ class TorrentSession:
             direction="Outgoing",
             advertise_dht=self.enable_dht,
             enable_pex=self.enable_pex,
+            encryption_policy=self.encryption_policy,
+            bind_address=self.network_bind_address,
         )
 
         try:
@@ -2246,25 +2457,46 @@ class TorrentSession:
         writer: asyncio.StreamWriter,
     ):
         registered = False
+        stream: Optional[PeerWireStream] = None
 
         try:
-            pstrlen_raw = await asyncio.wait_for(reader.readexactly(1), timeout=8.0)
-            pstrlen = pstrlen_raw[0]
-            if pstrlen != 19:
+            # A normal BitTorrent handshake has a deterministic 20-byte prefix.
+            # Anything else is treated as an MSE Diffie-Hellman greeting when
+            # encryption is enabled. Prefetched bytes are preserved by the
+            # selected stream wrapper.
+            first_bytes = await asyncio.wait_for(reader.readexactly(20), timeout=8.0)
+            plaintext_prefix = b"\x13BitTorrent protocol"
+            if first_bytes == plaintext_prefix:
+                if self.encryption_policy == PEER_ENCRYPTION_REQUIRE:
+                    return
+                stream = PeerWireStream(
+                    reader=reader,
+                    writer=writer,
+                    initial_plaintext=first_bytes,
+                    transport_security="Plaintext",
+                )
+            else:
+                if self.encryption_policy == PEER_ENCRYPTION_DISABLED:
+                    return
+                stream = await mse_responder_handshake(
+                    reader,
+                    writer,
+                    self.torrent.info_hash,
+                    first_bytes=first_bytes,
+                    timeout=8.0,
+                )
+
+            handshake = await asyncio.wait_for(stream.readexactly(68), timeout=8.0)
+            if handshake[:20] != plaintext_prefix:
                 return
 
-            remainder = await asyncio.wait_for(
-                reader.readexactly(pstrlen + 48),
-                timeout=8.0,
-            )
-            protocol = remainder[:pstrlen]
-            remote_reserved = bytes(remainder[pstrlen:pstrlen + 8])
+            remote_reserved = bytes(handshake[20:28])
             remote_supports_extensions = reserved_supports_extensions(remote_reserved)
             remote_supports_dht = reserved_supports_dht(remote_reserved)
-            info_hash = remainder[pstrlen + 8:pstrlen + 28]
-            remote_peer_id = bytes(remainder[pstrlen + 28:pstrlen + 48])
+            info_hash = handshake[28:48]
+            remote_peer_id = bytes(handshake[48:68])
 
-            if protocol != b"BitTorrent protocol" or info_hash != self.torrent.info_hash:
+            if info_hash != self.torrent.info_hash:
                 return
             if not self._is_current_run(run_token):
                 return
@@ -2276,22 +2508,21 @@ class TorrentSession:
                 enable_dht=self.enable_dht and not self.torrent.private,
             )
             response = (
-                bytes([19])
-                + b"BitTorrent protocol"
+                plaintext_prefix
                 + response_reserved
                 + self.torrent.info_hash
                 + self.peer_id
             )
-            writer.write(response)
+            stream.write(response)
 
             bitfield = self.piece_mgr.completed_bitfield()
-            writer.write(
+            stream.write(
                 struct.pack(">IB", 1 + len(bitfield), PeerMessageID.BITFIELD)
                 + bitfield
             )
-            writer.write(struct.pack(">IB", 1, PeerMessageID.UNCHOKE))
+            stream.write(struct.pack(">IB", 1, PeerMessageID.UNCHOKE))
             if remote_supports_extensions and not self.torrent.private:
-                writer.write(
+                stream.write(
                     build_extended_message(
                         0,
                         build_extended_handshake_payload(
@@ -2307,10 +2538,10 @@ class TorrentSession:
                 and not self.torrent.private
                 and self._dht.local_udp_port
             ):
-                writer.write(
+                stream.write(
                     struct.pack(">IBH", 3, PeerMessageID.PORT, self._dht.local_udp_port)
                 )
-            await writer.drain()
+            await stream.drain()
 
             self._seed_client_writers.add(writer)
 
@@ -2325,6 +2556,7 @@ class TorrentSession:
                 peer_ip = "?"
                 peer_port = 0
 
+            self.incoming_connections_total += 1
             if self._incoming_peer_callback:
                 try:
                     self._incoming_peer_callback(self._seed_port, peer_ip)
@@ -2340,6 +2572,8 @@ class TorrentSession:
                 "client": identify_peer_client(remote_peer_id),
                 "source": "Incoming",
                 "direction": "Incoming",
+                "transport_security": stream.transport_security,
+                "stream": stream,
                 "connected_at": time.monotonic(),
                 "last_activity_at": time.monotonic(),
                 "downloaded_bytes": 0,
@@ -2365,7 +2599,7 @@ class TorrentSession:
             self._emit_snapshot()
 
             while self._is_current_run(run_token):
-                length_raw = await asyncio.wait_for(reader.readexactly(4), timeout=120.0)
+                length_raw = await asyncio.wait_for(stream.readexactly(4), timeout=120.0)
                 (message_length,) = struct.unpack(">I", length_raw)
 
                 if message_length == 0:
@@ -2374,7 +2608,7 @@ class TorrentSession:
                     break
 
                 payload = await asyncio.wait_for(
-                    reader.readexactly(message_length),
+                    stream.readexactly(message_length),
                     timeout=30.0,
                 )
                 msg_id = payload[0]
@@ -2463,8 +2697,8 @@ class TorrentSession:
                                     exclude=(peer_ip, peer_port) if peer_port else None
                                 )
                             )
-                            writer.write(build_extended_message(remote_pex_id, pex_payload))
-                            await writer.drain()
+                            stream.write(build_extended_message(remote_pex_id, pex_payload))
+                            await stream.drain()
                             inbound_record["pex_messages_sent"] = int(
                                 inbound_record.get("pex_messages_sent", 0)
                             ) + 1
@@ -2524,14 +2758,14 @@ class TorrentSession:
                                         b"total_size": len(raw_metadata),
                                     }
                                 )
-                                writer.write(
+                                stream.write(
                                     build_extended_message(
                                         remote_metadata_id,
                                         header_bytes + block,
                                     )
                                 )
                             else:
-                                writer.write(
+                                stream.write(
                                     build_extended_message(
                                         remote_metadata_id,
                                         Bencode.encode(
@@ -2539,7 +2773,7 @@ class TorrentSession:
                                         ),
                                     )
                                 )
-                            await writer.drain()
+                            await stream.drain()
                         continue
 
                 if msg_id != PeerMessageID.REQUEST or len(body) != 12:
@@ -2553,6 +2787,7 @@ class TorrentSession:
                     continue
 
                 piece_index, begin, length = struct.unpack(">III", body)
+                self._record_upload_request()
                 if length <= 0 or length > BLOCK_SIZE:
                     continue
 
@@ -2576,18 +2811,24 @@ class TorrentSession:
                     continue
 
                 piece_payload = struct.pack(">II", piece_index, begin) + block_data
-                writer.write(
+                stream.write(
                     struct.pack(">IB", 1 + len(piece_payload), PeerMessageID.PIECE)
                     + piece_payload
                 )
-                await writer.drain()
-                self.uploaded_bytes += len(block_data)
+                await stream.drain()
+                self._record_upload_served(len(block_data))
                 inbound_record["uploaded_bytes"] = int(
                     inbound_record.get("uploaded_bytes", 0)
                 ) + len(block_data)
                 inbound_record["last_activity_at"] = time.monotonic()
 
-        except (asyncio.IncompleteReadError, asyncio.TimeoutError, ConnectionError):
+        except (
+            asyncio.IncompleteReadError,
+            asyncio.TimeoutError,
+            ConnectionError,
+            OSError,
+            MSEError,
+        ):
             pass
         except asyncio.CancelledError:
             pass
@@ -2610,6 +2851,17 @@ class TorrentSession:
         try:
             while self._is_current_run(run_token):
                 await asyncio.sleep(SPEED_SAMPLE_INTERVAL)
+
+                now = time.monotonic()
+                if (
+                    self.interface_lock
+                    and self.network_bind_address
+                    and now - self._last_interface_check_at >= 2.0
+                ):
+                    self._last_interface_check_at = now
+                    if not is_bind_address_available(self.network_bind_address):
+                        await self._trip_interface_lock()
+                        return
 
                 current_downloaded = self.piece_mgr.downloaded_bytes
                 current_uploaded = self.uploaded_bytes
@@ -2642,3 +2894,7 @@ class TorrentSession:
 
         except asyncio.CancelledError:
             pass
+
+
+
+

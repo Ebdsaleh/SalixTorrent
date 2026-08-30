@@ -686,7 +686,7 @@ class ApplicationMenu:
 
     def _diagnostics_string(self) -> str:
         settings = self.manager.get_app_settings()
-        connectivity = self.manager.get_connectivity_snapshot()
+        aggregate_connectivity = self.manager.get_connectivity_snapshot()
         try:
             dpg_version = str(dpg.get_dearpygui_version())
         except Exception:
@@ -696,14 +696,20 @@ class ApplicationMenu:
         selected_stats = self.download_view.latest_stats.get(selected, {}) if selected else {}
         selected_name = selected_stats.get("torrent_name", "--")
         selected_state = selected_stats.get("state_label", selected_stats.get("state", "--"))
+        selected_listen_port = int(selected_stats.get("listen_port") or 0)
+        if selected_listen_port:
+            connectivity = self.manager.get_connectivity_snapshot(port=selected_listen_port)
+        else:
+            connectivity = {"status": "Not listening", "method": "None"}
 
         external_ip = str(connectivity.get("external_ip") or "")
         try:
             external_port = int(connectivity.get("external_port") or 0)
         except (TypeError, ValueError):
             external_port = 0
+        external_scope = str(connectivity.get("external_scope") or "Unknown")
         external_endpoint = (
-            f"{external_ip}:{external_port}"
+            f"{external_ip}:{external_port} ({external_scope})"
             if external_ip and external_port
             else "--"
         )
@@ -719,14 +725,41 @@ class ApplicationMenu:
             f"Selected torrent: {selected_name}\n"
             f"Selected state: {selected_state}\n\n"
             f"Listen port preference: {settings.get('listen_port', '--')}\n"
+            f"Peer encryption: {settings.get('peer_encryption', 'Prefer Encryption')}\n"
+            f"Network bind: {settings.get('network_bind_address') or 'Any interface (system routing)'}\n"
+            f"Interface Lock: {'Enabled' if settings.get('interface_lock') else 'Disabled'}\n"
+            f"Peer IP masking: {'Enabled' if settings.get('mask_peer_ips') else 'Disabled'}\n"
+            f"Selected encrypted peers: {selected_stats.get('encrypted_peer_count', 0)}\n"
+            f"Selected plaintext peers: {selected_stats.get('plaintext_peer_count', 0)}\n"
+            f"Selected incoming peers: {selected_stats.get('incoming_peers', 0)} active / "
+            f"{selected_stats.get('incoming_connections_total', 0)} this session\n"
+            f"Selected upload requests: {selected_stats.get('upload_requests_served', 0)} served / "
+            f"{selected_stats.get('upload_requests_received', 0)} received\n"
+            f"Selected uploaded this session: {selected_stats.get('uploaded_this_session_bytes', 0)} bytes\n"
             f"DHT: {'Enabled' if settings.get('enable_dht') else 'Disabled'}\n"
             f"PEX: {'Enabled' if settings.get('enable_pex') else 'Disabled'}\n"
             f"LAN discovery: {'Enabled' if settings.get('enable_lan_discovery') else 'Disabled'}\n"
-            f"Connectivity: {connectivity.get('status', '--')}\n"
-            f"Mapping: {connectivity.get('method', '--')}\n"
-            f"Local endpoint: {connectivity.get('local_ip', '--')}:{connectivity.get('internal_port', '--')}\n"
-            f"External endpoint: {external_endpoint}\n"
-            f"Port mapping notice: {connectivity.get('last_error') or '--'}\n\n"
+            f"Selected connectivity: {connectivity.get('status', '--')}\n"
+            f"Selected mapping: {connectivity.get('method', '--')}\n"
+            f"UPnP status: {connectivity.get('upnp_status', '--')}\n"
+            f"UPnP stage/code: {connectivity.get('upnp_stage') or '--'} / {connectivity.get('upnp_code') or '--'}\n"
+            f"UPnP detail: {connectivity.get('upnp_error') or '--'}\n"
+            f"UPnP advice: {connectivity.get('upnp_advice') or '--'}\n"
+            f"NAT-PMP status: {connectivity.get('natpmp_status', '--')}\n"
+            f"NAT-PMP stage/code: {connectivity.get('natpmp_stage') or '--'} / {connectivity.get('natpmp_code') or '--'}\n"
+            f"NAT-PMP detail: {connectivity.get('natpmp_error') or '--'}\n"
+            f"NAT-PMP advice: {connectivity.get('natpmp_advice') or '--'}\n"
+            f"Selected listener endpoint: {selected_stats.get('listener_address') or '--'}:"
+            f"{selected_listen_port or '--'}\n"
+            f"Router-mapping local endpoint: {connectivity.get('local_ip', '--')}:"
+            f"{connectivity.get('internal_port', '--')}\n"
+            f"Selected external endpoint: {external_endpoint}\n"
+            f"Connectivity diagnosis: {connectivity.get('diagnosis') or '--'}\n"
+            f"Suggested action: {connectivity.get('action_hint') or '--'}\n"
+            f"Selected mapping notice: {connectivity.get('last_error') or '--'}\n"
+            f"Selected mapping lease: {'permanent' if connectivity.get('mapping_permanent') else (str(connectivity.get('mapping_lease_seconds')) + 's' if connectivity.get('mapping_lease_seconds') is not None else '--')}\n"
+            f"Active listener ports: {aggregate_connectivity.get('active_listener_ports') or '--'}\n"
+            f"Mapped listener ports: {aggregate_connectivity.get('mapped_ports') or '--'}\n\n"
             f"Settings: {self.manager.settings_path}\n"
             f"Session state: {self.manager.session_state_path}\n"
             f"UI error log: {self.gui._ui_error_log_path()}\n"
@@ -743,3 +776,7 @@ class ApplicationMenu:
             dpg.set_clipboard_text(self._diagnostics_string())
         except Exception:
             pass
+
+
+
+

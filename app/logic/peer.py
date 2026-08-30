@@ -9,6 +9,8 @@ import time
 from typing import Dict, Iterable, List, Optional, Tuple
 
 from app.logic.bencode import Bencode
+from app.logic.mse import MSEError, PeerWireStream, mse_initiator_handshake
+from app.logic.network_binding import normalise_bind_address
 
 
 class PeerMessageID:
@@ -46,6 +48,31 @@ LOCAL_UT_METADATA_ID = 2
 METADATA_BLOCK_SIZE = 16 * 1024
 PEX_SEND_INTERVAL = 60.0
 PEX_MAX_PEERS_PER_MESSAGE = 50
+
+PEER_ENCRYPTION_DISABLED = "Disabled"
+PEER_ENCRYPTION_PREFER = "Prefer Encryption"
+PEER_ENCRYPTION_REQUIRE = "Require Encryption"
+PEER_ENCRYPTION_POLICIES = (
+    PEER_ENCRYPTION_DISABLED,
+    PEER_ENCRYPTION_PREFER,
+    PEER_ENCRYPTION_REQUIRE,
+)
+
+
+def normalise_peer_encryption_policy(value: object) -> str:
+    text = str(value or PEER_ENCRYPTION_PREFER).strip()
+    aliases = {
+        "disabled": PEER_ENCRYPTION_DISABLED,
+        "off": PEER_ENCRYPTION_DISABLED,
+        "plaintext": PEER_ENCRYPTION_DISABLED,
+        "prefer": PEER_ENCRYPTION_PREFER,
+        "prefer encryption": PEER_ENCRYPTION_PREFER,
+        "preferred": PEER_ENCRYPTION_PREFER,
+        "require": PEER_ENCRYPTION_REQUIRE,
+        "require encryption": PEER_ENCRYPTION_REQUIRE,
+        "required": PEER_ENCRYPTION_REQUIRE,
+    }
+    return aliases.get(text.lower(), text if text in PEER_ENCRYPTION_POLICIES else PEER_ENCRYPTION_PREFER)
 
 
 _AZUREUS_CLIENTS = {
@@ -298,6 +325,8 @@ class PeerConnection:
         direction: str = "Outgoing",
         advertise_dht: bool = True,
         enable_pex: bool = True,
+        encryption_policy: str = PEER_ENCRYPTION_PREFER,
+        bind_address: str = "",
     ):
         self.ip = ip
         self.port = port
@@ -309,9 +338,15 @@ class PeerConnection:
         self.direction = direction
         self.advertise_dht = bool(advertise_dht)
         self.enable_pex = bool(enable_pex)
+        self.encryption_policy = normalise_peer_encryption_policy(encryption_policy)
+        self.bind_address = normalise_bind_address(bind_address)
 
         self.reader: Optional[asyncio.StreamReader] = None
         self.writer: Optional[asyncio.StreamWriter] = None
+        self.stream: Optional[PeerWireStream] = None
+        self.transport_security: str = "Plaintext"
+        self.encryption_attempted: bool = False
+        self.plaintext_fallback_used: bool = False
 
         # Peer protocol state.
         self.am_choking: bool = True
@@ -382,8 +417,12 @@ class PeerConnection:
             return False
 
         try:
-            self.writer.write(bytes(payload))
-            await self.writer.drain()
+            if self.stream is not None:
+                self.stream.write(bytes(payload))
+                await self.stream.drain()
+            else:
+                self.writer.write(bytes(payload))
+                await self.writer.drain()
             self._mark_activity()
             return True
         except asyncio.CancelledError:
@@ -399,44 +438,114 @@ class PeerConnection:
             await self.close()
             return False
 
+    def _build_handshake(self) -> bytes:
+        pstr = b"BitTorrent protocol"
+        return (
+            bytes([len(pstr)])
+            + pstr
+            + build_reserved_bytes(enable_extensions=True, enable_dht=self.advertise_dht)
+            + self.info_hash
+            + self.peer_id
+        )
+
+    async def _open_tcp(self, timeout: float):
+        kwargs = {}
+        if self.bind_address:
+            kwargs["local_addr"] = (self.bind_address, 0)
+        return await asyncio.wait_for(
+            asyncio.open_connection(self.ip, self.port, **kwargs),
+            timeout=timeout,
+        )
+
+    async def _finish_peer_handshake(self, response: bytes) -> bool:
+        if len(response) != 68 or response[:20] != b"\x13BitTorrent protocol":
+            return False
+        if response[28:48] != self.info_hash:
+            return False
+
+        self.remote_reserved = bytes(response[20:28])
+        self.supports_extensions = reserved_supports_extensions(self.remote_reserved)
+        self.supports_dht = reserved_supports_dht(self.remote_reserved)
+        self.remote_peer_id = bytes(response[48:68])
+        self.is_connected = True
+        self.connected_at = time.monotonic()
+        self._mark_activity()
+        return True
+
+    async def _connect_plaintext(self, timeout: float) -> bool:
+        self.reader, self.writer = await self._open_tcp(timeout)
+        self.stream = PeerWireStream(
+            reader=self.reader,
+            writer=self.writer,
+            transport_security="Plaintext",
+        )
+        handshake = self._build_handshake()
+        self.writer.write(handshake)
+        await self.writer.drain()
+        response = await asyncio.wait_for(self.reader.readexactly(68), timeout=timeout)
+        if not await self._finish_peer_handshake(response):
+            await self.close()
+            return False
+        self.transport_security = "Plaintext"
+        return True
+
+    async def _connect_mse(self, timeout: float) -> bool:
+        self.encryption_attempted = True
+        self.reader, self.writer = await self._open_tcp(timeout)
+        handshake = self._build_handshake()
+        self.stream = await mse_initiator_handshake(
+            self.reader,
+            self.writer,
+            self.info_hash,
+            initial_payload=handshake,
+            timeout=timeout,
+        )
+        response = await asyncio.wait_for(self.stream.readexactly(68), timeout=timeout)
+        if not await self._finish_peer_handshake(response):
+            await self.close()
+            return False
+        self.transport_security = self.stream.transport_security
+        return True
+
     async def connect(self, timeout: float = 8.0) -> bool:
-        """Establish TCP connection and perform the BitTorrent handshake."""
-        try:
-            self.reader, self.writer = await asyncio.wait_for(
-                asyncio.open_connection(self.ip, self.port),
-                timeout=timeout,
-            )
+        """Establish TCP and negotiate the configured peer transport policy.
 
-            pstr = b"BitTorrent protocol"
-            handshake = (
-                bytes([len(pstr)])
-                + pstr
-                + build_reserved_bytes(enable_extensions=True, enable_dht=self.advertise_dht)
-                + self.info_hash
-                + self.peer_id
-            )
+        Prefer Encryption makes one MSE/RC4 attempt first.  If that negotiation
+        fails, the socket is discarded and a completely fresh plaintext TCP
+        connection is opened.  Require Encryption never falls back.
+        """
+        policy = normalise_peer_encryption_policy(self.encryption_policy)
+        self.encryption_policy = policy
+        self.plaintext_fallback_used = False
 
-            self.writer.write(handshake)
-            await self.writer.drain()
-
-            response = await asyncio.wait_for(
-                self.reader.readexactly(68),
-                timeout=timeout,
-            )
-
-            if response[28:48] != self.info_hash:
+        if policy == PEER_ENCRYPTION_DISABLED:
+            try:
+                return await self._connect_plaintext(timeout)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
                 await self.close()
                 return False
 
-            self.remote_reserved = bytes(response[20:28])
-            self.supports_extensions = reserved_supports_extensions(self.remote_reserved)
-            self.supports_dht = reserved_supports_dht(self.remote_reserved)
-            self.remote_peer_id = bytes(response[48:68])
-            self.is_connected = True
-            self.connected_at = time.monotonic()
-            self._mark_activity()
-            return True
+        try:
+            if await self._connect_mse(timeout):
+                return True
+        except asyncio.CancelledError:
+            raise
+        except (MSEError, ConnectionError, OSError, asyncio.TimeoutError):
+            pass
+        except Exception:
+            pass
 
+        await self.close()
+        if policy == PEER_ENCRYPTION_REQUIRE:
+            return False
+
+        self.plaintext_fallback_used = True
+        try:
+            return await self._connect_plaintext(timeout)
+        except asyncio.CancelledError:
+            raise
         except Exception:
             await self.close()
             return False
@@ -684,13 +793,20 @@ class PeerConnection:
 
         return ("EXTENDED", (extension_id, extension_payload))
 
+    async def _readexactly(self, length: int) -> bytes:
+        if self.stream is not None:
+            return await self.stream.readexactly(length)
+        if self.reader is None:
+            raise asyncio.IncompleteReadError(b"", int(length))
+        return await self.reader.readexactly(length)
+
     async def read_message(self) -> Optional[tuple]:
         """Read and parse the next framed BitTorrent peer message."""
         if not self.is_connected or not self.reader:
             return None
 
         try:
-            length_bytes = await self.reader.readexactly(4)
+            length_bytes = await self._readexactly(4)
             (length,) = struct.unpack(">I", length_bytes)
 
             if length == 0:
@@ -704,7 +820,7 @@ class PeerConnection:
                 await self.close()
                 return None
 
-            payload = await self.reader.readexactly(length)
+            payload = await self._readexactly(length)
             msg_id = payload[0]
             body = payload[1:]
             self._mark_activity()
@@ -765,3 +881,4 @@ class PeerConnection:
                 pass
         self.reader = None
         self.writer = None
+        self.stream = None

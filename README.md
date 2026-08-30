@@ -20,7 +20,11 @@ SalixTorrent is a desktop BitTorrent v1 client written in Python with a custom a
 - Compact piece map, peer client identification, source diagnostics, and rolling speed history.
 - Torrent creation from a file/archive or directory.
 - Persistent session restoration and application preferences.
-- UPnP / NAT-PMP mapping attempts and incoming-connectivity reporting.
+- UPnP / NAT-PMP mapping for each active torrent listener, with per-listener incoming-connectivity reporting, structured failure diagnosis, and automatic lease renewal.
+- Event-driven seeding telemetry: uploaded total/session bytes, upload requests served/received, last upload, incoming peers, and exact listener endpoint.
+- MSE/PE peer transport with Disabled, Prefer Encryption (default), and Require Encryption policies.
+- Network-interface/VPN binding across peer, tracker, DHT, LPD, listener, and magnet traffic, with optional fail-closed Interface Lock.
+- Live transport-security telemetry and optional display-only peer IP masking (off by default).
 - Traditional File/Edit/View/Transfers/Tools/Help menu bar and keyboard shortcuts.
 - Comprehensive hover tooltips plus searchable Help Topics and an A-Z glossary.
 - Context menus for lifecycle actions, priorities, transfer-rate display units, recheck, tracker refresh, properties, and removal.
@@ -82,7 +86,7 @@ General | Peers | Pieces | Files | Sources | Speed
 - **Peers** — live peer address/client/source/direction/piece availability/rates/state/flags.
 - **Pieces** — verification state, active requests, availability, and a compact graphical piece map.
 - **Files** — per-file verified progress, piece span, state, and priority/selective-download controls.
-- **Sources** — trackers, DHT, PEX, and LPD with live status and diagnostic telemetry.
+- **Sources** — trackers, DHT, PEX, and LPD with live status and diagnostic telemetry; neutral Pending, amber Timeout warnings, and red source errors are reported separately.
 - **Speed** — rolling upload/download history plus per-torrent and global limit references.
 
 Technical labels and values throughout the interface have contextual hover help. `Help -> Help Topics...` opens the built-in searchable manual, while `Help -> Glossary A-Z...` jumps directly to the technical glossary.
@@ -104,6 +108,8 @@ Private torrents deliberately remain tracker-controlled. SalixTorrent disables D
 BitTorrent peer connections are bidirectional. While a torrent is still downloading, SalixTorrent can upload pieces that have already passed SHA-1 verification. Unverified or incomplete pieces are never served.
 
 When all wanted pieces are complete, the session can transition to seeding. Torrents created from local files/directories can also seed directly from the original source in read-only external-seed mode.
+
+The General view distinguishes the persisted **Uploaded Total** from **Uploaded This Session** and shows received/served peer `REQUEST` counts, the age of the last successful `PIECE` upload, and active/this-session incoming peers. These counters are updated directly at the corresponding network events; SalixTorrent does not add a peer-scanning loop merely to produce telemetry.
 
 ## Queue and bandwidth management
 
@@ -133,11 +139,27 @@ This includes settings, session state, cached magnet metadata, and the UI error 
 
 Fast-resume information trusts previously verified pieces only while the relevant file metadata still matches. A Force Recheck discards that trust and verifies the payload again from disk without deleting it.
 
-## Connectivity
+## Connectivity, transport security and network binding
 
 SalixTorrent listens for incoming BitTorrent TCP connections and attempts automatic router mapping using UPnP, with NAT-PMP as a fallback where available.
 
-`Mapped` means the router accepted a mapping request. `Incoming Confirmed` is stronger: SalixTorrent has actually observed a remote peer reaching the listening socket. Failure to obtain automatic mapping is a notice rather than a fatal transfer error; outbound connections and other discovery mechanisms can continue normally.
+Peer transport has three policies:
+
+- **Disabled** - normal plaintext BitTorrent peer wire only;
+- **Prefer Encryption** - the default; tries MSE/RC4 first and opens a fresh plaintext TCP connection only if the peer does not support MSE;
+- **Require Encryption** - accepts MSE/RC4 peer transport only and never falls back to plaintext.
+
+MSE/PE is the legacy interoperable BitTorrent peer-encryption mechanism. It obscures/encrypts the peer stream for compatible peers, but it is not modern authenticated encryption, does not hide IP addresses, and should not be treated as a guarantee that an ISP cannot classify or block BitTorrent traffic. SalixTorrent implements the MSE-required RC4 stream internally, so no additional cryptography package is required.
+
+Preferences can also bind torrent networking to a specific local IPv4 address, including an address owned by a VPN interface. Peer TCP connections, the incoming listener, HTTP/UDP trackers, DHT, LPD, and magnet metadata retrieval all use the selected source address. **Interface Lock** is an additional fail-closed guard: if that selected address disappears, the torrent enters Error and its torrent networking is closed immediately instead of allowing later activity to use another path.
+
+Peer IP masking is a display-only option intended for screenshots/recordings. It is **off by default** and does not change real socket endpoints or provide anonymity.
+
+`Mapped` means the router accepted a mapping request. `Incoming Confirmed` is stronger: SalixTorrent has actually observed a remote peer complete an incoming BitTorrent handshake on that listener. General, Preferences, and Diagnostics report UPnP and NAT-PMP separately, including the failing stage and protocol fault/result code when available, plus a cached diagnosis and suggested next action. Failure to obtain automatic mapping is a notice rather than a fatal transfer error; outbound connections and other discovery mechanisms can continue normally.
+
+When a mapping protocol reports an external IPv4 address, SalixTorrent classifies it conservatively as Public, Private, Shared/CGNAT, or another non-global scope. A non-public address is treated as a clue that double NAT or provider-side CGNAT may exist, not as definitive proof. The built-in Help/Glossary explains automatic mapping, manual TCP/UDP forwarding, double NAT, CGNAT, and why `Incoming Confirmed` is the strongest practical evidence available to the client.
+
+Router mapping leases are finite on many devices. SalixTorrent renews successful mappings before expiry with one shared sleeping timer covering all active listen ports. There is no busy connectivity poll and no per-torrent renewal loop. If a renewal attempt fails while an earlier mapping may still be valid, SalixTorrent retains the previous mapping and schedules a later retry rather than tearing the rule down first.
 
 ## Create Torrent
 
@@ -155,10 +177,10 @@ The project currently includes a small foundation suite and focused regression c
 
 ```bash
 python foundation_test.py
-python test_regressions.py
+python test_transport_security.py
 ```
 
-The release-critical regression coverage includes private-torrent discovery isolation and uploading verified data while a session is still downloading.
+The release-critical regression coverage includes MSE/RC4 interoperability, source binding, encryption fallback rules, multi-torrent port mappings, finite/permanent mapping-lease handling, structured UPnP/NAT-PMP diagnostics, source-severity accounting, Interface Lock, and real inbound seeding uploads with telemetry counters.
 
 ## Current scope
 
@@ -184,6 +206,8 @@ SalixTorrent/
 │   │   ├── dht.py
 │   │   ├── local_peer_discovery.py
 │   │   ├── magnet.py
+│   │   ├── mse.py
+│   │   ├── network_binding.py
 │   │   ├── peer.py
 │   │   ├── piece_manager.py
 │   │   ├── session.py

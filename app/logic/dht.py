@@ -13,6 +13,7 @@ import time
 from typing import Dict, List, Optional, Set, Tuple
 
 from app.logic.bencode import Bencode
+from app.logic.network_binding import normalise_bind_address
 
 
 DHT_BOOTSTRAP_NODES = (
@@ -61,6 +62,7 @@ class DHTClient:
         private: bool = False,
         bootstrap_nodes: Optional[Tuple[Tuple[str, int], ...]] = None,
         preferred_port: int = 0,
+        bind_address: str = "",
     ):
         self.info_hash = bytes(info_hash)
         if len(self.info_hash) != 20:
@@ -72,6 +74,7 @@ class DHTClient:
         except (TypeError, ValueError):
             requested_port = 0
         self.preferred_port = requested_port if 0 < requested_port <= 65535 else 0
+        self.bind_address = normalise_bind_address(bind_address)
         self.bootstrap_nodes = tuple(bootstrap_nodes or DHT_BOOTSTRAP_NODES)
         self.node_id = secrets.token_bytes(20)
         self._token_secret = secrets.token_bytes(20)
@@ -125,7 +128,7 @@ class DHTClient:
             try:
                 transport, protocol = await loop.create_datagram_endpoint(
                     lambda: _DHTProtocol(self),
-                    local_addr=("0.0.0.0", self.preferred_port),
+                    local_addr=(self.bind_address or "0.0.0.0", self.preferred_port),
                     family=socket.AF_INET,
                 )
             except OSError:
@@ -134,7 +137,7 @@ class DHTClient:
                 # functional by falling back to an ephemeral UDP port.
                 transport, protocol = await loop.create_datagram_endpoint(
                     lambda: _DHTProtocol(self),
-                    local_addr=("0.0.0.0", 0),
+                    local_addr=(self.bind_address or "0.0.0.0", 0),
                     family=socket.AF_INET,
                 )
         except (OSError, RuntimeError) as exc:
@@ -160,6 +163,9 @@ class DHTClient:
 
     def update_announce_port(self, announce_port: int):
         self.announce_port = max(0, min(65535, int(announce_port or 0)))
+
+    def set_bind_address(self, bind_address: str):
+        self.bind_address = normalise_bind_address(bind_address)
 
     def set_preferred_port(self, preferred_port: int):
         try:

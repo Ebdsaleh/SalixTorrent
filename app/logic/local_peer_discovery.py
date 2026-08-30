@@ -8,6 +8,8 @@ import struct
 import time
 from typing import List, Optional, Set, Tuple
 
+from app.logic.network_binding import normalise_bind_address
+
 
 LPD_MULTICAST_GROUP = "239.192.152.143"
 LPD_PORT = 6771
@@ -39,10 +41,17 @@ class LocalPeerDiscovery:
     Failure to create/join the multicast socket is non-fatal.
     """
 
-    def __init__(self, info_hash: bytes, announce_interval: float = LPD_ANNOUNCE_INTERVAL):
+    def __init__(
+        self,
+        info_hash: bytes,
+        announce_interval: float = LPD_ANNOUNCE_INTERVAL,
+        *,
+        bind_address: str = "",
+    ):
         self.info_hash = bytes(info_hash)
         self.info_hash_hex = self.info_hash.hex().upper()
         self.announce_interval = max(2.0, float(announce_interval))
+        self.bind_address = normalise_bind_address(bind_address)
 
         self.listen_port: int = 0
         self.transport: Optional[asyncio.DatagramTransport] = None
@@ -64,8 +73,10 @@ class LocalPeerDiscovery:
         self.announce_count: int = 0
         self.remote_queries_seen: int = 0
 
-    @staticmethod
-    def _make_socket() -> socket.socket:
+    def set_bind_address(self, bind_address: str):
+        self.bind_address = normalise_bind_address(bind_address)
+
+    def _make_socket(self) -> socket.socket:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
@@ -77,10 +88,18 @@ class LocalPeerDiscovery:
             except OSError:
                 pass
 
-        sock.bind(("", LPD_PORT))
+        bind_ip = self.bind_address or ""
+        sock.bind((bind_ip, LPD_PORT))
 
-        membership = socket.inet_aton(LPD_MULTICAST_GROUP) + socket.inet_aton("0.0.0.0")
+        membership_ip = self.bind_address or "0.0.0.0"
+        membership = socket.inet_aton(LPD_MULTICAST_GROUP) + socket.inet_aton(membership_ip)
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, membership)
+        if self.bind_address:
+            sock.setsockopt(
+                socket.IPPROTO_IP,
+                socket.IP_MULTICAST_IF,
+                socket.inet_aton(self.bind_address),
+            )
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 1)
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_LOOP, 1)
         sock.setblocking(False)

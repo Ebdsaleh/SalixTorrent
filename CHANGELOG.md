@@ -2,6 +2,42 @@
 
 Notable SalixTorrent changes are recorded here.
 
+## Unreleased
+
+### Added
+
+- BitTorrent MSE/PE peer transport with `Disabled`, `Prefer Encryption`, and `Require Encryption` policies; `Prefer Encryption` is the default.
+- RC4-protected MSE incoming and outgoing peer streams, with fresh-connection plaintext fallback only under `Prefer Encryption`.
+- Dependency-free internal RC4 stream implementation for MSE/PE; the existing project requirements remain sufficient.
+- Network-interface/VPN source binding for peer TCP, the incoming listener, HTTP/UDP trackers, DHT, LPD, and magnet metadata retrieval.
+- Optional Interface Lock / kill switch that fails a torrent closed if its selected local address disappears.
+- Per-peer and per-session transport-security telemetry (`MSE/RC4` versus `Plaintext`).
+- Optional display-only peer IP masking, disabled by default.
+- Transport/privacy Preferences controls and expanded Help/Glossary documentation.
+- Event-driven seeding telemetry for uploaded-this-session bytes, received/served upload requests, last successful PIECE upload, and active/this-session incoming peers.
+- Exact listener-endpoint reporting plus separate UPnP and NAT-PMP result diagnostics.
+- Structured incoming-connectivity diagnosis with mapping stage/result codes, actionable next-step guidance, and conservative public/private/Shared-CGNAT external-address classification.
+- Offline Help/Glossary coverage for tracker timeouts, mapping diagnosis, manual port forwarding, double NAT, CGNAT, and external-address scope.
+
+### Changed
+
+- Tracker announces advertise encrypted-peer support and request encrypted peers when `Require Encryption` is selected.
+- Changing the selected network path or peer-encryption policy closes existing torrent sockets so subsequent connections use the new policy.
+- Incoming connectivity now tracks every active torrent listen port independently instead of exposing one global port as if it belonged to every torrent.
+- General transfer wording now distinguishes persisted `Uploaded Total` from process-local `Uploaded This Session`, and `Active Time` from wall-clock age.
+- Finite UPnP/NAT-PMP mapping leases are renewed before expiry using one shared low-frequency timer for all active ports rather than a polling loop per torrent.
+- Sources telemetry now separates neutral pending states from amber timeout warnings and red source errors instead of grouping them together as generic problems.
+- NAT-PMP diagnostics decode standard gateway result codes; UPnP diagnostics preserve the failing discovery/SOAP stage and router fault code when available.
+
+### Fixed
+
+- Starting a second active torrent no longer removes the UPnP/NAT-PMP mapping belonging to the first torrent.
+- Stopping or rebinding a torrent releases only that torrent listener's router mapping.
+- General/Diagnostics connectivity reporting now follows the selected torrent's actual listen port, preventing another torrent's mapping from being shown as its own.
+- A failed router-lease refresh now retains the previous mapping while retrying instead of deleting a still-valid mapping first.
+- UPnP gateways that reject finite leases with `OnlyPermanentLeasesSupported` are retried with a permanent mapping rather than being reported as simply unmapped.
+- NAT-PMP lease scheduling now respects the lifetime actually returned by the gateway instead of assuming the requested lifetime was granted.
+
 ## v0.2.0 - 2026-08-26
 
 ### Added

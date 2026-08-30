@@ -14,6 +14,12 @@ import aiohttp
 
 from app.logic.bencode import Bencode
 from app.logic.torrent_file import TorrentFile
+from app.logic.network_binding import normalise_bind_address
+from app.logic.peer import (
+    PEER_ENCRYPTION_DISABLED,
+    PEER_ENCRYPTION_REQUIRE,
+    normalise_peer_encryption_policy,
+)
 
 
 class TrackerQueryError(RuntimeError):
@@ -28,14 +34,30 @@ class TrackerClient:
     not fabricate peer counts for trackers that have not actually replied.
     """
 
-    def __init__(self, torrent: TorrentFile, peer_id: bytes, port: int = 6881):
+    def __init__(
+        self,
+        torrent: TorrentFile,
+        peer_id: bytes,
+        port: int = 6881,
+        *,
+        bind_address: str = "",
+        encryption_policy: str = "Prefer Encryption",
+    ):
         self.torrent = torrent
         self.peer_id = peer_id
         self.port = port
+        self.bind_address = normalise_bind_address(bind_address)
+        self.encryption_policy = normalise_peer_encryption_policy(encryption_policy)
 
         self._source_records: Dict[str, dict] = {}
         for tracker_url in self.torrent.announce_list:
             self._ensure_source_record(tracker_url)
+
+    def set_bind_address(self, bind_address: str):
+        self.bind_address = normalise_bind_address(bind_address)
+
+    def set_encryption_policy(self, encryption_policy: str):
+        self.encryption_policy = normalise_peer_encryption_policy(encryption_policy)
 
     @staticmethod
     def _tracker_type(tracker_url: str) -> str:
@@ -257,6 +279,10 @@ class TrackerClient:
             ("left", str(max(0, int(left)))),
             ("compact", "1"),
         ]
+        if self.encryption_policy != PEER_ENCRYPTION_DISABLED:
+            params.append(("supportcrypto", "1"))
+        if self.encryption_policy == PEER_ENCRYPTION_REQUIRE:
+            params.append(("requirecrypto", "1"))
         if event:
             params.append(("event", event))
 
@@ -268,7 +294,10 @@ class TrackerClient:
         full_url = f"{tracker_url}{separator}{query}"
 
         timeout = aiohttp.ClientTimeout(total=8)
-        async with aiohttp.ClientSession(timeout=timeout) as session:
+        connector = aiohttp.TCPConnector(
+            local_addr=(self.bind_address, 0) if self.bind_address else None
+        )
+        async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
             async with session.get(full_url) as response:
                 if response.status != 200:
                     raise TrackerQueryError(f"HTTP {response.status}")
@@ -339,6 +368,8 @@ class TrackerClient:
 
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.settimeout(5.0)
+        if self.bind_address:
+            sock.bind((self.bind_address, 0))
 
         try:
             conn_id = 0x41727101980

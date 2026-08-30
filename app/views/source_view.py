@@ -43,8 +43,9 @@ class SourceView:
             "queried later as the session continues."
         ),
         "Timeout": (
-            "The source did not answer within the allowed time. SalixTorrent can "
-            "continue using other trackers, DHT, PEX, or Local Peer Discovery."
+            "Warning only for this discovery source: it did not answer within the allowed "
+            "time. The torrent itself can remain healthy while SalixTorrent continues using "
+            "other trackers, DHT, PEX, or Local Peer Discovery."
         ),
         "Error": (
             "The latest attempt to use this source failed. The Detail column and "
@@ -74,9 +75,10 @@ class SourceView:
                 color=(100, 180, 255),
             )
             self.note_text = dpg.add_text(
-                "Tracker / DHT / PEX / LAN discovery telemetry. "
-                "Waiting = source available but no result yet.",
+                "Discovery sources are independent. Waiting is neutral; Timeout is a warning for that "
+                "source, not a torrent failure, while other trackers/DHT/PEX/LAN continue.",
                 color=(150, 150, 150),
+                wrap=1200,
             )
             add_help_tooltip(self.note_text, "DISCOVERY")
             dpg.add_separator()
@@ -390,7 +392,9 @@ class SourceView:
         sources = list(sources_view.get("sources") or [])
         tracker_count = int(sources_view.get("tracker_count", 0) or 0)
         active_count = int(sources_view.get("active_count", 0) or 0)
-        problem_count = int(sources_view.get("problem_count", 0) or 0)
+        pending_count = int(sources_view.get("pending_count", 0) or 0)
+        warning_count = int(sources_view.get("warning_count", 0) or 0)
+        error_count = int(sources_view.get("error_count", 0) or 0)
         tracker_peers = int(sources_view.get("tracker_peers_last_seen", 0) or 0)
         dht_peers = int(sources_view.get("dht_peers_seen", 0) or 0)
         pex_peers = int(sources_view.get("pex_peers_seen", 0) or 0)
@@ -399,7 +403,8 @@ class SourceView:
         if sources:
             summary = (
                 f"Sources: {tracker_count} tracker(s) + DHT + PEX + LAN | "
-                f"Responding: {active_count} | Problems: {problem_count} | "
+                f"Responding: {active_count} | Pending: {pending_count} | "
+                f"Warnings: {warning_count} | Errors: {error_count} | "
                 f"Peers seen - Tracker {tracker_peers} | DHT {dht_peers} | "
                 f"PEX {pex_peers} | LAN {lan_peers}"
             )
@@ -461,3 +466,5 @@ class SourceView:
                 add_help_tooltip(detail_item, "SOURCE_DETAIL")
 
             self._row_ids.append(row_id)
+
+

@@ -15,6 +15,12 @@ from app.engine.ui_typography import (
     ui_font_label,
     ui_font_size_from_label,
 )
+from app.logic.network_binding import (
+    list_ipv4_interfaces,
+    mask_ip_for_display,
+    normalise_bind_address,
+)
+from app.logic.peer import PEER_ENCRYPTION_POLICIES
 from app.logic.torrent_manager import TorrentManager
 from app.views.help_terms import add_help_tooltip, add_text_tooltip
 from app.views.transfer_rate import TRANSFER_RATE_UNITS
@@ -32,6 +38,8 @@ class SettingsView:
         self.typography = UiTypography.get_instance()
         self.settings = self.manager.get_app_settings()
         self._last_connectivity_refresh = 0.0
+        self._bind_option_to_address = {}
+        self._bind_address_to_option = {}
 
     def build_view(self, parent_tag):
         with dpg.group(parent=parent_tag):
@@ -119,13 +127,15 @@ class SettingsView:
                         )
                         add_help_tooltip(self.enable_natpmp_checkbox, "NATPMP")
 
-                with dpg.child_window(width=-1, height=250, border=True):
+                with dpg.child_window(width=-1, height=360, border=True):
                     dpg.add_text("INCOMING CONNECTIVITY", color=(0, 255, 128))
                     dpg.add_separator()
                     self.connectivity_status = dpg.add_text("Status: Waiting")
                     add_help_tooltip(self.connectivity_status, "PORT_MAPPING")
                     self.connectivity_method = dpg.add_text("Mapping: --")
                     add_help_tooltip(self.connectivity_method, "PORT_MAPPING")
+                    self.connectivity_methods = dpg.add_text("Methods: UPnP -- | NAT-PMP --")
+                    add_help_tooltip(self.connectivity_methods, "MAPPING_METHOD_STATUS")
                     self.connectivity_local = dpg.add_text("Local: --")
                     add_help_tooltip(self.connectivity_local, "LOCAL_ENDPOINT")
                     self.connectivity_external = dpg.add_text("External: --")
@@ -134,6 +144,10 @@ class SettingsView:
                     add_help_tooltip(self.connectivity_protocols, "MAPPED_PROTOCOLS")
                     self.connectivity_incoming = dpg.add_text("Last incoming peer: --")
                     add_help_tooltip(self.connectivity_incoming, "LAST_INCOMING")
+                    self.connectivity_refresh_age = dpg.add_text("Last mapping check: --")
+                    add_help_tooltip(self.connectivity_refresh_age, "MAPPING_METHOD_STATUS")
+                    self.connectivity_next_refresh = dpg.add_text("Next lease refresh: --")
+                    add_help_tooltip(self.connectivity_next_refresh, "MAPPING_LEASE")
                     self.connectivity_error = dpg.add_text(
                         "", color=(220, 180, 100), wrap=480
                     )
@@ -151,6 +165,56 @@ class SettingsView:
                         wrap=480,
                     )
                     add_help_tooltip(connectivity_note, "PORT_MAPPING")
+
+            dpg.add_spacer(height=7)
+            with dpg.child_window(height=238, border=True):
+                dpg.add_text("PRIVACY / TRANSPORT", color=(100, 220, 200))
+                dpg.add_separator()
+                with dpg.group(horizontal=True):
+                    encryption_label = dpg.add_text("Peer transport encryption")
+                    add_help_tooltip(encryption_label, "MSE")
+                    self.peer_encryption_combo = dpg.add_combo(
+                        items=list(PEER_ENCRYPTION_POLICIES),
+                        default_value=self.settings.get("peer_encryption", "Prefer Encryption"),
+                        width=190,
+                    )
+                    add_help_tooltip(self.peer_encryption_combo, "PEER_ENCRYPTION_POLICY")
+
+                bind_options, selected_bind_option = self._build_network_interface_options(
+                    self.settings.get("network_bind_address", "")
+                )
+                with dpg.group(horizontal=True):
+                    bind_label = dpg.add_text("Network interface / VPN")
+                    add_help_tooltip(bind_label, "NETWORK_BINDING")
+                    self.network_bind_combo = dpg.add_combo(
+                        items=bind_options,
+                        default_value=selected_bind_option,
+                        width=430,
+                    )
+                    add_help_tooltip(self.network_bind_combo, "NETWORK_BINDING")
+                    refresh_interfaces_button = dpg.add_button(
+                        label=" Refresh Interfaces ",
+                        callback=self._refresh_network_interfaces,
+                    )
+                    add_help_tooltip(refresh_interfaces_button, "NETWORK_BINDING")
+
+                self.interface_lock_checkbox = dpg.add_checkbox(
+                    label="Interface Lock / kill switch (fail closed if the selected address disappears)",
+                    default_value=bool(self.settings.get("interface_lock", False)),
+                )
+                add_help_tooltip(self.interface_lock_checkbox, "INTERFACE_LOCK")
+                self.mask_peer_ips_checkbox = dpg.add_checkbox(
+                    label="Mask peer IP addresses in the interface",
+                    default_value=bool(self.settings.get("mask_peer_ips", False)),
+                )
+                add_help_tooltip(self.mask_peer_ips_checkbox, "IP_MASKING")
+                transport_note = dpg.add_text(
+                    "Binding chooses the source address for torrent traffic. Interface Lock additionally "
+                    "monitors that address and stops torrent networking immediately if it disappears.",
+                    color=(145, 145, 150),
+                    wrap=1000,
+                )
+                add_help_tooltip(transport_note, "INTERFACE_LOCK")
 
             dpg.add_spacer(height=7)
             with dpg.group(horizontal=True):
@@ -327,6 +391,37 @@ class SettingsView:
             )
             add_help_tooltip(settings_path_text, "SETTINGS_FILE")
 
+    def _build_network_interface_options(self, selected_address=""):
+        selected_address = normalise_bind_address(selected_address)
+        option_to_address = {"Any interface (system routing)": ""}
+
+        for interface in list_ipv4_interfaces():
+            address = normalise_bind_address(interface.address)
+            if not address:
+                continue
+            label = interface.label
+            if label in option_to_address and option_to_address[label] != address:
+                label = f"{label} [{address}]"
+            option_to_address[label] = address
+
+        if selected_address and selected_address not in option_to_address.values():
+            option_to_address[f"Unavailable — {selected_address}"] = selected_address
+
+        self._bind_option_to_address = option_to_address
+        self._bind_address_to_option = {address: label for label, address in option_to_address.items()}
+        selected_label = self._bind_address_to_option.get(
+            selected_address, "Any interface (system routing)"
+        )
+        return list(option_to_address), selected_label
+
+    def _refresh_network_interfaces(self):
+        selected_label = str(dpg.get_value(self.network_bind_combo) or "")
+        selected_address = self._bind_option_to_address.get(selected_label, "")
+        options, selected = self._build_network_interface_options(selected_address)
+        dpg.configure_item(self.network_bind_combo, items=options)
+        dpg.set_value(self.network_bind_combo, selected)
+        dpg.set_value(self.status_text, "Network interface list refreshed")
+
     def _choose_download_dir(self):
         root = tk.Tk()
         root.withdraw()
@@ -357,6 +452,14 @@ class SettingsView:
                 dpg.get_value(self.ui_font_size_combo)
             ),
             "listen_port": int(dpg.get_value(self.listen_port_input) or 6881),
+            "peer_encryption": str(
+                dpg.get_value(self.peer_encryption_combo) or "Prefer Encryption"
+            ),
+            "network_bind_address": self._bind_option_to_address.get(
+                str(dpg.get_value(self.network_bind_combo) or ""), ""
+            ),
+            "interface_lock": bool(dpg.get_value(self.interface_lock_checkbox)),
+            "mask_peer_ips": bool(dpg.get_value(self.mask_peer_ips_checkbox)),
             "enable_dht": bool(dpg.get_value(self.enable_dht_checkbox)),
             "enable_pex": bool(dpg.get_value(self.enable_pex_checkbox)),
             "enable_lan_discovery": bool(dpg.get_value(self.enable_lan_checkbox)),
@@ -375,6 +478,12 @@ class SettingsView:
 
     def _sync_controls(self, settings: dict):
         self.settings = dict(settings)
+        bind_options, bind_selected = self._build_network_interface_options(
+            settings.get("network_bind_address", "")
+        )
+        if hasattr(self, "network_bind_combo") and dpg.does_item_exist(self.network_bind_combo):
+            dpg.configure_item(self.network_bind_combo, items=bind_options)
+
         values = {
             self.download_dir_input: settings["download_dir"],
             self.max_peers_input: settings["default_max_peers"],
@@ -387,6 +496,10 @@ class SettingsView:
             self.transfer_rate_display_combo: settings.get("transfer_rate_display_unit", "Auto"),
             self.ui_font_size_combo: ui_font_label(settings.get("ui_font_size", 15)),
             self.listen_port_input: settings["listen_port"],
+            self.peer_encryption_combo: settings.get("peer_encryption", "Prefer Encryption"),
+            self.network_bind_combo: bind_selected,
+            self.interface_lock_checkbox: settings.get("interface_lock", False),
+            self.mask_peer_ips_checkbox: settings.get("mask_peer_ips", False),
             self.enable_dht_checkbox: settings["enable_dht"],
             self.enable_pex_checkbox: settings["enable_pex"],
             self.enable_lan_checkbox: settings["enable_lan_discovery"],
@@ -404,6 +517,22 @@ class SettingsView:
         }
         for item, value in values.items():
             dpg.set_value(item, value)
+
+    @staticmethod
+    def _format_duration(seconds):
+        if seconds is None:
+            return "--"
+        try:
+            total = max(0, int(float(seconds)))
+        except (TypeError, ValueError):
+            return "--"
+        hours, rem = divmod(total, 3600)
+        minutes, secs = divmod(rem, 60)
+        if hours:
+            return f"{hours}h {minutes:02d}m"
+        if minutes:
+            return f"{minutes}m {secs:02d}s"
+        return f"{secs}s"
 
     @staticmethod
     def _format_age(seconds):
@@ -430,30 +559,87 @@ class SettingsView:
             protocols.append("TCP")
         if snap.get("mapped_udp"):
             protocols.append("UDP")
+        listener_ports = [int(p) for p in snap.get("active_listener_ports", []) if p]
+        mapped_ports = [int(p) for p in snap.get("mapped_ports", []) if p]
+        mapping_count = int(snap.get("mapping_count") or 0)
+        listener_count = int(snap.get("listener_count") or 0)
+
+        if listener_count > 1:
+            status = f"{status} ({mapping_count}/{listener_count} listener ports mapped)"
+            local_value = f"Local: {local_ip} | ports {', '.join(str(p) for p in listener_ports)}"
+            if external_ip:
+                external_scope = str(snap.get("external_scope") or "Unknown")
+                scope_suffix = f" ({external_scope})" if external_scope != "Unknown" else ""
+                external_value = f"External: {external_ip}{scope_suffix} | mapped ports {', '.join(str(p) for p in mapped_ports) or '--'}"
+            else:
+                external_value = f"External mapped ports: {', '.join(str(p) for p in mapped_ports) or '--'}"
+        else:
+            local_value = f"Local: {local_ip}:{internal_port or '--'}"
+            external_scope = str(snap.get("external_scope") or "Unknown")
+            scope_suffix = f" ({external_scope})" if external_ip not in {"", "--"} and external_scope != "Unknown" else ""
+            external_value = f"External: {external_ip}:{external_port or '--'}{scope_suffix}"
+
         dpg.set_value(self.connectivity_status, f"Status: {status}")
         dpg.set_value(self.connectivity_method, f"Mapping: {method}")
-        dpg.set_value(self.connectivity_local, f"Local: {local_ip}:{internal_port or '--'}")
         dpg.set_value(
-            self.connectivity_external,
-            f"External: {external_ip}:{external_port or '--'}",
+            self.connectivity_methods,
+            f"Methods: UPnP {snap.get('upnp_status', '--')} | "
+            f"NAT-PMP {snap.get('natpmp_status', '--')}",
         )
+        dpg.set_value(self.connectivity_local, local_value)
+        dpg.set_value(self.connectivity_external, external_value)
         dpg.set_value(
             self.connectivity_protocols,
             f"Mapped protocols: {' + '.join(protocols) if protocols else '--'}",
         )
         incoming_peer = str(snap.get("last_incoming_peer") or "--")
+        if self.settings.get("mask_peer_ips") and incoming_peer not in {"", "--"}:
+            incoming_peer = mask_ip_for_display(incoming_peer)
         incoming_age = self._format_age(snap.get("last_incoming_seconds"))
         dpg.set_value(
             self.connectivity_incoming,
             f"Last incoming peer: {incoming_peer} ({incoming_age})",
         )
-        mapping_notice = str(snap.get("last_error") or "")
-        if mapping_notice:
-            if str(snap.get("status") or "") == "Unmapped":
-                mapping_notice = f"Port mapping notice: {mapping_notice}"
-            else:
-                mapping_notice = f"Connectivity notice: {mapping_notice}"
+        dpg.set_value(
+            self.connectivity_refresh_age,
+            f"Last mapping check: {self._format_age(snap.get('last_refresh_seconds'))}",
+        )
+        next_refresh = snap.get("next_mapping_refresh_seconds")
+        if snap.get("mapping_permanent") and int(snap.get("mapping_count") or 0) > 0:
+            next_refresh_text = "not required (permanent lease)"
+        else:
+            next_refresh_text = (
+                f"in {self._format_duration(next_refresh)}"
+                if next_refresh is not None else "--"
+            )
+        dpg.set_value(
+            self.connectivity_next_refresh,
+            f"Next lease refresh: {next_refresh_text}",
+        )
+        details = []
+        upnp_summary = str(snap.get("upnp_summary") or "").strip()
+        natpmp_summary = str(snap.get("natpmp_summary") or "").strip()
+        if upnp_summary:
+            details.append(upnp_summary)
+        if natpmp_summary:
+            details.append(natpmp_summary)
+        diagnosis = str(snap.get("diagnosis") or "").strip()
+        if diagnosis:
+            details.append(f"Diagnosis: {diagnosis}")
+        action_hint = str(snap.get("action_hint") or "").strip()
+        if action_hint:
+            details.append(f"Suggested action: {action_hint}")
+        mapping_notice = "\n".join(details)
         dpg.set_value(self.connectivity_error, mapping_notice)
+        if status == "Incoming Confirmed":
+            notice_color = (0, 220, 128)
+        elif status.startswith("Mapped"):
+            notice_color = (100, 180, 255)
+        elif status == "Unmapped":
+            notice_color = (255, 200, 100)
+        else:
+            notice_color = (170, 170, 175)
+        dpg.configure_item(self.connectivity_error, color=notice_color)
 
     def _refresh_connectivity(self):
         self.manager.refresh_connectivity()

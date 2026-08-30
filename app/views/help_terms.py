@@ -44,16 +44,18 @@ HELP_TERMS = {
     ),
     "UPNP": (
         "UPnP - Universal Plug and Play",
-        "A router protocol SalixTorrent can use to request an automatic incoming "
-        "port mapping. A successful mapping can make it easier for Internet peers "
-        "to initiate connections to you. Failure is not fatal: outbound peer "
-        "connections can still download and upload normally.",
+        "A router protocol SalixTorrent can use to request automatic incoming "
+        "port mappings for its active torrent listeners. SalixTorrent records the exact "
+        "stage and router fault code when available, and automatically retries with a "
+        "permanent lease when an IGD reports that only permanent mappings are supported. "
+        "Failure is not fatal: outbound peer connections can still download and upload normally.",
     ),
     "NATPMP": (
         "NAT-PMP - NAT Port Mapping Protocol",
         "A lightweight automatic router port-mapping protocol used as a fallback "
-        "when UPnP is unavailable. A timeout usually means the gateway does not "
-        "support NAT-PMP or does not permit clients to create mappings.",
+        "when UPnP is unavailable. SalixTorrent decodes standard NAT-PMP result codes so a "
+        "timeout, authorization refusal, network failure, resource exhaustion, or unsupported "
+        "operation can be distinguished. Failure remains non-fatal to outbound transfers.",
     ),
     "BEP": (
         "BEP - BitTorrent Enhancement Proposal",
@@ -140,6 +142,19 @@ HELP_TERMS = {
         "intervals, DHT node activity, PEX receive/transmit counts, or the Local "
         "Peer Discovery multicast endpoint.",
     ),
+    "SOURCE_WAITING": (
+        "Discovery Source: Waiting",
+        "A neutral discovery state. The source exists but has not produced a result yet, "
+        "or its next scheduled announce/query has not run. Waiting is not a failure and "
+        "does not imply that the torrent is unable to find peers through other sources.",
+    ),
+    "TRACKER_TIMEOUT": (
+        "Tracker Timeout",
+        "A warning that one tracker did not answer before its request deadline. Public "
+        "trackers can be overloaded, offline, filtered, or temporarily unreachable. A "
+        "timeout is source-local rather than a torrent failure: other trackers, DHT, PEX "
+        "and LPD can continue discovering peers, and already-connected peers are unaffected.",
+    ),
 
     # ------------------------------------------------------------------
     # Swarm / peer state
@@ -172,7 +187,9 @@ HELP_TERMS = {
         "Peer Address",
         "The remote IP address and TCP port of this live BitTorrent connection. "
         "It identifies the network endpoint SalixTorrent is talking to, not the "
-        "person or account using that client.",
+        "person or account using that client. Optional IP masking changes only how "
+        "the address is displayed in SalixTorrent; the real endpoint is still "
+        "required for the peer-to-peer connection.",
     ),
     "PEER_CLIENT": (
         "Peer Client",
@@ -340,10 +357,28 @@ HELP_TERMS = {
         "the amount considered remaining.",
     ),
     "UPLOADED": (
-        "Uploaded",
-        "Payload bytes SalixTorrent has served to other peers for this torrent. "
-        "Uploading can happen while downloading as soon as verified pieces are "
-        "available, and continues naturally when the torrent is seeding.",
+        "Uploaded Total",
+        "The persisted cumulative payload bytes SalixTorrent has served to other peers "
+        "for this torrent. Uploading can happen while downloading as soon as verified "
+        "pieces are available and continues naturally while seeding.",
+    ),
+    "UPLOADED_SESSION": (
+        "Uploaded This Session",
+        "Payload bytes served by this torrent since the current SalixTorrent process "
+        "created/restored the torrent session. This counter is intentionally lightweight "
+        "and is not persisted across application restarts.",
+    ),
+    "UPLOAD_REQUESTS": (
+        "Upload Requests",
+        "Counts BitTorrent REQUEST messages received and how many were successfully "
+        "served with PIECE payload data. The counters update only when those network "
+        "events happen; SalixTorrent does not scan peers to calculate them.",
+    ),
+    "LAST_UPLOAD": (
+        "Last Upload",
+        "How long ago this torrent last successfully transmitted a PIECE payload to a "
+        "peer. An idle seed can correctly show no current upload speed even when this "
+        "value proves that it served data recently.",
     ),
     "ETA": (
         "ETA - Estimated Time of Arrival",
@@ -352,9 +387,10 @@ HELP_TERMS = {
         "transfer speed change, and may be unavailable when speed is near zero.",
     ),
     "ELAPSED": (
-        "Elapsed Active Time",
-        "How long this torrent has spent actively running in the current session. "
-        "Paused/stopped time is not intended to represent productive transfer time.",
+        "Active Time",
+        "How long this torrent has spent actively running in the current application "
+        "session. Paused, stopped and queued time is excluded so the value is not "
+        "mistaken for wall-clock age.",
     ),
     "SHARE_RATIO": (
         "Share Ratio",
@@ -429,11 +465,145 @@ HELP_TERMS = {
         "SalixTorrent can try nearby fallback ports if the preferred port is "
         "already in use. DHT may use the same number over UDP.",
     ),
+    "LISTENER_ENDPOINT": (
+        "Listener Endpoint",
+        "The exact local IPv4 address and TCP port used by the selected torrent's "
+        "incoming peer listener. 0.0.0.0 means the socket accepts connections on all "
+        "local IPv4 interfaces; a specific address means network binding is active.",
+    ),
+    "INCOMING_CONNECTIONS": (
+        "Incoming Connections",
+        "Shows currently connected inbound peers and the number of successfully "
+        "handshaken inbound peer connections observed during this application session. "
+        "This is event-driven telemetry and does not require a polling loop.",
+    ),
+    "MAPPING_METHOD_STATUS": (
+        "Port Mapping Method Status",
+        "Shows UPnP and NAT-PMP separately so an Unmapped result explains which method "
+        "failed, was disabled, or was not needed. UPnP is attempted first; NAT-PMP is "
+        "the fallback when enabled.",
+    ),
+    "MAPPING_LEASE": (
+        "Port Mapping Lease Refresh",
+        "Automatic router mappings can have finite lifetimes. SalixTorrent keeps one "
+        "low-frequency renewal timer for all active mapped listen ports and refreshes "
+        "finite leases before expiry. If a UPnP gateway requires a permanent lease, "
+        "SalixTorrent records that fact and does not schedule unnecessary renewals. It "
+        "does not run a polling loop per torrent.",
+    ),
+    "MAPPING_DIAGNOSIS": (
+        "Incoming Connectivity Diagnosis",
+        "A cached explanation derived from the most recent UPnP/NAT-PMP attempt for the "
+        "selected listen port. It distinguishes discovery failure, gateway refusal, port "
+        "conflicts, malformed replies and other mapping stages. The diagnosis is updated "
+        "when mapping work already occurs; SalixTorrent does not continuously poll the router.",
+    ),
+    "CONNECTIVITY_ACTION": (
+        "Connectivity Suggested Action",
+        "A practical next step based on the latest mapping result. Suggestions may include "
+        "enabling UPnP/NAT-PMP, choosing another listen port, configuring a manual TCP port "
+        "forward, checking the active VPN/default route, or investigating double NAT/CGNAT. "
+        "The wording is guidance, not a claim that SalixTorrent can inspect router settings it cannot see.",
+    ),
+    "MANUAL_PORT_FORWARD": (
+        "Manual Port Forward",
+        "A router rule configured by the user that sends unsolicited Internet traffic on a "
+        "chosen external port to SalixTorrent's local computer and listen port. TCP is the "
+        "important mapping for incoming BitTorrent peers; forwarding the same UDP port can "
+        "also improve DHT reachability. The computer should keep a stable LAN address/reservation.",
+    ),
+    "CGNAT": (
+        "CGNAT - Carrier-Grade NAT",
+        "NAT performed by the Internet provider upstream of your own router. With CGNAT, your "
+        "router may not own a directly reachable public IPv4 address, so a local UPnP or manual "
+        "port-forward rule may still be unreachable from the Internet. The shared IPv4 range "
+        "100.64.0.0/10 is a strong indicator, but absence of that range does not rule CGNAT out.",
+    ),
+    "DOUBLE_NAT": (
+        "Double NAT",
+        "Two routing/NAT devices are in series, for example an ISP modem-router in front of a "
+        "second home router. A port mapping on the inner router can succeed while the outer "
+        "router still blocks unsolicited inbound traffic. Incoming Confirmed is stronger proof "
+        "than a local mapping because it demonstrates the complete path in practice.",
+    ),
+    "EXTERNAL_ADDRESS_SCOPE": (
+        "External Address Scope",
+        "How SalixTorrent classifies an external IPv4 address reported by a mapping protocol. "
+        "Public means globally routable according to Python's IP address rules. Private, "
+        "Shared/CGNAT, or other non-global values suggest an upstream NAT may still exist; this "
+        "is a diagnostic clue rather than definitive proof of the ISP's network design.",
+    ),
+    "MSE": (
+        "MSE - Message Stream Encryption",
+        "A legacy BitTorrent peer-transport encryption/obfuscation mechanism. "
+        "SalixTorrent negotiates MSE with Diffie-Hellman and protects the peer-wire "
+        "stream with RC4 after discarding the first 1024 keystream bytes. It can "
+        "make simple protocol inspection harder, but it is not modern authenticated "
+        "encryption, does not provide anonymity, and cannot guarantee that an ISP "
+        "cannot identify or block BitTorrent traffic.",
+    ),
+    "PE": (
+        "PE - Protocol Encryption",
+        "A common BitTorrent name for the same family of encrypted/obfuscated peer "
+        "transport negotiated by MSE. In SalixTorrent, an encrypted peer shown as "
+        "MSE/RC4 is using this transport; tracker HTTPS is a separate security layer.",
+    ),
+    "RC4": (
+        "RC4",
+        "The legacy stream cipher used by BitTorrent MSE/PE. SalixTorrent uses the "
+        "MSE RC4-drop1024 convention required for interoperability. RC4 should not "
+        "be confused with modern authenticated encryption and is used here only "
+        "because it is part of the legacy peer-encryption protocol.",
+    ),
+    "PEER_ENCRYPTION_POLICY": (
+        "Peer Encryption Policy",
+        "Disabled uses normal plaintext BitTorrent peer transport. Prefer Encryption "
+        "tries MSE/RC4 first and, if the peer does not support it, opens a fresh "
+        "plaintext TCP connection. Require Encryption accepts only MSE/RC4 peer "
+        "transport and never falls back to plaintext.",
+    ),
+    "TRANSPORT_SECURITY": (
+        "Transport Security",
+        "Shows how a live BitTorrent peer connection is carrying the peer-wire "
+        "stream. MSE/RC4 means peer transport encryption was negotiated; Plaintext "
+        "means the normal unencrypted peer stream is in use. This describes the "
+        "peer connection only, not tracker HTTPS, VPN tunnelling, or anonymity.",
+    ),
+    "NETWORK_BINDING": (
+        "Network Interface / VPN Binding",
+        "Pins SalixTorrent torrent networking to a selected local IPv4 address. "
+        "Peer TCP connections and the incoming listener, HTTP/UDP trackers, DHT, "
+        "Local Peer Discovery and magnet metadata retrieval use that source address. "
+        "Choosing Any interface leaves routing to the operating system.",
+    ),
+    "INTERFACE_LOCK": (
+        "Interface Lock / Kill Switch",
+        "An active fail-closed guard for a specifically selected network address. "
+        "Binding already chooses the source address; Interface Lock additionally "
+        "monitors it. If that address disappears, SalixTorrent immediately moves the "
+        "torrent to Error and closes its torrent networking instead of allowing a "
+        "future connection to escape through another interface.",
+    ),
+    "VPN": (
+        "VPN - Virtual Private Network",
+        "A network path provided by VPN software, usually exposed to applications as "
+        "a local interface/address. Selecting that address in Network Interface / VPN "
+        "Binding pins SalixTorrent torrent traffic to it; Interface Lock adds active "
+        "fail-closed monitoring if the address vanishes.",
+    ),
+    "IP_MASKING": (
+        "Peer IP Masking",
+        "A display-only privacy option that hides part of peer IP addresses in "
+        "SalixTorrent's interface and peer table. It does not change the real socket "
+        "address, hide you from the peer, tracker or ISP, or provide network anonymity. "
+        "It is useful mainly when sharing screenshots or screen recordings.",
+    ),
     "PORT_MAPPING": (
         "Incoming Port Mapping",
-        "A router rule forwarding an Internet-facing port to SalixTorrent on this "
-        "computer. Being unmapped is not a fatal error, but it can reduce the "
-        "number of peers able to initiate connections to you.",
+        "A router rule forwarding an Internet-facing port to one of SalixTorrent's "
+        "active listen sockets on this computer. When several torrents use different "
+        "listen ports, SalixTorrent keeps their mappings independently. Being unmapped "
+        "is not fatal, but it can reduce the number of peers able to initiate connections.",
     ),
     "LOCAL_ENDPOINT": (
         "Local Endpoint",
@@ -729,8 +899,9 @@ HELP_TERMS = {
     ),
     "PREFERENCES_VIEW": (
         "Preferences",
-        "Persistent SalixTorrent settings for storage defaults, networking, queue "
-        "behavior, bandwidth, transfer-rate display and desktop integration.",
+        "Persistent SalixTorrent settings for storage defaults, peer encryption, "
+        "network-interface/VPN binding, Interface Lock, peer-IP display masking, "
+        "discovery, queue behavior, bandwidth, transfer-rate display and desktop integration.",
     ),
     "DIAGNOSTICS": (
         "Diagnostics",
@@ -817,5 +988,7 @@ def add_context_tooltip(
         contextual_text(title, body, facts=facts, footer=footer),
         wrap=wrap,
     )
+
+
 
 

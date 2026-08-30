@@ -129,6 +129,12 @@ HELP_TOPICS: Tuple[HelpTopic, ...] = (
                 "the number is presented; it does not alter the limiter or network traffic.",
             ),
             (
+                "Upload proof and idle seeds",
+                "A seed does not transmit continuously merely because it is in Seeding state. "
+                "Uploaded This Session, Upload Requests and Last Upload provide direct evidence of "
+                "piece-serving activity even when the instantaneous upload rate has returned to zero.",
+            ),
+            (
                 "Bandwidth limits",
                 "Per-torrent limits constrain one transfer. Global limits are shared by all active "
                 "torrents together. A value of 0 means unlimited. The Speed view visualizes recent "
@@ -139,6 +145,9 @@ HELP_TOPICS: Tuple[HelpTopic, ...] = (
             "TRANSFER_RATE",
             "DOWNLOADED",
             "UPLOADED",
+            "UPLOADED_SESSION",
+            "UPLOAD_REQUESTS",
+            "LAST_UPLOAD",
             "TRANSFER_LIMITS",
             "GLOBAL_BANDWIDTH",
             "SHARE_RATIO",
@@ -253,10 +262,12 @@ HELP_TOPICS: Tuple[HelpTopic, ...] = (
                 "diagnostics such as announce intervals and timeouts.",
             ),
             (
-                "Timeouts are normal",
-                "One tracker timing out does not mean the torrent has failed. Public torrents can "
-                "continue discovering peers through other trackers, DHT, PEX and Local Peer "
-                "Discovery. SalixTorrent reports the failure so the user can see what happened.",
+                "Source severity: Waiting, Timeout and Error",
+                "Waiting is neutral: the source has not produced a result yet. Timeout is an amber "
+                "warning that one source did not answer before its deadline, not a torrent-level "
+                "failure. Error is red because that source's latest attempt failed for a concrete "
+                "reason. Public torrents can continue through other trackers, DHT, PEX and Local "
+                "Peer Discovery, and existing peer connections do not depend on a tracker staying online.",
             ),
         ),
         related_terms=(
@@ -267,6 +278,8 @@ HELP_TOPICS: Tuple[HelpTopic, ...] = (
             "SOURCE_PEERS",
             "SOURCE_RESPONSE",
             "SOURCE_LAST_UPDATE",
+            "SOURCE_WAITING",
+            "TRACKER_TIMEOUT",
         ),
     ),
     HelpTopic(
@@ -328,18 +341,47 @@ HELP_TOPICS: Tuple[HelpTopic, ...] = (
             (
                 "UPnP and NAT-PMP",
                 "SalixTorrent can ask a compatible router to create that mapping automatically. It "
-                "tries UPnP and can fall back to NAT-PMP. Failure to map is a notice, not a fatal "
-                "torrent error: outbound connections, trackers, DHT and PEX can still work.",
+                "tries UPnP and can fall back to NAT-PMP. The interface reports each method separately, "
+                "including the stage and protocol fault/result code when one is available. UPnP routers "
+                "that reject finite leases with OnlyPermanentLeasesSupported are retried correctly with "
+                "a permanent lease. Failure to map is a notice, not a fatal torrent error: outbound "
+                "connections, trackers, DHT and PEX can still work.",
+            ),
+            (
+                "Reading the diagnosis",
+                "Discovery failures mean SalixTorrent could not find a compatible mapping service. A "
+                "gateway refusal means the router answered but denied the request. A port conflict means "
+                "the requested external port is already mapped elsewhere. Preferences, General and "
+                "Diagnostics preserve these distinctions and suggest a next action without continuously "
+                "polling the router.",
             ),
             (
                 "Mapped versus Incoming Confirmed",
                 "Mapped means the router accepted a mapping request. Incoming Confirmed is stronger "
-                "evidence: SalixTorrent has actually observed a remote peer connect to its listen "
-                "socket. Networks behind CGNAT may remain unreachable even when the local router is "
-                "configured correctly.",
+                "evidence: SalixTorrent has actually observed a remote peer complete an incoming "
+                "BitTorrent handshake on that torrent's listen socket. The General view also shows "
+                "the exact listener endpoint and active/this-session inbound peer counts. If a router "
+                "reports a private, Shared/CGNAT, or other non-global external address, SalixTorrent "
+                "labels that as a clue that an upstream NAT may still exist rather than claiming the "
+                "Internet path is proven reachable.",
+            ),
+            (
+                "Manual forwarding, double NAT and CGNAT",
+                "When automatic mapping is unavailable, manually forwarding the torrent's TCP listen "
+                "port to this computer can restore inbound peer reachability; forwarding the same UDP "
+                "port can also help DHT. If two routers perform NAT, both layers may need configuration. "
+                "With ISP CGNAT, a local router rule may not be enough because the provider controls an "
+                "additional upstream translation layer.",
+            ),
+            (
+                "Binding a specific network path",
+                "Preferences can bind torrent networking to one local IPv4 address, including an address "
+                "owned by a VPN interface. This affects outgoing peer sockets, the incoming listener, "
+                "trackers, DHT, LPD and magnet metadata retrieval. Interface Lock adds monitoring so a "
+                "disappearing selected address fails closed instead of silently changing routes.",
             ),
         ),
-        related_terms=("LISTEN_PORT", "PORT_MAPPING", "UPNP", "NATPMP", "LOCAL_ENDPOINT", "EXTERNAL_ENDPOINT", "TCP", "UDP"),
+        related_terms=("LISTEN_PORT", "LISTENER_ENDPOINT", "INCOMING_CONNECTIONS", "PORT_MAPPING", "MAPPING_METHOD_STATUS", "MAPPING_DIAGNOSIS", "CONNECTIVITY_ACTION", "MAPPING_LEASE", "UPNP", "NATPMP", "MANUAL_PORT_FORWARD", "CGNAT", "DOUBLE_NAT", "LOCAL_ENDPOINT", "EXTERNAL_ENDPOINT", "EXTERNAL_ADDRESS_SCOPE", "NETWORK_BINDING", "INTERFACE_LOCK", "VPN", "TCP", "UDP"),
     ),
     HelpTopic(
         key="queue_priorities",
@@ -413,36 +455,55 @@ HELP_TOPICS: Tuple[HelpTopic, ...] = (
         key="privacy",
         title="Privacy",
         summary=(
-            "What the private-torrent flag changes, what BitTorrent exposes to peers and discovery "
-            "services, and what SalixTorrent deliberately avoids leaking."
+            "Peer transport encryption, interface/VPN binding, Interface Lock, display masking, "
+            "and the privacy limits inherent to direct BitTorrent networking."
         ),
         sections=(
             (
-                "Private torrents",
+                "Peer transport encryption (MSE/PE)",
+                "Prefer Encryption is SalixTorrent's default: it tries MSE/RC4 first and opens a fresh "
+                "plaintext connection only when the peer does not support MSE. Require Encryption "
+                "never falls back. MSE/PE obscures the BitTorrent peer stream, but it is a legacy "
+                "protocol rather than modern authenticated encryption and cannot guarantee that an ISP "
+                "cannot classify or block BitTorrent traffic.",
+            ),
+            (
+                "Network binding and Interface Lock",
+                "Selecting a specific Network Interface / VPN address already source-binds SalixTorrent's "
+                "peer sockets, incoming listener, trackers, DHT, LPD and magnet metadata traffic to that "
+                "address. Interface Lock is an additional active kill switch: if the selected address "
+                "disappears, the torrent enters Error and its torrent networking is closed immediately.",
+            ),
+            (
+                "Peer IP masking",
+                "Mask Peer IP Addresses is disabled by default and changes only what SalixTorrent draws "
+                "on screen. It can make screenshots less revealing, but it does not alter the real peer "
+                "connection or hide network endpoints from peers, trackers, a VPN provider or an ISP.",
+            ),
+            (
+                "Private torrents and discovery",
                 "A torrent with private=1 requests tracker-controlled swarm discovery. SalixTorrent "
                 "disables public DHT, PEX and Local Peer Discovery for those torrents and does not "
                 "inject public fallback trackers when no tracker is supplied.",
             ),
             (
                 "Peer visibility",
-                "BitTorrent peers normally learn one another's IP address and listening port because "
-                "direct peer-to-peer connections require network endpoints. BitTorrent by itself is "
-                "not an anonymity system.",
+                "Direct BitTorrent peers normally learn one another's network endpoint because a direct "
+                "connection requires an address and port. Peer transport encryption does not turn "
+                "BitTorrent into an anonymity system.",
             ),
             (
-                "Trackers and discovery services",
-                "When enabled, trackers, DHT and Local Peer Discovery necessarily receive enough "
-                "information to participate in peer discovery. PEX distributes peer endpoints among "
-                "already-connected peers.",
-            ),
-            (
-                "Metadata versus payload",
-                "Trackers normally coordinate peer discovery and do not relay torrent payload bytes. "
-                "The payload travels directly between peers. Magnet metadata exchange likewise comes "
-                "from compatible peers rather than from the tracker itself.",
+                "Trackers, metadata and payload",
+                "Trackers coordinate discovery and normally do not relay torrent payload bytes. DHT, "
+                "LPD and PEX exchange discovery information when enabled, while magnet metadata and "
+                "torrent payload travel directly between compatible peers.",
             ),
         ),
-        related_terms=("PRIVATE_TORRENT", "DHT", "PEX", "LPD", "TRACKER", "PEER_ADDRESS"),
+        related_terms=(
+            "MSE", "PE", "RC4", "PEER_ENCRYPTION_POLICY", "TRANSPORT_SECURITY",
+            "NETWORK_BINDING", "INTERFACE_LOCK", "VPN", "IP_MASKING",
+            "PRIVATE_TORRENT", "DHT", "PEX", "LPD", "TRACKER", "PEER_ADDRESS",
+        ),
     ),
     HelpTopic(
         key="torrent_creation",
@@ -993,5 +1054,7 @@ class HelpTopicsView:
         # changed width, so maximizing/restoring the viewport stays polished
         # without turning Help into a continuously rebuilding view.
         self._update_content_wrap()
+
+
 
 

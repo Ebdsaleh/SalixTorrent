@@ -60,6 +60,11 @@ class PeerView:
                     width_fixed=True,
                     init_width_or_weight=85,
                 )
+                transport_col = dpg.add_table_column(
+                    label="Transport",
+                    width_fixed=True,
+                    init_width_or_weight=105,
+                )
                 pieces_col = dpg.add_table_column(
                     label="Pieces",
                     width_fixed=True,
@@ -94,6 +99,7 @@ class PeerView:
                 add_help_tooltip(client_col, "PEER_CLIENT")
                 add_help_tooltip(source_col, "PEER_SOURCE")
                 add_help_tooltip(direction_col, "PEER_DIRECTION")
+                add_help_tooltip(transport_col, "TRANSPORT_SECURITY")
                 add_help_tooltip(pieces_col, "PEER_PROGRESS")
                 add_help_tooltip(down_col, "TRANSFER_RATE")
                 add_help_tooltip(up_col, "TRANSFER_RATE")
@@ -148,15 +154,18 @@ class PeerView:
         connected = int(snapshot.get("connected_peers", len(peers)) or 0)
         local_found = int(snapshot.get("local_peers_discovered", 0) or 0)
         state_label = snapshot.get("state_label", snapshot.get("state", "Idle"))
+        encrypted = int(snapshot.get("encrypted_peer_count", 0) or 0)
+        plaintext = int(snapshot.get("plaintext_peer_count", 0) or 0)
+        policy = str(snapshot.get("encryption_policy") or "Prefer Encryption")
 
         if connected:
             summary = (
-                f"Peers: {connected} connected | LAN discoveries: {local_found} | "
-                f"Torrent state: {state_label}"
+                f"Peers: {connected} connected | MSE/RC4: {encrypted} | Plaintext: {plaintext} | "
+                f"Policy: {policy} | Torrent state: {state_label}"
             )
         else:
             summary = (
-                f"Peers: 0 connected | LAN discoveries: {local_found} | "
+                f"Peers: 0 connected | MSE/RC4: 0 | Plaintext: 0 | Policy: {policy} | "
                 f"Torrent state: {state_label} - waiting for peer connections"
             )
 
@@ -186,8 +195,10 @@ class PeerView:
                 if source_term:
                     add_help_tooltip(source_item, source_term)
                 direction_item = dpg.add_text(str(peer.get("direction", "--")))
+                transport_item = dpg.add_text(str(peer.get("transport_security", "Plaintext")))
                 progress_item = dpg.add_text(self._format_progress(peer.get("progress")))
                 add_help_tooltip(direction_item, "PEER_DIRECTION")
+                add_help_tooltip(transport_item, "TRANSPORT_SECURITY")
                 add_help_tooltip(progress_item, "PEER_PROGRESS")
                 down_item = dpg.add_text(
                     format_transfer_rate(

@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from app.logic.connectivity import ConnectivityManager
+from app.logic.network_binding import normalise_bind_address
 from app.logic.magnet import (
     MagnetCancelled,
     MagnetError,
@@ -176,6 +177,10 @@ class TorrentManager:
             "enable_lan_discovery": True,
             "enable_upnp": True,
             "enable_natpmp": True,
+            "peer_encryption": "Prefer Encryption",
+            "network_bind_address": "",
+            "interface_lock": False,
+            "mask_peer_ips": False,
             "global_download_limit_value": 0.0,
             "global_download_limit_unit": "KB/s",
             "global_upload_limit_value": 0.0,
@@ -218,6 +223,19 @@ class TorrentManager:
         out["enable_lan_discovery"] = bool(data.get("enable_lan_discovery", True))
         out["enable_upnp"] = bool(data.get("enable_upnp", True))
         out["enable_natpmp"] = bool(data.get("enable_natpmp", True))
+        out["interface_lock"] = bool(data.get("interface_lock", False))
+        out["mask_peer_ips"] = bool(data.get("mask_peer_ips", False))
+
+        encryption = str(data.get("peer_encryption") or "Prefer Encryption").strip()
+        valid_encryption = {"Disabled", "Prefer Encryption", "Require Encryption"}
+        out["peer_encryption"] = (
+            encryption if encryption in valid_encryption else "Prefer Encryption"
+        )
+
+        bind_address = normalise_bind_address(data.get("network_bind_address", ""))
+        out["network_bind_address"] = bind_address
+        # A kill switch has no path to protect when routing is left to the OS.
+        out["interface_lock"] = bool(out["interface_lock"] and bind_address)
 
         try:
             listen_port = int(data.get("listen_port", 6881))
@@ -317,18 +335,22 @@ class TorrentManager:
             )
         )
 
-    def get_connectivity_snapshot(self) -> dict:
-        return self._connectivity.snapshot()
+    def get_connectivity_snapshot(self, port: Optional[int] = None) -> dict:
+        return self._connectivity.snapshot(port=port)
 
     def refresh_connectivity(self):
         self._connectivity.request_refresh(self._settings)
 
-    def _on_session_listen_port(self, port: int):
-        # A real bound port is better than the configured preference. Re-map
-        # the router if the session had to fall back because the preferred port
-        # was occupied.
-        if port:
-            self._connectivity.request_refresh(self._settings, actual_port=int(port))
+    def _on_session_listen_port(self, port: int, active: bool = True):
+        # Every live TorrentSession owns its own listener. Keep a router mapping
+        # for each actual bound port instead of replacing the mapping belonging
+        # to another torrent.
+        if not port:
+            return
+        if active:
+            self._connectivity.register_port(self._settings, int(port))
+        else:
+            self._connectivity.release_port(int(port))
 
     def _on_incoming_peer(self, port: int, remote_ip: str):
         self._connectivity.mark_incoming(port, remote_ip)
@@ -602,6 +624,10 @@ class TorrentManager:
                         enable_dht=self._settings.get("enable_dht", True),
                         enable_pex=self._settings.get("enable_pex", True),
                         enable_lan_discovery=self._settings.get("enable_lan_discovery", True),
+                        encryption_policy=self._settings.get("peer_encryption", "Prefer Encryption"),
+                        network_bind_address=self._settings.get("network_bind_address", ""),
+                        interface_lock=self._settings.get("interface_lock", False),
+                        mask_peer_ips=self._settings.get("mask_peer_ips", False),
                         global_download_limiter=self._global_download_limiter,
                         global_upload_limiter=self._global_upload_limiter,
                         listen_port_callback=self._on_session_listen_port,
@@ -1142,6 +1168,9 @@ class TorrentManager:
                 peer_id,
                 max_peers=int(self._settings.get("default_max_peers", 25)),
                 progress_callback=on_progress,
+                encryption_policy=self._settings.get("peer_encryption", "Prefer Encryption"),
+                bind_address=self._settings.get("network_bind_address", ""),
+                interface_lock=self._settings.get("interface_lock", False),
             )
             self._magnet_fetchers[info_hash] = fetcher
             self._emit_magnet_event(
@@ -1346,6 +1375,10 @@ class TorrentManager:
                                 enable_dht=settings.get("enable_dht", True),
                                 enable_pex=settings.get("enable_pex", True),
                                 enable_lan_discovery=settings.get("enable_lan_discovery", True),
+                                encryption_policy=settings.get("peer_encryption", "Prefer Encryption"),
+                                network_bind_address=settings.get("network_bind_address", ""),
+                                interface_lock=settings.get("interface_lock", False),
+                                mask_peer_ips=settings.get("mask_peer_ips", False),
                             )
                         except Exception as exc:
                             print(f"[Salix_T Notice] Could not apply live network preferences: {exc}")
@@ -1528,6 +1561,10 @@ class TorrentManager:
             enable_dht=self._settings.get("enable_dht", True),
             enable_pex=self._settings.get("enable_pex", True),
             enable_lan_discovery=self._settings.get("enable_lan_discovery", True),
+            encryption_policy=self._settings.get("peer_encryption", "Prefer Encryption"),
+            network_bind_address=self._settings.get("network_bind_address", ""),
+            interface_lock=self._settings.get("interface_lock", False),
+            mask_peer_ips=self._settings.get("mask_peer_ips", False),
             global_download_limiter=self._global_download_limiter,
             global_upload_limiter=self._global_upload_limiter,
             listen_port_callback=self._on_session_listen_port,

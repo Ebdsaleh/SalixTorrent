@@ -257,7 +257,7 @@ class DownloadView:
             with dpg.tab_bar(callback=self._on_detail_tab_changed) as self.detail_tab_bar:
                 with dpg.tab(label="General") as general_tab:
                     with dpg.group(horizontal=True):
-                        with dpg.child_window(width=410, height=355, border=True):
+                        with dpg.child_window(width=410, height=425, border=True):
                             transfer_heading = dpg.add_text("TRANSFER", color=(100, 180, 255))
                             add_text_tooltip(transfer_heading, "Transfer metrics\n\nLive payload rates, byte totals, remaining data, ETA, elapsed active time, share ratio and current connected-peer count for the selected torrent.")
                             dpg.add_separator()
@@ -269,11 +269,17 @@ class DownloadView:
                             add_help_tooltip(self.downloaded_text, "DOWNLOADED")
                             self.remaining_text = dpg.add_text("Remaining: 0 B")
                             add_help_tooltip(self.remaining_text, "REMAINING")
-                            self.uploaded_text = dpg.add_text("Uploaded: 0 B")
+                            self.uploaded_text = dpg.add_text("Uploaded Total: 0 B")
                             add_help_tooltip(self.uploaded_text, "UPLOADED")
+                            self.uploaded_session_text = dpg.add_text("Uploaded This Session: 0 B")
+                            add_help_tooltip(self.uploaded_session_text, "UPLOADED_SESSION")
+                            self.upload_requests_text = dpg.add_text("Upload Requests: 0 served / 0 received")
+                            add_help_tooltip(self.upload_requests_text, "UPLOAD_REQUESTS")
+                            self.last_upload_text = dpg.add_text("Last Upload: --")
+                            add_help_tooltip(self.last_upload_text, "LAST_UPLOAD")
                             self.eta_text = dpg.add_text("ETA: --")
                             add_help_tooltip(self.eta_text, "ETA")
-                            self.elapsed_text = dpg.add_text("Elapsed: 00:00")
+                            self.elapsed_text = dpg.add_text("Active Time: 00:00")
                             add_help_tooltip(self.elapsed_text, "ELAPSED")
                             self.ratio_text = dpg.add_text("Share Ratio: --")
                             add_help_tooltip(self.ratio_text, "SHARE_RATIO")
@@ -288,7 +294,7 @@ class DownloadView:
                             )
                             add_help_tooltip(self.retry_button, "RETRY_TORRENT")
 
-                        with dpg.child_window(width=430, height=355, border=True):
+                        with dpg.child_window(width=430, height=425, border=True):
                             swarm_heading = dpg.add_text("SWARM STATUS", color=(255, 200, 100))
                             add_text_tooltip(swarm_heading, "Swarm status\n\nHow the selected torrent is participating in the BitTorrent swarm: lifecycle state, discovery, peers, availability, connectivity and storage mode.")
                             dpg.add_separator()
@@ -304,8 +310,22 @@ class DownloadView:
                             add_help_tooltip(self.discovery_text, "DISCOVERY")
                             self.listen_port_text = dpg.add_text("Listen Port: --")
                             add_help_tooltip(self.listen_port_text, "LISTEN_PORT")
+                            self.listener_endpoint_text = dpg.add_text("Listener: --")
+                            add_help_tooltip(self.listener_endpoint_text, "LISTENER_ENDPOINT")
+                            self.transport_text = dpg.add_text("Transport: --")
+                            add_help_tooltip(self.transport_text, "TRANSPORT_SECURITY")
+                            self.network_path_text = dpg.add_text("Network Path: --")
+                            add_help_tooltip(self.network_path_text, "NETWORK_BINDING")
                             self.connectivity_text = dpg.add_text("Incoming: --")
                             add_help_tooltip(self.connectivity_text, "PORT_MAPPING")
+                            self.incoming_peers_text = dpg.add_text("Incoming Peers: 0 active / 0 this session")
+                            add_help_tooltip(self.incoming_peers_text, "INCOMING_CONNECTIONS")
+                            self.mapping_methods_text = dpg.add_text("Mapping Methods: UPnP -- | NAT-PMP --")
+                            add_help_tooltip(self.mapping_methods_text, "MAPPING_METHOD_STATUS")
+                            self.mapping_detail_text = dpg.add_text("Mapping Detail: --", wrap=405)
+                            add_help_tooltip(self.mapping_detail_text, "MAPPING_DIAGNOSIS")
+                            self.connectivity_hint_text = dpg.add_text("Connectivity Hint: --", color=(155, 155, 160), wrap=405)
+                            add_help_tooltip(self.connectivity_hint_text, "CONNECTIVITY_ACTION")
                             self.external_port_text = dpg.add_text("External: --")
                             add_help_tooltip(self.external_port_text, "EXTERNAL_ENDPOINT")
                             self.storage_text = dpg.add_text("Storage: Downloads")
@@ -368,7 +388,7 @@ class DownloadView:
                             )
                             add_help_tooltip(self.limit_status_text, "TRANSFER_LIMITS")
 
-                        with dpg.child_window(width=-1, height=355, border=True):
+                        with dpg.child_window(width=-1, height=425, border=True):
                             torrent_info_heading = dpg.add_text("TORRENT INFO", color=(0, 255, 128))
                             add_text_tooltip(torrent_info_heading, "Torrent metadata\n\nDescriptive and protocol metadata read from the .torrent or resolved magnet, plus the local storage and cached metadata paths used by SalixTorrent.")
                             dpg.add_separator()
@@ -835,6 +855,26 @@ class DownloadView:
         return f"{minutes:02d}:{secs:02d}"
 
     @staticmethod
+    def _format_age(seconds: object) -> str:
+        if seconds is None:
+            return "--"
+        try:
+            total = max(0, int(float(seconds)))
+        except (TypeError, ValueError):
+            return "--"
+        if total < 60:
+            return f"{total}s ago"
+        if total < 3600:
+            minutes, secs = divmod(total, 60)
+            return f"{minutes}m {secs:02d}s ago"
+        hours, rem = divmod(total, 3600)
+        minutes = rem // 60
+        if hours < 24:
+            return f"{hours}h {minutes:02d}m ago"
+        days, hours = divmod(hours, 24)
+        return f"{days}d {hours:02d}h ago"
+
+    @staticmethod
     def _format_creation_date(timestamp: object) -> str:
         try:
             value = int(timestamp or 0)
@@ -1021,7 +1061,11 @@ class DownloadView:
             f"Private: {'Yes' if stats.get('private') else 'No'}\n"
             f"Total Size: {self._format_bytes(stats.get('total_bytes'))}\n"
             f"Downloaded: {self._format_bytes(stats.get('downloaded_bytes'))}\n"
-            f"Uploaded: {self._format_bytes(stats.get('uploaded_bytes'))}\n"
+            f"Uploaded Total: {self._format_bytes(stats.get('uploaded_bytes'))}\n"
+            f"Uploaded This Session: {self._format_bytes(stats.get('uploaded_this_session_bytes'))}\n"
+            f"Upload Requests: {int(stats.get('upload_requests_served', 0) or 0)} served / "
+            f"{int(stats.get('upload_requests_received', 0) or 0)} received\n"
+            f"Last Upload: {self._format_age(stats.get('last_upload_seconds'))}\n"
             f"Share Ratio: {ratio_text}\n"
             f"Pieces: {stats.get('total_pieces', 0)} x {self._format_bytes(stats.get('piece_length'))}\n"
             f"Files: {stats.get('file_count', 0)}\n"
@@ -1029,7 +1073,9 @@ class DownloadView:
             f"{leechers if leechers is not None else '--'}\n"
             f"Availability: {float(stats.get('swarm_availability', 0.0) or 0.0):.2f}\n"
             f"Discovery: {stats.get('discovery_summary', '--')}\n"
-            f"Elapsed: {self._format_duration(stats.get('elapsed_seconds'))}\n"
+            f"Active Time: {self._format_duration(stats.get('elapsed_seconds'))}\n"
+            f"Incoming Peers: {int(stats.get('incoming_peers', 0) or 0)} active / "
+            f"{int(stats.get('incoming_connections_total', 0) or 0)} this session\n"
             f"ETA: {self._format_duration(stats.get('eta_seconds'))}\n\n"
             f"Storage Mode: {stats.get('storage_mode', '--')}\n"
             f"Storage Path: {stats.get('storage_path', '--')}\n"
@@ -1568,9 +1614,12 @@ class DownloadView:
         )
         dpg.set_value(self.downloaded_text, "Downloaded: 0 B / 0 B")
         dpg.set_value(self.remaining_text, "Remaining: 0 B")
-        dpg.set_value(self.uploaded_text, "Uploaded: 0 B")
+        dpg.set_value(self.uploaded_text, "Uploaded Total: 0 B")
+        dpg.set_value(self.uploaded_session_text, "Uploaded This Session: 0 B")
+        dpg.set_value(self.upload_requests_text, "Upload Requests: 0 served / 0 received")
+        dpg.set_value(self.last_upload_text, "Last Upload: --")
         dpg.set_value(self.eta_text, "ETA: --")
-        dpg.set_value(self.elapsed_text, "Elapsed: 00:00")
+        dpg.set_value(self.elapsed_text, "Active Time: 00:00")
         dpg.set_value(self.ratio_text, "Share Ratio: --")
         dpg.set_value(self.peers_text, "Connected Peers: 0")
         dpg.set_value(self.error_text, "")
@@ -1580,7 +1629,14 @@ class DownloadView:
         dpg.set_value(self.availability_text, "Availability: --")
         dpg.set_value(self.discovery_text, "Discovery: --")
         dpg.set_value(self.listen_port_text, "Listen Port: --")
+        dpg.set_value(self.listener_endpoint_text, "Listener: --")
+        dpg.set_value(self.transport_text, "Transport: --")
+        dpg.set_value(self.network_path_text, "Network Path: --")
         dpg.set_value(self.connectivity_text, "Incoming: --")
+        dpg.set_value(self.incoming_peers_text, "Incoming Peers: 0 active / 0 this session")
+        dpg.set_value(self.mapping_methods_text, "Mapping Methods: UPnP -- | NAT-PMP --")
+        dpg.set_value(self.mapping_detail_text, "Mapping Detail: --")
+        dpg.set_value(self.connectivity_hint_text, "Connectivity Hint: --")
         dpg.set_value(self.external_port_text, "External: --")
         dpg.set_value(self.storage_text, "Storage: Downloads")
         dpg.set_value(self.lpd_text, "LAN Discovery: --")
@@ -1847,12 +1903,25 @@ class DownloadView:
         )
         dpg.set_value(
             self.uploaded_text,
-            f"Uploaded: {self._format_bytes(msg.get('uploaded_bytes'))}",
+            f"Uploaded Total: {self._format_bytes(msg.get('uploaded_bytes'))}",
+        )
+        dpg.set_value(
+            self.uploaded_session_text,
+            f"Uploaded This Session: {self._format_bytes(msg.get('uploaded_this_session_bytes'))}",
+        )
+        dpg.set_value(
+            self.upload_requests_text,
+            f"Upload Requests: {int(msg.get('upload_requests_served', 0) or 0):,} served / "
+            f"{int(msg.get('upload_requests_received', 0) or 0):,} received",
+        )
+        dpg.set_value(
+            self.last_upload_text,
+            f"Last Upload: {self._format_age(msg.get('last_upload_seconds'))}",
         )
         dpg.set_value(self.eta_text, f"ETA: {self._format_duration(msg.get('eta_seconds'))}")
         dpg.set_value(
             self.elapsed_text,
-            f"Elapsed: {self._format_duration(msg.get('elapsed_seconds'))}",
+            f"Active Time: {self._format_duration(msg.get('elapsed_seconds'))}",
         )
         ratio = msg.get("share_ratio")
         ratio_text = f"{float(ratio):.3f}" if ratio is not None else "--"
@@ -1905,8 +1974,43 @@ class DownloadView:
             self.listen_port_text,
             f"Listen Port: {shown_port if shown_port else '--'}{port_suffix}",
         )
+        listener_address = str(msg.get("listener_address") or "").strip()
+        if listen_port and listener_address:
+            listener_suffix = " (all IPv4 interfaces)" if listener_address == "0.0.0.0" else ""
+            listener_value = f"Listener: {listener_address}:{listen_port}{listener_suffix}"
+        elif listen_port:
+            listener_value = f"Listener: port {listen_port}"
+        else:
+            listener_value = "Listener: Not listening"
+        dpg.set_value(self.listener_endpoint_text, listener_value)
 
-        connectivity = self.manager.get_connectivity_snapshot()
+        encrypted_count = int(msg.get("encrypted_peer_count", 0) or 0)
+        plaintext_count = int(msg.get("plaintext_peer_count", 0) or 0)
+        encryption_policy = str(msg.get("encryption_policy") or "Prefer Encryption")
+        dpg.set_value(
+            self.transport_text,
+            f"Transport: {encryption_policy} | MSE/RC4 {encrypted_count} | Plaintext {plaintext_count}",
+        )
+
+        bind_address = str(msg.get("network_bind_address") or "").strip()
+        lock_enabled = bool(msg.get("interface_lock", False))
+        lock_active = bool(msg.get("interface_lock_active", False))
+        if bind_address:
+            lock_label = "Locked" if lock_enabled and lock_active else ("Lock enabled" if lock_enabled else "Lock off")
+            network_path = f"Network Path: {bind_address} | {lock_label}"
+        else:
+            network_path = "Network Path: Any interface (system routing) | Lock off"
+        dpg.set_value(self.network_path_text, network_path)
+
+        if listen_port:
+            connectivity = self.manager.get_connectivity_snapshot(port=listen_port)
+        else:
+            connectivity = {
+                "status": "Not listening",
+                "method": "None",
+                "external_ip": "",
+                "external_port": 0,
+            }
         connectivity_status = str(connectivity.get("status") or "Waiting")
         mapping_method = str(connectivity.get("method") or "").strip()
         if mapping_method and mapping_method not in {"--", "None"}:
@@ -1914,11 +2018,39 @@ class DownloadView:
         else:
             incoming_value = f"Incoming: {connectivity_status}"
         dpg.set_value(self.connectivity_text, incoming_value)
+        incoming_active = int(msg.get("incoming_peers", 0) or 0)
+        incoming_total = int(msg.get("incoming_connections_total", 0) or 0)
+        dpg.set_value(
+            self.incoming_peers_text,
+            f"Incoming Peers: {incoming_active:,} active / {incoming_total:,} this session",
+        )
+        dpg.set_value(
+            self.mapping_methods_text,
+            f"Mapping Methods: UPnP {connectivity.get('upnp_status', '--')} | "
+            f"NAT-PMP {connectivity.get('natpmp_status', '--')}",
+        )
+        upnp_summary = str(connectivity.get("upnp_summary") or "").strip()
+        natpmp_summary = str(connectivity.get("natpmp_summary") or "").strip()
+        method_details = [
+            value for value in (upnp_summary, natpmp_summary)
+            if value and not value.endswith("Not tried") and not value.endswith("Not needed")
+        ]
+        dpg.set_value(
+            self.mapping_detail_text,
+            f"Mapping Detail: {' | '.join(method_details) if method_details else '--'}",
+        )
+        action_hint = str(connectivity.get("action_hint") or "").strip()
+        dpg.set_value(
+            self.connectivity_hint_text,
+            f"Connectivity Hint: {action_hint or '--'}",
+        )
 
         external_ip = str(connectivity.get("external_ip") or "").strip()
         external_port = int(connectivity.get("external_port") or 0)
+        external_scope = str(connectivity.get("external_scope") or "Unknown")
         if external_ip and external_port:
-            external_value = f"External: {external_ip}:{external_port}"
+            scope_suffix = f" ({external_scope})" if external_scope != "Unknown" else ""
+            external_value = f"External: {external_ip}:{external_port}{scope_suffix}"
         elif external_port:
             external_value = f"External: port {external_port}"
         else:
@@ -2103,3 +2235,7 @@ class DownloadView:
             snapshot = self.latest_stats.get(self.active_info_hash)
             if snapshot:
                 self._render_inspector(snapshot, force_detail=True)
+
+
+
+

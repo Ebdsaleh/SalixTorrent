@@ -15,7 +15,8 @@ from urllib.parse import parse_qs, unquote, urlparse
 from app.logic.bencode import Bencode
 from app.logic.dht import DHTClient
 from app.logic.local_peer_discovery import LocalPeerDiscovery
-from app.logic.peer import PeerConnection
+from app.logic.peer import PeerConnection, normalise_peer_encryption_policy
+from app.logic.network_binding import is_bind_address_available, normalise_bind_address
 from app.logic.tracker import TrackerClient
 
 
@@ -118,17 +119,35 @@ class MagnetMetadataFetcher:
         *,
         max_peers: int = 25,
         progress_callback: Optional[Callable[[str, float, str], None]] = None,
+        encryption_policy: str = "Prefer Encryption",
+        bind_address: str = "",
+        interface_lock: bool = False,
     ):
         self.magnet = magnet
         self.peer_id = bytes(peer_id)
         self.max_peers = max(1, min(200, int(max_peers)))
         self.progress_callback = progress_callback
+        self.encryption_policy = normalise_peer_encryption_policy(encryption_policy)
+        self.bind_address = normalise_bind_address(bind_address)
+        self.interface_lock = bool(interface_lock)
 
         self._cancelled = False
-        self._dht = DHTClient(self.magnet.info_hash, private=False)
-        self._lpd = LocalPeerDiscovery(self.magnet.info_hash)
+        self._dht = DHTClient(
+            self.magnet.info_hash,
+            private=False,
+            bind_address=self.bind_address,
+        )
+        self._lpd = LocalPeerDiscovery(
+            self.magnet.info_hash,
+            bind_address=self.bind_address,
+        )
         self._tracker = (
-            TrackerClient(_MagnetTorrentStub(self.magnet), self.peer_id)
+            TrackerClient(
+                _MagnetTorrentStub(self.magnet),
+                self.peer_id,
+                bind_address=self.bind_address,
+                encryption_policy=self.encryption_policy,
+            )
             if self.magnet.trackers
             else None
         )
@@ -142,6 +161,14 @@ class MagnetMetadataFetcher:
     def _check_cancelled(self):
         if self._cancelled:
             raise MagnetCancelled()
+        if (
+            self.interface_lock
+            and self.bind_address
+            and not is_bind_address_available(self.bind_address)
+        ):
+            raise MagnetError(
+                f"Interface Lock: bound address {self.bind_address} is no longer available."
+            )
 
     def _progress(self, stage: str, fraction: float, message: str):
         callback = self.progress_callback
@@ -247,6 +274,8 @@ class MagnetMetadataFetcher:
             self.peer_id,
             source="Magnet",
             direction="Outgoing",
+            encryption_policy=self.encryption_policy,
+            bind_address=self.bind_address,
         )
 
         try:
