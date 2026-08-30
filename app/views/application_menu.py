@@ -745,6 +745,21 @@ class ApplicationMenu:
             f"Request pipeline: adaptive {selected_stats.get('request_pipeline_min', 8)}-"
             f"{selected_stats.get('request_pipeline_max', 64)} per peer; "
             f"timeout {selected_stats.get('request_timeout_seconds', 30)}s\n"
+            f"Disk writer: {'Active' if (selected_stats.get('disk_io') or {}).get('writer_active') else 'Idle'}\n"
+            f"Disk buffer: {(selected_stats.get('disk_io') or {}).get('pending_bytes', 0)} / "
+            f"{(selected_stats.get('disk_io') or {}).get('buffer_limit_bytes', 0)} bytes "
+            f"({(selected_stats.get('disk_io') or {}).get('pending_writes', 0)} pending writes)\n"
+            f"Disk writes: {(selected_stats.get('disk_io') or {}).get('writes_completed', 0)} completed / "
+            f"{(selected_stats.get('disk_io') or {}).get('write_failures', 0)} failed; "
+            f"average {(selected_stats.get('disk_io') or {}).get('write_latency_average_ms', 0.0):.2f} ms; "
+            f"max {(selected_stats.get('disk_io') or {}).get('write_latency_max_ms', 0.0):.2f} ms\n"
+            f"Disk backpressure: {(selected_stats.get('disk_io') or {}).get('backpressure_events', 0)} events / "
+            f"{(selected_stats.get('disk_io') or {}).get('backpressure_seconds', 0.0):.3f}s waiting\n"
+            f"Recent-piece cache: {(selected_stats.get('disk_io') or {}).get('cache_bytes', 0)} / "
+            f"{(selected_stats.get('disk_io') or {}).get('cache_limit_bytes', 0)} bytes; "
+            f"{(selected_stats.get('disk_io') or {}).get('cache_hits', 0)} hits / "
+            f"{(selected_stats.get('disk_io') or {}).get('cache_misses', 0)} misses\n"
+            f"Disk error: {(selected_stats.get('disk_io') or {}).get('error') or '--'}\n"
             f"DHT: {'Enabled' if settings.get('enable_dht') else 'Disabled'}\n"
             f"PEX: {'Enabled' if settings.get('enable_pex') else 'Disabled'}\n"
             f"LAN discovery: {'Enabled' if settings.get('enable_lan_discovery') else 'Disabled'}\n"
@@ -785,9 +800,3 @@ class ApplicationMenu:
             dpg.set_clipboard_text(self._diagnostics_string())
         except Exception:
             pass
-
-
-
-
-
-

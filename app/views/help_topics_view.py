@@ -259,13 +259,37 @@ HELP_TOPICS: Tuple[HelpTopic, ...] = (
                 "honoured for uploads that have not yet been sent.",
             ),
             (
+                "Bounded asynchronous disk writes",
+                "After a piece passes SHA-1 verification, SalixTorrent reserves capacity in a "
+                "64 MiB byte-bounded write-behind buffer and one sleeping disk worker persists it "
+                "outside the asyncio event loop. If storage falls behind, only the coroutine that "
+                "needs more buffer space waits; networking and the UI continue running. Completion "
+                "is announced only after queued verified pieces have reached storage.",
+            ),
+            (
+                "Recent-piece cache and seeding",
+                "Recently persisted pieces are retained in a bounded 32 MiB LRU cache. Upload "
+                "requests can therefore reuse hot data without a read-after-write disk operation. "
+                "Pieces still waiting in the write buffer are pinned separately and are immediately "
+                "uploadable from memory. Both structures are bounded and are discarded when the "
+                "session disk pipeline shuts down.",
+            ),
+            (
+                "Disk telemetry and failure behaviour",
+                "The Pieces view and Diagnostics expose pending bytes/writes, write latency, cache "
+                "hits/misses and backpressure without scanning the payload. A filesystem write "
+                "failure is fail-closed: buffered reservations are released, unpersisted pieces are "
+                "not written into fast-resume metadata, and the torrent enters an Error state rather "
+                "than pretending data was safely stored.",
+            ),
+            (
                 "Force Recheck",
                 "Force Recheck invalidates fast-resume assumptions and hashes the existing payload "
                 "again without deleting it. This is useful after files were changed externally or "
                 "when you want to verify the current disk contents against the torrent metadata.",
             ),
         ),
-        related_terms=("PIECE", "BLOCK", "PIECE_STATE", "PIECE_AVAILABILITY", "RAREST_FIRST", "RANDOM_TIE_BREAKING", "REQUEST_SCHEDULER", "REQUEST_PIPELINE", "OUTSTANDING_REQUEST", "REQUEST_TIMEOUT", "ENDGAME_MODE", "CANCEL_MESSAGE", "FILE_PRIORITY", "FORCE_RECHECK", "FAST_RESUME"),
+        related_terms=("PIECE", "BLOCK", "PIECE_STATE", "PIECE_AVAILABILITY", "RAREST_FIRST", "RANDOM_TIE_BREAKING", "REQUEST_SCHEDULER", "REQUEST_PIPELINE", "OUTSTANDING_REQUEST", "REQUEST_TIMEOUT", "ENDGAME_MODE", "CANCEL_MESSAGE", "DISK_IO_PIPELINE", "DISK_WRITE_BUFFER", "DISK_BACKPRESSURE", "RECENT_PIECE_CACHE", "DISK_TELEMETRY", "FILE_PRIORITY", "FORCE_RECHECK", "FAST_RESUME"),
     ),
     HelpTopic(
         key="trackers_discovery",
@@ -1087,11 +1111,3 @@ class HelpTopicsView:
         # changed width, so maximizing/restoring the viewport stays polished
         # without turning Help into a continuously rebuilding view.
         self._update_content_wrap()
-
-
-
-
-
-
-
-

@@ -1365,6 +1365,7 @@ class TorrentSession:
             force=force_detail_refresh
         )
         speed_view = self._build_speed_view_snapshot()
+        disk_io = self.piece_mgr.disk_io_snapshot()
 
         tracker_sources = [
             source
@@ -1470,6 +1471,7 @@ class TorrentSession:
             "file_view": file_view,
             "sources_view": sources_view,
             "speed_view": speed_view,
+            "disk_io": disk_io,
             "completed_pieces": self.piece_mgr.completed_pieces,
             "total_pieces": len(self.piece_mgr.pieces),
             "piece_length": int(self.torrent.piece_length),
@@ -1617,6 +1619,12 @@ class TorrentSession:
 
             started_complete = self.piece_mgr.is_finished
 
+            # Phase 4: live downloads use one bounded write-behind worker. It
+            # sleeps when idle and moves filesystem writes/resume fsync work off
+            # the peer/event-loop hot path. Complete seeds need no writer.
+            if not started_complete and not self.seed_source_path:
+                await self.piece_mgr.start_disk_io()
+
             # If every currently wanted file is already complete (including
             # the valid case where every file is marked Don't Download), there
             # is no network work to schedule. A fully complete torrent still
@@ -1637,6 +1645,22 @@ class TorrentSession:
                 return
 
             await self._run_downloading(run_token)
+
+            # A torrent is not announced complete until every verified piece in
+            # the bounded write-behind buffer has reached filesystem storage.
+            # This preserves crash-safe resume semantics while keeping each
+            # individual peer receive path non-blocking on disk.
+            if self._is_current_run(run_token) and self.piece_mgr.disk_error:
+                self.error_message = self.piece_mgr.disk_error
+                self.state = SessionState.ERROR
+                self.is_running = False
+            elif self._is_current_run(run_token):
+                try:
+                    await self.piece_mgr.flush_disk_writes()
+                except OSError as exc:
+                    self.error_message = str(exc)
+                    self.state = SessionState.ERROR
+                    self.is_running = False
 
             if self._is_current_run(run_token) and self.piece_mgr.is_finished:
                 await self._run_seeding(run_token, completion_event=True)
@@ -1669,6 +1693,13 @@ class TorrentSession:
 
             if self._telemetry_task is local_telemetry_task:
                 self._telemetry_task = None
+
+            try:
+                await self.piece_mgr.shutdown_disk_io(flush=True)
+            except OSError as exc:
+                if run_token == self._run_token:
+                    self.error_message = str(exc)
+                    self.state = SessionState.ERROR
 
             if run_token == self._run_token:
                 self.is_running = False
@@ -1731,6 +1762,12 @@ class TorrentSession:
             while self._is_current_run(run_token) and not self.piece_mgr.wanted_is_finished:
                 await self._pause_event.wait()
                 if not self._is_current_run(run_token):
+                    break
+
+                if self.piece_mgr.disk_error:
+                    self.error_message = self.piece_mgr.disk_error
+                    self.state = SessionState.ERROR
+                    self.is_running = False
                     break
 
                 if self.state != SessionState.PAUSED:
@@ -2511,6 +2548,13 @@ class TorrentSession:
                     if result.hash_failed:
                         await self._cancel_piece_download_requests(piece_idx)
                     if result.piece_completed:
+                        try:
+                            await self.piece_mgr.enqueue_completed_piece(piece_idx)
+                        except OSError as exc:
+                            self.error_message = str(exc)
+                            self.state = SessionState.ERROR
+                            self.is_running = False
+                            break
                         await self._broadcast_have(piece_idx, exclude_peer=peer)
 
                 elif msg_type == "BITFIELD":
@@ -3359,11 +3403,3 @@ class TorrentSession:
 
         except asyncio.CancelledError:
             pass
-
-
-
-
-
-
-
-

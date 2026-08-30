@@ -6,6 +6,9 @@ Notable SalixTorrent changes are recorded here.
 
 ### Added
 
+- Bounded 64 MiB asynchronous piece write-behind pipeline with one sleeping disk worker, byte-level backpressure, and fail-closed disk-write error handling.
+- Bounded 32 MiB recent-piece LRU cache plus pinned pending-piece reads so freshly verified data can be seeded without immediate read-after-write disk I/O.
+- O(1) disk telemetry for queued bytes/writes, write latency, backpressure events/time, cache usage/hits/misses, completed writes, and failures.
 - Explicit per-peer outstanding block-request ownership with a reverse index for O(pipeline-size) cleanup on choke, disconnect and timeout.
 - Bounded Endgame Mode for the final 32 wanted blocks, including duplicate tail requests, targeted peer-wire `CANCEL` frames, and received-CANCEL handling for pending uploads.
 - Adaptive per-peer request pipelines (8-64 blocks) with sent-request timeout and immediate stalled-block reassignment.
@@ -26,6 +29,8 @@ Notable SalixTorrent changes are recorded here.
 
 ### Changed
 
+- Verified piece filesystem writes and resume-state fsync work now run away from the asyncio peer/UI hot path; torrent completion waits for the bounded disk queue to flush.
+- Fast-resume metadata now records only persisted pieces, while verified-but-buffered pieces remain temporarily uploadable from memory.
 - Pieces telemetry now exposes scheduler mode, wanted blocks remaining, outstanding wire requests, and endgame duplicate counts without adding a polling loop.
 - Download workers refill bounded pipelines in small bursts and start request timeout clocks only after REQUEST frames are actually transmitted.
 - Pieces telemetry now reads the incremental availability cache instead of rebuilding availability by rescanning every connected peer bitfield.
@@ -40,6 +45,8 @@ Notable SalixTorrent changes are recorded here.
 
 ### Fixed
 
+- Slow storage can no longer block the peer event loop during verified-piece writes; bounded asynchronous backpressure limits memory growth instead.
+- A disk write failure no longer leaves buffered-only pieces represented as safely completed resume data.
 - Starting a second active torrent no longer removes the UPnP/NAT-PMP mapping belonging to the first torrent.
 - Stopping or rebinding a torrent releases only that torrent listener's router mapping.
 - General/Diagnostics connectivity reporting now follows the selected torrent's actual listen port, preventing another torrent's mapping from being shown as its own.

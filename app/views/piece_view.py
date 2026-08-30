@@ -26,13 +26,14 @@ class PieceView:
     def __init__(self):
         self.summary_text = None
         self.scheduler_text = None
+        self.disk_text = None
         self.map_info_text = None
         self.map_drawlist = None
         self.table_id = None
         self._row_ids = []
 
     def build_view(self, parent_tag):
-        with dpg.child_window(parent=parent_tag, height=335, border=True):
+        with dpg.child_window(parent=parent_tag, height=355, border=True):
             self.summary_text = dpg.add_text(
                 "Pieces: select a torrent to inspect piece state",
                 color=(100, 180, 255),
@@ -43,6 +44,11 @@ class PieceView:
                 color=(155, 155, 160),
             )
             add_help_tooltip(self.scheduler_text, "REQUEST_SCHEDULER")
+            self.disk_text = dpg.add_text(
+                "Disk I/O: writer idle | buffer 0 B | recent-piece cache 0 B",
+                color=(150, 150, 150),
+            )
+            add_help_tooltip(self.disk_text, "DISK_IO_PIPELINE")
             map_legend = dpg.add_text(
                 "Map: Verified | Downloading | Requested | Mixed | Missing | No known source",
                 color=(150, 150, 150),
@@ -162,6 +168,11 @@ class PieceView:
                 self.scheduler_text,
                 "Scheduler: Rarest-first | Pipeline: adaptive | Endgame: Standby",
             )
+        if self.disk_text and dpg.does_item_exist(self.disk_text):
+            dpg.set_value(
+                self.disk_text,
+                "Disk I/O: writer idle | buffer 0 B | recent-piece cache 0 B",
+            )
         if self.map_info_text and dpg.does_item_exist(self.map_info_text):
             dpg.set_value(
                 self.map_info_text,
@@ -259,6 +270,31 @@ class PieceView:
             ),
         )
 
+        disk = snapshot.get("disk_io") or piece_view.get("disk_io") or {}
+        writer_label = "active" if disk.get("writer_active") else "idle"
+        pending_bytes = int(disk.get("pending_bytes", 0) or 0)
+        buffer_limit = int(disk.get("buffer_limit_bytes", 0) or 0)
+        pending_writes = int(disk.get("pending_writes", 0) or 0)
+        cache_bytes = int(disk.get("cache_bytes", 0) or 0)
+        cache_limit = int(disk.get("cache_limit_bytes", 0) or 0)
+        cache_hits = int(disk.get("cache_hits", 0) or 0)
+        cache_misses = int(disk.get("cache_misses", 0) or 0)
+        average_ms = float(disk.get("write_latency_average_ms", 0.0) or 0.0)
+        pressure_events = int(disk.get("backpressure_events", 0) or 0)
+        disk_error = str(disk.get("error") or "")
+        disk_label = (
+            f"Disk I/O: writer {writer_label} | "
+            f"buffer {self._format_size(pending_bytes)} / {self._format_size(buffer_limit)} "
+            f"({pending_writes} pending) | avg write {average_ms:.2f} ms | "
+            f"backpressure {pressure_events} | cache "
+            f"{self._format_size(cache_bytes)} / {self._format_size(cache_limit)} "
+            f"({cache_hits} hit / {cache_misses} miss)"
+        )
+        if disk_error:
+            disk_label += f" | ERROR: {disk_error}"
+        if self.disk_text and dpg.does_item_exist(self.disk_text):
+            dpg.set_value(self.disk_text, disk_label)
+
         cell_count = len(piece_view.get("map_cells") or [])
         pieces_per_cell = int(piece_view.get("pieces_per_map_cell", 1) or 1)
         if pieces_per_cell <= 1:
@@ -286,5 +322,3 @@ class PieceView:
                 dpg.add_text(str(piece.get("state", "Missing")))
 
             self._row_ids.append(row_id)
-
-

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import bisect
 import hashlib
@@ -12,6 +13,7 @@ import os
 import random
 import threading
 import time
+from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Callable, Iterable, List, Optional
 
@@ -20,6 +22,12 @@ from app.logic.torrent_file import TorrentFile
 BLOCK_SIZE = 16384
 RESUME_STATE_VERSION = 1
 MULTI_FILE_RESUME_INTERVAL = 5.0
+
+# Phase 4 disk pipeline. Verified pieces are queued to one asynchronous writer
+# instead of blocking a peer worker on filesystem I/O. Memory is bounded by
+# bytes, not item count, so unusual piece sizes cannot silently blow up RAM.
+DISK_WRITE_BUFFER_BYTES = 64 * 1024 * 1024
+RECENT_PIECE_CACHE_BYTES = 32 * 1024 * 1024
 
 # Phase 2/3 request scheduling. Endgame only activates once a small tail of
 # wanted blocks remains. Duplicate tail requests are bounded so completion
@@ -96,6 +104,9 @@ class Piece:
         self.expected_hash = expected_hash
         self._blocks: Optional[List[Block]] = None
         self.is_complete: bool = False
+        # A verified piece may briefly live in the bounded write-behind buffer
+        # before reaching disk. Resume metadata records only persisted pieces.
+        self.is_persisted: bool = False
 
     @property
     def blocks(self) -> List[Block]:
@@ -117,6 +128,7 @@ class Piece:
 
     def reset(self):
         self.is_complete = False
+        self.is_persisted = False
 
         if self._blocks is None:
             return
@@ -184,6 +196,10 @@ class PieceManager:
         torrent: TorrentFile,
         download_dir: str = "downloads",
         seed_source_path: Optional[str] = None,
+        *,
+        disk_write_buffer_bytes: int = DISK_WRITE_BUFFER_BYTES,
+        recent_piece_cache_bytes: int = RECENT_PIECE_CACHE_BYTES,
+        enable_recent_piece_cache: bool = True,
     ):
         self.torrent = torrent
         self.download_dir = download_dir
@@ -235,6 +251,9 @@ class PieceManager:
         # for every 16 KiB block request.
         self._piece_availability: List[int] = [0] * len(self.pieces)
         self._peer_piece_sets: dict[object, set[int]] = {}
+        self._persisted_bitfield = bytearray(math.ceil(len(self.pieces) / 8))
+        self._persisted_pieces_count: int = 0
+        self._persisted_bytes_count: int = 0
         self._active_piece_indices: set[int] = set()
 
         # Explicit block-request ownership. Each peer normally owns a block
@@ -242,6 +261,52 @@ class PieceManager:
         # The reverse index means disconnect/timeout cleanup touches only that
         # peer's small pipeline rather than scanning the torrent.
         self._requests_by_peer: dict[object, set[Block]] = {}
+
+        # Phase 4: bounded write-behind + recent-piece read cache. The asyncio
+        # queue/condition exist only while a session run is active. Pending
+        # piece bytes are pinned until their disk write completes; after that
+        # they may move into the optional LRU read cache. Cache/state access can
+        # also come from upload threads, so only the tiny dictionaries/counters
+        # are protected by a normal lock.
+        try:
+            requested_write_buffer = max(1, int(disk_write_buffer_bytes))
+        except (TypeError, ValueError):
+            requested_write_buffer = DISK_WRITE_BUFFER_BYTES
+        try:
+            requested_read_cache = max(0, int(recent_piece_cache_bytes))
+        except (TypeError, ValueError):
+            requested_read_cache = RECENT_PIECE_CACHE_BYTES
+
+        self._disk_write_buffer_limit = max(
+            requested_write_buffer,
+            int(getattr(self.torrent, "piece_length", 0) or 0),
+        )
+        self._recent_piece_cache_limit = requested_read_cache
+        self._recent_piece_cache_enabled = bool(
+            enable_recent_piece_cache and requested_read_cache > 0
+        )
+        self._disk_queue: Optional[asyncio.Queue] = None
+        self._disk_condition: Optional[asyncio.Condition] = None
+        self._disk_worker_task: Optional[asyncio.Task] = None
+        self._disk_pending_bytes: int = 0
+        self._disk_pending_writes: int = 0
+        self._disk_state_lock = threading.Lock()
+        self._pending_piece_data: dict[int, bytes] = {}
+        self._disk_unqueued_verified: set[int] = set()
+        self._recent_piece_cache: OrderedDict[int, bytes] = OrderedDict()
+        self._recent_piece_cache_bytes: int = 0
+        self._disk_writes_completed: int = 0
+        self._disk_bytes_written: int = 0
+        self._disk_write_failures: int = 0
+        self._disk_write_latency_total: float = 0.0
+        self._disk_write_latency_last: float = 0.0
+        self._disk_write_latency_max: float = 0.0
+        self._disk_backpressure_events: int = 0
+        self._disk_backpressure_seconds: float = 0.0
+        self._disk_cache_hits: int = 0
+        self._disk_cache_misses: int = 0
+        self._disk_error: str = ""
+
         self._rarity_buckets: dict[int, dict[int, set[int]]] = {
             FILE_PRIORITY_RANK[FILE_PRIORITY_HIGH]: {},
             FILE_PRIORITY_RANK[FILE_PRIORITY_NORMAL]: {},
@@ -549,10 +614,14 @@ class PieceManager:
 
     @property
     def completed_wanted_pieces(self) -> int:
+        with self._disk_state_lock:
+            staged = set(self._disk_unqueued_verified)
         return sum(
             1
             for index, piece in enumerate(self.pieces)
-            if self.piece_priority_rank(index) > 0 and piece.is_complete
+            if self.piece_priority_rank(index) > 0
+            and piece.is_complete
+            and index not in staged
         )
 
     @property
@@ -564,8 +633,10 @@ class PieceManager:
 
     @property
     def wanted_is_finished(self) -> bool:
+        with self._disk_state_lock:
+            staged = set(self._disk_unqueued_verified)
         return all(
-            piece.is_complete
+            piece.is_complete and index not in staged
             for index, piece in enumerate(self.pieces)
             if self.piece_priority_rank(index) > 0
         )
@@ -863,7 +934,9 @@ class PieceManager:
                     # partial resume record is not sufficient evidence.
                     for piece in self.pieces:
                         piece.is_complete = False
+                        piece.is_persisted = False
                     self.downloaded_bytes = 0
+                    self._rebuild_persisted_cache()
                 else:
                     self.fast_resume_used = True
                     self._set_check_progress(len(self.pieces), len(self.pieces))
@@ -908,6 +981,7 @@ class PieceManager:
         self.downloaded_bytes = 0
         for piece in self.pieces:
             piece.is_complete = False
+            piece.is_persisted = False
 
         candidates = self._candidate_piece_indices()
         self._set_check_progress(0, len(candidates))
@@ -935,6 +1009,7 @@ class PieceManager:
                 and hashlib.sha1(data).digest() == piece.expected_hash
             ):
                 piece.is_complete = True
+                piece.is_persisted = True
                 self.downloaded_bytes += piece.length
 
             checked = scan_index + 1
@@ -951,6 +1026,7 @@ class PieceManager:
                 last_reported_percent = percent
 
         self._set_check_progress(len(candidates), len(candidates))
+        self._rebuild_persisted_cache()
         self._rebuild_rarity_buckets()
         if progress_callback:
             progress_callback()
@@ -968,6 +1044,51 @@ class PieceManager:
 
         return bytes(bitfield)
 
+    def _rebuild_persisted_cache(self):
+        bitfield = bytearray(math.ceil(len(self.pieces) / 8))
+        count = 0
+        byte_count = 0
+        for piece in self.pieces:
+            if not piece.is_complete or not piece.is_persisted:
+                continue
+            byte_index = piece.index // 8
+            bit_index = 7 - (piece.index % 8)
+            bitfield[byte_index] |= 1 << bit_index
+            count += 1
+            byte_count += piece.length
+        self._persisted_bitfield = bitfield
+        self._persisted_pieces_count = count
+        self._persisted_bytes_count = byte_count
+
+    def _set_piece_persisted(self, piece: Piece, persisted: bool):
+        persisted = bool(persisted) and bool(piece.is_complete)
+        if piece.is_persisted == persisted:
+            return
+        piece.is_persisted = persisted
+        byte_index = piece.index // 8
+        bit_index = 7 - (piece.index % 8)
+        mask = 1 << bit_index
+        if persisted:
+            self._persisted_bitfield[byte_index] |= mask
+            self._persisted_pieces_count += 1
+            self._persisted_bytes_count += piece.length
+        else:
+            self._persisted_bitfield[byte_index] &= ~mask
+            self._persisted_pieces_count = max(0, self._persisted_pieces_count - 1)
+            self._persisted_bytes_count = max(0, self._persisted_bytes_count - piece.length)
+
+    def _build_persisted_bitfield(self) -> bytes:
+        """Return cached disk-safe resume state without rescanning all pieces."""
+        return bytes(self._persisted_bitfield)
+
+    @property
+    def persisted_pieces(self) -> int:
+        return self._persisted_pieces_count
+
+    @property
+    def persisted_bytes(self) -> int:
+        return self._persisted_bytes_count
+
     def _apply_completed_bitfield(self, raw_bitfield: bytes) -> bool:
         required_bytes = math.ceil(len(self.pieces) / 8)
         if len(raw_bitfield) != required_bytes:
@@ -979,10 +1100,12 @@ class PieceManager:
             bit_index = 7 - (piece.index % 8)
             is_complete = bool(raw_bitfield[byte_index] & (1 << bit_index))
             piece.is_complete = is_complete
+            piece.is_persisted = is_complete
             if is_complete:
                 downloaded_bytes += piece.length
 
         self.downloaded_bytes = downloaded_bytes
+        self._rebuild_persisted_cache()
         self._rebuild_rarity_buckets()
         return True
 
@@ -1056,7 +1179,9 @@ class PieceManager:
         with self._resume_lock:
             try:
                 os.makedirs(self.resume_dir, exist_ok=True)
-                bitfield = self._build_completed_bitfield()
+                bitfield = self._build_persisted_bitfield()
+                persisted_pieces = self.persisted_pieces
+                persisted_bytes = self.persisted_bytes
 
                 state = {
                     "version": RESUME_STATE_VERSION,
@@ -1066,8 +1191,8 @@ class PieceManager:
                     "piece_length": self.torrent.piece_length,
                     "piece_count": len(self.pieces),
                     "completed_bitfield": base64.b64encode(bitfield).decode("ascii"),
-                    "completed_pieces": self.completed_pieces,
-                    "downloaded_bytes": self.downloaded_bytes,
+                    "completed_pieces": persisted_pieces,
+                    "downloaded_bytes": persisted_bytes,
                     "external_seed": self.read_only_seed_source,
                     "seed_source_path": self.seed_source_path if self.read_only_seed_source else "",
                 }
@@ -1128,8 +1253,10 @@ class PieceManager:
 
             for piece in self.pieces:
                 piece.is_complete = False
+                piece.is_persisted = False
                 if piece.blocks_initialized:
                     piece.reset()
+            self._rebuild_persisted_cache()
             self._rebuild_rarity_buckets()
 
     @staticmethod
@@ -1499,10 +1626,22 @@ class PieceManager:
             )
 
         if piece.verify_hash():
-            self._write_piece_to_disk(piece)
             piece.is_complete = True
+            piece.is_persisted = False
             self._remove_from_rarity_buckets(piece.index)
-            self.save_resume_state()
+
+            # Preserve historical synchronous PieceManager behaviour for direct
+            # callers/tests that are not running a TorrentSession disk worker.
+            # Live transfers start the Phase 4 writer before peer traffic, so
+            # their filesystem I/O never runs on the peer/event-loop hot path.
+            if self._disk_worker_task is None:
+                self._write_piece_to_disk(piece)
+                self._set_piece_persisted(piece, True)
+                self.save_resume_state()
+            else:
+                with self._disk_state_lock:
+                    self._disk_unqueued_verified.add(piece.index)
+
             return BlockReceiveResult(
                 accepted=True,
                 piece_completed=True,
@@ -1538,6 +1677,324 @@ class PieceManager:
             peer_key=peer_key,
         ).piece_completed
 
+    @property
+    def disk_error(self) -> str:
+        return self._disk_error
+
+    async def start_disk_io(self):
+        """Start one sleeping asynchronous disk writer for this PieceManager."""
+        if self.read_only_seed_source or self._disk_worker_task is not None:
+            return
+
+        self._disk_queue = asyncio.Queue()
+        self._disk_condition = asyncio.Condition()
+        self._disk_pending_bytes = 0
+        self._disk_pending_writes = 0
+        self._disk_error = ""
+        self._disk_writes_completed = 0
+        self._disk_bytes_written = 0
+        self._disk_write_failures = 0
+        self._disk_write_latency_total = 0.0
+        self._disk_write_latency_last = 0.0
+        self._disk_write_latency_max = 0.0
+        self._disk_backpressure_events = 0
+        self._disk_backpressure_seconds = 0.0
+        self._disk_cache_hits = 0
+        self._disk_cache_misses = 0
+        with self._disk_state_lock:
+            self._pending_piece_data.clear()
+            self._disk_unqueued_verified.clear()
+            self._recent_piece_cache.clear()
+            self._recent_piece_cache_bytes = 0
+        self._disk_worker_task = asyncio.create_task(self._disk_writer_loop())
+
+    async def enqueue_completed_piece(self, piece_index: int) -> bool:
+        """Queue one verified piece without blocking the event loop on disk I/O.
+
+        Queue capacity is measured in bytes. If the buffer is full this coroutine
+        sleeps on a condition until the writer frees space, applying true
+        backpressure while allowing every unrelated asyncio task to keep running.
+        """
+        if piece_index < 0 or piece_index >= len(self.pieces):
+            return False
+        piece = self.pieces[piece_index]
+        if not piece.is_complete or piece.is_persisted:
+            return bool(piece.is_complete)
+
+        # Direct callers retain the old synchronous semantics.
+        if self._disk_worker_task is None or self._disk_queue is None or self._disk_condition is None:
+            self._write_piece_to_disk(piece)
+            self._set_piece_persisted(piece, True)
+            self.save_resume_state()
+            return True
+
+        if self._disk_error:
+            raise OSError(self._disk_error)
+
+        size = int(piece.length)
+        waited = False
+        wait_started = 0.0
+        condition = self._disk_condition
+        async with condition:
+            while (
+                self._disk_pending_bytes > 0
+                and self._disk_pending_bytes + size > self._disk_write_buffer_limit
+            ):
+                if self._disk_error:
+                    raise OSError(self._disk_error)
+                if not waited:
+                    waited = True
+                    wait_started = time.monotonic()
+                    self._disk_backpressure_events += 1
+                await condition.wait()
+
+            if self._disk_error:
+                raise OSError(self._disk_error)
+
+            # Acquire byte capacity before joining block payloads into one piece
+            # buffer. Waiting peers therefore do not each allocate another full
+            # piece merely because the writer is saturated.
+            self._disk_pending_bytes += size
+            self._disk_pending_writes += 1
+
+        if waited:
+            self._disk_backpressure_seconds += max(0.0, time.monotonic() - wait_started)
+
+        data = piece.get_data()
+        if len(data) != piece.length:
+            async with condition:
+                self._disk_pending_bytes = max(0, self._disk_pending_bytes - size)
+                self._disk_pending_writes = max(0, self._disk_pending_writes - 1)
+                condition.notify_all()
+            raise OSError(f"Verified piece {piece_index} no longer has its complete in-memory payload.")
+
+        with self._disk_state_lock:
+            self._pending_piece_data[piece_index] = data
+
+        # Once the full pending buffer is pinned, individual block payloads are
+        # redundant. Clearing them prevents the async write buffer from doubling
+        # memory usage while the piece waits for disk.
+        if piece.blocks_initialized:
+            for block in piece._blocks or ():
+                block.data = None
+                block.requesters.clear()
+
+        self._disk_queue.put_nowait((piece_index, data, time.monotonic()))
+        with self._disk_state_lock:
+            self._disk_unqueued_verified.discard(piece_index)
+        return True
+
+    async def _disk_writer_loop(self):
+        queue_obj = self._disk_queue
+        condition = self._disk_condition
+        if queue_obj is None or condition is None:
+            return
+
+        while True:
+            item = await queue_obj.get()
+            if item is None:
+                queue_obj.task_done()
+                break
+
+            piece_index, data, _queued_at = item
+            write_started = time.monotonic()
+            try:
+                file_offset = piece_index * self.torrent.piece_length
+                await asyncio.to_thread(self._write_range, file_offset, data)
+                latency = max(0.0, time.monotonic() - write_started)
+
+                piece = self.pieces[piece_index]
+                self._set_piece_persisted(piece, True)
+                self._disk_writes_completed += 1
+                self._disk_bytes_written += len(data)
+                self._disk_write_latency_total += latency
+                self._disk_write_latency_last = latency
+                self._disk_write_latency_max = max(self._disk_write_latency_max, latency)
+
+                with self._disk_state_lock:
+                    self._pending_piece_data.pop(piece_index, None)
+                    if self._recent_piece_cache_enabled and len(data) <= self._recent_piece_cache_limit:
+                        old = self._recent_piece_cache.pop(piece_index, None)
+                        if old is not None:
+                            self._recent_piece_cache_bytes -= len(old)
+                        self._recent_piece_cache[piece_index] = data
+                        self._recent_piece_cache_bytes += len(data)
+                        while (
+                            self._recent_piece_cache
+                            and self._recent_piece_cache_bytes > self._recent_piece_cache_limit
+                        ):
+                            _, evicted = self._recent_piece_cache.popitem(last=False)
+                            self._recent_piece_cache_bytes -= len(evicted)
+
+                # Resume JSON/fsync is also moved off the event loop. The
+                # existing multi-file throttling still coalesces frequent saves.
+                await asyncio.to_thread(self.save_resume_state)
+
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                self._disk_write_failures += 1
+                self._disk_error = f"Disk write failed for piece {piece_index}: {exc}"
+                self.last_error = self._disk_error
+                await self._invalidate_pending_disk_writes(piece_index)
+                queue_obj.task_done()
+                break
+            else:
+                async with condition:
+                    self._disk_pending_bytes = max(0, self._disk_pending_bytes - len(data))
+                    self._disk_pending_writes = max(0, self._disk_pending_writes - 1)
+                    condition.notify_all()
+                queue_obj.task_done()
+
+    async def _invalidate_pending_disk_writes(self, failed_piece_index: int):
+        """Fail closed on disk errors and release every buffered byte reservation."""
+        queue_obj = self._disk_queue
+        condition = self._disk_condition
+        with self._disk_state_lock:
+            pending_indices = {failed_piece_index, *self._disk_unqueued_verified}
+            self._disk_unqueued_verified.clear()
+        if queue_obj is not None:
+            while True:
+                try:
+                    item = queue_obj.get_nowait()
+                except asyncio.QueueEmpty:
+                    break
+                if item is None:
+                    queue_obj.task_done()
+                    continue
+                piece_index, _data, _queued_at = item
+                pending_indices.add(piece_index)
+                queue_obj.task_done()
+
+        for piece_index in pending_indices:
+            if 0 <= piece_index < len(self.pieces):
+                piece = self.pieces[piece_index]
+                if piece.is_complete and not piece.is_persisted:
+                    self.downloaded_bytes = max(0, self.downloaded_bytes - piece.length)
+                    piece.reset()
+
+        # Disk failure is terminal for the current run, so a one-time O(n)
+        # scheduler rebuild is preferable to maintaining a special hot-path
+        # reinsertion branch for an exceptional condition.
+        self._rebuild_persisted_cache()
+        self._rebuild_rarity_buckets()
+
+        with self._disk_state_lock:
+            self._pending_piece_data.clear()
+
+        if condition is not None:
+            async with condition:
+                self._disk_pending_bytes = 0
+                self._disk_pending_writes = 0
+                condition.notify_all()
+
+    async def flush_disk_writes(self) -> bool:
+        """Wait until every queued verified piece is persisted or a write fails."""
+        if self._disk_queue is None:
+            return not bool(self._disk_error)
+        await self._disk_queue.join()
+        if self._disk_error:
+            raise OSError(self._disk_error)
+        return True
+
+    async def shutdown_disk_io(self, *, flush: bool = True):
+        """Drain and stop the shared disk writer, then release cached payload memory."""
+        task = self._disk_worker_task
+        queue_obj = self._disk_queue
+        if task is None or queue_obj is None:
+            return
+
+        flush_error: Optional[Exception] = None
+        if flush:
+            try:
+                # A peer task can be cancelled while waiting for byte capacity.
+                # Preserve any already-verified piece by enqueueing that tiny
+                # staged set before draining the writer during Stop/shutdown.
+                if not self._disk_error:
+                    with self._disk_state_lock:
+                        staged = tuple(self._disk_unqueued_verified)
+                    for piece_index in staged:
+                        await self.enqueue_completed_piece(piece_index)
+                await self.flush_disk_writes()
+            except Exception as exc:
+                flush_error = exc
+
+        if not task.done():
+            queue_obj.put_nowait(None)
+            await asyncio.gather(task, return_exceptions=True)
+
+        self._disk_worker_task = None
+        self._disk_queue = None
+        self._disk_condition = None
+        self._disk_pending_bytes = 0
+        self._disk_pending_writes = 0
+        with self._disk_state_lock:
+            self._pending_piece_data.clear()
+            self._disk_unqueued_verified.clear()
+            self._recent_piece_cache.clear()
+            self._recent_piece_cache_bytes = 0
+
+        if flush_error is not None:
+            raise flush_error
+
+    def disk_io_snapshot(self) -> dict:
+        """Return O(1) disk/cache telemetry; no file or piece scan is performed."""
+        writes = self._disk_writes_completed
+        average = self._disk_write_latency_total / writes if writes else 0.0
+        with self._disk_state_lock:
+            cache_bytes = self._recent_piece_cache_bytes
+            cache_entries = len(self._recent_piece_cache)
+            pending_cache_entries = len(self._pending_piece_data)
+            staged_verified = len(self._disk_unqueued_verified)
+            cache_hits = self._disk_cache_hits
+            cache_misses = self._disk_cache_misses
+
+        return {
+            "writer_active": bool(self._disk_worker_task is not None and not self._disk_worker_task.done()),
+            "buffer_limit_bytes": int(self._disk_write_buffer_limit),
+            "pending_bytes": int(self._disk_pending_bytes),
+            "pending_writes": int(self._disk_pending_writes),
+            "pending_cached_pieces": pending_cache_entries,
+            "staged_verified_pieces": staged_verified,
+            "writes_completed": int(writes),
+            "bytes_written": int(self._disk_bytes_written),
+            "write_failures": int(self._disk_write_failures),
+            "write_latency_last_ms": self._disk_write_latency_last * 1000.0,
+            "write_latency_average_ms": average * 1000.0,
+            "write_latency_max_ms": self._disk_write_latency_max * 1000.0,
+            "backpressure_events": int(self._disk_backpressure_events),
+            "backpressure_seconds": float(self._disk_backpressure_seconds),
+            "cache_enabled": bool(self._recent_piece_cache_enabled),
+            "cache_limit_bytes": int(self._recent_piece_cache_limit),
+            "cache_bytes": int(cache_bytes),
+            "cache_entries": int(cache_entries),
+            "cache_hits": int(cache_hits),
+            "cache_misses": int(cache_misses),
+            "error": self._disk_error,
+        }
+
+    def _read_piece_from_memory(self, piece: Piece, offset: int, length: int) -> bytes:
+        """Read a complete but not-yet-enqueued piece from its received blocks."""
+        blocks = piece._blocks or ()
+        end = offset + length
+        result = bytearray()
+        current = offset
+        for block in blocks:
+            block_end = block.offset + block.length
+            if block_end <= current:
+                continue
+            if block.offset >= end:
+                break
+            if block.data is None:
+                return b""
+            local_start = max(current, block.offset) - block.offset
+            local_end = min(end, block_end) - block.offset
+            result.extend(block.data[local_start:local_end])
+            current = block.offset + local_end
+            if current >= end:
+                break
+        return bytes(result) if len(result) == length else b""
+
     def _write_piece_to_disk(self, piece: Piece):
         file_offset = piece.index * self.torrent.piece_length
         self._write_range(file_offset, piece.get_data())
@@ -1554,6 +2011,31 @@ class PieceManager:
         if offset + length > piece.length or length > BLOCK_SIZE:
             return b""
 
+        # Pending verified pieces must be uploadable before their write-behind
+        # reaches disk. Recently persisted pieces can also be served from the
+        # bounded LRU cache, avoiding a read-after-write filesystem round trip.
+        with self._disk_state_lock:
+            cached = self._pending_piece_data.get(piece_index)
+            if cached is not None:
+                self._disk_cache_hits += 1
+                return cached[offset:offset + length]
+
+            cached = self._recent_piece_cache.get(piece_index)
+            if cached is not None:
+                self._recent_piece_cache.move_to_end(piece_index)
+                self._disk_cache_hits += 1
+                return cached[offset:offset + length]
+
+        if not piece.is_persisted:
+            data = self._read_piece_from_memory(piece, offset, length)
+            if data:
+                with self._disk_state_lock:
+                    self._disk_cache_hits += 1
+                return data
+            return b""
+
+        with self._disk_state_lock:
+            self._disk_cache_misses += 1
         file_offset = piece.index * self.torrent.piece_length + offset
         return self._read_range(file_offset, length)
 
@@ -1948,6 +2430,7 @@ class PieceManager:
             "pieces_per_map_cell": pieces_per_cell,
             "map_cells": map_cells,
             "details": details,
+            "disk_io": self.disk_io_snapshot(),
         }
 
     def completed_bitfield(self) -> bytes:
@@ -1970,7 +2453,12 @@ class PieceManager:
 
     @property
     def completed_pieces(self) -> int:
-        return sum(1 for piece in self.pieces if piece.is_complete)
+        with self._disk_state_lock:
+            staged = set(self._disk_unqueued_verified)
+        return sum(
+            1 for piece in self.pieces
+            if piece.is_complete and piece.index not in staged
+        )
 
     @property
     def progress(self) -> float:
@@ -1982,8 +2470,7 @@ class PieceManager:
     def is_finished(self) -> bool:
         if not self.pieces:
             return self.torrent.total_length == 0
+        with self._disk_state_lock:
+            if self._disk_unqueued_verified:
+                return False
         return all(piece.is_complete for piece in self.pieces)
-
-
-
-

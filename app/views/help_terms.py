@@ -333,6 +333,41 @@ HELP_TERMS = {
         "peer wins an endgame race or a request is reassigned. SalixTorrent both sends "
         "CANCEL and honours received CANCEL messages for pending uploads.",
     ),
+    "DISK_IO_PIPELINE": (
+        "Asynchronous Disk I/O Pipeline",
+        "SalixTorrent writes newly verified pieces through one bounded write-behind queue "
+        "instead of making a peer/network coroutine wait for synchronous filesystem I/O. "
+        "The disk worker sleeps when idle and performs writes away from the event loop. "
+        "Torrent completion is not announced until queued verified pieces are persisted.",
+    ),
+    "DISK_WRITE_BUFFER": (
+        "Bounded Disk Write Buffer",
+        "A byte-limited queue of verified pieces waiting to be written to storage. The "
+        "default limit is 64 MiB (or one full piece when a torrent uses unusually larger "
+        "pieces). The bound prevents a fast network from creating unlimited Python memory "
+        "growth when storage is slower than the incoming transfer.",
+    ),
+    "DISK_BACKPRESSURE": (
+        "Disk Backpressure",
+        "When the bounded write buffer is full, the peer coroutine that completed another "
+        "piece sleeps on an asynchronous condition until the disk worker frees capacity. "
+        "Other peers, Dear PyGui, trackers and timers remain runnable. Backpressure is "
+        "therefore flow control, not a blocking busy-wait or polling loop.",
+    ),
+    "RECENT_PIECE_CACHE": (
+        "Recent-Piece Read Cache",
+        "A bounded in-memory LRU cache for pieces that were just verified and written. It "
+        "lets upload requests reuse hot piece data instead of immediately reading it back "
+        "from disk. A verified piece that is still waiting in the write buffer is also "
+        "served from its pinned memory copy, so write-behind never creates an upload gap.",
+    ),
+    "DISK_TELEMETRY": (
+        "Disk I/O Telemetry",
+        "Cached counters describing the disk pipeline: pending bytes/writes, write latency, "
+        "completed/failed writes, backpressure events and time, plus recent-piece cache "
+        "usage/hits/misses. Reading these values is O(1); SalixTorrent does not scan files "
+        "or piece lists merely to update the display.",
+    ),
     "PIECE_STATE": (
         "Piece State",
         "Verified means the piece hash passed. Downloading/Requested means work is "
@@ -1051,11 +1086,3 @@ def add_context_tooltip(
         contextual_text(title, body, facts=facts, footer=footer),
         wrap=wrap,
     )
-
-
-
-
-
-
-
-
