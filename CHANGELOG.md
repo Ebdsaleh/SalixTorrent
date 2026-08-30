@@ -61,6 +61,8 @@ Notable SalixTorrent changes are recorded here.
 - NAT-PMP diagnostics decode standard gateway result codes; UPnP diagnostics preserve the failing discovery/SOAP stage and router fault code when available.
 
 ### Fixed
+- UDP tracker timeouts now remain source-local Timeout warnings through dual-stack address failover instead of being wrapped and misreported as protocol Errors.
+- Sources labels the primary state column as Discovery and tracker help distinguishes announce status from independent scrape status.
 
 - Windows Proactor shutdown no longer prints a traceback for the expected `ConnectionResetError` / WinError 10054 case when a remote peer resets its TCP connection during application teardown; unrelated asyncio exceptions remain visible.
 - IPv6 DHT `values` parsing now accepts the BEP-32-required hybrid list containing both 6-byte IPv4 and 18-byte IPv6 peer entries.

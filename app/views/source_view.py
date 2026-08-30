@@ -104,7 +104,7 @@ class SourceView:
                     init_width_or_weight=65,
                 )
                 dpg.add_table_column(
-                    label="Status",
+                    label="Discovery",
                     width_fixed=True,
                     init_width_or_weight=95,
                 )
@@ -347,8 +347,8 @@ class SourceView:
                 "The torrent's file data does NOT pass through this tracker. Once "
                 "peers are discovered, the data is exchanged directly peer-to-peer.",
                 "",
-                f"Current status: {status}",
-                f"Peers returned by latest result: {peers}",
+                f"Announce status: {status}",
+                f"Peers returned by latest announce: {peers}",
                 f"Tracker-reported seeds / leechers: {swarm}",
                 f"Latest response time: {response}",
                 f"Last update: {age}",

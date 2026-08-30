@@ -508,9 +508,25 @@ class TrackerClient:
         )
         successes = [result for result in results if not isinstance(result, Exception)]
         if not successes:
-            error = next((result for result in results if isinstance(result, Exception)), None)
-            if isinstance(error, BaseException):
-                raise error
+            failures = [result for result in results if isinstance(result, Exception)]
+            hard_error = next(
+                (
+                    result for result in failures
+                    if not isinstance(result, (asyncio.TimeoutError, TimeoutError, socket.timeout))
+                ),
+                None,
+            )
+            if isinstance(hard_error, BaseException):
+                raise hard_error
+            timeout_error = next(
+                (
+                    result for result in failures
+                    if isinstance(result, (asyncio.TimeoutError, TimeoutError, socket.timeout))
+                ),
+                None,
+            )
+            if isinstance(timeout_error, BaseException):
+                raise timeout_error
             raise TrackerQueryError("UDP tracker did not respond")
 
         peers: List[Tuple[str, int]] = []
@@ -588,19 +604,34 @@ class TrackerClient:
         left: int,
         event: Optional[str],
     ):
+        # Preserve a genuine timeout as a timeout.  Wrapping socket.timeout in
+        # TrackerQueryError makes the Sources view report a red protocol Error
+        # even though the tracker simply did not answer before the deadline.
         last_error: Optional[BaseException] = None
+        last_timeout: Optional[BaseException] = None
         for family, socktype, proto, sockaddr in candidates:
             try:
                 peers, metadata = self._query_udp_tracker_endpoint(
                     family, socktype, proto, sockaddr, uploaded, downloaded, left, event
                 )
                 return family, peers, metadata
-            except (OSError, socket.timeout, TrackerQueryError) as exc:
+            except (socket.timeout, TimeoutError) as exc:
+                last_timeout = exc
+                continue
+            except (OSError, TrackerQueryError) as exc:
                 last_error = exc
                 continue
+
+        # A concrete protocol/socket failure is more informative than a timeout
+        # from another DNS candidate.  If every candidate merely timed out, let
+        # fetch_peers() classify it as the normal amber Timeout warning.
         if isinstance(last_error, TrackerQueryError):
             raise last_error
-        raise TrackerQueryError(str(last_error or "UDP tracker did not respond"))
+        if last_error is not None:
+            raise TrackerQueryError(str(last_error))
+        if last_timeout is not None:
+            raise last_timeout
+        raise TrackerQueryError("UDP tracker did not respond")
 
     def _query_udp_tracker_endpoint(
         self,
