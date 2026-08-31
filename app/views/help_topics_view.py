@@ -708,6 +708,59 @@ HELP_TOPICS: Tuple[HelpTopic, ...] = (
         ),
     ),
     HelpTopic(
+        key="bittorrent_v2",
+        title="BitTorrent v2 Foundation",
+        summary=(
+            "What BEP-52 changes compared with BitTorrent v1, what SalixTorrent Phase 8 "
+            "already validates, and which networking pieces are intentionally deferred to Phase 9."
+        ),
+        sections=(
+            (
+                "SHA-256 torrent identity",
+                "BitTorrent v2 hashes the exact bencoded info dictionary with SHA-256 instead of "
+                "assuming a 20-byte SHA-1 identity. SalixTorrent stores the complete 32-byte v2 "
+                "hash and keeps the 20-byte truncated wire form as a derived value rather than "
+                "discarding half of the canonical identity.",
+            ),
+            (
+                "File tree and file-aligned pieces",
+                "BEP-52 describes content with a nested file tree. Every non-empty file begins on a "
+                "torrent-piece boundary, so v2 is not parsed as one continuous v1 byte stream. "
+                "SalixTorrent validates path components before they become filesystem paths and "
+                "requires each non-empty file to carry a 32-byte pieces root.",
+            ),
+            (
+                "Merkle verification",
+                "Each file root authenticates a binary SHA-256 Merkle tree whose leaves cover 16 KiB "
+                "blocks. Phase 8 includes reusable root construction and sibling-proof verification, "
+                "including the layer-specific zero-subtree hashes required to balance short files.",
+            ),
+            (
+                "Piece layers",
+                "The top-level piece layers dictionary contains hashes from the tree layer where one "
+                "hash covers one configured torrent piece. SalixTorrent checks 32-byte framing, the "
+                "file-size-derived hash count, short-final-piece padding, and reconstructs each declared "
+                "pieces root so corrupted layer metadata is rejected immediately.",
+            ),
+            (
+                "Why v2 transfers are still gated",
+                "Parsing a v2 torrent safely is not the same as joining a v2 swarm. Phase 9 still has "
+                "to implement btmh magnets, v2 peer-wire hash messages, v2-only transfers, hybrid "
+                "cross-format validation and torrent creation. Until then TorrentSession rejects v2 or "
+                "hybrid metainfo explicitly after successful Phase-8 validation rather than routing it "
+                "through the v1 engine incorrectly.",
+            ),
+        ),
+        related_terms=(
+            "BITTORRENT_V2",
+            "BEP52",
+            "TORRENT_IDENTITY_V2",
+            "PIECES_ROOT",
+            "PIECE_LAYERS_V2",
+            "MERKLE_TREE",
+        ),
+    ),
+    HelpTopic(
         key="headless",
         title="Headless & Command-Line Mode",
         summary=(

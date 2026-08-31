@@ -93,6 +93,44 @@ HELP_TERMS = {
         "small pieces, reconstructs it, and verifies that its SHA-1 info hash "
         "matches the magnet before accepting it.",
     ),
+    "BITTORRENT_V2": (
+        "BitTorrent v2 / BEP-52",
+        "The second BitTorrent metainfo and peer-protocol generation. v2 uses SHA-256 "
+        "torrent identity, file-aligned pieces, per-file Merkle trees and piece layers. "
+        "SalixTorrent Phase 8 parses and validates this foundation; live v2/hybrid swarm "
+        "networking is deliberately reserved for Phase 9.",
+    ),
+    "BEP52": (
+        "BEP-52 - BitTorrent Protocol Specification v2",
+        "Defines BitTorrent v2 metainfo, SHA-256 info hashes, the file tree, per-file "
+        "pieces roots, piece layers and hash-proof peer messages. SalixTorrent validates "
+        "BEP-52 metainfo independently of the current v1 session engine.",
+    ),
+    "TORRENT_IDENTITY_V2": (
+        "v2 SHA-256 Torrent Identity",
+        "For meta version 2, the exact bencoded info dictionary is hashed with SHA-256. "
+        "SalixTorrent stores the full 32-byte identity and only derives the 20-byte "
+        "truncated form where BEP-52 explicitly requires a tracker/peer-wire identifier.",
+    ),
+    "PIECES_ROOT": (
+        "Pieces Root",
+        "A 32-byte SHA-256 Merkle root describing one non-empty file in a BEP-52 torrent. "
+        "The tree is built from 16 KiB leaf blocks; missing leaves needed only to balance "
+        "the tree use deterministic zero-subtree hashes.",
+    ),
+    "PIECE_LAYERS_V2": (
+        "BEP-52 Piece Layers",
+        "A top-level metainfo dictionary mapping a file's pieces root to concatenated "
+        "32-byte hashes at the layer where each hash covers one configured torrent piece. "
+        "SalixTorrent verifies the expected count and reconstructs the declared root instead "
+        "of trusting the layer as opaque metadata.",
+    ),
+    "MERKLE_TREE": (
+        "Merkle Tree",
+        "A binary hash tree where parent hashes authenticate child hashes. BitTorrent v2 "
+        "uses SHA-256 Merkle trees per file, allowing piece/block data to be proven against "
+        "a trusted pieces root without storing a flat SHA-1 hash list in the v2 metadata.",
+    ),
     "TCP": (
         "TCP - Transmission Control Protocol",
         "The reliable, connection-oriented transport used for normal BitTorrent "

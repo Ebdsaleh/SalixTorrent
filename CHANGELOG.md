@@ -6,6 +6,12 @@ Notable SalixTorrent changes are recorded here.
 
 ### Added
 
+- Phase 8 BEP-52 BitTorrent v2 metainfo foundation with version-aware `TorrentIdentity` storage for v1 SHA-1, full v2 SHA-256, hybrid dual identities, and the 20-byte truncated v2 wire form without discarding the canonical 32-byte hash.
+- Strict v2 `meta version` / `file tree` parsing with traversal-safe path components, non-empty-file `pieces root` validation, file-aligned v2 piece counting, and explicit rejection of unsupported future meta versions.
+- BEP-52 Merkle primitives for 16 KiB SHA-256 leaf blocks, layer-specific zero-subtree hashes, full file-root construction, piece-layer construction, piece-layer/root validation, and sibling-proof verification.
+- Required top-level v2 `piece layers` parsing with exact 32-byte hash framing, file-size-derived layer counts, correct short-final-piece subtree padding, unreferenced-layer rejection, and cryptographic reconstruction of each declared pieces root.
+- Dedicated Phase 8 regression coverage for exact raw-info SHA-256 identity, hybrid identity storage, file-tree safety, piece-layer corruption, Merkle proofs, future meta-version handling, and the Phase-9 networking gate.
+
 - Phase 7 presentation-neutral `TransferAddRequest` / `TransferAddHandle` contract and shared `TorrentManager.add_transfer()` path for desktop `.torrent`, desktop magnet, startup-target, and headless inputs.
 - Headless BitTorrent v1 magnet resolution through the existing BEP-9 metadata engine, including structured magnet progress/error events and non-persistent resolved metainfo.
 - Dear-PyGui-free `app/cli/headless.py` presentation layer with rate-limited human-readable status, optional JSON Lines output, download-directory/max-peer overrides, and optional exit-on-complete behavior.
@@ -13,6 +19,9 @@ Notable SalixTorrent changes are recorded here.
 - Phase 7 regression coverage for source classification, shared add routing, headless event presentation, magnet resolution, persistence isolation, and shutdown ownership.
 
 ### Changed
+
+- `TorrentFile` no longer assumes every torrent identity is a 20-byte SHA-1 value; v1 compatibility properties remain intact while new code can query canonical version-aware identity explicitly.
+- v2/hybrid metainfo is parsed and validated before session construction, then deliberately rejected by `TorrentSession` with a clear Phase-9 message so the existing v1 tracker/DHT/peer/piece engine cannot accidentally operate on BEP-52 semantics.
 
 - Desktop Open Torrent, Open Magnet, and command-line startup targets now use the same transfer-add API instead of maintaining separate add/start flows.
 - Torrent-session persistence now tracks persistent sessions explicitly, allowing transient/headless sessions to coexist without leaking into `session.json`.

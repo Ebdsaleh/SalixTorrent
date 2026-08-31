@@ -1,8 +1,8 @@
 # SalixTorrent (Salix_T) v0.3.0
 
-SalixTorrent is a desktop BitTorrent v1 client written in Python with a custom asynchronous protocol engine and a Dear PyGui interface. The project aims to expose what a torrent client is doing rather than hiding the protocol behind a single progress bar: transfers, peers, pieces, files, trackers, discovery sources, bandwidth history, connectivity, and protocol terminology are all inspectable from the application.
+SalixTorrent is a desktop BitTorrent client written in Python with a custom asynchronous protocol engine and a Dear PyGui interface. The live transfer engine remains BitTorrent v1 in v0.3.x, while the BEP-52 BitTorrent v2 metainfo/identity/Merkle foundation is now implemented ahead of Phase 9 networking. The project aims to expose what a torrent client is doing rather than hiding the protocol behind a single progress bar: transfers, peers, pieces, files, trackers, discovery sources, bandwidth history, connectivity, and protocol terminology are all inspectable from the application.
 
-> **Release status:** v0.3.0 is a development release and a major capability milestone for the BitTorrent v1 engine and desktop framework. Core downloading, concurrent uploading, seeding, torrent creation, magnet metadata retrieval, rarest-first/endgame scheduling, bounded asynchronous disk I/O, dual-stack IPv4/IPv6 networking, tracker scrape telemetry, responsive Dear PyGui layouts, and the offline Documentation subsystem are functional. Packaging into a standalone executable remains intentionally deferred until the planned application feature set is further along.
+> **Release status:** v0.3.0 is a development release and a major capability milestone for the BitTorrent v1 engine and desktop framework. Core v1 downloading, concurrent uploading, seeding, torrent creation, magnet metadata retrieval, rarest-first/endgame scheduling, bounded asynchronous disk I/O, dual-stack IPv4/IPv6 networking, tracker scrape telemetry, responsive Dear PyGui layouts, and the offline Documentation subsystem are functional. Phase 8 additionally provides strict BEP-52 v2 metainfo parsing, SHA-256 torrent identity, file-tree handling, Merkle verification primitives, and piece-layer validation. v2 peer networking/magnets/hybrid transfers remain intentionally gated until Phase 9.
 
 ## Highlights
 
@@ -91,6 +91,16 @@ Useful headless options include `--download-dir`, `--max-peers`, `--status-inter
 Phase 7 removes the old GUI/CLI split for user-supplied torrent sources. Desktop Open Torrent/Open Magnet, command-line startup targets, headless `.torrent` files, and headless magnets all enter one presentation-neutral `TransferAddRequest -> TorrentManager.add_transfer()` path. The request carries lifecycle/persistence/download/max-peer policy while the engine owns validation, magnet metadata resolution, session creation, queue/start behavior, and structured events.
 
 The headless layer lives under `app/cli/` and consumes the same `MAGNET_*` and `TRANSFER_STATS` event dictionaries used by the desktop presentation. It formats those events as human-readable terminal status or JSON Lines; it does not import Dear PyGui and does not contain torrent protocol logic. This keeps the backend usable by future OS file/magnet registration, service processes, tests, or alternate front ends without cloning application behavior.
+
+## BitTorrent v2 foundation (Phase 8)
+
+Phase 8 introduces the BEP-52 foundation without pretending that the v1 peer engine is already a v2 client. `TorrentFile` can parse and validate v2 metainfo, preserve the exact raw `info` bytes, calculate the full 32-byte SHA-256 v2 info hash, and represent v1/v2 identities without forcing every torrent identifier into a 20-byte field. Hybrid metainfo can therefore carry both SHA-1 and SHA-256 identities internally even though hybrid swarm participation is reserved for Phase 9.
+
+BEP-52 file trees are traversed as file-aligned metadata rather than flattened into the v1 continuous byte-stream model. Path traversal components are rejected before they can become filesystem paths, non-empty files require 32-byte `pieces root` values, empty files must omit them, and meta versions newer than 2 fail with a version-specific error before generic validation. The required top-level `piece layers` dictionary is parsed into 32-byte SHA-256 hashes and validated against file length, configured piece size, and each file's declared Merkle root.
+
+`app/logic/torrent_v2.py` contains presentation-neutral Merkle primitives: BEP-52 16 KiB leaf hashing, layer-specific zero-subtree hashes, file-root construction, piece-layer construction/verification, and sibling-proof verification. A short final piece is padded inside its piece-sized Merkle subtree before reduction, while hashes covering only data beyond EOF are omitted from the serialized piece layer. These primitives are independent of Dear PyGui and the current v1 session scheduler so Phase 9 can integrate v2 peer-wire hash messages without rewriting metainfo validation.
+
+For safety, `TorrentSession` currently rejects any v2/hybrid metainfo after successful parsing with an explicit Phase-9 message. v2-only `btmh` magnet generation is likewise deliberately not exposed yet. This prevents the existing v1 tracker/DHT/MSE/piece engine from silently treating a 32-byte identity or file-aligned piece space as if it were BEP-3.
 
 ## Interface
 
@@ -241,7 +251,7 @@ Users can choose piece size, trackers, privacy, comment, output path, and option
 
 ## Tests
 
-The project currently includes a small foundation suite and focused regression coverage. Local/network integration scripts may require a `test.torrent` and active peers.
+The project currently includes a foundation suite and focused regression coverage, including dedicated BEP-52/v2 metainfo and Merkle tests. Local/network integration scripts may require a `test.torrent` and active peers.
 
 ```bash
 python foundation_test.py
@@ -253,13 +263,15 @@ python test_ipv6.py
 python test_tracker_scrape.py
 python test_responsive_layout.py
 python test_documentation.py
+python test_headless_cli.py
+python test_torrent_v2.py
 ```
 
-The release-critical regression coverage includes MSE/RC4 interoperability, rarest-first/endgame scheduling, bounded request pipelines, asynchronous disk backpressure/caching, source binding, encryption fallback rules, multi-torrent port mappings, finite/permanent mapping-lease handling, structured UPnP/NAT-PMP diagnostics, source-severity accounting, Interface Lock, real inbound seeding uploads, IPv6 peer TCP, BEP-7/BEP-15 tracker peers, BEP-11 IPv6 PEX, BEP-32 DHT behavior, BEP-48 HTTP scrape batching, BEP-15 UDP scrape batching, scrape/announce telemetry isolation, Windows Proactor reset handling, responsive content-bounds geometry, framework property-cascade fallback/provenance, per-page documentation layout overrides, and semantic documentation typography/media sizing.
+The release-critical regression coverage includes strict BEP-52 v2 identity/file-tree/piece-layer/Merkle validation, MSE/RC4 interoperability, rarest-first/endgame scheduling, bounded request pipelines, asynchronous disk backpressure/caching, source binding, encryption fallback rules, multi-torrent port mappings, finite/permanent mapping-lease handling, structured UPnP/NAT-PMP diagnostics, source-severity accounting, Interface Lock, real inbound seeding uploads, IPv6 peer TCP, BEP-7/BEP-15 tracker peers, BEP-11 IPv6 PEX, BEP-32 DHT behavior, BEP-48 HTTP scrape batching, BEP-15 UDP scrape batching, scrape/announce telemetry isolation, Windows Proactor reset handling, responsive content-bounds geometry, framework property-cascade fallback/provenance, per-page documentation layout overrides, and semantic documentation typography/media sizing.
 
 ## Current scope
 
-v0.3.0 focuses on BitTorrent v1. BitTorrent v2 / `btmh` support is not implemented yet. Standalone executable packaging, file associations, magnet URI registration, and installer work are intentionally planned for a later feature-complete release pass.
+v0.3.x still uses the BitTorrent v1 peer/session engine for live transfers. Phase 8 now implements the BEP-52 v2 metainfo, SHA-256 identity, file-tree, Merkle, and piece-layer foundation, but v2 `btmh` magnets, v2 peer-wire hash exchange, v2-only downloads/seeding, and hybrid swarm participation are intentionally reserved for Phase 9. Standalone executable packaging, file associations, magnet URI registration, and installer work remain planned for a later release pass.
 
 ## Project structure
 
@@ -277,6 +289,7 @@ SalixTorrent/
 ├── test_responsive_layout.py
 ├── test_documentation.py
 ├── test_headless_cli.py
+├── test_torrent_v2.py
 ├── app/
 │   ├── version.py
 │   ├── cli/
@@ -310,6 +323,7 @@ SalixTorrent/
 │   │   ├── torrent_creator.py
 │   │   ├── torrent_file.py
 │   │   ├── torrent_manager.py
+│   │   ├── torrent_v2.py
 │   │   ├── transfer_add.py
 │   │   ├── tracker.py
 │   │   └── tracker_scrape.py

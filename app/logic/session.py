@@ -229,6 +229,11 @@ class TorrentSession:
     ):
         self.torrent_path = torrent_path
         self.torrent = TorrentFile(torrent_path)
+        if self.torrent.is_v2:
+            raise NotImplementedError(
+                "BitTorrent v2 metainfo is valid and supported by the Phase 8 parser, "
+                "but v2/hybrid peer networking is scheduled for Phase 9."
+            )
         self.ui_queue = ui_queue or queue.Queue()
         self.max_peers = max_peers
 
