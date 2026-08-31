@@ -71,11 +71,26 @@ Show the release version:
 python main.py --version
 ```
 
-A headless CLI path is also available for `.torrent` files:
+Headless mode uses the same transfer-add API and BitTorrent engine as the desktop interface. It accepts either `.torrent` files or BitTorrent v1 magnets:
 
 ```bash
 python main.py --cli path/to/file.torrent
+python main.py --cli "magnet:?xt=urn:btih:..."
 ```
+
+Headless status is rate-limited terminal output by default. For scripts and external tooling, JSON Lines output is available without importing Dear PyGui:
+
+```bash
+python main.py --cli path/to/file.torrent --json-status
+```
+
+Useful headless options include `--download-dir`, `--max-peers`, `--status-interval`, and `--exit-on-complete`. Without `--exit-on-complete`, a completed transfer remains alive and seeds until interrupted. `Ctrl+C`, SIGTERM, and Windows SIGBREAK request the same centralized TorrentManager shutdown used by desktop exit. Headless runs are deliberately excluded from the desktop application's persistent transfer queue and resolved magnet metainfo is held only for the lifetime of the headless process.
+
+## Shared transfer-add architecture
+
+Phase 7 removes the old GUI/CLI split for user-supplied torrent sources. Desktop Open Torrent/Open Magnet, command-line startup targets, headless `.torrent` files, and headless magnets all enter one presentation-neutral `TransferAddRequest -> TorrentManager.add_transfer()` path. The request carries lifecycle/persistence/download/max-peer policy while the engine owns validation, magnet metadata resolution, session creation, queue/start behavior, and structured events.
+
+The headless layer lives under `app/cli/` and consumes the same `MAGNET_*` and `TRANSFER_STATS` event dictionaries used by the desktop presentation. It formats those events as human-readable terminal status or JSON Lines; it does not import Dear PyGui and does not contain torrent protocol logic. This keeps the backend usable by future OS file/magnet registration, service processes, tests, or alternate front ends without cloning application behavior.
 
 ## Interface
 
@@ -261,8 +276,11 @@ SalixTorrent/
 ├── test_tracker_scrape.py
 ├── test_responsive_layout.py
 ├── test_documentation.py
+├── test_headless_cli.py
 ├── app/
 │   ├── version.py
+│   ├── cli/
+│   │   └── headless.py
 │   ├── engine/
 │   │   ├── documentation/
 │   │   │   ├── layout.py
@@ -292,6 +310,7 @@ SalixTorrent/
 │   │   ├── torrent_creator.py
 │   │   ├── torrent_file.py
 │   │   ├── torrent_manager.py
+│   │   ├── transfer_add.py
 │   │   ├── tracker.py
 │   │   └── tracker_scrape.py
 │   └── views/

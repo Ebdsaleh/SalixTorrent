@@ -4,7 +4,22 @@ Notable SalixTorrent changes are recorded here.
 
 ## Unreleased
 
-No changes recorded yet.
+### Added
+
+- Phase 7 presentation-neutral `TransferAddRequest` / `TransferAddHandle` contract and shared `TorrentManager.add_transfer()` path for desktop `.torrent`, desktop magnet, startup-target, and headless inputs.
+- Headless BitTorrent v1 magnet resolution through the existing BEP-9 metadata engine, including structured magnet progress/error events and non-persistent resolved metainfo.
+- Dear-PyGui-free `app/cli/headless.py` presentation layer with rate-limited human-readable status, optional JSON Lines output, download-directory/max-peer overrides, and optional exit-on-complete behavior.
+- Clean headless SIGINT/SIGTERM/Windows SIGBREAK handling that routes process termination through centralized TorrentManager shutdown.
+- Phase 7 regression coverage for source classification, shared add routing, headless event presentation, magnet resolution, persistence isolation, and shutdown ownership.
+
+### Changed
+
+- Desktop Open Torrent, Open Magnet, and command-line startup targets now use the same transfer-add API instead of maintaining separate add/start flows.
+- Torrent-session persistence now tracks persistent sessions explicitly, allowing transient/headless sessions to coexist without leaking into `session.json`.
+
+### Fixed
+
+- Headless mode no longer risks overwriting the desktop transfer queue during shutdown, and non-persistent magnet resolution no longer leaves cached metainfo in SalixTorrent application data.
 
 ## v0.3.0 - 2026-08-31
 

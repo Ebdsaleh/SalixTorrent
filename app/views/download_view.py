@@ -13,6 +13,7 @@ import dearpygui.dearpygui as dpg
 
 from app.logic.network_binding import format_endpoint
 from app.logic.torrent_manager import TorrentManager
+from app.logic.transfer_add import TransferAddRequest
 from app.engine.desktop_integration import DesktopIntegration
 from app.engine.responsive_layout import DialogMetrics, ResponsiveLayout, clamp, fill_height, split_widths
 from app.views.peer_view import PeerView
@@ -798,7 +799,10 @@ class DownloadView:
     def _submit_magnet(self):
         magnet_uri = str(dpg.get_value(self.magnet_input) or "").strip()
         try:
-            info_hash = self.manager.add_magnet(magnet_uri, start=True)
+            handle = self.manager.add_transfer(
+                TransferAddRequest(source=magnet_uri, start=True, persist=True)
+            )
+            info_hash = handle.info_hash
         except Exception as exc:
             dpg.set_value(self.magnet_status_text, f"Error: {exc}")
             dpg.set_value(self.magnet_progress, 0.0)
@@ -873,10 +877,11 @@ class DownloadView:
         root.destroy()
 
         if file_path and os.path.exists(file_path):
-            session = self.manager.add_torrent(file_path)
-            self._removed_info_hashes.discard(session.torrent.hex_info_hash)
-            self._select_torrent(session.torrent.hex_info_hash)
-            self.manager.start_torrent(session.torrent.hex_info_hash)
+            handle = self.manager.add_transfer(
+                TransferAddRequest(source=file_path, start=True, persist=True)
+            )
+            self._removed_info_hashes.discard(handle.info_hash)
+            self._select_torrent(handle.info_hash)
 
     def _on_resume_clicked(self):
         if self.active_info_hash:

@@ -708,6 +708,57 @@ HELP_TOPICS: Tuple[HelpTopic, ...] = (
         ),
     ),
     HelpTopic(
+        key="headless",
+        title="Headless & Command-Line Mode",
+        summary=(
+            "How SalixTorrent runs without Dear PyGui, resolves .torrent files or magnets through "
+            "the same engine as the desktop interface, reports structured progress, and shuts down cleanly."
+        ),
+        sections=(
+            (
+                "One transfer-add path",
+                "Desktop Open Torrent/Open Magnet, startup targets and headless inputs all enter the same "
+                "presentation-neutral transfer-add API. The front end supplies a source and policy such as "
+                "start, persistence, maximum peers or download directory; TorrentManager owns validation, "
+                "magnet metadata resolution, session creation and lifecycle behavior.",
+            ),
+            (
+                "Headless magnet resolution",
+                '`python main.py --cli "magnet:?xt=urn:btih:..."` uses the ordinary BEP-9 magnet '
+                "resolver, tracker/DHT discovery, peer-encryption policy and network binding settings without "
+                "requiring Dear PyGui. Resolved metainfo is temporary in headless mode and is removed when "
+                "the process shuts down.",
+            ),
+            (
+                "Progress and status output",
+                "Headless mode consumes structured MAGNET and TRANSFER_STATS engine events. Human-readable "
+                "status is rate-limited so a terminal is not flooded. `--json-status` emits JSON Lines for "
+                "scripts or future supervisory tools while keeping torrent protocol logic out of the CLI layer.",
+            ),
+            (
+                "Completion and seeding",
+                "By default a completed headless torrent stays alive and seeds, matching normal BitTorrent "
+                "client behavior. `--exit-on-complete` is available for scripted jobs that should terminate "
+                "once the wanted payload becomes complete.",
+            ),
+            (
+                "Clean shutdown and persistence isolation",
+                "Ctrl+C, SIGTERM and Windows SIGBREAK request centralized TorrentManager shutdown so peer, "
+                "tracker, DHT, listener and disk work is torn down by its normal owner. Headless sessions do "
+                "not read or rewrite the desktop transfer queue, so command-line experiments cannot silently "
+                "replace the user's saved GUI session.",
+            ),
+        ),
+        related_terms=(
+            "HEADLESS_MODE",
+            "TRANSFER_ADD_API",
+            "HEADLESS_STATUS",
+            "JSON_STATUS",
+            "EXIT_ON_COMPLETE",
+            "CLEAN_SIGNAL_SHUTDOWN",
+        ),
+    ),
+    HelpTopic(
         key="documentation",
         title="Documentation & Accessibility",
         summary=(

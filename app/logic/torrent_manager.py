@@ -8,12 +8,18 @@ import secrets
 import shutil
 import sys
 import threading
+import tempfile
 from pathlib import Path
 from typing import Dict, List, Optional
 
 from app.logic.connectivity import ConnectivityManager
 from app.logic.network_binding import normalise_bind_address
 from app.logic.tracker_scrape import TrackerScrapeCoordinator
+from app.logic.transfer_add import (
+    TransferAddHandle,
+    TransferAddRequest,
+    TransferSourceKind,
+)
 from app.logic.magnet import (
     MagnetCancelled,
     MagnetError,
@@ -73,10 +79,23 @@ class TorrentManager:
         TORRENT_PRIORITY_LOW: 2,
     }
 
-    def __new__(cls, ui_queue: Optional[queue.Queue] = None):
+    def __new__(
+        cls,
+        ui_queue: Optional[queue.Queue] = None,
+        *,
+        event_queue: Optional[queue.Queue] = None,
+        session_persistence_enabled: bool = True,
+    ):
+        if ui_queue is not None and event_queue is not None and ui_queue is not event_queue:
+            raise ValueError("Provide either ui_queue or event_queue, not two different queues.")
+        supplied_queue = event_queue if event_queue is not None else ui_queue
+
         if cls._instance is None:
             cls._instance = super(TorrentManager, cls).__new__(cls)
-            cls._instance.ui_queue = ui_queue or queue.Queue()
+            cls._instance.event_queue = supplied_queue or queue.Queue()
+            # Backwards-compatible alias used by TorrentSession and existing DPG
+            # views. The queue itself is presentation-neutral structured events.
+            cls._instance.ui_queue = cls._instance.event_queue
             cls._instance.sessions: Dict[str, TorrentSession] = {}
             cls._instance._cmd_queue: Optional[asyncio.Queue] = None
             cls._instance._loop: Optional[asyncio.AbstractEventLoop] = None
@@ -85,6 +104,9 @@ class TorrentManager:
             cls._instance._engine_ready = threading.Event()
             cls._instance._sessions_lock = threading.Lock()
             cls._instance._state_file_lock = threading.Lock()
+            cls._instance._session_persistence_enabled = bool(session_persistence_enabled)
+            cls._instance._persistent_sessions = set()
+            cls._instance._ephemeral_torrent_paths = set()
 
             # Persistent session metadata.  This is deliberately separate from
             # TorrentSession.state because application shutdown must stop network
@@ -125,9 +147,10 @@ class TorrentManager:
                 cls._instance._scrape_sessions_snapshot,
                 bind_address=cls._instance._settings.get("network_bind_address", ""),
             )
-        elif ui_queue is not None:
-            # Keep the singleton attached to the application's real UI queue.
-            cls._instance.ui_queue = ui_queue
+        elif supplied_queue is not None:
+            # Keep the singleton attached to the application's real event queue.
+            cls._instance.event_queue = supplied_queue
+            cls._instance.ui_queue = supplied_queue
 
         return cls._instance
 
@@ -481,9 +504,19 @@ class TorrentManager:
 
     def _build_persistent_state(self) -> dict:
         with self._sessions_lock:
-            sessions = dict(self.sessions)
-            desired_states = dict(self._desired_states)
-            source_paths = dict(self._source_paths)
+            persistent_hashes = set(self._persistent_sessions)
+            sessions = {
+                h: session for h, session in self.sessions.items()
+                if h in persistent_hashes
+            }
+            desired_states = {
+                h: state for h, state in self._desired_states.items()
+                if h in persistent_hashes
+            }
+            source_paths = {
+                h: path for h, path in self._source_paths.items()
+                if h in persistent_hashes
+            }
             selected_info_hash = self._selected_info_hash
 
             order = [h for h in self._queue_order if h in sessions]
@@ -536,6 +569,8 @@ class TorrentManager:
 
     def save_session_state(self, force: bool = False):
         """Atomically persist the current queue and the user's lifecycle intent."""
+        if not self._session_persistence_enabled:
+            return
         if self._restoring_state and not force:
             return
 
@@ -554,6 +589,8 @@ class TorrentManager:
             print(f"[Salix_T Notice] Could not save previous session: {exc}")
 
     def _load_session_state(self) -> Optional[dict]:
+        if not self._session_persistence_enabled:
+            return None
         if not self._state_file.exists():
             return None
 
@@ -686,6 +723,7 @@ class TorrentManager:
                     self.sessions[info_hash] = session
                     self._desired_states[info_hash] = intent
                     self._source_paths[info_hash] = source_path
+                    self._persistent_sessions.add(info_hash)
                     restored_order.append(info_hash)
 
                 # Recreate the visual lifecycle state before the first snapshot.
@@ -911,6 +949,7 @@ class TorrentManager:
             self.sessions.pop(info_hash, None)
             self._desired_states.pop(info_hash, None)
             self._source_paths.pop(info_hash, None)
+            self._persistent_sessions.discard(info_hash)
             self._explicit_start_requests.discard(info_hash)
             self._queue_order = [h for h in self._queue_order if h != info_hash]
 
@@ -1189,7 +1228,15 @@ class TorrentManager:
             }
         )
 
-    async def _resolve_magnet(self, magnet_uri: str, start_requested: bool):
+    async def _resolve_magnet(
+        self,
+        magnet_uri: str,
+        start_requested: bool,
+        *,
+        persist: bool = True,
+        max_peers: Optional[int] = None,
+        download_dir: Optional[str] = None,
+    ):
         magnet = MagnetLink.parse(magnet_uri)
         info_hash = magnet.hex_info_hash
         fetcher = None
@@ -1226,7 +1273,11 @@ class TorrentManager:
             fetcher = MagnetMetadataFetcher(
                 magnet,
                 peer_id,
-                max_peers=int(self._settings.get("default_max_peers", 25)),
+                max_peers=(
+                    max(1, int(max_peers))
+                    if max_peers is not None
+                    else int(self._settings.get("default_max_peers", 25))
+                ),
                 progress_callback=on_progress,
                 encryption_policy=self._settings.get("peer_encryption", "Prefer Encryption"),
                 bind_address=self._settings.get("network_bind_address", ""),
@@ -1244,17 +1295,32 @@ class TorrentManager:
             raw_info = await fetcher.resolve()
             torrent_bytes = build_torrent_bytes(magnet, raw_info)
 
-            self._ensure_state_directories()
-            destination = self._torrent_cache_dir / f"{info_hash}.torrent"
-            temp_path = destination.with_suffix(".torrent.tmp")
-            await asyncio.to_thread(temp_path.write_bytes, torrent_bytes)
-            os.replace(temp_path, destination)
+            if persist:
+                self._ensure_state_directories()
+                destination = self._torrent_cache_dir / f"{info_hash}.torrent"
+                temp_path = destination.with_suffix(".torrent.tmp")
+                await asyncio.to_thread(temp_path.write_bytes, torrent_bytes)
+                os.replace(temp_path, destination)
+            else:
+                fd, temp_name = tempfile.mkstemp(
+                    prefix=f"salixtorrent-{info_hash[:12]}-",
+                    suffix=".torrent",
+                )
+                os.close(fd)
+                destination = Path(temp_name)
+                await asyncio.to_thread(destination.write_bytes, torrent_bytes)
+                self._ephemeral_torrent_paths.add(str(destination))
 
             # Parse through the ordinary TorrentSession/TorrentFile path. This
             # verifies the exact raw info hash again and means resolved magnets
             # use the same storage, checking, queueing and persistence code as
             # normal .torrent files.
-            session = self.add_torrent(str(destination), persist=True)
+            session = self.add_torrent(
+                str(destination),
+                max_peers=max_peers,
+                persist=persist,
+                download_dir=download_dir,
+            )
             if session.torrent.hex_info_hash != info_hash:
                 raise MagnetError("Resolved metadata did not reproduce the magnet info hash.")
 
@@ -1410,7 +1476,13 @@ class TorrentManager:
                         continue
 
                     task = asyncio.create_task(
-                        self._resolve_magnet(magnet.uri, start_requested)
+                        self._resolve_magnet(
+                            magnet.uri,
+                            start_requested,
+                            persist=bool(payload.get("persist", True)),
+                            max_peers=payload.get("max_peers"),
+                            download_dir=payload.get("download_dir"),
+                        )
                     )
                     self._magnet_tasks[actual_hash] = task
                     continue
@@ -1559,11 +1631,20 @@ class TorrentManager:
     # Torrent lifecycle API
     # ------------------------------------------------------------------
 
-    def add_magnet(self, magnet_uri: str, start: bool = True) -> str:
+    def add_magnet(
+        self,
+        magnet_uri: str,
+        start: bool = True,
+        *,
+        persist: bool = True,
+        max_peers: Optional[int] = None,
+        download_dir: Optional[str] = None,
+    ) -> str:
         """Begin non-blocking BEP-9 metadata retrieval for a magnet URI.
 
-        Returns the normalized hexadecimal info hash immediately so the UI can
-        associate progress/cancel events with the request.
+        Returns the normalized hexadecimal info hash immediately so any
+        presentation layer can correlate progress/cancel events with the request.
+        ``persist=False`` keeps resolved metainfo out of the desktop session/cache.
         """
         magnet = MagnetLink.parse(magnet_uri)
         if not self._running:
@@ -1577,10 +1658,67 @@ class TorrentManager:
             (
                 TorrentCommand.ADD_MAGNET,
                 magnet.hex_info_hash,
-                {"magnet_uri": magnet.uri, "start": bool(start)},
+                {
+                    "magnet_uri": magnet.uri,
+                    "start": bool(start),
+                    "persist": bool(persist),
+                    "max_peers": max_peers,
+                    "download_dir": download_dir,
+                },
             ),
         )
         return magnet.hex_info_hash
+
+    def add_transfer(
+        self,
+        request: TransferAddRequest | str,
+        **overrides,
+    ) -> TransferAddHandle:
+        """Add a .torrent file or magnet through one presentation-neutral API.
+
+        GUI, CLI, future file associations, and magnet URI registration should
+        enter the engine here so validation/lifecycle policy cannot drift between
+        front ends.  ``request`` may be a prebuilt TransferAddRequest or a source
+        string plus keyword overrides accepted by that dataclass.
+        """
+        if isinstance(request, TransferAddRequest):
+            if overrides:
+                raise TypeError("Overrides are not accepted with TransferAddRequest.")
+            add_request = request
+        else:
+            add_request = TransferAddRequest(source=str(request or ""), **overrides)
+
+        source = add_request.normalized_source
+        if add_request.kind == TransferSourceKind.MAGNET:
+            info_hash = self.add_magnet(
+                source,
+                start=add_request.start,
+                persist=add_request.persist,
+                max_peers=add_request.max_peers,
+                download_dir=add_request.download_dir,
+            )
+            return TransferAddHandle(
+                kind=TransferSourceKind.MAGNET,
+                source=source,
+                info_hash=info_hash,
+                session=None,
+            )
+
+        session = self.add_torrent(
+            source,
+            max_peers=add_request.max_peers,
+            persist=add_request.persist,
+            download_dir=add_request.download_dir,
+        )
+        info_hash = session.torrent.hex_info_hash
+        if add_request.start:
+            self.start_torrent(info_hash)
+        return TransferAddHandle(
+            kind=TransferSourceKind.TORRENT,
+            source=source,
+            info_hash=info_hash,
+            session=session,
+        )
 
     def cancel_magnet(self, info_hash: str):
         info_hash = str(info_hash or "").strip().lower()
@@ -1701,6 +1839,11 @@ class TorrentManager:
                     self._queue_order.append(info_hash)
                 session = new_session
 
+
+        if persist:
+            with self._sessions_lock:
+                self._persistent_sessions.add(info_hash)
+
         if existing_session and not replaced_existing:
             if persist:
                 self._cache_torrent_file(info_hash, torrent_path)
@@ -1726,7 +1869,8 @@ class TorrentManager:
                 self._settings.get("default_upload_limit_unit", "KB/s"),
             )
 
-        self._cache_torrent_file(info_hash, torrent_path)
+        if persist:
+            self._cache_torrent_file(info_hash, torrent_path)
 
         # Put an Idle row into the UI immediately. The background engine will
         # later change it to Checking/Downloading/Seeding as appropriate.
@@ -1892,15 +2036,27 @@ class TorrentManager:
         for info_hash in hashes:
             self.start_torrent(info_hash)
 
+    def _cleanup_ephemeral_torrents(self):
+        paths = list(self._ephemeral_torrent_paths)
+        self._ephemeral_torrent_paths.clear()
+        for value in paths:
+            try:
+                Path(value).unlink(missing_ok=True)
+            except OSError:
+                pass
+
     def shutdown(self, timeout: float = 5.0):
         """Persist intent, then cleanly stop the async engine before process exit."""
         # This snapshot is the important one: it captures ACTIVE before the
-        # shutdown command invokes session.stop() for network cleanup.
+        # shutdown command invokes session.stop() for network cleanup. Headless
+        # managers disable session persistence entirely, so they never overwrite
+        # the desktop application's saved queue.
         self.save_session_state(force=True)
 
         if not self._running:
             self._scrape_coordinator.close()
             self._connectivity.close()
+            self._cleanup_ephemeral_torrents()
             return
 
         if self._engine_ready.wait(timeout=2.0):
@@ -1920,5 +2076,5 @@ class TorrentManager:
             print("[Salix_T Notice] Async engine did not finish shutdown before timeout.")
 
         self._connectivity.close()
-
+        self._cleanup_ephemeral_torrents()
 

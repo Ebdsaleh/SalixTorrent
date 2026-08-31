@@ -1121,6 +1121,40 @@ HELP_TERMS = {
         "torrent, discovery settings, connectivity state and application-data file "
         "locations. It is designed to make troubleshooting reproducible.",
     ),
+    "HEADLESS_MODE": (
+        "Headless Mode",
+        "Runs SalixTorrent without Dear PyGui. Headless mode accepts .torrent files or BitTorrent v1 "
+        "magnet URIs, uses the same TorrentManager/peer/tracker/DHT engine as the desktop interface, "
+        "and owns only terminal presentation and process lifecycle.",
+    ),
+    "TRANSFER_ADD_API": (
+        "Shared Transfer-Add API",
+        "The presentation-neutral path used by desktop Open Torrent/Open Magnet, startup targets and "
+        "headless inputs. A TransferAddRequest carries source and policy; TorrentManager performs the "
+        "actual validation, magnet resolution, session creation and optional start operation.",
+    ),
+    "HEADLESS_STATUS": (
+        "Headless Status Output",
+        "Rate-limited terminal presentation derived from structured TRANSFER_STATS and MAGNET events. "
+        "The engine exposes state, progress, rates and peers; the CLI decides only how to render them.",
+    ),
+    "JSON_STATUS": (
+        "JSON Status",
+        "The --json-status headless option emits one JSON object per line for scripts or supervisory "
+        "tools. It uses the same structured engine events as human-readable status and does not import "
+        "Dear PyGui.",
+    ),
+    "EXIT_ON_COMPLETE": (
+        "Exit on Complete",
+        "The --exit-on-complete headless option terminates after the wanted payload becomes complete. "
+        "Without it, SalixTorrent remains alive and seeds until a shutdown signal is received.",
+    ),
+    "CLEAN_SIGNAL_SHUTDOWN": (
+        "Clean Signal Shutdown",
+        "Ctrl+C, SIGTERM and Windows SIGBREAK request the same centralized TorrentManager shutdown used "
+        "for ordinary application exit, allowing live peer, tracker, DHT, listener and disk work to close "
+        "through their normal lifecycle owner.",
+    ),
 }
 
 
