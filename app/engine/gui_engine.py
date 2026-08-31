@@ -11,6 +11,7 @@ import dearpygui.dearpygui as dpg
 from app.engine.scene_manager import SceneManager
 from app.engine.desktop_integration import DesktopIntegration
 from app.engine.ui_typography import UiTypography
+from app.engine.responsive_layout import ResponsiveLayout
 
 
 class GuiEngine:
@@ -67,7 +68,17 @@ class GuiEngine:
             )
 
         dpg.create_viewport(title="SalixTorrent (Salix_T)", width=1100, height=700)
+        # Native desktop applications enforce a sensible minimum rather than
+        # allowing their controls to collapse into unusable geometry.
+        try:
+            dpg.set_viewport_min_width(1000)
+            dpg.set_viewport_min_height(620)
+        except Exception:
+            pass
         dpg.setup_dearpygui()
+
+        self.layout = ResponsiveLayout.get_instance()
+        self.layout.install_viewport_callback()
 
         # TorrentManager is already created by main.py before the viewport. A
         # local import avoids turning the engine/settings relationship into a
@@ -99,6 +110,12 @@ class GuiEngine:
 
     def switch_scene(self, scene_name: str, **kwargs):
         self.scene_mgr.switch_to(scene_name, **kwargs)
+        # Hidden scene containers do not receive useful resize events. Refresh
+        # layout once when a scene becomes visible rather than polling it.
+        try:
+            self.layout.refresh_all()
+        except Exception:
+            pass
         if self.application_menu is not None:
             try:
                 self.application_menu.update(force=True)
@@ -151,6 +168,10 @@ class GuiEngine:
         manager = TorrentManager.get_instance()
         self.desktop.configure(manager.get_app_settings())
         dpg.show_viewport()
+        try:
+            self.layout.refresh_all()
+        except Exception:
+            pass
 
         # Dear PyGui 2.x exposes the native platform handle. On older builds the
         # tray still exists, but automatic minimize-to-tray is simply skipped.
@@ -232,5 +253,3 @@ class GuiEngine:
         finally:
             self.desktop.stop()
             dpg.destroy_context()
-
-

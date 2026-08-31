@@ -38,7 +38,7 @@ class SpeedView:
         self._rate_unit = "Auto"
 
     def build_view(self, parent_tag):
-        with dpg.child_window(parent=parent_tag, height=315, border=True):
+        with dpg.child_window(parent=parent_tag, height=-1, border=True):
             with dpg.group(horizontal=True):
                 self.summary_text = dpg.add_text(
                     "Speed: select a torrent to inspect transfer history",
@@ -68,7 +68,7 @@ class SpeedView:
             add_help_tooltip(self.limit_text, "TRANSFER_LIMITS")
             dpg.add_separator()
 
-            with dpg.plot(height=230, width=-1) as self.plot_id:
+            with dpg.plot(height=-1, width=-1) as self.plot_id:
                 dpg.add_plot_legend()
                 self.x_axis = dpg.add_plot_axis(
                     dpg.mvXAxis,
@@ -282,5 +282,3 @@ class SpeedView:
         minimum_scale = 0.125 if plot_unit in {"MB/s", "Mbps"} else 128.0
         y_max = max(minimum_scale, peak * 1.15)
         dpg.set_axis_limits(self.y_axis, 0.0, y_max)
-
-

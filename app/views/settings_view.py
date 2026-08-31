@@ -8,6 +8,7 @@ from tkinter import filedialog
 import dearpygui.dearpygui as dpg
 
 from app.engine.desktop_integration import DesktopIntegration
+from app.engine.responsive_layout import ResponsiveLayout, clamp, split_widths
 from app.engine.ui_typography import (
     UI_FONT_LABELS,
     UI_FONT_SIZES,
@@ -41,21 +42,23 @@ class SettingsView:
         self._last_connectivity_refresh = 0.0
         self._bind_option_to_address = {}
         self._bind_address_to_option = {}
+        self.layout = ResponsiveLayout.get_instance()
+        self._layout_root = None
 
     def build_view(self, parent_tag):
         with dpg.group(parent=parent_tag):
             preferences_heading = dpg.add_text("PREFERENCES", color=(0, 255, 128))
             add_help_tooltip(preferences_heading, "PREFERENCES_VIEW")
-            preferences_intro = dpg.add_text(
+            self.preferences_intro = dpg.add_text(
                 "Network toggles and global limits apply to active sessions immediately. "
                 "New-torrent defaults only affect torrents added later.",
                 color=(155, 155, 160),
                 wrap=1000,
             )
-            add_help_tooltip(preferences_intro, "PREFERENCES_VIEW")
+            add_help_tooltip(self.preferences_intro, "PREFERENCES_VIEW")
             dpg.add_spacer(height=6)
 
-            with dpg.child_window(height=112, border=True):
+            with dpg.child_window(height=112, width=-1, border=True) as self.downloads_panel:
                 dpg.add_text("DOWNLOADS", color=(100, 180, 255))
                 dpg.add_separator()
                 with dpg.group(horizontal=True):
@@ -70,7 +73,7 @@ class SettingsView:
 
             dpg.add_spacer(height=7)
             with dpg.group(horizontal=True):
-                with dpg.child_window(width=530, height=250, border=True):
+                with dpg.child_window(width=530, height=250, border=True) as self.networking_panel:
                     dpg.add_text("NETWORKING", color=(255, 200, 100))
                     dpg.add_separator()
                     with dpg.group(horizontal=True):
@@ -128,7 +131,7 @@ class SettingsView:
                         )
                         add_help_tooltip(self.enable_natpmp_checkbox, "NATPMP")
 
-                with dpg.child_window(width=-1, height=360, border=True):
+                with dpg.child_window(width=-1, height=360, border=True) as self.connectivity_panel:
                     dpg.add_text("INCOMING CONNECTIVITY", color=(0, 255, 128))
                     dpg.add_separator()
                     self.connectivity_status = dpg.add_text("Status: Waiting")
@@ -159,16 +162,16 @@ class SettingsView:
                         callback=self._refresh_connectivity,
                     )
                     add_help_tooltip(refresh_connectivity_button, "PORT_MAPPING")
-                    connectivity_note = dpg.add_text(
+                    self.connectivity_note = dpg.add_text(
                         "'Mapped' means the router accepted a mapping. 'Incoming Confirmed' "
                         "means a real remote peer has reached SalixTorrent.",
                         color=(145, 145, 150),
                         wrap=480,
                     )
-                    add_help_tooltip(connectivity_note, "PORT_MAPPING")
+                    add_help_tooltip(self.connectivity_note, "PORT_MAPPING")
 
             dpg.add_spacer(height=7)
-            with dpg.child_window(height=238, border=True):
+            with dpg.child_window(height=238, width=-1, border=True) as self.privacy_panel:
                 dpg.add_text("PRIVACY / TRANSPORT", color=(100, 220, 200))
                 dpg.add_separator()
                 with dpg.group(horizontal=True):
@@ -209,18 +212,18 @@ class SettingsView:
                     default_value=bool(self.settings.get("mask_peer_ips", False)),
                 )
                 add_help_tooltip(self.mask_peer_ips_checkbox, "IP_MASKING")
-                transport_note = dpg.add_text(
+                self.transport_note = dpg.add_text(
                     "Binding chooses one local IPv4 or IPv6 source address for torrent traffic. "
                     "Any interface uses both families when the operating system provides them. Interface Lock "
                     "additionally monitors the selected address and stops torrent networking immediately if it disappears.",
                     color=(145, 145, 150),
                     wrap=1000,
                 )
-                add_help_tooltip(transport_note, "INTERFACE_LOCK")
+                add_help_tooltip(self.transport_note, "INTERFACE_LOCK")
 
             dpg.add_spacer(height=7)
             with dpg.group(horizontal=True):
-                with dpg.child_window(width=530, height=225, border=True):
+                with dpg.child_window(width=530, height=225, border=True) as self.queue_preferences_panel:
                     dpg.add_text("QUEUE", color=(180, 160, 255))
                     dpg.add_separator()
                     with dpg.group(horizontal=True):
@@ -250,7 +253,7 @@ class SettingsView:
                     )
                     add_help_tooltip(self.auto_resume_checkbox, "AUTO_RESUME")
 
-                with dpg.child_window(width=-1, height=225, border=True):
+                with dpg.child_window(width=-1, height=225, border=True) as self.global_bandwidth_panel:
                     dpg.add_text("GLOBAL BANDWIDTH", color=(255, 170, 100))
                     dpg.add_separator()
                     global_bandwidth_note = dpg.add_text(
@@ -293,7 +296,7 @@ class SettingsView:
 
             dpg.add_spacer(height=7)
             with dpg.group(horizontal=True):
-                with dpg.child_window(width=530, height=205, border=True):
+                with dpg.child_window(width=530, height=205, border=True) as self.new_defaults_panel:
                     dpg.add_text("NEW TORRENT DEFAULTS", color=(100, 180, 255))
                     dpg.add_separator()
                     new_torrent_defaults_note = dpg.add_text("Per-torrent limits assigned when a torrent is added.")
@@ -331,7 +334,7 @@ class SettingsView:
                         add_help_tooltip(self.upload_limit_input, "NEW_TORRENT_LIMITS")
                         add_help_tooltip(self.upload_limit_unit, "NEW_TORRENT_LIMITS")
 
-                with dpg.child_window(width=-1, height=260, border=True):
+                with dpg.child_window(width=-1, height=260, border=True) as self.desktop_panel:
                     dpg.add_text("DESKTOP", color=(0, 255, 128))
                     dpg.add_separator()
                     with dpg.group(horizontal=True):
@@ -392,6 +395,49 @@ class SettingsView:
                 color=(130, 130, 135),
             )
             add_help_tooltip(settings_path_text, "SETTINGS_FILE")
+
+        self._layout_root = parent_tag
+        self.layout.watch_item(
+            parent_tag,
+            ("settings_view", "root"),
+            self._layout_settings_view,
+        )
+
+    def _layout_settings_view(self):
+        width, _height = self.layout.item_size(self._layout_root)
+        if width <= 1:
+            return
+
+        inner_width = max(640, width - 18)
+        left_width, right_width = split_widths(
+            inner_width,
+            (0.48, 0.52),
+            minimums=(430, 430),
+            gap=8,
+        )
+        for left, right in (
+            (self.networking_panel, self.connectivity_panel),
+            (self.queue_preferences_panel, self.global_bandwidth_panel),
+            (self.new_defaults_panel, self.desktop_panel),
+        ):
+            self.layout.width(left, left_width)
+            self.layout.width(right, right_width)
+
+        self.layout.width(
+            self.download_dir_input,
+            clamp(width - 300, 320, 1200),
+        )
+        self.layout.width(
+            self.network_bind_combo,
+            clamp(width - 430, 280, 650),
+        )
+
+        full_wrap = clamp(width - 42, 560, 1400)
+        connectivity_wrap = max(280, right_width - 34)
+        self.layout.wrap(self.preferences_intro, full_wrap)
+        self.layout.wrap(self.transport_note, full_wrap)
+        self.layout.wrap(self.connectivity_error, connectivity_wrap)
+        self.layout.wrap(self.connectivity_note, connectivity_wrap)
 
     def _build_network_interface_options(self, selected_address=""):
         selected_address = normalise_bind_address(selected_address)
@@ -677,6 +723,7 @@ class SettingsView:
         self._render_connectivity()
 
     def on_show(self, **kwargs):
+        self.layout.trigger(("settings_view", "root"))
         settings = self.manager.get_app_settings()
         settings["max_active_downloads"] = self.manager.get_max_active_downloads()
         self._sync_controls(settings)
@@ -690,9 +737,3 @@ class SettingsView:
         if now - self._last_connectivity_refresh >= 1.0:
             self._last_connectivity_refresh = now
             self._render_connectivity()
-
-
-
-
-
-

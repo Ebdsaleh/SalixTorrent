@@ -70,22 +70,22 @@ class MasterViewport:
             dpg.add_separator()
             dpg.add_spacer(height=5)
 
-            with dpg.group(tag="view_container_DownloadView"):
+            with dpg.child_window(tag="view_container_DownloadView", width=-1, height=-1, border=False):
                 download_view.build_view(parent_tag="view_container_DownloadView")
                 self.gui.scene_mgr.register_scene("DownloadView", download_view)
 
-            with dpg.group(tag="view_container_CreateTorrentView"):
+            with dpg.child_window(tag="view_container_CreateTorrentView", width=-1, height=-1, border=False):
                 create_torrent_view.build_view(parent_tag="view_container_CreateTorrentView")
                 self.gui.scene_mgr.register_scene(
                     "CreateTorrentView",
                     create_torrent_view,
                 )
 
-            with dpg.group(tag="view_container_SettingsView"):
+            with dpg.child_window(tag="view_container_SettingsView", width=-1, height=-1, border=False):
                 settings_view.build_view(parent_tag="view_container_SettingsView")
                 self.gui.scene_mgr.register_scene("SettingsView", settings_view)
 
-            with dpg.group(tag="view_container_HelpTopicsView"):
+            with dpg.child_window(tag="view_container_HelpTopicsView", width=-1, height=-1, border=False):
                 help_topics_view.build_view(parent_tag="view_container_HelpTopicsView")
                 self.gui.scene_mgr.register_scene("HelpTopicsView", help_topics_view)
 
@@ -100,5 +100,3 @@ class MasterViewport:
 
     def run(self):
         self.gui.run()
-
-

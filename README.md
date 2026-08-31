@@ -92,6 +92,12 @@ General | Peers | Pieces | Files | Sources | Speed
 
 Technical labels and values throughout the interface have contextual hover help. `Help -> Help Topics...` opens the built-in searchable manual, while `Help -> Glossary A-Z...` jumps directly to the technical glossary.
 
+### Responsive desktop layout
+
+SalixTorrent treats Dear PyGui as the rendering engine rather than accepting fixed launch-time geometry. Main scenes fill the available client area, data tables/plots and editors grow into useful space, split panes recompute their proportions on resize, and data-heavy dialogs keep their action rows attached to the bottom of the resizable content. Text wrapping follows the rendered pane width instead of retaining one hard-coded measure.
+
+The layout system is event-driven: viewport and item resize handlers feed one reusable `ResponsiveLayout` service, which memoizes geometry writes and performs no per-frame layout polling. Small destructive confirmations and transient notices intentionally remain compact/fixed-size, matching normal desktop-application conventions rather than stretching controls that gain no usability from extra space.
+
 ## Peer discovery
 
 For public torrents SalixTorrent can discover peers through:

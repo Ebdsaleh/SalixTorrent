@@ -40,7 +40,7 @@ class FileView:
         self._storage_mode = "Download"
 
     def build_view(self, parent_tag):
-        with dpg.child_window(parent=parent_tag, height=315, border=True):
+        with dpg.child_window(parent=parent_tag, height=-1, border=True):
             self.summary_text = dpg.add_text(
                 "Files: select a torrent to inspect payload files",
                 color=(100, 180, 255),
@@ -66,7 +66,7 @@ class FileView:
                 borders_innerH=True,
                 borders_innerV=True,
                 scrollY=True,
-                height=225,
+                height=-1,
             ) as self.table_id:
                 file_col = dpg.add_table_column(
                     label="File",
@@ -390,5 +390,3 @@ class FileView:
         for index in list(self._rows):
             if index not in visible_indices:
                 self._delete_row(index)
-
-

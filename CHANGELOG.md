@@ -6,6 +6,8 @@ Notable SalixTorrent changes are recorded here.
 
 ### Added
 
+- Reusable event-driven `ResponsiveLayout` service for Dear PyGui viewport/item resize dispatch, memoized geometry writes, proportional splits, fill regions, and resizable-dialog content anchoring.
+- Responsive geometry regression tests covering bounds, proportional split allocation, narrow-window fallback, and growable content-height calculations.
 - BEP-48 HTTP/HTTPS tracker scrape support with standards-derived scrape endpoints, repeated `info_hash` parameters, and bounded multi-torrent batching.
 - BEP-15 UDP tracker scrape action support with bounded multi-info-hash datagrams and connection-ID reuse across batches.
 - One application-wide timer-driven scrape coordinator that groups active torrents by tracker, caches results, and avoids UI-driven or per-torrent scrape polling.
@@ -39,6 +41,11 @@ Notable SalixTorrent changes are recorded here.
 
 ### Changed
 
+- Primary application scenes now occupy the available viewport region as real child workspaces instead of fixed-content groups, allowing native-style expansion and scrolling.
+- Active Transfers now gives additional height to the queue on tall windows, lets the detail workspace consume the remaining area, expands Peers/Pieces/Files/Sources/Speed tables and plots, and proportionally resizes the General panels with live wrap widths.
+- Create Torrent now grows the tracker editor with available vertical space; Preferences uses responsive two-column widths and adaptive field/text wrapping; Help uses a responsive navigator/content split.
+- Diagnostics, Torrent Properties, and Open Magnet are resizable data dialogs whose growable content keeps their action rows attached to the lower content boundary. Small destructive confirmations and transient notices remain intentionally fixed-size.
+- Help text wrapping is now driven by resize events instead of checking pane geometry every UI frame.
 - Tracker announce health and tracker scrape statistics are now represented independently so a scrape timeout/unsupported endpoint cannot make an otherwise healthy discovery source look failed.
 - Sources now exposes scrape S/L/C alongside announce-derived Swarm S/L and summarizes scrape active/pending/warning/error state separately.
 - Manual tracker refresh also schedules a coalesced scrape refresh, while normal scrape refreshes use one shared low-frequency timer.
@@ -61,6 +68,7 @@ Notable SalixTorrent changes are recorded here.
 - NAT-PMP diagnostics decode standard gateway result codes; UPnP diagnostics preserve the failing discovery/SOAP stage and router fault code when available.
 
 ### Fixed
+- Dear PyGui item-resize callbacks now expose only the standard sender/app_data/user_data signature under manual callback management; responsive window resizing no longer crashes `dpg.run_callbacks()` with `IndexError: tuple index out of range`.
 - UDP tracker timeouts now remain source-local Timeout warnings through dual-stack address failover instead of being wrapped and misreported as protocol Errors.
 - Sources labels the primary state column as Discovery and tracker help distinguishes announce status from independent scrape status.
 
@@ -109,6 +117,7 @@ Notable SalixTorrent changes are recorded here.
 - UI-facing typography uses ASCII-safe separators for consistent rendering with the bundled/current monospace font.
 
 ### Fixed
+- Dear PyGui item-resize callbacks now expose only the standard sender/app_data/user_data signature under manual callback management; responsive window resizing no longer crashes `dpg.run_callbacks()` with `IndexError: tuple index out of range`.
 
 - Torrent file-picker delays and inconsistent transfer controls after newly loading a torrent.
 - Pause/Stop/Resume behaviour while checking or downloading.

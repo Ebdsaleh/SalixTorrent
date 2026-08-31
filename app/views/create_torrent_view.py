@@ -10,6 +10,7 @@ from tkinter import filedialog
 
 import dearpygui.dearpygui as dpg
 
+from app.engine.responsive_layout import ResponsiveLayout, clamp
 from app.logic.torrent_creator import (
     TorrentCreationCancelled,
     TorrentCreationProgress,
@@ -42,6 +43,8 @@ class CreateTorrentView:
         self._worker: threading.Thread | None = None
         self._cancel_event: threading.Event | None = None
         self._output_was_user_chosen = False
+        self.layout = ResponsiveLayout.get_instance()
+        self._layout_root = None
 
     @staticmethod
     def _native_root():
@@ -54,14 +57,14 @@ class CreateTorrentView:
         with dpg.group(parent=parent_tag):
             create_heading = dpg.add_text("CREATE TORRENT", color=(0, 255, 128))
             add_help_tooltip(create_heading, "CREATE_TORRENT")
-            create_intro = dpg.add_text(
+            self.create_intro = dpg.add_text(
                 "Create a shareable BitTorrent v1 .torrent from a file, archive, or folder.",
                 color=(170, 170, 170),
             )
-            add_help_tooltip(create_intro, "CREATE_TORRENT")
+            add_help_tooltip(self.create_intro, "CREATE_TORRENT")
             dpg.add_spacer(height=8)
 
-            with dpg.child_window(height=155, border=True):
+            with dpg.child_window(height=155, width=-1, border=True) as self.source_panel:
                 dpg.add_text("SOURCE", color=(100, 180, 255))
                 dpg.add_separator()
                 with dpg.group(horizontal=True):
@@ -89,7 +92,7 @@ class CreateTorrentView:
 
             dpg.add_spacer(height=8)
 
-            with dpg.child_window(height=155, border=True):
+            with dpg.child_window(height=155, width=-1, border=True) as self.output_panel:
                 dpg.add_text("OUTPUT", color=(100, 180, 255))
                 dpg.add_separator()
                 with dpg.group(horizontal=True):
@@ -125,7 +128,7 @@ class CreateTorrentView:
 
             dpg.add_spacer(height=8)
 
-            with dpg.child_window(height=175, border=True):
+            with dpg.child_window(height=175, width=-1, border=True) as self.trackers_panel:
                 dpg.add_text("TRACKERS", color=(255, 200, 100))
                 trackers_note = dpg.add_text(
                     "One tracker URL per line. Blank lines and lines beginning with # are ignored.",
@@ -142,7 +145,7 @@ class CreateTorrentView:
 
             dpg.add_spacer(height=8)
 
-            with dpg.child_window(height=145, border=True):
+            with dpg.child_window(height=145, width=-1, border=True) as self.creation_progress_panel:
                 dpg.add_text("CREATION PROGRESS", color=(180, 160, 255))
                 dpg.add_separator()
                 self.progress_bar = dpg.add_progress_bar(
@@ -178,6 +181,30 @@ class CreateTorrentView:
                         show=False,
                     )
                     add_help_tooltip(self.start_seeding_button, "START_SEEDING")
+
+        self._layout_root = parent_tag
+        self.layout.watch_item(
+            parent_tag,
+            ("create_torrent", "root"),
+            self._layout_create_view,
+        )
+
+    def _layout_create_view(self):
+        width, height = self.layout.item_size(self._layout_root)
+        if width <= 1 or height <= 1:
+            return
+
+        # Source/output/progress stay compact; the tracker editor absorbs extra
+        # vertical room because it is the genuinely expandable workspace here.
+        tracker_height = clamp(height - 505, 175, 430)
+        self.layout.height(self.trackers_panel, tracker_height)
+        self.layout.height(self.trackers_input, max(105, tracker_height - 70))
+
+        wrap_width = clamp(width - 42, 560, 1400)
+        self.layout.wrap(self.create_intro, wrap_width)
+        self.layout.wrap(self.source_text, wrap_width)
+        self.layout.wrap(self.source_summary, wrap_width)
+        self.layout.wrap(self.detail_text, wrap_width)
 
     def _set_source(self, path: str):
         if not path:

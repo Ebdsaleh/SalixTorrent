@@ -33,7 +33,7 @@ class PieceView:
         self._row_ids = []
 
     def build_view(self, parent_tag):
-        with dpg.child_window(parent=parent_tag, height=355, border=True):
+        with dpg.child_window(parent=parent_tag, height=-1, border=True):
             self.summary_text = dpg.add_text(
                 "Pieces: select a torrent to inspect piece state",
                 color=(100, 180, 255),
@@ -82,7 +82,7 @@ class PieceView:
                 borders_innerH=True,
                 borders_innerV=True,
                 scrollY=True,
-                height=120,
+                height=-1,
             ) as self.table_id:
                 piece_col = dpg.add_table_column(
                     label="Piece",

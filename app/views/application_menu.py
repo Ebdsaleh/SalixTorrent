@@ -14,6 +14,7 @@ from typing import Optional
 import dearpygui.dearpygui as dpg
 
 from app.logic.network_binding import format_endpoint
+from app.engine.responsive_layout import DialogMetrics, ResponsiveLayout
 from app.logic.torrent_manager import TorrentManager
 from app.version import APP_VERSION
 from app.views.help_terms import add_help_tooltip, add_text_tooltip
@@ -45,6 +46,7 @@ class ApplicationMenu:
         self._last_state_signature = None
         self._last_state_refresh = 0.0
         self._shortcut_registry = None
+        self.layout = ResponsiveLayout.get_instance()
 
         self._scene_items = {}
         self._detail_items = {}
@@ -616,10 +618,11 @@ class ApplicationMenu:
             show=False,
             width=700,
             height=500,
+            min_size=[620, 360],
         ) as self.diagnostics_modal:
             dpg.add_text("SALIXTORRENT DIAGNOSTICS", color=(255, 200, 100))
             dpg.add_separator()
-            with dpg.child_window(height=385, border=False):
+            with dpg.child_window(height=385, width=-1, border=False) as self.diagnostics_body:
                 self.diagnostics_text = dpg.add_text("", wrap=650)
             with dpg.group(horizontal=True):
                 dpg.add_button(
@@ -669,8 +672,31 @@ class ApplicationMenu:
                 callback=lambda: dpg.hide_item(self.about_modal),
             )
 
+        self.layout.watch_item(
+            self.diagnostics_modal,
+            ("application_menu", "diagnostics"),
+            self._layout_diagnostics_modal,
+        )
+
+    def _layout_diagnostics_modal(self):
+        self.layout.dialog(
+            self.diagnostics_modal,
+            self.diagnostics_body,
+            metrics=DialogMetrics(
+                reserved_height=115,
+                minimum_content_height=180,
+                horizontal_margin=50,
+                minimum_wrap=520,
+                maximum_wrap=1500,
+            ),
+            wrap_items=(self.diagnostics_text,),
+        )
+
     def _center_modal(self, item, width: int, height: int):
         try:
+            rendered_width, rendered_height = self.layout.item_size(item)
+            width = rendered_width or int(width)
+            height = rendered_height or int(height)
             x = max(0, (dpg.get_viewport_client_width() - width) // 2)
             y = max(0, (dpg.get_viewport_client_height() - height) // 2)
             dpg.set_item_pos(item, [x, y])
@@ -802,6 +828,7 @@ class ApplicationMenu:
         dpg.set_value(self.diagnostics_text, text)
         dpg.show_item(self.diagnostics_modal)
         self._center_modal(self.diagnostics_modal, 700, 500)
+        self.layout.trigger(("application_menu", "diagnostics"))
 
     def _copy_diagnostics(self):
         try:

@@ -7,6 +7,7 @@ from typing import Dict, Iterable, List, Sequence, Tuple
 
 import dearpygui.dearpygui as dpg
 
+from app.engine.responsive_layout import ResponsiveLayout, clamp, split_widths
 from app.views.help_terms import HELP_TERMS, add_text_tooltip
 
 
@@ -657,6 +658,14 @@ HELP_TOPICS: Tuple[HelpTopic, ...] = (
                 "behavior and desktop integration. Help > Diagnostics produces a copyable runtime "
                 "snapshot including connectivity state and application-data paths for troubleshooting.",
             ),
+            (
+                "Resizing and layout",
+                "SalixTorrent uses event-driven responsive layout for its main workspaces and "
+                "data-heavy dialogs. Tables, plots, help panes, tracker editors and diagnostic "
+                "text use additional window space when available, while dialog action rows stay "
+                "with the bottom of the resizable content. Layout work runs only when geometry "
+                "changes rather than continuously in the render loop.",
+            ),
         ),
         related_terms=(
             "ACTIVE_TRANSFERS_VIEW",
@@ -665,6 +674,7 @@ HELP_TOPICS: Tuple[HelpTopic, ...] = (
             "QUEUE_STATUS_FILTER",
             "PROPERTIES",
             "DIAGNOSTICS",
+            "RESPONSIVE_LAYOUT",
             "REMOVE_TORRENT",
         ),
     ),
@@ -733,6 +743,9 @@ class HelpTopicsView:
         self.right_pane = None
         self._wrapped_content_items: List[int] = []
         self._last_wrap_width = 700
+        self.layout = ResponsiveLayout.get_instance()
+        self._layout_root = None
+        self.left_pane = None
 
     # ------------------------------------------------------------------
     # Build
@@ -777,6 +790,7 @@ class HelpTopicsView:
         split = dpg.add_group(horizontal=True, parent=parent_tag)
         left = dpg.add_child_window(width=340, height=-1, border=True, parent=split)
         right = dpg.add_child_window(width=-1, height=-1, border=True, parent=split)
+        self.left_pane = left
         self.right_pane = right
 
         self.left_tab_bar = dpg.add_tab_bar(parent=left)
@@ -795,6 +809,29 @@ class HelpTopicsView:
         self.content_sections = dpg.add_group(parent=right)
 
         self._show_topic("basics")
+
+        self._layout_root = parent_tag
+        self.layout.watch_item(
+            parent_tag,
+            ("help_topics", "root"),
+            self._layout_help_view,
+        )
+
+    def _layout_help_view(self):
+        width, _height = self.layout.item_size(self._layout_root)
+        if width <= 1:
+            return
+
+        left_width, right_width = split_widths(
+            width - 16,
+            (0.28, 0.72),
+            minimums=(260, 500),
+            gap=8,
+        )
+        self.layout.width(self.left_pane, left_width)
+        self.layout.width(self.right_pane, right_width)
+        self.layout.width(self.search_input, clamp(width * 0.36, 280, 620))
+        self._update_content_wrap(force=True)
 
     def _build_contents_index(self):
         intro = dpg.add_text("CONTENTS", color=(100, 180, 255), parent=self.contents_tab)
@@ -1126,6 +1163,7 @@ class HelpTopicsView:
     # Scene hooks -------------------------------------------------------
 
     def on_show(self, **kwargs):
+        self.layout.trigger(("help_topics", "root"))
         self._update_content_wrap(force=True)
         if kwargs.get("glossary"):
             self.open_glossary()
@@ -1133,8 +1171,6 @@ class HelpTopicsView:
             self._open_contents_topic(str(kwargs["topic"]))
 
     def update(self, dt: float):
+        # Layout is resize-event driven; there is intentionally no per-frame
+        # geometry polling in the Help view.
         del dt
-        # This only reconfigures wrapping when the content pane has materially
-        # changed width, so maximizing/restoring the viewport stays polished
-        # without turning Help into a continuously rebuilding view.
-        self._update_content_wrap()

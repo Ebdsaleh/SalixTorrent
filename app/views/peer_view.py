@@ -16,7 +16,7 @@ class PeerView:
         self._rate_unit = "Auto"
 
     def build_view(self, parent_tag):
-        with dpg.child_window(parent=parent_tag, height=285, border=True):
+        with dpg.child_window(parent=parent_tag, height=-1, border=True):
             self.summary_text = dpg.add_text(
                 "Peers: select a torrent to inspect its connections",
                 color=(100, 180, 255),
@@ -38,7 +38,7 @@ class PeerView:
                 borders_innerH=True,
                 borders_innerV=True,
                 scrollY=True,
-                height=215,
+                height=-1,
             ) as self.table_id:
                 address_col = dpg.add_table_column(
                     label="Address",
@@ -224,5 +224,3 @@ class PeerView:
                 add_help_tooltip(age_item, "PEER_AGE")
 
             self._row_ids.append(row_id)
-
-

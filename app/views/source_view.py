@@ -69,7 +69,7 @@ class SourceView:
         self._row_ids = []
 
     def build_view(self, parent_tag):
-        with dpg.child_window(parent=parent_tag, height=315, border=True):
+        with dpg.child_window(parent=parent_tag, height=-1, border=True):
             self.summary_text = dpg.add_text(
                 "Sources: select a torrent to inspect peer discovery",
                 color=(100, 180, 255),
@@ -91,7 +91,7 @@ class SourceView:
                 borders_innerH=True,
                 borders_innerV=True,
                 scrollY=True,
-                height=235,
+                height=-1,
             ) as self.table_id:
                 dpg.add_table_column(
                     label="Source",

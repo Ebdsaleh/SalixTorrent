@@ -485,6 +485,14 @@ HELP_TERMS = {
         "smaller displays. SalixTorrent prefers a scalable system monospace font "
         "so text remains crisp instead of enlarging Dear PyGui's tiny bitmap font.",
     ),
+    "RESPONSIVE_LAYOUT": (
+        "Responsive Interface Layout",
+        "SalixTorrent's workspace and data-rich dialogs respond to actual resize events rather "
+        "than polling geometry every frame. Expandable regions consume available space, text "
+        "wrapping follows the rendered pane width, and dialog action rows remain attached to "
+        "their content boundary. Small destructive confirmations and transient notices can "
+        "remain intentionally fixed-size, matching normal desktop-application conventions.",
+    ),
     "TRANSFER_RATE": (
         "Transfer Rate Units",
         "Controls how live upload/download speeds are displayed. KB/s and MB/s "
