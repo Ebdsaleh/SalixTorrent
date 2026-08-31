@@ -6,6 +6,14 @@ Notable SalixTorrent changes are recorded here.
 
 ### Added
 
+- Phase 6.5 semantic Documentation subsystem with renderer-neutral `DocPage`/section/paragraph/link/callout/code/media models and a Dear PyGui renderer.
+- Parent-relative `ContentBounds` geometry and horizontal/vertical alignment primitives so reusable components can align inside their current pane instead of assuming viewport coordinates.
+- Semantic documentation typography roles for page titles, leads, section/subsection headings, body text, captions, code and index headings, backed by pre-registered scalable font sizes.
+- Independent Documentation Scale preference (90/100/115/130%) plus an in-Help scale control; document hierarchy scales together without enlarging data tables/toolbars.
+- Centered bounded-width documentation composition: page titles center within the current readable content rectangle and long body text keeps a capped reading measure on wide monitors.
+- Reusable documentation icon/callout and rich-media plumbing with portable ASCII icon fallback, lazy responsive static-image textures, captions/alt text, and graceful animation/video fallback until timed playback is implemented.
+- Documentation subsystem regression coverage for content bounds, semantic typography hierarchy, scale normalization, media aspect-ratio fitting and renderer-neutral models.
+
 - Reusable event-driven `ResponsiveLayout` service for Dear PyGui viewport/item resize dispatch, memoized geometry writes, proportional splits, fill regions, and resizable-dialog content anchoring.
 - Responsive geometry regression tests covering bounds, proportional split allocation, narrow-window fallback, and growable content-height calculations.
 - BEP-48 HTTP/HTTPS tracker scrape support with standards-derived scrape endpoints, repeated `info_hash` parameters, and bounded multi-torrent batching.
@@ -40,6 +48,11 @@ Notable SalixTorrent changes are recorded here.
 - Offline Help/Glossary coverage for tracker timeouts, mapping diagnosis, manual port forwarding, double NAT, CGNAT, and external-address scope.
 
 ### Changed
+
+- The entire Help Topics and Glossary detail pane now renders through the Documentation subsystem; topic titles are visually significant centered page headings, section hierarchy is semantic, related links share one component, and glossary definitions use the same document renderer.
+- Help content no longer maintains an ad-hoc list of wrapped text widgets; one resize-event-driven renderer reapplies cached content bounds, wrapping, anchoring and typography only when geometry or documentation scale changes.
+- Global UI font registration now covers the bounded semantic size range once at startup, allowing item-level document roles without runtime font-atlas rebuilds.
+- Diagnostics now reports Interface Text Size, Documentation Scale and the selected scalable UI font for presentation troubleshooting.
 
 - Primary application scenes now occupy the available viewport region as real child workspaces instead of fixed-content groups, allowing native-style expansion and scrolling.
 - Active Transfers now gives additional height to the queue on tall windows, lets the detail workspace consume the remaining area, expands Peers/Pieces/Files/Sources/Speed tables and plots, and proportionally resizes the General panels with live wrap widths.

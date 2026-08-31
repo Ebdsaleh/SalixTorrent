@@ -10,6 +10,7 @@ this layer can later be extracted into a reusable GUI framework.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 from typing import Callable, Hashable, Iterable, Sequence
 
 try:  # Keep the geometry helpers importable in headless/unit-test environments.
@@ -19,6 +20,91 @@ except ModuleNotFoundError:  # pragma: no cover - exercised only without GUI dep
 
 
 Number = int | float
+
+
+class HorizontalAlign(str, Enum):
+    LEFT = "left"
+    CENTER = "center"
+    RIGHT = "right"
+
+
+class VerticalAlign(str, Enum):
+    TOP = "top"
+    CENTER = "center"
+    BOTTOM = "bottom"
+
+
+@dataclass(frozen=True)
+class ContentBounds:
+    """Parent-relative rectangle used by reusable responsive components.
+
+    Dear PyGui does not provide a CSS-like layout model.  Components therefore
+    receive an explicit content rectangle and calculate their own alignment
+    inside that rectangle.  ``x``/``y`` are local to the current parent, not the
+    operating-system viewport.
+    """
+
+    x: int
+    y: int
+    width: int
+    height: int
+
+    @property
+    def right(self) -> int:
+        return self.x + self.width
+
+    @property
+    def bottom(self) -> int:
+        return self.y + self.height
+
+
+@dataclass(frozen=True)
+class ContentMetrics:
+    """Policy for a centered, readable content region inside a parent."""
+
+    horizontal_padding: int = 18
+    vertical_padding: int = 0
+    minimum_width: int = 320
+    maximum_width: int = 980
+
+
+def aligned_offset(container_size: Number, item_size: Number, alignment: HorizontalAlign | VerticalAlign | str) -> int:
+    """Return the parent-relative offset for one axis alignment."""
+    container = max(0, int(container_size))
+    item = max(0, min(container, int(item_size)))
+    value = str(getattr(alignment, "value", alignment)).lower()
+    if value in {"center", "middle"}:
+        return max(0, (container - item) // 2)
+    if value in {"right", "bottom", "end"}:
+        return max(0, container - item)
+    return 0
+
+
+def content_bounds(
+    container_width: Number,
+    container_height: Number = 0,
+    *,
+    metrics: ContentMetrics = ContentMetrics(),
+) -> ContentBounds:
+    """Return a centered readable rectangle within the supplied parent size.
+
+    The maximum width prevents documentation/body text from becoming an
+    unreadably long line on large monitors.  Narrow windows gracefully use all
+    available width instead of overflowing the parent.
+    """
+    width = max(1, int(container_width))
+    height = max(0, int(container_height))
+    hpad = max(0, int(metrics.horizontal_padding))
+    vpad = max(0, int(metrics.vertical_padding))
+    available = max(1, width - (hpad * 2))
+    preferred = min(max(1, int(metrics.maximum_width)), available)
+    if available >= int(metrics.minimum_width):
+        preferred = max(int(metrics.minimum_width), preferred)
+    else:
+        preferred = available
+    x = aligned_offset(width, preferred, HorizontalAlign.CENTER)
+    inner_height = max(0, height - (vpad * 2))
+    return ContentBounds(x=x, y=vpad, width=preferred, height=inner_height)
 
 
 def clamp(value: Number, minimum: Number, maximum: Number) -> int:
@@ -260,6 +346,11 @@ class ResponsiveLayout:
         for item in tuple(items):
             self.wrap(item, value)
 
+    def indent(self, item, value: Number):
+        """Apply parent-relative indentation with geometry-write memoization."""
+        target = max(0, int(value))
+        return self._apply(item, "indent", target, lambda: dpg.configure_item(item, indent=target))
+
     def dialog(
         self,
         window,
@@ -286,5 +377,7 @@ class ResponsiveLayout:
             metrics.maximum_wrap,
         )
         self.wraps(wrap_items, wrap_width)
+
+
 
 

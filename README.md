@@ -27,7 +27,7 @@ SalixTorrent is a desktop BitTorrent v1 client written in Python with a custom a
 - Network-interface/VPN binding across peer, tracker, DHT, LPD, listener, and magnet traffic, with optional fail-closed Interface Lock.
 - Live transport-security telemetry and optional display-only peer IP masking (off by default).
 - Traditional File/Edit/View/Transfers/Tools/Help menu bar and keyboard shortcuts.
-- Comprehensive hover tooltips plus searchable Help Topics and an A-Z glossary.
+- Comprehensive hover tooltips plus a semantic, responsive offline Documentation subsystem powering Help Topics and the A-Z glossary.
 - Context menus for lifecycle actions, priorities, transfer-rate display units, recheck, tracker refresh, properties, and removal.
 
 ## Requirements
@@ -91,6 +91,16 @@ General | Peers | Pieces | Files | Sources | Speed
 - **Speed** — rolling upload/download history plus per-torrent and global limit references.
 
 Technical labels and values throughout the interface have contextual hover help. `Help -> Help Topics...` opens the built-in searchable manual, while `Help -> Glossary A-Z...` jumps directly to the technical glossary.
+
+### Documentation subsystem
+
+Help and Glossary content is rendered through a reusable semantic documentation layer instead of assigning presentation directly inside each topic. Content describes page titles, leads, sections, paragraphs, links, callouts, code and media; the Dear PyGui renderer supplies semantic fonts, colors, spacing, parent-relative alignment and responsive reflow. The same content model can therefore be extracted later without carrying torrent-specific layout code with it.
+
+Documentation uses a centered readable content region with a bounded maximum line width. Maximizing the application gives the manual useful surrounding space rather than stretching paragraphs across the full monitor. On smaller windows that content region contracts to the available pane width. Page titles are centered relative to those current document bounds, while section headings and body content remain readable left-aligned anchors inside the same region.
+
+`Preferences -> Desktop -> Documentation scale` independently controls Help/Glossary presentation at 90%, 100%, 115% or 130%. Semantic roles scale together, preserving the visual hierarchy between page titles, section headings, body text, captions and code. The normal Interface Text Size setting still controls the rest of SalixTorrent. Role fonts are pre-registered before Dear PyGui setup so changing document scale does not rebuild the font atlas during an active session.
+
+The model already supports semantic icons/callouts and media blocks. Static images can be loaded lazily into Dear PyGui textures, centered within the current document bounds and scaled down while preserving aspect ratio. Animation/video are represented as media types so a future timed decoder/player backend can be added without rewriting documentation content; until such a backend exists they intentionally degrade to an explanatory text fallback.
 
 ### Responsive desktop layout
 
@@ -222,9 +232,11 @@ python test_disk_io.py
 python test_transport_security.py
 python test_ipv6.py
 python test_tracker_scrape.py
+python test_responsive_layout.py
+python test_documentation.py
 ```
 
-The release-critical regression coverage includes MSE/RC4 interoperability, rarest-first/endgame scheduling, bounded request pipelines, asynchronous disk backpressure/caching, source binding, encryption fallback rules, multi-torrent port mappings, finite/permanent mapping-lease handling, structured UPnP/NAT-PMP diagnostics, source-severity accounting, Interface Lock, real inbound seeding uploads, IPv6 peer TCP, BEP-7/BEP-15 tracker peers, BEP-11 IPv6 PEX, BEP-32 DHT behavior, BEP-48 HTTP scrape batching, BEP-15 UDP scrape batching, scrape/announce telemetry isolation, and Windows Proactor reset handling.
+The release-critical regression coverage includes MSE/RC4 interoperability, rarest-first/endgame scheduling, bounded request pipelines, asynchronous disk backpressure/caching, source binding, encryption fallback rules, multi-torrent port mappings, finite/permanent mapping-lease handling, structured UPnP/NAT-PMP diagnostics, source-severity accounting, Interface Lock, real inbound seeding uploads, IPv6 peer TCP, BEP-7/BEP-15 tracker peers, BEP-11 IPv6 PEX, BEP-32 DHT behavior, BEP-48 HTTP scrape batching, BEP-15 UDP scrape batching, scrape/announce telemetry isolation, Windows Proactor reset handling, responsive content-bounds geometry, and semantic documentation typography/media sizing.
 
 ## Current scope
 

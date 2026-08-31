@@ -7,10 +7,17 @@ import sys
 from pathlib import Path
 from typing import Dict, Optional
 
-import dearpygui.dearpygui as dpg
+try:
+    import dearpygui.dearpygui as dpg
+except ModuleNotFoundError:  # Keep semantic typography helpers testable headlessly.
+    dpg = None  # type: ignore[assignment]
 
 
 UI_FONT_SIZES = (13, 15, 17, 20)
+# Semantic/documentation components use role-specific scalable sizes. Register
+# the full bounded range once so later item-level font binding never needs to
+# rebuild Dear PyGui's font atlas during an active session.
+SEMANTIC_FONT_SIZES = tuple(range(11, 32)) + (34,)
 DEFAULT_UI_FONT_SIZE = 15
 UI_FONT_LABELS = {
     13: "13 px - Compact",
@@ -107,11 +114,15 @@ class UiTypography:
         if self._registered:
             return
 
+        if dpg is None:
+            self._registered = True
+            return
+
         self._font_path = self._find_scalable_font()
         if self._font_path is not None:
             try:
                 with dpg.font_registry(tag="salix_ui_font_registry"):
-                    for size in UI_FONT_SIZES:
+                    for size in SEMANTIC_FONT_SIZES:
                         self._fonts[size] = dpg.add_font(str(self._font_path), size)
             except Exception as exc:
                 # Font discovery is a presentation enhancement, never a reason
@@ -128,6 +139,8 @@ class UiTypography:
         self._current_size = size
 
         font_id = self._fonts.get(size)
+        if dpg is None:
+            return size
         try:
             if font_id is not None:
                 dpg.bind_font(font_id)
@@ -142,6 +155,49 @@ class UiTypography:
             print(f"[Salix_T Notice] Could not apply UI font size {size}px: {exc}")
         return size
 
+
+    def font_for_size(self, value: object):
+        """Return the closest registered scalable font, or ``None`` on fallback."""
+        if not self._fonts:
+            return None
+        try:
+            requested = int(value)
+        except (TypeError, ValueError):
+            requested = self._current_size
+        size = min(self._fonts, key=lambda candidate: abs(candidate - requested))
+        return self._fonts.get(size)
+
+    def bind_item_font(self, item, value: object) -> bool:
+        """Bind one semantic-size font to an item without changing global scale."""
+        font_id = self.font_for_size(value)
+        if font_id is None or dpg is None:
+            return False
+        try:
+            dpg.bind_item_font(item, font_id)
+            return True
+        except Exception:
+            return False
+
+    def measure_text_width(self, text: object, value: object) -> int:
+        """Measure text for parent-relative alignment with a safe headless fallback."""
+        rendered = str(text or "")
+        try:
+            requested = int(value)
+        except (TypeError, ValueError):
+            requested = self._current_size
+        font_id = self.font_for_size(requested)
+        if dpg is None:
+            return max(1, int(len(rendered) * max(8, requested) * 0.62))
+        try:
+            if font_id is not None:
+                width, _height = dpg.get_text_size(rendered, font=font_id)
+            else:
+                width, _height = dpg.get_text_size(rendered)
+            return max(1, int(width))
+        except Exception:
+            # Monospace approximation used only when DPG cannot measure yet.
+            return max(1, int(len(rendered) * max(8, requested) * 0.62))
+
     @property
     def current_size(self) -> int:
         return self._current_size
@@ -149,3 +205,5 @@ class UiTypography:
     @property
     def font_path(self) -> str:
         return str(self._font_path) if self._font_path is not None else "Dear PyGui built-in"
+
+

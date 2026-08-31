@@ -751,6 +751,9 @@ class ApplicationMenu:
             f"Loaded torrents: {len(self.download_view.torrent_order)}\n"
             f"Selected torrent: {selected_name}\n"
             f"Selected state: {selected_state}\n\n"
+            f"Interface text size: {settings.get('ui_font_size', 15)} px\n"
+            f"Documentation scale: {settings.get('documentation_scale', 100)}%\n"
+            f"UI font: {self.gui.typography.font_path}\n"
             f"Listen port preference: {settings.get('listen_port', '--')}\n"
             f"Peer encryption: {settings.get('peer_encryption', 'Prefer Encryption')}\n"
             f"Network bind: {settings.get('network_bind_address') or 'Any interface (system routing)'}\n"
@@ -835,3 +838,5 @@ class ApplicationMenu:
             dpg.set_clipboard_text(self._diagnostics_string())
         except Exception:
             pass
+
+

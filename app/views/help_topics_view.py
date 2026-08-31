@@ -3,11 +3,27 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Sequence, Tuple
+from typing import Dict, Iterable, List, Tuple
 
 import dearpygui.dearpygui as dpg
 
+from app.engine.documentation import (
+    DOCUMENTATION_SCALE_LABELS,
+    DOCUMENTATION_SCALES,
+    DocLink,
+    DocLinks,
+    DocPage,
+    DocParagraph,
+    DocRole,
+    DocSection,
+    DocumentationRenderer,
+    documentation_scale_from_label,
+    documentation_scale_label,
+    role_font_size,
+)
 from app.engine.responsive_layout import ResponsiveLayout, clamp, split_widths
+from app.engine.ui_typography import UiTypography
+from app.logic.torrent_manager import TorrentManager
 from app.views.help_terms import HELP_TERMS, add_text_tooltip
 
 
@@ -679,6 +695,58 @@ HELP_TOPICS: Tuple[HelpTopic, ...] = (
         ),
     ),
     HelpTopic(
+        key="documentation",
+        title="Documentation & Accessibility",
+        summary=(
+            "How SalixTorrent's offline manual uses semantic typography, readable content bounds, "
+            "responsive anchoring and reusable document components."
+        ),
+        sections=(
+            (
+                "Semantic document structure",
+                "Help topics and glossary definitions are content, not hand-positioned Dear PyGui "
+                "widgets. The documentation subsystem renders semantic page titles, leads, section "
+                "headings, paragraphs, links, callouts, code and media using one shared presentation "
+                "policy. This keeps hierarchy consistent throughout the offline manual.",
+            ),
+            (
+                "Parent-relative alignment",
+                "A centered page title is centered within the current documentation content bounds, "
+                "not within the operating-system viewport. The same content-bounds model can anchor "
+                "future images, icons, callouts and other components reliably inside nested rows, "
+                "columns or panes.",
+            ),
+            (
+                "Readable width on large displays",
+                "Responsive does not mean stretching paragraphs across every available pixel. On a "
+                "wide Help pane SalixTorrent centers a bounded reading column; on a smaller window "
+                "that column contracts to the available width and text reflows automatically.",
+            ),
+            (
+                "Semantic typography and scale",
+                "Page titles, section headings, body text, captions and code use named typography "
+                "roles instead of arbitrary per-topic font sizes. Documentation Scale in Preferences "
+                "changes the whole hierarchy together while the normal Interface Text Size continues "
+                "to control the rest of the application.",
+            ),
+            (
+                "Rich-media plumbing",
+                "Static images are supported as responsive document media with captions and alt text. "
+                "The semantic model also reserves animation and video media types so a future timed "
+                "decoder/player backend can be added without rewriting help content. Unsupported "
+                "timed media degrades to an explanatory text fallback rather than failing the page.",
+            ),
+        ),
+        related_terms=(
+            "DOCUMENTATION_SYSTEM",
+            "DOCUMENTATION_SCALE",
+            "DOCUMENT_CONTENT_BOUNDS",
+            "DOCUMENT_MEDIA",
+            "RESPONSIVE_LAYOUT",
+            "UI_TEXT_SIZE",
+        ),
+    ),
+    HelpTopic(
         key="glossary",
         title="Glossary A-Z",
         summary=(
@@ -715,37 +783,43 @@ for _topic in HELP_TOPICS:
 
 
 class HelpTopicsView:
-    """Old-school CHM-style built-in manual.
+    """Responsive offline manual rendered by the Documentation subsystem.
 
-    A subject/index navigator lives on the left and the selected article or
-    glossary definition lives on the right.  The view is intentionally a normal
-    SalixTorrent scene rather than a modal so the application menu remains
-    available while reading help.
+    Navigation/search remain ordinary application controls. The article pane is
+    intentionally semantic: topic/glossary content is converted to ``DocPage``
+    objects and the shared renderer owns typography, readable content width,
+    parent-relative alignment and future rich-media behavior.
     """
 
     def __init__(self):
         self.parent_tag = None
+        self.manager = TorrentManager.get_instance()
+        self.typography = UiTypography.get_instance()
+        self.layout = ResponsiveLayout.get_instance()
+
         self.search_input = None
         self.search_status = None
+        self.documentation_scale_combo = None
         self.left_tab_bar = None
         self.contents_tab = None
         self.glossary_tab = None
-        self.content_body = None
-        self.content_title = None
-        self.content_summary = None
-        self.content_sections = None
+        self.left_pane = None
+        self.right_pane = None
+        self.renderer = None
+        self._layout_root = None
+
         self._topic_items: Dict[str, int] = {}
         self._term_items: Dict[str, int] = {}
         self._glossary_letter_groups: Dict[str, int] = {}
+        self._glossary_letter_items: Dict[str, int] = {}
         self._term_letters: Dict[str, str] = {}
         self._current_topic = "basics"
         self._current_term = ""
-        self.right_pane = None
-        self._wrapped_content_items: List[int] = []
-        self._last_wrap_width = 700
-        self.layout = ResponsiveLayout.get_instance()
-        self._layout_root = None
-        self.left_pane = None
+
+        self.help_heading = None
+        self.help_intro = None
+        self.contents_heading = None
+        self.glossary_heading = None
 
     # ------------------------------------------------------------------
     # Build
@@ -753,16 +827,21 @@ class HelpTopicsView:
 
     def build_view(self, parent_tag: str):
         self.parent_tag = parent_tag
+        scale = int(self.manager.get_app_settings().get("documentation_scale", 100))
 
-        dpg.add_text("SALIXTORRENT HELP TOPICS", color=(0, 255, 128), parent=parent_tag)
-        dpg.add_text(
-            "Built-in reference for BitTorrent concepts and SalixTorrent controls. "
-            "Select a subject on the left; its explanation appears on the right.",
+        self.help_heading = dpg.add_text(
+            "SALIXTORRENT HELP & GLOSSARY",
+            color=(0, 255, 128),
+            parent=parent_tag,
+        )
+        self.help_intro = dpg.add_text(
+            "Built-in offline reference for BitTorrent concepts, SalixTorrent controls and "
+            "the technical detail behind the live interface.",
             color=(165, 165, 170),
             parent=parent_tag,
             wrap=1000,
         )
-        dpg.add_spacer(height=4, parent=parent_tag)
+        dpg.add_spacer(height=5, parent=parent_tag)
 
         search_row = dpg.add_group(horizontal=True, parent=parent_tag)
         dpg.add_text("Search", parent=search_row)
@@ -777,38 +856,52 @@ class HelpTopicsView:
             parent=search_row,
             callback=self._clear_search,
         )
+        dpg.add_spacer(width=12, parent=search_row)
+        dpg.add_text("Documentation", parent=search_row)
+        self.documentation_scale_combo = dpg.add_combo(
+            items=[DOCUMENTATION_SCALE_LABELS[value] for value in DOCUMENTATION_SCALES],
+            default_value=documentation_scale_label(scale),
+            width=190,
+            parent=search_row,
+            callback=self._on_documentation_scale_changed,
+        )
         self.search_status = dpg.add_text("", color=(140, 180, 220), parent=search_row)
         add_text_tooltip(
             self.search_input,
             "Help search\n\nFilters both the subject list and the A-Z glossary. Search by full words, acronyms such as DHT/PEX/LPD, or concepts such as port mapping, pieces, privacy or magnet links.",
         )
-        add_text_tooltip(clear_button, "Clear help search\n\nRestores the complete Contents and Glossary A-Z lists.")
+        add_text_tooltip(
+            clear_button,
+            "Clear help search\n\nRestores the complete Contents and Glossary A-Z lists.",
+        )
+        add_text_tooltip(
+            self.documentation_scale_combo,
+            HELP_TERMS["DOCUMENTATION_SCALE"][1],
+        )
 
         dpg.add_separator(parent=parent_tag)
         dpg.add_spacer(height=3, parent=parent_tag)
 
         split = dpg.add_group(horizontal=True, parent=parent_tag)
-        left = dpg.add_child_window(width=340, height=-1, border=True, parent=split)
-        right = dpg.add_child_window(width=-1, height=-1, border=True, parent=split)
-        self.left_pane = left
-        self.right_pane = right
+        self.left_pane = dpg.add_child_window(width=340, height=-1, border=True, parent=split)
+        self.right_pane = dpg.add_child_window(width=-1, height=-1, border=True, parent=split)
 
-        self.left_tab_bar = dpg.add_tab_bar(parent=left)
+        self.left_tab_bar = dpg.add_tab_bar(parent=self.left_pane)
         self.contents_tab = dpg.add_tab(label="Contents", parent=self.left_tab_bar)
         self.glossary_tab = dpg.add_tab(label="Glossary A-Z", parent=self.left_tab_bar)
 
         self._build_contents_index()
         self._build_glossary_index()
 
-        self.content_title = dpg.add_text("", color=(100, 180, 255), parent=right)
-        self.content_summary = dpg.add_text(
-            "", color=(180, 180, 185), wrap=self._last_wrap_width, parent=right
+        self.renderer = DocumentationRenderer(
+            self.right_pane,
+            layout=self.layout,
+            scale_percent=scale,
+            on_link=self._on_document_link,
+            tooltip=add_text_tooltip,
         )
-        self._wrapped_content_items = [self.content_summary]
-        dpg.add_separator(parent=right)
-        self.content_sections = dpg.add_group(parent=right)
-
         self._show_topic("basics")
+        self._apply_shell_typography()
 
         self._layout_root = parent_tag
         self.layout.watch_item(
@@ -824,19 +917,46 @@ class HelpTopicsView:
 
         left_width, right_width = split_widths(
             width - 16,
-            (0.28, 0.72),
-            minimums=(260, 500),
+            (0.26, 0.74),
+            minimums=(260, 520),
             gap=8,
         )
         self.layout.width(self.left_pane, left_width)
         self.layout.width(self.right_pane, right_width)
-        self.layout.width(self.search_input, clamp(width * 0.36, 280, 620))
-        self._update_content_wrap(force=True)
+        self.layout.width(self.search_input, clamp(width * 0.34, 260, 620))
+        self.layout.wrap(self.help_intro, clamp(width - 28, 540, 1150))
+        if self.renderer is not None:
+            self.renderer.reflow(right_width, force=True)
+
+    def _apply_shell_typography(self):
+        scale = int(self.manager.get_app_settings().get("documentation_scale", 100))
+        if self.help_heading is not None:
+            self.typography.bind_item_font(
+                self.help_heading,
+                role_font_size(DocRole.SECTION_TITLE, self.typography.current_size, scale),
+            )
+        if self.contents_heading is not None:
+            self.typography.bind_item_font(
+                self.contents_heading,
+                role_font_size(DocRole.INDEX_HEADING, self.typography.current_size, scale),
+            )
+        if self.glossary_heading is not None:
+            self.typography.bind_item_font(
+                self.glossary_heading,
+                role_font_size(DocRole.INDEX_HEADING, self.typography.current_size, scale),
+            )
+        for item in tuple(self._glossary_letter_items.values()):
+            self.typography.bind_item_font(
+                item,
+                role_font_size(DocRole.INDEX_HEADING, self.typography.current_size, scale),
+            )
 
     def _build_contents_index(self):
-        intro = dpg.add_text("CONTENTS", color=(100, 180, 255), parent=self.contents_tab)
+        self.contents_heading = dpg.add_text(
+            "CONTENTS", color=(100, 180, 255), parent=self.contents_tab
+        )
         add_text_tooltip(
-            intro,
+            self.contents_heading,
             "Help Contents\n\nThe main SalixTorrent manual arranged by subject, similar to the Contents pane in traditional Windows CHM help files.",
         )
         dpg.add_separator(parent=self.contents_tab)
@@ -858,9 +978,11 @@ class HelpTopicsView:
         return title.casefold()
 
     def _build_glossary_index(self):
-        intro = dpg.add_text("GLOSSARY A-Z", color=(100, 180, 255), parent=self.glossary_tab)
+        self.glossary_heading = dpg.add_text(
+            "GLOSSARY A-Z", color=(100, 180, 255), parent=self.glossary_tab
+        )
         add_text_tooltip(
-            intro,
+            self.glossary_heading,
             "Glossary A-Z\n\nAlphabetical index generated from the same definitions used by SalixTorrent's contextual hover help.",
         )
         dpg.add_separator(parent=self.glossary_tab)
@@ -872,8 +994,11 @@ class HelpTopicsView:
             if letter != last_letter:
                 current_group = dpg.add_group(parent=self.glossary_tab)
                 self._glossary_letter_groups[letter] = current_group
-                dpg.add_spacer(height=3, parent=current_group)
-                dpg.add_text(letter, color=(255, 200, 100), parent=current_group)
+                dpg.add_spacer(height=5, parent=current_group)
+                letter_item = dpg.add_text(
+                    letter, color=(255, 200, 100), parent=current_group
+                )
+                self._glossary_letter_items[letter] = letter_item
                 last_letter = letter
 
             item = dpg.add_selectable(
@@ -900,44 +1025,44 @@ class HelpTopicsView:
     # ------------------------------------------------------------------
 
     def _on_topic_selected(self, sender=None, app_data=None, user_data=None):
-        """Render the Help Topic selected in the Contents navigator.
-
-        Dear PyGui always supplies ``user_data`` as the third callback argument.
-        Keeping the topic key in the item's explicit ``user_data`` avoids a subtle
-        lambda/default-argument bug where DPG's ``None`` replaced the captured key.
-        """
         if user_data is not None:
             self._show_topic(str(user_data))
 
     def _on_term_selected(self, sender=None, app_data=None, user_data=None):
-        """Render the selected A-Z glossary definition."""
         if user_data is not None:
             self._show_term(str(user_data))
 
-    def _on_related_term_clicked(self, sender=None, app_data=None, user_data=None):
-        """Follow a Help Topic -> related glossary cross-reference."""
-        if user_data is not None:
-            self._open_glossary_term(str(user_data))
-
-    def _on_related_topic_clicked(self, sender=None, app_data=None, user_data=None):
-        """Follow a glossary definition -> related Help Topic cross-reference."""
-        if user_data is not None:
-            self._open_contents_topic(str(user_data))
-
-    # ------------------------------------------------------------------
-    # Rendering
-    # ------------------------------------------------------------------
-
-    def _clear_content(self):
-        if not self.content_sections:
+    def _on_document_link(self, target: str):
+        kind, separator, value = str(target or "").partition(":")
+        if not separator:
             return
+        if kind == "term":
+            self._open_glossary_term(value)
+        elif kind == "topic":
+            self._open_contents_topic(value)
+
+    def _on_documentation_scale_changed(self, sender=None, app_data=None, user_data=None):
+        del sender, user_data
         try:
-            dpg.delete_item(self.content_sections, children_only=True)
+            raw = dpg.get_value(self.documentation_scale_combo)
+        except Exception:
+            raw = app_data
+        scale = self.manager.set_documentation_scale(
+            documentation_scale_from_label(raw)
+        )
+        try:
+            dpg.set_value(self.documentation_scale_combo, documentation_scale_label(scale))
         except Exception:
             pass
-        self._wrapped_content_items = (
-            [self.content_summary] if self.content_summary is not None else []
-        )
+        if self.renderer is not None:
+            # set_scale() already refreshes semantic fonts and performs one
+            # forced reflow; avoid duplicate geometry/font work in the callback.
+            self.renderer.set_scale(scale)
+        self._apply_shell_typography()
+
+    # ------------------------------------------------------------------
+    # Semantic document rendering
+    # ------------------------------------------------------------------
 
     def _set_selections(self, topic_key: str = "", term_key: str = ""):
         for key, item in self._topic_items.items():
@@ -951,90 +1076,119 @@ class HelpTopicsView:
             except Exception:
                 pass
 
-    def _show_topic(self, topic_key: str):
-        topic = TOPIC_BY_KEY.get(str(topic_key))
-        if topic is None:
-            return
+    def _topic_page(self, topic: HelpTopic) -> DocPage:
+        sections = [
+            DocSection(
+                title=heading,
+                blocks=(DocParagraph(body),),
+            )
+            for heading, body in topic.sections
+        ]
 
+        links = []
+        for term_key in topic.related_terms:
+            entry = HELP_TERMS.get(term_key)
+            if not entry:
+                continue
+            links.append(
+                DocLink(
+                    label=entry[0],
+                    target=f"term:{term_key}",
+                    tooltip=f"Open glossary entry\n\n{entry[0]}\n\n{entry[1]}",
+                )
+            )
+        if links:
+            sections.append(
+                DocSection(
+                    title="Related glossary terms",
+                    blocks=(DocLinks(title="", links=tuple(links)),),
+                )
+            )
+
+        if topic.key == "glossary":
+            sections.append(
+                DocSection(
+                    title="Browse the alphabetical index",
+                    blocks=(
+                        DocLinks(
+                            title="",
+                            links=(
+                                DocLink(
+                                    label="Open Glossary A-Z",
+                                    target="topic:__open_glossary__",
+                                    tooltip="Switch the navigator to the alphabetized glossary index.",
+                                ),
+                            ),
+                        ),
+                    ),
+                )
+            )
+        return DocPage(title=topic.title, lead=topic.summary, sections=tuple(sections))
+
+    def _show_topic(self, topic_key: str):
+        if topic_key == "__open_glossary__":
+            self._open_glossary_tab()
+            return
+        topic = TOPIC_BY_KEY.get(str(topic_key))
+        if topic is None or self.renderer is None:
+            return
         self._current_topic = topic.key
         self._current_term = ""
         self._set_selections(topic_key=topic.key)
-
-        dpg.set_value(self.content_title, topic.title)
-        dpg.set_value(self.content_summary, topic.summary)
-        self._clear_content()
-
-        for heading, body in topic.sections:
-            dpg.add_text(heading.upper(), color=(255, 200, 100), parent=self.content_sections)
-            body_item = dpg.add_text(
-                body, wrap=self._last_wrap_width, parent=self.content_sections
-            )
-            self._wrapped_content_items.append(body_item)
-            dpg.add_spacer(height=9, parent=self.content_sections)
-
-        if topic.related_terms:
-            dpg.add_separator(parent=self.content_sections)
-            dpg.add_text("RELATED GLOSSARY TERMS", color=(100, 180, 255), parent=self.content_sections)
-            related_row = None
-            count_in_row = 0
-            for term_key in topic.related_terms:
-                entry = HELP_TERMS.get(term_key)
-                if not entry:
-                    continue
-                if related_row is None or count_in_row >= 3:
-                    related_row = dpg.add_group(horizontal=True, parent=self.content_sections)
-                    count_in_row = 0
-                button = dpg.add_button(
-                    label=f" {entry[0]} ",
-                    parent=related_row,
-                    callback=self._on_related_term_clicked,
-                    user_data=term_key,
-                )
-                add_text_tooltip(button, f"Open glossary entry\n\n{entry[0]}\n\n{entry[1]}")
-                count_in_row += 1
-
-        if topic.key == "glossary":
-            dpg.add_spacer(height=8, parent=self.content_sections)
-            button = dpg.add_button(
-                label=" Open Glossary A-Z ",
-                parent=self.content_sections,
-                callback=self._open_glossary_tab,
-            )
-            add_text_tooltip(button, "Open Glossary A-Z\n\nSwitches the left navigator to the alphabetized glossary index.")
+        self.renderer.render_page(self._topic_page(topic))
+        self._scroll_document_to_top()
 
     def _show_term(self, term_key: str):
         key = str(term_key or "").upper()
         entry = HELP_TERMS.get(key)
-        if not entry:
+        if not entry or self.renderer is None:
             return
 
         title, body = entry
         self._current_term = key
         self._set_selections(term_key=key)
-        dpg.set_value(self.content_title, title)
-        dpg.set_value(self.content_summary, "Glossary definition")
-        self._clear_content()
 
-        body_item = dpg.add_text(
-            body, wrap=self._last_wrap_width, parent=self.content_sections
-        )
-        self._wrapped_content_items.append(body_item)
-        dpg.add_spacer(height=10, parent=self.content_sections)
-
+        sections = []
         topic_key = TERM_TOPIC_MAP.get(key, "basics")
         topic = TOPIC_BY_KEY.get(topic_key)
         if topic:
-            dpg.add_separator(parent=self.content_sections)
-            dpg.add_text("RELATED HELP TOPIC", color=(100, 180, 255), parent=self.content_sections)
-            button = dpg.add_button(
-                label=f" {topic.title} ",
-                parent=self.content_sections,
-                callback=self._on_related_topic_clicked,
-                user_data=topic.key,
+            sections.append(
+                DocSection(
+                    title="Related help topic",
+                    blocks=(
+                        DocLinks(
+                            title="",
+                            links=(
+                                DocLink(
+                                    label=topic.title,
+                                    target=f"topic:{topic.key}",
+                                    tooltip=f"Open help topic\n\n{topic.title}\n\n{topic.summary}",
+                                ),
+                            ),
+                        ),
+                    ),
+                )
             )
-            add_text_tooltip(button, f"Open help topic\n\n{topic.title}\n\n{topic.summary}")
+
+        page = DocPage(
+            title=title,
+            lead="Glossary definition",
+            blocks=(DocParagraph(body),),
+            sections=tuple(sections),
+        )
+        self.renderer.render_page(page)
+        self._scroll_document_to_top()
+
+    def _scroll_document_to_top(self):
+        try:
+            dpg.set_y_scroll(self.right_pane, 0.0)
+        except Exception:
+            pass
 
     def _open_contents_topic(self, topic_key: str):
+        if topic_key == "__open_glossary__":
+            self._open_glossary_tab()
+            return
         try:
             dpg.set_value(self.left_tab_bar, self.contents_tab)
         except Exception:
@@ -1049,50 +1203,21 @@ class HelpTopicsView:
         self._show_term(term_key)
 
     def _open_glossary_tab(self, sender=None, app_data=None, user_data=None):
+        del sender, app_data, user_data
         try:
             dpg.set_value(self.left_tab_bar, self.glossary_tab)
         except Exception:
             pass
-        # Keep the right pane on the glossary overview until a term is selected.
-
-    def open_glossary(self):
-        """Public helper used by menu commands to jump directly to the A-Z index."""
-        self._open_glossary_tab()
         if self._current_term:
             self._show_term(self._current_term)
         else:
-            self._show_topic("glossary")
+            glossary = TOPIC_BY_KEY.get("glossary")
+            if glossary is not None and self.renderer is not None:
+                self.renderer.render_page(self._topic_page(glossary))
+                self._scroll_document_to_top()
 
-    def _update_content_wrap(self, force: bool = False):
-        """Keep Help text readable at both windowed and maximized sizes.
-
-        The content pane may become very wide on a large monitor. A bounded
-        reading measure uses more of that space without creating extremely long
-        lines that are tiring to scan.
-        """
-        if self.right_pane is None:
-            return
-        try:
-            width = float(dpg.get_item_rect_size(self.right_pane)[0])
-        except Exception:
-            return
-        if width <= 1:
-            return
-
-        target = int(max(560, min(1050, width - 36)))
-        if not force and abs(target - self._last_wrap_width) < 8:
-            return
-        self._last_wrap_width = target
-
-        alive = []
-        for item in self._wrapped_content_items:
-            try:
-                if dpg.does_item_exist(item):
-                    dpg.configure_item(item, wrap=target)
-                    alive.append(item)
-            except Exception:
-                continue
-        self._wrapped_content_items = alive
+    def open_glossary(self):
+        self._open_glossary_tab()
 
     # ------------------------------------------------------------------
     # Search
@@ -1106,6 +1231,7 @@ class HelpTopicsView:
         return any(needle in str(value).casefold() for value in values)
 
     def _on_search_changed(self, sender=None, app_data=None, user_data=None):
+        del sender, user_data
         try:
             query = str(dpg.get_value(self.search_input) or "").strip()
         except Exception:
@@ -1154,6 +1280,7 @@ class HelpTopicsView:
             dpg.set_value(self.search_status, "")
 
     def _clear_search(self, sender=None, app_data=None, user_data=None):
+        del sender, app_data, user_data
         try:
             dpg.set_value(self.search_input, "")
         except Exception:
@@ -1163,14 +1290,22 @@ class HelpTopicsView:
     # Scene hooks -------------------------------------------------------
 
     def on_show(self, **kwargs):
+        scale = int(self.manager.get_app_settings().get("documentation_scale", 100))
+        try:
+            dpg.set_value(self.documentation_scale_combo, documentation_scale_label(scale))
+        except Exception:
+            pass
+        if self.renderer is not None:
+            self.renderer.set_scale(scale)
+            self.renderer.refresh_typography()
+        self._apply_shell_typography()
         self.layout.trigger(("help_topics", "root"))
-        self._update_content_wrap(force=True)
         if kwargs.get("glossary"):
             self.open_glossary()
         elif kwargs.get("topic"):
             self._open_contents_topic(str(kwargs["topic"]))
 
     def update(self, dt: float):
-        # Layout is resize-event driven; there is intentionally no per-frame
-        # geometry polling in the Help view.
+        # Documentation layout is resize-event driven; there is intentionally no
+        # per-frame geometry/typography polling in the Help view.
         del dt

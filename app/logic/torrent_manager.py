@@ -197,6 +197,7 @@ class TorrentManager:
             "default_queue_priority": TORRENT_PRIORITY_NORMAL,
             "transfer_rate_display_unit": "Auto",
             "ui_font_size": 15,
+            "documentation_scale": 100,
         }
 
     @classmethod
@@ -289,6 +290,16 @@ class TorrentManager:
             requested_font_size = 15
         out["ui_font_size"] = min(
             valid_font_sizes, key=lambda size: abs(size - requested_font_size)
+        )
+
+        valid_documentation_scales = (90, 100, 115, 130)
+        try:
+            requested_documentation_scale = int(data.get("documentation_scale", 100))
+        except (TypeError, ValueError):
+            requested_documentation_scale = 100
+        out["documentation_scale"] = min(
+            valid_documentation_scales,
+            key=lambda scale: abs(scale - requested_documentation_scale),
         )
         return out
 
@@ -404,6 +415,19 @@ class TorrentManager:
             self._settings["transfer_rate_display_unit"] = value
             self.save_app_settings()
         return value
+
+    def set_documentation_scale(self, value: object) -> int:
+        """Persist Help/Glossary text scale without refreshing network settings."""
+        valid = (90, 100, 115, 130)
+        try:
+            requested = int(value)
+        except (TypeError, ValueError):
+            requested = 100
+        scale = min(valid, key=lambda candidate: abs(candidate - requested))
+        if self._settings.get("documentation_scale") != scale:
+            self._settings["documentation_scale"] = scale
+            self.save_app_settings()
+        return scale
 
     @property
     def session_state_path(self) -> str:
@@ -1896,3 +1920,5 @@ class TorrentManager:
             print("[Salix_T Notice] Async engine did not finish shutdown before timeout.")
 
         self._connectivity.close()
+
+

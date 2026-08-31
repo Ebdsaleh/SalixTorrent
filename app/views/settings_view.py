@@ -8,6 +8,12 @@ from tkinter import filedialog
 import dearpygui.dearpygui as dpg
 
 from app.engine.desktop_integration import DesktopIntegration
+from app.engine.documentation import (
+    DOCUMENTATION_SCALE_LABELS,
+    DOCUMENTATION_SCALES,
+    documentation_scale_from_label,
+    documentation_scale_label,
+)
 from app.engine.responsive_layout import ResponsiveLayout, clamp, split_widths
 from app.engine.ui_typography import (
     UI_FONT_LABELS,
@@ -334,7 +340,7 @@ class SettingsView:
                         add_help_tooltip(self.upload_limit_input, "NEW_TORRENT_LIMITS")
                         add_help_tooltip(self.upload_limit_unit, "NEW_TORRENT_LIMITS")
 
-                with dpg.child_window(width=-1, height=260, border=True) as self.desktop_panel:
+                with dpg.child_window(width=-1, height=292, border=True) as self.desktop_panel:
                     dpg.add_text("DESKTOP", color=(0, 255, 128))
                     dpg.add_separator()
                     with dpg.group(horizontal=True):
@@ -346,6 +352,17 @@ class SettingsView:
                         )
                         add_help_tooltip(text_size_label, "UI_TEXT_SIZE")
                         add_help_tooltip(self.ui_font_size_combo, "UI_TEXT_SIZE")
+                    with dpg.group(horizontal=True):
+                        documentation_scale_label_item = dpg.add_text("Documentation scale")
+                        self.documentation_scale_combo = dpg.add_combo(
+                            items=[DOCUMENTATION_SCALE_LABELS[scale] for scale in DOCUMENTATION_SCALES],
+                            default_value=documentation_scale_label(
+                                self.settings.get("documentation_scale", 100)
+                            ),
+                            width=190,
+                        )
+                        add_help_tooltip(documentation_scale_label_item, "DOCUMENTATION_SCALE")
+                        add_help_tooltip(self.documentation_scale_combo, "DOCUMENTATION_SCALE")
                     with dpg.group(horizontal=True):
                         rate_display_label = dpg.add_text("Transfer rate display")
                         self.transfer_rate_display_combo = dpg.add_combo(
@@ -499,6 +516,9 @@ class SettingsView:
             "ui_font_size": ui_font_size_from_label(
                 dpg.get_value(self.ui_font_size_combo)
             ),
+            "documentation_scale": documentation_scale_from_label(
+                dpg.get_value(self.documentation_scale_combo)
+            ),
             "listen_port": int(dpg.get_value(self.listen_port_input) or 6881),
             "peer_encryption": str(
                 dpg.get_value(self.peer_encryption_combo) or "Prefer Encryption"
@@ -543,6 +563,9 @@ class SettingsView:
             self.minimize_to_tray_checkbox: settings["minimize_to_tray"],
             self.transfer_rate_display_combo: settings.get("transfer_rate_display_unit", "Auto"),
             self.ui_font_size_combo: ui_font_label(settings.get("ui_font_size", 15)),
+            self.documentation_scale_combo: documentation_scale_label(
+                settings.get("documentation_scale", 100)
+            ),
             self.listen_port_input: settings["listen_port"],
             self.peer_encryption_combo: settings.get("peer_encryption", "Prefer Encryption"),
             self.network_bind_combo: bind_selected,
@@ -737,3 +760,5 @@ class SettingsView:
         if now - self._last_connectivity_refresh >= 1.0:
             self._last_connectivity_refresh = now
             self._render_connectivity()
+
+

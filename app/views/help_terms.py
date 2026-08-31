@@ -493,6 +493,36 @@ HELP_TERMS = {
         "their content boundary. Small destructive confirmations and transient notices can "
         "remain intentionally fixed-size, matching normal desktop-application conventions.",
     ),
+    "DOCUMENTATION_SCALE": (
+        "Documentation Text Scale",
+        "Controls the semantic text scale used by the built-in Help and Glossary without changing "
+        "the rest of SalixTorrent. Page titles, section headings, body text, captions and code keep "
+        "their relative hierarchy while scaling together. The documentation renderer uses pre-"
+        "registered scalable fonts, so changing this setting does not rebuild the font atlas while "
+        "the application is running.",
+    ),
+    "DOCUMENTATION_SYSTEM": (
+        "Documentation Subsystem",
+        "SalixTorrent's built-in manual is rendered from semantic document components rather than "
+        "hard-coded widget formatting. A document describes titles, sections, paragraphs, callouts, "
+        "links and media; the Dear PyGui renderer applies typography, readable line width, parent-"
+        "relative anchoring and responsive reflow. This separation is designed for later extraction "
+        "into a reusable application framework.",
+    ),
+    "DOCUMENT_CONTENT_BOUNDS": (
+        "Documentation Content Bounds",
+        "The parent-relative rectangle allocated to readable document content. On wide windows the "
+        "manual keeps a bounded line length and centers that readable region inside the Help pane; "
+        "on narrow windows it uses the available width. Centering therefore means center within the "
+        "current document container, not center of the operating-system viewport.",
+    ),
+    "DOCUMENT_MEDIA": (
+        "Documentation Media",
+        "Semantic media blocks let documentation refer to images, animation or video without tying "
+        "the content model to a specific renderer. Static images are supported by the Dear PyGui "
+        "documentation renderer now. Timed animation/video types are represented in the model and "
+        "degrade to an explanatory fallback until a real decoder/player backend is implemented.",
+    ),
     "TRANSFER_RATE": (
         "Transfer Rate Units",
         "Controls how live upload/download speeds are displayed. KB/s and MB/s "
@@ -1144,3 +1174,5 @@ def add_context_tooltip(
         contextual_text(title, body, facts=facts, footer=footer),
         wrap=wrap,
     )
+
+
