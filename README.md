@@ -1,10 +1,12 @@
-# SalixTorrent (Salix_T) v0.2.0
+# SalixTorrent (Salix_T) v0.3.0
 
 SalixTorrent is a desktop BitTorrent v1 client written in Python with a custom asynchronous protocol engine and a Dear PyGui interface. The project aims to expose what a torrent client is doing rather than hiding the protocol behind a single progress bar: transfers, peers, pieces, files, trackers, discovery sources, bandwidth history, connectivity, and protocol terminology are all inspectable from the application.
 
-> **Release status:** v0.2.0 is a development release. Core downloading, concurrent uploading, seeding, torrent creation, magnet metadata retrieval, queue management, and the desktop UI are functional. Packaging into a standalone executable is intentionally deferred until the feature set is considered complete.
+> **Release status:** v0.3.0 is a development release and a major capability milestone for the BitTorrent v1 engine and desktop framework. Core downloading, concurrent uploading, seeding, torrent creation, magnet metadata retrieval, rarest-first/endgame scheduling, bounded asynchronous disk I/O, dual-stack IPv4/IPv6 networking, tracker scrape telemetry, responsive Dear PyGui layouts, and the offline Documentation subsystem are functional. Packaging into a standalone executable remains intentionally deferred until the planned application feature set is further along.
 
 ## Highlights
+
+**v0.3.0 milestone:** SalixTorrent now combines a substantially more capable BitTorrent v1 engine with a reusable responsive Dear PyGui presentation foundation. The release adds rarest-first/endgame scheduling, bounded adaptive request pipelines, asynchronous disk backpressure/caching, MSE/PE transport, network-interface binding and Interface Lock, dual-stack IPv6 peer/tracker/DHT support, batched tracker scrape statistics, event-driven seeding/connectivity telemetry, and the semantic responsive Documentation subsystem.
 
 - Load `.torrent` files or BitTorrent v1 magnet links.
 - BEP-9 magnet metadata retrieval with info-hash verification and local metadata caching.
@@ -32,7 +34,7 @@ SalixTorrent is a desktop BitTorrent v1 client written in Python with a custom a
 
 ## Requirements
 
-- Python 3.13 is the primary development/runtime version for v0.2.0.
+- Python 3.13 is the primary development/runtime version for v0.3.0.
 - Dear PyGui 2.3.1 or newer in the 2.x series.
 - aiohttp 3.11 or newer in the 3.x series.
 - Tk support in the Python installation for native file/folder dialogs.
@@ -242,7 +244,7 @@ The release-critical regression coverage includes MSE/RC4 interoperability, rare
 
 ## Current scope
 
-v0.2.0 focuses on BitTorrent v1. BitTorrent v2 / `btmh` support is not implemented yet. Standalone executable packaging, file associations, magnet URI registration, and installer work are intentionally planned for a later feature-complete release pass.
+v0.3.0 focuses on BitTorrent v1. BitTorrent v2 / `btmh` support is not implemented yet. Standalone executable packaging, file associations, magnet URI registration, and installer work are intentionally planned for a later feature-complete release pass.
 
 ## Project structure
 
@@ -251,15 +253,32 @@ SalixTorrent/
 ├── main.py
 ├── requirements.txt
 ├── foundation_test.py
+├── test_piece_selection.py
+├── test_request_scheduling.py
+├── test_disk_io.py
+├── test_transport_security.py
+├── test_ipv6.py
 ├── test_tracker_scrape.py
+├── test_responsive_layout.py
+├── test_documentation.py
 ├── app/
 │   ├── version.py
 │   ├── engine/
+│   │   ├── documentation/
+│   │   │   ├── layout.py
+│   │   │   ├── model.py
+│   │   │   ├── renderer.py
+│   │   │   └── typography.py
 │   │   ├── desktop_integration.py
 │   │   ├── gui_engine.py
 │   │   ├── master_viewport.py
-│   │   └── scene_manager.py
+│   │   ├── property_cascade.py
+│   │   ├── responsive_layout.py
+│   │   ├── scene_manager.py
+│   │   ├── texture_manager.py
+│   │   └── ui_typography.py
 │   ├── logic/
+│   │   ├── async_manager.py
 │   │   ├── bencode.py
 │   │   ├── connectivity.py
 │   │   ├── dht.py
@@ -288,5 +307,6 @@ SalixTorrent/
 │       ├── source_view.py
 │       ├── speed_view.py
 │       └── transfer_rate.py
+├── CHANGELOG.md
 └── README.md
 ```

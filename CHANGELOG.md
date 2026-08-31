@@ -4,6 +4,10 @@ Notable SalixTorrent changes are recorded here.
 
 ## Unreleased
 
+No changes recorded yet.
+
+## v0.3.0 - 2026-08-31
+
 ### Added
 
 - Generic framework property-cascade resolver with an explicit `UNSET` inheritance sentinel, Default/Theme/Instance provenance, per-property validation fallback, and rejected-candidate diagnostics.
