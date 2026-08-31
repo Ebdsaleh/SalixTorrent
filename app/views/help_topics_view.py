@@ -16,6 +16,7 @@ from app.engine.documentation import (
     DocParagraph,
     DocRole,
     DocSection,
+    DocumentationLayoutTheme,
     DocumentationRenderer,
     documentation_scale_from_label,
     documentation_scale_label,
@@ -34,6 +35,18 @@ class HelpTopic:
     summary: str
     sections: Tuple[Tuple[str, str], ...]
     related_terms: Tuple[str, ...] = ()
+
+
+# SalixTorrent's application theme deliberately widens the framework's
+# conservative 980 px documentation default.  Individual DocPage instances can
+# still override any of these values through their sparse DocLayout policy.
+SALIX_DOCUMENTATION_LAYOUT_THEME = DocumentationLayoutTheme(
+    maximum_width=1180,
+    margin_left=8,
+    margin_right=8,
+    padding_left=18,
+    padding_right=18,
+)
 
 
 HELP_TOPICS: Tuple[HelpTopic, ...] = (
@@ -718,9 +731,41 @@ HELP_TOPICS: Tuple[HelpTopic, ...] = (
             ),
             (
                 "Readable width on large displays",
-                "Responsive does not mean stretching paragraphs across every available pixel. On a "
-                "wide Help pane SalixTorrent centers a bounded reading column; on a smaller window "
-                "that column contracts to the available width and text reflows automatically.",
+                "Responsive does not mean stretching paragraphs across every available pixel. The "
+                "framework has a conservative built-in readable-width default, while SalixTorrent's "
+                "active documentation layout theme widens that policy for this application. On a "
+                "smaller window the valid configured width is constrained to the available pane and "
+                "can expand again automatically when more space returns.",
+            ),
+            (
+                "Layout property cascade",
+                "Documentation geometry uses the same deterministic property cascade intended for "
+                "the reusable GUI framework: safe framework defaults are the base layer, a sparse "
+                "active layout theme may override only the properties it defines, and a DocPage "
+                "instance may explicitly override either layer. Each property resolves independently, "
+                "so changing one page margin does not silently replace unrelated theme values.",
+            ),
+            (
+                "Margins, padding and alignment are independent",
+                "Outer margins separate the document rectangle from its parent pane. Inner padding "
+                "separates that rectangle from readable content. Page-title, media and document "
+                "alignment are separate semantic properties, so a page can change its margins or "
+                "padding while the title remains centered inside the resulting content bounds.",
+            ),
+            (
+                "Invalid values fall back; valid values constrain",
+                "An invalid explicit page value falls back to a valid theme value, then to the safe "
+                "framework default. A valid value that simply does not fit the current window is not "
+                "discarded: runtime geometry constrains it temporarily. This preserves the configured "
+                "intent when the window is enlarged again and keeps theme/layout debugging predictable.",
+            ),
+            (
+                "Explicit inheritance and inspectable resolution",
+                "The framework uses an explicit UNSET inheritance sentinel instead of overloading None. "
+                "That leaves None available as a real semantic value where appropriate, such as a page "
+                "requesting no configured maximum width. Resolved layout values retain whether they "
+                "came from Default, Theme or Instance and record rejected candidates for developer "
+                "diagnostics and future visual theme inspectors.",
             ),
             (
                 "Semantic typography and scale",
@@ -741,6 +786,10 @@ HELP_TOPICS: Tuple[HelpTopic, ...] = (
             "DOCUMENTATION_SYSTEM",
             "DOCUMENTATION_SCALE",
             "DOCUMENT_CONTENT_BOUNDS",
+            "DOCUMENT_LAYOUT_POLICY",
+            "PROPERTY_CASCADE",
+            "DOCUMENT_MARGIN_PADDING",
+            "UNSET_INHERITANCE",
             "DOCUMENT_MEDIA",
             "RESPONSIVE_LAYOUT",
             "UI_TEXT_SIZE",
@@ -896,6 +945,7 @@ class HelpTopicsView:
         self.renderer = DocumentationRenderer(
             self.right_pane,
             layout=self.layout,
+            layout_theme=SALIX_DOCUMENTATION_LAYOUT_THEME,
             scale_percent=scale,
             on_link=self._on_document_link,
             tooltip=add_text_tooltip,

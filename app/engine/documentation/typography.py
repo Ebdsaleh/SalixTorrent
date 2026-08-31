@@ -73,9 +73,6 @@ class DocumentationTheme:
     caption_color: Tuple[int, int, int] = (150, 160, 175)
     code_color: Tuple[int, int, int] = (205, 220, 230)
     related_color: Tuple[int, int, int] = (105, 185, 255)
-    content_max_width: int = 980
-    content_min_width: int = 420
-    horizontal_padding: int = 22
     section_gap: int = 14
     paragraph_gap: int = 7
     title_bottom_gap: int = 7

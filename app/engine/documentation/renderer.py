@@ -12,14 +12,18 @@ except ModuleNotFoundError:  # pragma: no cover - renderer is GUI-only
     dpg = None  # type: ignore[assignment]
 
 from app.engine.responsive_layout import (
-    ContentMetrics,
     HorizontalAlign,
     ResponsiveLayout,
     aligned_offset,
-    content_bounds,
 )
 from app.engine.ui_typography import UiTypography
 
+from .layout import (
+    DocLayout,
+    DocumentationLayoutTheme,
+    documentation_bounds,
+    resolve_documentation_layout,
+)
 from .model import (
     DocBlock,
     DocCallout,
@@ -46,7 +50,7 @@ class _RenderedText:
     item: object
     role: DocRole
     wrap: bool = True
-    centered: bool = False
+    alignment: HorizontalAlign = HorizontalAlign.LEFT
     extra_indent: int = 0
 
 
@@ -69,6 +73,7 @@ class _RenderedMedia:
     native_height: int
     maximum_width: int
     maximum_height: int
+    alignment: HorizontalAlign = HorizontalAlign.CENTER
 
 
 class DocumentationMediaCache:
@@ -112,6 +117,7 @@ class DocumentationRenderer:
         *,
         layout: Optional[ResponsiveLayout] = None,
         theme: Optional[DocumentationTheme] = None,
+        layout_theme: Optional[DocumentationLayoutTheme] = None,
         scale_percent: int = 100,
         unicode_symbols: bool = False,
         on_link: Optional[Callable[[str], None]] = None,
@@ -120,6 +126,7 @@ class DocumentationRenderer:
         self.parent = parent
         self.layout = layout or ResponsiveLayout.get_instance()
         self.theme = theme or DocumentationTheme()
+        self.layout_theme = layout_theme or DocumentationLayoutTheme()
         self.typography = UiTypography.get_instance()
         self.scale_percent = normalise_documentation_scale(scale_percent)
         self.unicode_symbols = bool(unicode_symbols)
@@ -132,6 +139,12 @@ class DocumentationRenderer:
         self._media_items: list[_RenderedMedia] = []
         self._last_parent_width = 0
         self._last_bounds = None
+        self._current_page: DocPage | None = None
+        self._page_layout_override = DocLayout()
+        self._resolved_layout = resolve_documentation_layout(
+            theme=self.layout_theme,
+            override=self._page_layout_override,
+        )
 
     def set_scale(self, value: object):
         new_value = normalise_documentation_scale(value)
@@ -140,6 +153,64 @@ class DocumentationRenderer:
         self.scale_percent = new_value
         self.refresh_typography()
         self.reflow(force=True)
+
+    def set_theme(self, theme: DocumentationTheme | None):
+        """Replace visual tokens and rerender the current semantic page."""
+        self.theme = theme or DocumentationTheme()
+        if self._current_page is not None:
+            self.render_page(self._current_page)
+
+    def set_layout_theme(self, theme: DocumentationLayoutTheme | None):
+        """Replace sparse layout-theme overrides and rerender current content."""
+        self.layout_theme = theme or DocumentationLayoutTheme()
+        if self._current_page is not None:
+            # render_page() performs the one required resolve before rebuilding
+            # semantic widgets; do not resolve/reflow twice in one theme edit.
+            self.render_page(self._current_page)
+        else:
+            self._resolved_layout = resolve_documentation_layout(
+                theme=self.layout_theme,
+                override=self._page_layout_override,
+            )
+            self.reflow(force=True)
+
+    def layout_snapshot(self, width: int | None = None, height: int | None = None) -> dict:
+        """Return configured/effective layout values for theme debugging."""
+        if width is None or height is None:
+            actual_width, actual_height = self.layout.item_size(self.parent)
+            if width is None:
+                width = actual_width
+            if height is None:
+                height = actual_height
+        constrained = documentation_bounds(
+            max(1, int(width or 1)),
+            max(0, int(height or 0)),
+            layout=self._resolved_layout,
+        )
+        configured = {
+            name: getattr(self._resolved_layout, name)
+            for name in (
+                "maximum_width", "minimum_width",
+                "margin_left", "margin_right", "margin_top", "margin_bottom",
+                "padding_left", "padding_right", "padding_top", "padding_bottom",
+                "document_alignment", "title_alignment", "media_alignment",
+            )
+        }
+        return {
+            "configured": configured,
+            "sources": {name: source.value for name, source in self._resolved_layout.sources},
+            "rejected": tuple(
+                {
+                    "property": name,
+                    "source": rejection.source.value,
+                    "value": rejection.value,
+                    "reason": rejection.reason,
+                }
+                for name, rejection in self._resolved_layout.rejected
+            ),
+            "document_bounds": constrained.document,
+            "content_bounds": constrained.content,
+        }
 
     def clear(self):
         if dpg is not None:
@@ -167,7 +238,7 @@ class DocumentationRenderer:
         role: DocRole,
         *,
         wrap: bool = True,
-        centered: bool = False,
+        alignment: HorizontalAlign = HorizontalAlign.LEFT,
         extra_indent: int = 0,
         parent=None,
     ):
@@ -184,7 +255,7 @@ class DocumentationRenderer:
                 item=item,
                 role=DocRole(role),
                 wrap=wrap,
-                centered=centered,
+                alignment=HorizontalAlign(alignment),
                 extra_indent=max(0, int(extra_indent)),
             )
         )
@@ -192,8 +263,19 @@ class DocumentationRenderer:
         return item
 
     def render_page(self, page: DocPage):
+        self._current_page = page
+        self._page_layout_override = page.layout
+        self._resolved_layout = resolve_documentation_layout(
+            theme=self.layout_theme,
+            override=self._page_layout_override,
+        )
         self.clear()
-        self._add_text(page.title, DocRole.PAGE_TITLE, wrap=False, centered=True)
+        self._add_text(
+            page.title,
+            DocRole.PAGE_TITLE,
+            wrap=False,
+            alignment=self._resolved_layout.title_alignment,
+        )
         if dpg is not None:
             dpg.add_spacer(height=self.theme.title_bottom_gap, parent=self.parent)
         if page.lead:
@@ -264,7 +346,15 @@ class DocumentationRenderer:
             color=self.theme.color_for_callout(block.kind),
             parent=self.parent,
         )
-        self._text_items.append(_RenderedText(heading, DocRole.SUBSECTION_TITLE, False, False, 8))
+        self._text_items.append(
+            _RenderedText(
+                heading,
+                DocRole.SUBSECTION_TITLE,
+                False,
+                HorizontalAlign.LEFT,
+                8,
+            )
+        )
         self._bind(heading, DocRole.SUBSECTION_TITLE)
         body = dpg.add_text(
             block.body,
@@ -272,7 +362,9 @@ class DocumentationRenderer:
             wrap=1,
             parent=self.parent,
         )
-        self._text_items.append(_RenderedText(body, DocRole.BODY, True, False, 22))
+        self._text_items.append(
+            _RenderedText(body, DocRole.BODY, True, HorizontalAlign.LEFT, 22)
+        )
         self._bind(body, DocRole.BODY)
         dpg.add_spacer(height=self.theme.paragraph_gap, parent=self.parent)
 
@@ -292,7 +384,9 @@ class DocumentationRenderer:
             parent=self.parent,
         )
         self._width_items.append(_RenderedWidth(item))
-        self._text_items.append(_RenderedText(item, DocRole.CODE, False, False, 0))
+        self._text_items.append(
+            _RenderedText(item, DocRole.CODE, False, HorizontalAlign.LEFT, 0)
+        )
         self._bind(item, DocRole.CODE)
         dpg.add_spacer(height=self.theme.paragraph_gap, parent=self.parent)
 
@@ -329,10 +423,16 @@ class DocumentationRenderer:
                 native_height=height,
                 maximum_width=max(1, int(block.maximum_width)),
                 maximum_height=max(1, int(block.maximum_height)),
+                alignment=self._resolved_layout.media_alignment,
             )
         )
         if block.caption:
-            self._add_text(block.caption, DocRole.CAPTION, wrap=True, centered=True)
+            self._add_text(
+                block.caption,
+                DocRole.CAPTION,
+                wrap=True,
+                alignment=self._resolved_layout.media_alignment,
+            )
         dpg.add_spacer(height=self.theme.paragraph_gap, parent=self.parent)
 
     def _render_links(self, block: DocLinks):
@@ -397,15 +497,14 @@ class DocumentationRenderer:
         if not force and abs(width - self._last_parent_width) < 4:
             return
         self._last_parent_width = width
-        bounds = content_bounds(
+        _actual_width, actual_height = self.layout.item_size(self.parent)
+        constrained = documentation_bounds(
             width,
-            metrics=ContentMetrics(
-                horizontal_padding=self.theme.horizontal_padding,
-                minimum_width=self.theme.content_min_width,
-                maximum_width=self.theme.content_max_width,
-            ),
+            actual_height,
+            layout=self._resolved_layout,
         )
-        self._last_bounds = bounds
+        bounds = constrained.content
+        self._last_bounds = constrained
 
         alive_text: list[_RenderedText] = []
         for record in self._text_items:
@@ -414,13 +513,13 @@ class DocumentationRenderer:
                     continue
             except Exception:
                 continue
-            if record.centered:
+            if record.alignment is not HorizontalAlign.LEFT:
                 try:
                     value = str(dpg.get_value(record.item) or "")
                 except Exception:
                     value = ""
                 measured = min(bounds.width, self._measure_text(value, record.role))
-                indent = bounds.x + aligned_offset(bounds.width, measured, HorizontalAlign.CENTER)
+                indent = bounds.x + aligned_offset(bounds.width, measured, record.alignment)
             else:
                 indent = bounds.x + record.extra_indent
             self.layout.indent(record.item, indent)
@@ -465,7 +564,7 @@ class DocumentationRenderer:
                 min(bounds.width, record.maximum_width),
                 record.maximum_height,
             )
-            indent = bounds.x + aligned_offset(bounds.width, target_width, HorizontalAlign.CENTER)
+            indent = bounds.x + aligned_offset(bounds.width, target_width, record.alignment)
             self.layout.indent(record.item, indent)
             self.layout.size(record.item, target_width, target_height)
             alive_media.append(record)

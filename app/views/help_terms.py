@@ -523,6 +523,32 @@ HELP_TERMS = {
         "documentation renderer now. Timed animation/video types are represented in the model and "
         "degrade to an explanatory fallback until a real decoder/player backend is implemented.",
     ),
+    "DOCUMENT_LAYOUT_POLICY": (
+        "Documentation Layout Policy",
+        "The resolved geometry policy for a DocPage: maximum/minimum width, outer margins, inner "
+        "padding, and document/title/media alignment. Framework defaults, sparse theme overrides "
+        "and explicit page overrides resolve before current-window constraints are applied.",
+    ),
+    "PROPERTY_CASCADE": (
+        "Framework Property Cascade",
+        "The deterministic configuration order used by reusable presentation primitives: a safe "
+        "framework Default is optionally overridden by a valid Theme value, then by a valid explicit "
+        "Instance value. Invalid higher-precedence candidates fall back one layer at a time instead "
+        "of breaking the component or replacing unrelated properties.",
+    ),
+    "DOCUMENT_MARGIN_PADDING": (
+        "Documentation Margin and Padding",
+        "Margin is space outside the document rectangle, between the document and its parent pane. "
+        "Padding is space inside that rectangle, between its edge and readable content. They are "
+        "independent from title/media alignment, so changing content insets does not stop a title "
+        "from centering within the current content bounds.",
+    ),
+    "UNSET_INHERITANCE": (
+        "UNSET Inheritance",
+        "A framework sentinel meaning that an instance or sparse theme did not provide a value and "
+        "should inherit the next lower-precedence layer. It is intentionally distinct from None, "
+        "which can remain an explicit semantic value such as no configured maximum document width.",
+    ),
     "TRANSFER_RATE": (
         "Transfer Rate Units",
         "Controls how live upload/download speeds are displayed. KB/s and MB/s "
@@ -1174,5 +1200,3 @@ def add_context_tooltip(
         contextual_text(title, body, facts=facts, footer=footer),
         wrap=wrap,
     )
-
-

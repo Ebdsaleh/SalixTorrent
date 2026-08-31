@@ -1,5 +1,15 @@
 """Reusable semantic documentation subsystem for Dear PyGui applications."""
 
+from .layout import (
+    DEFAULT_DOCUMENTATION_LAYOUT,
+    DocLayout,
+    DocumentationBounds,
+    DocumentationLayoutDefaults,
+    DocumentationLayoutTheme,
+    ResolvedDocumentationLayout,
+    documentation_bounds,
+    resolve_documentation_layout,
+)
 from .model import (
     DocBlock,
     DocCallout,
@@ -29,6 +39,14 @@ from .typography import (
 )
 
 __all__ = [
+    "DEFAULT_DOCUMENTATION_LAYOUT",
+    "DocLayout",
+    "DocumentationBounds",
+    "DocumentationLayoutDefaults",
+    "DocumentationLayoutTheme",
+    "ResolvedDocumentationLayout",
+    "documentation_bounds",
+    "resolve_documentation_layout",
     "DocBlock",
     "DocCallout",
     "DocCalloutKind",

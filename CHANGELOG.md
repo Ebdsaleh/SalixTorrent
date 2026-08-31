@@ -6,6 +6,11 @@ Notable SalixTorrent changes are recorded here.
 
 ### Added
 
+- Generic framework property-cascade resolver with an explicit `UNSET` inheritance sentinel, Default/Theme/Instance provenance, per-property validation fallback, and rejected-candidate diagnostics.
+- Phase 6.5 documentation-layout policy split with hard-coded safe framework defaults, sparse `DocumentationLayoutTheme` overrides, sparse per-`DocPage` `DocLayout` instance overrides, and independent margin/padding/document/title/media alignment properties.
+- Runtime documentation constraint geometry that preserves valid configured values while temporarily fitting them to smaller parent bounds instead of treating responsive contraction as invalid configuration.
+- Inspectable documentation layout snapshots exposing configured values, property source layers, rejected candidates, and effective document/content rectangles for programmatic theme development.
+
 - Phase 6.5 semantic Documentation subsystem with renderer-neutral `DocPage`/section/paragraph/link/callout/code/media models and a Dear PyGui renderer.
 - Parent-relative `ContentBounds` geometry and horizontal/vertical alignment primitives so reusable components can align inside their current pane instead of assuming viewport coordinates.
 - Semantic documentation typography roles for page titles, leads, section/subsection headings, body text, captions, code and index headings, backed by pre-registered scalable font sizes.
@@ -48,6 +53,9 @@ Notable SalixTorrent changes are recorded here.
 - Offline Help/Glossary coverage for tracker timeouts, mapping diagnosis, manual port forwarding, double NAT, CGNAT, and external-address scope.
 
 ### Changed
+
+- SalixTorrent's active Help/Glossary layout theme now widens the framework's conservative 980 px default reading measure to 1180 px with smaller inner insets, reducing excessive dead margin while page titles remain centered inside the resolved content bounds.
+- Documentation visual tokens and geometry policy are now separate concerns: `DocumentationTheme` owns colors/spacing while `DocumentationLayoutTheme`/`DocLayout` own responsive geometry.
 
 - The entire Help Topics and Glossary detail pane now renders through the Documentation subsystem; topic titles are visually significant centered page headings, section hierarchy is semantic, related links share one component, and glossary definitions use the same document renderer.
 - Help content no longer maintains an ad-hoc list of wrapped text widgets; one resize-event-driven renderer reapplies cached content bounds, wrapping, anchoring and typography only when geometry or documentation scale changes.

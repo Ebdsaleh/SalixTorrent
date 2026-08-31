@@ -8,9 +8,11 @@ subsystem suitable for later extraction into a reusable DPG framework.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Tuple
+
+from .layout import DocLayout
 
 
 class DocRole(str, Enum):
@@ -119,3 +121,4 @@ class DocPage:
     lead: str = ""
     sections: Tuple[DocSection, ...] = ()
     blocks: Tuple[DocBlock, ...] = ()
+    layout: DocLayout = field(default_factory=DocLayout)
