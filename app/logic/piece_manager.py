@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from typing import Callable, Iterable, List, Optional
 
 from app.logic.torrent_file import TorrentFile
+from app.logic.torrent_v2 import file_merkle_root, piece_layer_hashes_from_data
 
 BLOCK_SIZE = 16384
 RESUME_STATE_VERSION = 1
@@ -98,10 +99,30 @@ class BlockReceiveResult:
 
 
 class Piece:
-    def __init__(self, index: int, length: int, expected_hash: bytes):
+    def __init__(
+        self,
+        index: int,
+        length: int,
+        expected_hash: bytes = b"",
+        *,
+        expected_v2_hash: bytes = b"",
+        v2_file_root: bytes = b"",
+        verify_v2_file_root: bool = False,
+        piece_length: int = 0,
+        padding_length: int = 0,
+        storage_offset: Optional[int] = None,
+    ):
         self.index = index
         self.length = length
-        self.expected_hash = expected_hash
+        self.expected_hash = bytes(expected_hash or b"")
+        self.expected_v2_hash = bytes(expected_v2_hash or b"")
+        self.v2_file_root = bytes(v2_file_root or b"")
+        self.verify_v2_file_root = bool(verify_v2_file_root)
+        self.piece_length = max(0, int(piece_length or length or 0))
+        self.padding_length = max(0, int(padding_length or 0))
+        self.storage_offset = (
+            int(storage_offset) if storage_offset is not None else index * self.piece_length
+        )
         self._blocks: Optional[List[Block]] = None
         self.is_complete: bool = False
         # A verified piece may briefly live in the bounded write-behind buffer
@@ -168,8 +189,33 @@ class Piece:
             if block.data is not None
         )
 
+    def verify_data(self, data: bytes) -> bool:
+        data = bytes(data)
+        if len(data) != self.length:
+            return False
+
+        if self.expected_hash:
+            v1_data = data + (b"\x00" * self.padding_length)
+            if hashlib.sha1(v1_data).digest() != self.expected_hash:
+                return False
+
+        if self.verify_v2_file_root:
+            if not self.v2_file_root or file_merkle_root(data) != self.v2_file_root:
+                return False
+        elif self.expected_v2_hash:
+            hashes = piece_layer_hashes_from_data(data, self.piece_length)
+            if len(hashes) != 1 or hashes[0] != self.expected_v2_hash:
+                return False
+
+        return bool(self.expected_hash or self.expected_v2_hash or self.verify_v2_file_root)
+
     def verify_hash(self) -> bool:
-        return hashlib.sha1(self.get_data()).digest() == self.expected_hash
+        return self.verify_data(self.get_data())
+
+    def wire_length(self, generation: str = "v1") -> int:
+        if str(generation).lower() == "v1":
+            return self.length + self.padding_length
+        return self.length
 
 
 @dataclass(frozen=True)
@@ -315,11 +361,46 @@ class PieceManager:
         self._rebuild_piece_priority_cache()
 
     def _initialize_pieces(self):
-        total_remaining = self.torrent.total_length
+        if bool(getattr(self.torrent, "is_v2", False)):
+            for descriptor in self.torrent.v2_piece_map:
+                index = int(descriptor["index"])
+                expected_sha1 = (
+                    self.torrent.pieces[index]
+                    if bool(getattr(self.torrent, "is_v1", True)) and index < len(self.torrent.pieces)
+                    else b""
+                )
+                padding = (
+                    self.torrent.hybrid_piece_padding[index]
+                    if self.torrent.is_hybrid and index < len(self.torrent.hybrid_piece_padding)
+                    else 0
+                )
+                self.pieces.append(
+                    Piece(
+                        index,
+                        int(descriptor["length"]),
+                        expected_sha1,
+                        expected_v2_hash=descriptor.get("expected_piece_hash", b""),
+                        v2_file_root=descriptor.get("pieces_root", b""),
+                        verify_v2_file_root=bool(descriptor.get("verify_file_root")),
+                        piece_length=self.torrent.piece_length,
+                        padding_length=padding,
+                        storage_offset=int(descriptor["payload_offset"]),
+                    )
+                )
+            return
 
+        total_remaining = self.torrent.total_length
         for index, expected_hash in enumerate(self.torrent.pieces):
             piece_len = min(self.torrent.piece_length, total_remaining)
-            self.pieces.append(Piece(index, piece_len, expected_hash))
+            self.pieces.append(
+                Piece(
+                    index,
+                    piece_len,
+                    expected_hash,
+                    piece_length=self.torrent.piece_length,
+                    storage_offset=index * self.torrent.piece_length,
+                )
+            )
             total_remaining -= piece_len
 
     def _initialize_storage_files(self):
@@ -368,8 +449,11 @@ class PieceManager:
         if piece_index < 0 or piece_index >= len(self.pieces) or not self._storage_files:
             return []
 
+        if bool(getattr(self.torrent, "is_v2", False)) and piece_index < len(self.torrent.v2_piece_map):
+            return [int(self.torrent.v2_piece_map[piece_index]["file_index"])]
+
         piece = self.pieces[piece_index]
-        start = piece_index * self.torrent.piece_length
+        start = piece.storage_offset
         end = min(self.torrent.total_length, start + piece.length)
         index = self._storage_index_for_offset(start)
         result: List[int] = []
@@ -677,6 +761,25 @@ class PieceManager:
         return not (cancel_event and cancel_event.is_set())
 
     def _payload_exists(self) -> bool:
+        if bool(getattr(self.torrent, "is_v2", False)):
+            candidates = []
+            for piece in self.pieces:
+                if piece.index >= len(self.torrent.v2_piece_map):
+                    continue
+                descriptor = self.torrent.v2_piece_map[piece.index]
+                file_index = int(descriptor["file_index"])
+                if not (0 <= file_index < len(self._storage_files)):
+                    continue
+                item = self._storage_files[file_index]
+                try:
+                    actual = min(os.path.getsize(item.path), item.length)
+                except OSError:
+                    continue
+                required = int(descriptor["file_offset"]) + piece.length
+                if actual >= required:
+                    candidates.append(piece.index)
+            return candidates
+
         if not self.torrent.is_multi_file:
             return bool(self._storage_files) and os.path.isfile(self._storage_files[0].path)
 
@@ -840,6 +943,37 @@ class PieceManager:
             count = (capped + self.torrent.piece_length - 1) // self.torrent.piece_length
             return list(range(min(len(self.pieces), count)))
 
+        # BEP-52 addresses pieces per-file and aligns every file to a piece
+        # boundary on the wire.  Our physical storage deliberately omits the
+        # BEP-47 padding used by hybrid torrents, so a piece index can no longer
+        # be derived from ``physical_offset // piece_length``.  Use the v2 piece
+        # map instead: it retains the owning file and in-file byte range while
+        # ``payload_offset`` remains the compact, padding-free disk offset.
+        if bool(getattr(self.torrent, "is_v2", False)):
+            candidates = []
+            for descriptor in getattr(self.torrent, "v2_piece_map", ()):
+                try:
+                    piece_index = int(descriptor["index"])
+                    file_index = int(descriptor["file_index"])
+                    file_offset = int(descriptor["file_offset"])
+                    piece_length = int(descriptor["length"])
+                except (KeyError, TypeError, ValueError):
+                    continue
+                if not (0 <= piece_index < len(self.pieces)):
+                    continue
+                if not (0 <= file_index < len(self._storage_files)):
+                    continue
+                item = self._storage_files[file_index]
+                if item.length <= 0 or not os.path.exists(item.path):
+                    continue
+                try:
+                    actual = min(os.path.getsize(item.path), item.length)
+                except OSError:
+                    continue
+                if actual >= file_offset + piece_length:
+                    candidates.append(piece_index)
+            return candidates
+
         candidates = set()
         for item in self._storage_files:
             if item.length <= 0 or not os.path.exists(item.path):
@@ -1001,13 +1135,12 @@ class PieceManager:
                 return False
 
             piece = self.pieces[piece_index]
-            file_offset = piece.index * self.torrent.piece_length
+            file_offset = piece.storage_offset
             data = self._read_range(file_offset, piece.length)
 
-            if (
-                len(data) == piece.length
-                and hashlib.sha1(data).digest() == piece.expected_hash
-            ):
+            verified = piece.verify_data(data) if len(data) == piece.length else False
+
+            if verified:
                 piece.is_complete = True
                 piece.is_persisted = True
                 self.downloaded_bytes += piece.length
@@ -1799,7 +1932,7 @@ class PieceManager:
             piece_index, data, _queued_at = item
             write_started = time.monotonic()
             try:
-                file_offset = piece_index * self.torrent.piece_length
+                file_offset = self.pieces[piece_index].storage_offset
                 await asyncio.to_thread(self._write_range, file_offset, data)
                 latency = max(0.0, time.monotonic() - write_started)
 
@@ -1996,20 +2129,39 @@ class PieceManager:
         return bytes(result) if len(result) == length else b""
 
     def _write_piece_to_disk(self, piece: Piece):
-        file_offset = piece.index * self.torrent.piece_length
-        self._write_range(file_offset, piece.get_data())
+        self._write_range(piece.storage_offset, piece.get_data())
 
-    def read_block(self, piece_index: int, offset: int, length: int) -> bytes:
+    def read_block(
+        self,
+        piece_index: int,
+        offset: int,
+        length: int,
+        generation: str = "v1",
+    ) -> bytes:
         if piece_index < 0 or piece_index >= len(self.pieces):
             return b""
 
         piece = self.pieces[piece_index]
         if not piece.is_complete:
             return b""
-        if offset < 0 or length <= 0:
+        if offset < 0 or length <= 0 or length > BLOCK_SIZE:
             return b""
-        if offset + length > piece.length or length > BLOCK_SIZE:
+
+        generation = str(generation or "v1").lower()
+        wire_length = piece.wire_length(generation)
+        if offset + length > wire_length:
             return b""
+
+        # BEP-47 hybrid padding is virtual storage. v1 peers are allowed to
+        # request those bytes, but they are deterministic zeroes and are never
+        # materialised as .pad files. v2 peers see only the real file bytes.
+        if offset >= piece.length:
+            if generation == "v1" and offset + length <= wire_length:
+                return b"\x00" * length
+            return b""
+
+        payload_length = min(length, piece.length - offset)
+        padding_length = length - payload_length
 
         # Pending verified pieces must be uploadable before their write-behind
         # reaches disk. Recently persisted pieces can also be served from the
@@ -2018,26 +2170,31 @@ class PieceManager:
             cached = self._pending_piece_data.get(piece_index)
             if cached is not None:
                 self._disk_cache_hits += 1
-                return cached[offset:offset + length]
+                data = cached[offset:offset + payload_length]
+                return data + (b"\x00" * padding_length) if len(data) == payload_length else b""
 
             cached = self._recent_piece_cache.get(piece_index)
             if cached is not None:
                 self._recent_piece_cache.move_to_end(piece_index)
                 self._disk_cache_hits += 1
-                return cached[offset:offset + length]
+                data = cached[offset:offset + payload_length]
+                return data + (b"\x00" * padding_length) if len(data) == payload_length else b""
 
         if not piece.is_persisted:
-            data = self._read_piece_from_memory(piece, offset, length)
+            data = self._read_piece_from_memory(piece, offset, payload_length)
             if data:
                 with self._disk_state_lock:
                     self._disk_cache_hits += 1
-                return data
+                return data + (b"\x00" * padding_length)
             return b""
 
         with self._disk_state_lock:
             self._disk_cache_misses += 1
-        file_offset = piece.index * self.torrent.piece_length + offset
-        return self._read_range(file_offset, length)
+        file_offset = piece.storage_offset + offset
+        data = self._read_range(file_offset, payload_length)
+        if len(data) != payload_length:
+            return b""
+        return data + (b"\x00" * padding_length)
 
     def build_file_telemetry(self, detail_limit: int = 500) -> dict:
         """Build per-file progress without allocating untouched piece blocks.
@@ -2073,7 +2230,7 @@ class PieceManager:
             if piece.is_complete or not piece.blocks_initialized:
                 continue
 
-            piece_start = piece.index * self.torrent.piece_length
+            piece_start = piece.storage_offset
             blocks = piece._blocks or []
             for block in blocks:
                 if block.data is not None:
@@ -2112,7 +2269,7 @@ class PieceManager:
                 None,
             )
             if first_incomplete_piece is not None:
-                current_offset = first_incomplete_piece.index * self.torrent.piece_length
+                current_offset = first_incomplete_piece.storage_offset
                 current_file = self._storage_index_for_offset(current_offset)
             else:
                 current_file = 0
@@ -2474,3 +2631,5 @@ class PieceManager:
             if self._disk_unqueued_verified:
                 return False
         return all(piece.is_complete for piece in self.pieces)
+
+

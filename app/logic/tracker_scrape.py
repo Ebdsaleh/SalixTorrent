@@ -218,23 +218,31 @@ class TrackerScrapeCoordinator:
         if not sessions:
             return
 
-        groups: Dict[str, List[Tuple[Any, bytes]]] = defaultdict(list)
+        groups: Dict[str, List[Tuple[Any, str, bytes]]] = defaultdict(list)
         for session in sessions:
             torrent = getattr(session, "torrent", None)
-            info_hash = getattr(torrent, "info_hash", b"")
-            if not isinstance(info_hash, bytes) or len(info_hash) != 20:
-                continue
-            for tracker_url in list(getattr(torrent, "announce_list", []) or []):
-                url = str(tracker_url or "")
-                if url.startswith(("http://", "https://", "udp://")):
-                    groups[url].append((session, info_hash))
+            active_generations = tuple(getattr(session, "active_generations", ()) or ())
+            swarm_hashes = dict(getattr(session, "swarm_hashes", {}) or {})
+            if not active_generations:
+                info_hash = getattr(torrent, "info_hash", b"")
+                if isinstance(info_hash, bytes) and len(info_hash) == 20:
+                    active_generations = ("v1",)
+                    swarm_hashes = {"v1": info_hash}
+            for generation in active_generations:
+                info_hash = swarm_hashes.get(generation, b"")
+                if not isinstance(info_hash, bytes) or len(info_hash) != 20:
+                    continue
+                for tracker_url in list(getattr(torrent, "announce_list", []) or []):
+                    url = str(tracker_url or "")
+                    if url.startswith(("http://", "https://", "udp://")):
+                        groups[url].append((session, str(generation), info_hash))
 
         if not groups:
             return
 
         semaphore = asyncio.Semaphore(MAX_CONCURRENT_SCRAPE_TRACKERS)
 
-        async def run_group(tracker_url: str, entries: List[Tuple[Any, bytes]]):
+        async def run_group(tracker_url: str, entries: List[Tuple[Any, str, bytes]]):
             async with semaphore:
                 await self._scrape_group(tracker_url, entries)
 
@@ -243,23 +251,30 @@ class TrackerScrapeCoordinator:
         )
 
     @staticmethod
-    def _apply(session: Any, tracker_url: str, result: dict):
+    def _apply(session: Any, generation: str, tracker_url: str, result: dict):
         try:
             apply_method = getattr(session, "apply_tracker_scrape_result", None)
             if callable(apply_method):
-                apply_method(tracker_url, result)
+                try:
+                    apply_method(tracker_url, result, generation=generation)
+                except TypeError:
+                    apply_method(tracker_url, result)
             else:
-                session.tracker.apply_scrape_result(tracker_url, result)
+                trackers = getattr(session, "_trackers_by_generation", {}) or {}
+                tracker = trackers.get(generation) or getattr(session, "tracker", None)
+                if tracker is not None:
+                    tracker.apply_scrape_result(tracker_url, result)
         except Exception:
             pass
 
-    async def _scrape_group(self, tracker_url: str, entries: List[Tuple[Any, bytes]]):
-        # One torrent/info-hash per manager session, but preserve order while
-        # removing accidental duplicates before constructing batches.
-        by_hash: Dict[bytes, List[Any]] = defaultdict(list)
-        for session, info_hash in entries:
-            if session not in by_hash[info_hash]:
-                by_hash[info_hash].append(session)
+    async def _scrape_group(self, tracker_url: str, entries: List[Tuple[Any, str, bytes]]):
+        # Hybrid sessions contribute one independently addressed swarm per
+        # generation. Preserve both even when they belong to the same session.
+        by_hash: Dict[bytes, List[Tuple[Any, str]]] = defaultdict(list)
+        for session, generation, info_hash in entries:
+            target = (session, generation)
+            if target not in by_hash[info_hash]:
+                by_hash[info_hash].append(target)
         hashes = list(by_hash)
         protocol = urllib.parse.urlsplit(tracker_url).scheme.lower()
 
@@ -300,8 +315,8 @@ class TrackerScrapeCoordinator:
                         "batch_size": batch_size,
                         **stats,
                     }
-                for session in sessions_for_hash:
-                    self._apply(session, tracker_url, result)
+                for session, generation in sessions_for_hash:
+                    self._apply(session, generation, tracker_url, result)
 
         except asyncio.CancelledError:
             raise
@@ -314,8 +329,8 @@ class TrackerScrapeCoordinator:
                 "batch_size": len(hashes),
                 "error": str(exc),
             }
-            for session, _info_hash in entries:
-                self._apply(session, tracker_url, result)
+            for session, generation, _info_hash in entries:
+                self._apply(session, generation, tracker_url, result)
         except (asyncio.TimeoutError, TimeoutError, socket.timeout) as exc:
             result = {
                 "status": "Timeout",
@@ -325,8 +340,8 @@ class TrackerScrapeCoordinator:
                 "batch_size": len(hashes),
                 "error": str(exc) or "Tracker scrape timed out",
             }
-            for session, _info_hash in entries:
-                self._apply(session, tracker_url, result)
+            for session, generation, _info_hash in entries:
+                self._apply(session, generation, tracker_url, result)
         except Exception as exc:
             result = {
                 "status": "Error",
@@ -336,8 +351,8 @@ class TrackerScrapeCoordinator:
                 "batch_size": len(hashes),
                 "error": str(exc) or exc.__class__.__name__,
             }
-            for session, _info_hash in entries:
-                self._apply(session, tracker_url, result)
+            for session, generation, _info_hash in entries:
+                self._apply(session, generation, tracker_url, result)
 
     async def _scrape_http(self, endpoint: str, info_hashes: Sequence[bytes]) -> Dict[bytes, dict]:
         parsed = urllib.parse.urlsplit(endpoint)
@@ -473,3 +488,5 @@ class TrackerScrapeCoordinator:
             return out
         finally:
             sock.close()
+
+

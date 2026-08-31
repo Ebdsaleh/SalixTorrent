@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from app.engine.runtime_paths import resource_path
 from typing import Callable, Optional
 
 try:
@@ -91,7 +92,7 @@ class DocumentationMediaCache:
     def load_image(self, source: str):
         if dpg is None:
             return None
-        path = str(Path(source).expanduser())
+        path = str(resource_path(Path(source).expanduser()))
         cached = self._textures.get(path)
         if cached is not None:
             return cached
@@ -569,3 +570,5 @@ class DocumentationRenderer:
             self.layout.size(record.item, target_width, target_height)
             alive_media.append(record)
         self._media_items = alive_media
+
+

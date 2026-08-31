@@ -13,6 +13,9 @@
 *.bat
 *tree.txt
 test_*.py
+/build/
+/dist/
+
 *test_cli_swarm.py
 *test_download.py
 *test_peer.py

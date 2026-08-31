@@ -20,6 +20,37 @@ class TransferSourceKind(str, Enum):
     MAGNET = "magnet"
 
 
+TORRENT_PROTOCOL_AUTO = "Auto / Best Compatible"
+TORRENT_PROTOCOL_V1_ONLY = "BitTorrent v1 Only"
+TORRENT_PROTOCOL_V2_ONLY = "BitTorrent v2 Only"
+TORRENT_PROTOCOL_POLICIES = (
+    TORRENT_PROTOCOL_AUTO,
+    TORRENT_PROTOCOL_V1_ONLY,
+    TORRENT_PROTOCOL_V2_ONLY,
+)
+
+
+def normalise_torrent_protocol_policy(value: object) -> str:
+    """Return one stable presentation-neutral torrent generation policy."""
+    text = str(value or TORRENT_PROTOCOL_AUTO).strip()
+    aliases = {
+        "auto": TORRENT_PROTOCOL_AUTO,
+        "best": TORRENT_PROTOCOL_AUTO,
+        "best compatible": TORRENT_PROTOCOL_AUTO,
+        "auto / best compatible": TORRENT_PROTOCOL_AUTO,
+        "v1": TORRENT_PROTOCOL_V1_ONLY,
+        "v1 only": TORRENT_PROTOCOL_V1_ONLY,
+        "bittorrent v1 only": TORRENT_PROTOCOL_V1_ONLY,
+        "v2": TORRENT_PROTOCOL_V2_ONLY,
+        "v2 only": TORRENT_PROTOCOL_V2_ONLY,
+        "bittorrent v2 only": TORRENT_PROTOCOL_V2_ONLY,
+    }
+    return aliases.get(
+        text.lower(),
+        text if text in TORRENT_PROTOCOL_POLICIES else TORRENT_PROTOCOL_AUTO,
+    )
+
+
 def classify_transfer_source(source: object) -> TransferSourceKind:
     value = str(source or "").strip()
     if not value:
@@ -38,6 +69,7 @@ class TransferAddRequest:
     persist: bool = True
     max_peers: Optional[int] = None
     download_dir: Optional[str] = None
+    protocol_policy: Optional[str] = None
 
     @property
     def kind(self) -> TransferSourceKind:
@@ -64,3 +96,5 @@ class TransferAddHandle:
     source: str
     info_hash: str
     session: Optional["TorrentSession"] = None
+
+

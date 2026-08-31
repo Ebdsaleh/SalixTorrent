@@ -1,0 +1,2 @@
+# Phase 10 release tooling. Runtime users do not need this file.
+pyinstaller>=6.22,<7

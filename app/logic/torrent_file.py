@@ -29,8 +29,8 @@ class UnsupportedTorrentVersionError(ValueError):
 class TorrentFile:
     """Parse v1 and BEP-52 v2 metainfo without assuming a 20-byte identity.
 
-    Phase 8 parses and cryptographically validates the v2 metainfo foundation.
-    The live peer/session engine remains v1-only until Phase 9.
+    The parser keeps both generations for hybrid torrents so the live engine can
+    join either swarm without losing BEP-47 padding or BEP-52 file alignment.
     """
 
     def __init__(self, file_path: str):
@@ -58,6 +58,10 @@ class TorrentFile:
         self.total_length: int = 0
         self.is_multi_file: bool = False
         self.files: List[Dict[str, Any]] = []
+        self.v1_files: List[Dict[str, Any]] = []
+        self.v2_files: List[Dict[str, Any]] = []
+        self.v2_piece_map: List[Dict[str, Any]] = []
+        self.hybrid_piece_padding: List[int] = []
         self.comment: str = ""
         self.created_by: str = ""
         self.creation_date: int = 0
@@ -175,6 +179,9 @@ class TorrentFile:
                     "length": length,
                     "path": os.path.join(*path_parts),
                     "path_parts": path_parts,
+                    "attributes": bytes(file_entry.get(b"attr", b""))
+                    if isinstance(file_entry.get(b"attr", b""), bytes)
+                    else b"",
                 })
                 self.total_length += length
         else:
@@ -189,6 +196,9 @@ class TorrentFile:
                 "length": self.total_length,
                 "path": self.name,
                 "path_parts": [self.name],
+                "attributes": bytes(info_dict.get(b"attr", b""))
+                if isinstance(info_dict.get(b"attr", b""), bytes)
+                else b"",
             })
 
         expected_piece_count = (
@@ -197,6 +207,9 @@ class TorrentFile:
         )
         if len(self.pieces) != expected_piece_count:
             raise ValueError("Torrent piece hash count does not match its declared payload size.")
+
+        for entry in self.files:
+            entry["is_padding"] = b"p" in entry.get("attributes", b"")
 
     def _walk_v2_file_tree(self, node: object, prefix: list[str], out: list[dict]):
         if not isinstance(node, dict):
@@ -309,6 +322,90 @@ class TorrentFile:
         self.files = v2_files
         self.is_multi_file = len(v2_files) != 1 or v2_files[0]["path_parts"] != [self.name]
 
+    def _build_v2_piece_map(self):
+        """Build the BEP-52 logical piece address space in file-tree order."""
+        self.v2_piece_map = []
+        piece_index = 0
+        payload_offset = 0
+        for file_index, entry in enumerate(self.v2_files):
+            length = int(entry["length"])
+            root = bytes(entry.get("pieces_root", b""))
+            layer = list(entry.get("piece_layer", []))
+            count = expected_piece_layer_count(length, self.piece_length)
+            for file_piece_index in range(count):
+                start = file_piece_index * self.piece_length
+                real_length = min(self.piece_length, length - start)
+                expected_piece_hash = (
+                    bytes(layer[file_piece_index])
+                    if count > 1 and file_piece_index < len(layer)
+                    else b""
+                )
+                self.v2_piece_map.append({
+                    "index": piece_index,
+                    "file_index": file_index,
+                    "file_piece_index": file_piece_index,
+                    "file_offset": start,
+                    "payload_offset": payload_offset + start,
+                    "length": real_length,
+                    "pieces_root": root,
+                    "expected_piece_hash": expected_piece_hash,
+                    "verify_file_root": count == 1,
+                })
+                piece_index += 1
+            payload_offset += length
+
+    def _validate_hybrid_equivalence(self):
+        """Validate BEP-52's v1/v2 upgrade-path equivalence requirements.
+
+        Padding files are synthetic v1 entries.  Removing them must leave the
+        same real files in the same order as the v2 file tree, and every real
+        file after the first must start on a v1 piece boundary.
+        """
+        real_v1 = [entry for entry in self.v1_files if not entry.get("is_padding")]
+        if len(real_v1) != len(self.v2_files):
+            raise ValueError("Hybrid torrent v1/v2 file counts do not describe the same content.")
+
+        for left, right in zip(real_v1, self.v2_files):
+            if tuple(left.get("path_parts", ())) != tuple(right.get("path_parts", ())):
+                raise ValueError("Hybrid torrent v1/v2 file paths do not match.")
+            if int(left.get("length", -1)) != int(right.get("length", -2)):
+                raise ValueError("Hybrid torrent v1/v2 file lengths do not match.")
+
+        stream_offset = 0
+        real_index = 0
+        per_file_padding: List[int] = [0] * len(real_v1)
+        for entry in self.v1_files:
+            length = int(entry.get("length", 0))
+            if entry.get("is_padding"):
+                if length <= 0:
+                    raise ValueError("Hybrid BEP-47 padding files must have a positive length.")
+                if real_index <= 0:
+                    raise ValueError("Hybrid BEP-47 padding cannot precede the first real file.")
+                per_file_padding[real_index - 1] += length
+                stream_offset += length
+                continue
+
+            if real_index > 0 and stream_offset % self.piece_length:
+                raise ValueError("Hybrid v1 files are not aligned to BEP-52 piece boundaries.")
+            stream_offset += length
+            real_index += 1
+
+        for index in range(max(0, len(real_v1) - 1)):
+            expected = (-int(real_v1[index]["length"])) % self.piece_length
+            if per_file_padding[index] != expected:
+                raise ValueError("Hybrid BEP-47 padding does not match the BEP-52 file alignment.")
+
+        if len(self.pieces) != len(self.v2_piece_map):
+            raise ValueError("Hybrid v1/v2 piece address spaces do not have the same size.")
+
+        self.hybrid_piece_padding = [0] * len(self.v2_piece_map)
+        cursor = 0
+        for file_index, entry in enumerate(self.v2_files):
+            count = expected_piece_layer_count(entry["length"], self.piece_length)
+            if count:
+                self.hybrid_piece_padding[cursor + count - 1] = per_file_padding[file_index]
+            cursor += count
+
     def _load_and_parse(self):
         if not os.path.exists(self.file_path):
             raise FileNotFoundError(f"Metainfo file not found: {self.file_path}")
@@ -361,7 +458,6 @@ class TorrentFile:
         self.private = bool(int(info_dict.get(b"private", 0) or 0))
 
         # Parse v2 first so the v2 identity and piece layers are always checked.
-        # Hybrid cross-format equivalence and networking are intentionally Phase 9.
         v2_files: list[dict] | None = None
         if self.is_v2:
             self._parse_v2_payload(raw_dict, info_dict)
@@ -369,14 +465,24 @@ class TorrentFile:
 
         if self.is_v1:
             self._parse_v1_payload(info_dict)
+            self.v1_files = list(self.files)
             if self.is_hybrid:
-                # Retain v2 representation for Phase 9 while leaving the public
-                # legacy ``files`` view v1-compatible for existing code paths.
                 self.v2_files = v2_files or []
             else:
                 self.v2_files = []
         else:
+            self.v1_files = []
             self.v2_files = list(self.files)
+
+        if self.is_v2:
+            self._build_v2_piece_map()
+        if self.is_hybrid:
+            self._validate_hybrid_equivalence()
+            # User-facing file/storage views contain only real files. BEP-47
+            # padding stays virtual and is never created on disk.
+            self.files = [entry for entry in self.v1_files if not entry.get("is_padding")]
+            self.total_length = sum(int(entry["length"]) for entry in self.files)
+            self.is_multi_file = len(self.files) != 1 or self.files[0]["path_parts"] != [self.name]
 
         if not self.announce_list and not self.private:
             self.announce_list.extend(FALLBACK_TRACKERS)
@@ -386,11 +492,7 @@ class TorrentFile:
     def num_pieces(self) -> int:
         if self.is_v1:
             return len(self.pieces)
-        return sum(
-            expected_piece_layer_count(entry["length"], self.piece_length)
-            for entry in self.files
-            if entry["length"] > 0
-        )
+        return len(self.v2_piece_map)
 
     @property
     def hex_info_hash(self) -> str:
@@ -419,15 +521,21 @@ class TorrentFile:
 
     @property
     def magnet_uri(self) -> str:
-        """Return the currently supported v1 magnet representation.
+        """Return a generation-aware BEP-9 magnet URI.
 
-        BEP-52 ``btmh`` generation is Phase 9. Hybrid torrents may still expose
-        their v1 ``btih`` identity, but v2-only torrents intentionally fail
-        explicitly instead of generating an incorrect URI.
+        v2 uses a SHA2-256 multihash: function code 0x12, length 0x20, followed
+        by the full 32-byte infohash, all hex encoded after ``urn:btmh``.
         """
-        if not self.v1_info_hash:
-            raise NotImplementedError("v2-only btmh magnet generation is scheduled for Phase 9.")
-        parts = [f"magnet:?xt=urn:btih:{self.v1_info_hash.hex()}"]
+        xt_values: List[str] = []
+        if self.v1_info_hash:
+            xt_values.append(f"urn:btih:{self.v1_info_hash.hex()}")
+        if self.v2_info_hash:
+            xt_values.append(f"urn:btmh:1220{self.v2_info_hash.hex()}")
+        if not xt_values:
+            raise ValueError("Torrent does not contain a magnet-compatible identity.")
+        parts = [f"magnet:?xt={quote(xt_values[0], safe=':')}"]
+        for xt in xt_values[1:]:
+            parts.append(f"xt={quote(xt, safe=':')}")
         if self.name:
             parts.append(f"dn={quote(self.name, safe='')}")
         for tracker in self.announce_list:
@@ -435,3 +543,5 @@ class TorrentFile:
             if url:
                 parts.append(f"tr={quote(url, safe='')}")
         return "&".join(parts)
+
+

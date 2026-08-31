@@ -12,6 +12,7 @@ import time
 from collections import deque
 from typing import Callable, Deque, Dict, List, Optional, Set, Tuple
 
+from app.logic.bencode import Bencode
 from app.logic.dht import DHTClient, DHT_REFRESH_INTERVAL
 from app.logic.local_peer_discovery import LocalPeerDiscovery
 from app.logic.peer import (
@@ -27,13 +28,16 @@ from app.logic.peer import (
     PeerMessageID,
     build_extended_handshake_payload,
     build_extended_message,
+    build_hash_request_payload,
     encode_pex_payload,
     identify_peer_client,
     parse_extended_handshake,
     parse_metadata_payload,
     parse_pex_payload,
+    parse_hash_request_payload,
     reserved_supports_dht,
     reserved_supports_extensions,
+    reserved_supports_v2,
     normalise_peer_encryption_policy,
 )
 from app.logic.mse import MSEError, PeerWireStream, mse_responder_handshake
@@ -52,7 +56,14 @@ from app.logic.piece_manager import (
     PieceManager,
 )
 from app.logic.torrent_file import TorrentFile
+from app.logic.torrent_v2 import expected_piece_layer_count, piece_layer_depth, zero_hash
 from app.logic.tracker import TrackerClient
+from app.logic.transfer_add import (
+    TORRENT_PROTOCOL_AUTO,
+    TORRENT_PROTOCOL_V1_ONLY,
+    TORRENT_PROTOCOL_V2_ONLY,
+    normalise_torrent_protocol_policy,
+)
 
 RATE_UNIT_MULTIPLIERS = {
     "KB/s": 1024.0,
@@ -222,6 +233,7 @@ class TorrentSession:
         network_bind_address: str = "",
         interface_lock: bool = False,
         mask_peer_ips: bool = False,
+        protocol_policy: str = TORRENT_PROTOCOL_AUTO,
         global_download_limiter: Optional[AsyncBandwidthLimiter] = None,
         global_upload_limiter: Optional[AsyncBandwidthLimiter] = None,
         listen_port_callback: Optional[Callable[..., None]] = None,
@@ -229,11 +241,24 @@ class TorrentSession:
     ):
         self.torrent_path = torrent_path
         self.torrent = TorrentFile(torrent_path)
-        if self.torrent.is_v2:
-            raise NotImplementedError(
-                "BitTorrent v2 metainfo is valid and supported by the Phase 8 parser, "
-                "but v2/hybrid peer networking is scheduled for Phase 9."
-            )
+        self.protocol_policy = normalise_torrent_protocol_policy(protocol_policy)
+        if self.protocol_policy == TORRENT_PROTOCOL_V1_ONLY and not self.torrent.is_v1:
+            raise ValueError("BitTorrent v1 Only was selected, but this torrent has no v1 identity.")
+        if self.protocol_policy == TORRENT_PROTOCOL_V2_ONLY and not self.torrent.is_v2:
+            raise ValueError("BitTorrent v2 Only was selected, but this torrent has no v2 identity.")
+
+        generations = []
+        if self.torrent.is_v1 and self.protocol_policy != TORRENT_PROTOCOL_V2_ONLY:
+            generations.append("v1")
+        if self.torrent.is_v2 and self.protocol_policy != TORRENT_PROTOCOL_V1_ONLY:
+            generations.append("v2")
+        if not generations:
+            raise ValueError("The selected torrent protocol policy has no compatible swarm identity.")
+        self.active_generations = tuple(generations)
+        self.swarm_hashes = {
+            "v1": self.torrent.v1_info_hash,
+            "v2": self.torrent.v2_info_hash[:20] if self.torrent.v2_info_hash else b"",
+        }
         self.ui_queue = ui_queue or queue.Queue()
         self.max_peers = max_peers
 
@@ -255,12 +280,18 @@ class TorrentSession:
         self.interface_lock = bool(interface_lock)
         self.mask_peer_ips = bool(mask_peer_ips)
         self._last_interface_check_at: float = 0.0
-        self.tracker = TrackerClient(
-            self.torrent,
-            self.peer_id,
-            bind_address=self.network_bind_address,
-            encryption_policy=self.encryption_policy,
-        )
+        self._trackers_by_generation = {
+            generation: TrackerClient(
+                self.torrent,
+                self.peer_id,
+                bind_address=self.network_bind_address,
+                encryption_policy=self.encryption_policy,
+                info_hash=self.swarm_hashes[generation],
+                generation=generation,
+            )
+            for generation in self.active_generations
+        }
+        self.tracker = self._trackers_by_generation[self.active_generations[0]]
 
         self.active_peers: List[PeerConnection] = []
         self._worker_tasks: List[asyncio.Task] = []
@@ -281,8 +312,8 @@ class TorrentSession:
         self._seed_listener_addresses: Dict[int, str] = {}
         self._seed_client_writers: Set[asyncio.StreamWriter] = set()
         self._inbound_peer_records: Dict[int, dict] = {}
-        self._seed_outbound_endpoints: Set[Tuple[str, int]] = set()
-        self._download_endpoints: Set[Tuple[str, int]] = set()
+        self._seed_outbound_endpoints: Set[Tuple[str, int, str]] = set()
+        self._download_endpoints: Set[Tuple[str, int, str]] = set()
         try:
             requested_listen_port = int(listen_port or 6881)
         except (TypeError, ValueError):
@@ -300,22 +331,30 @@ class TorrentSession:
         self._listen_port_callback = listen_port_callback
         self._incoming_peer_callback = incoming_peer_callback
 
-        self._lpd = LocalPeerDiscovery(
-            self.torrent.info_hash,
-            bind_address=self.network_bind_address,
-        )
-        self._dht = DHTClient(
-            self.torrent.info_hash,
-            private=self.torrent.private or not self.enable_dht,
-            preferred_port=self.preferred_listen_port,
-            bind_address=self.network_bind_address,
-        )
+        self._lpd_by_generation = {
+            generation: LocalPeerDiscovery(
+                self.swarm_hashes[generation],
+                bind_address=self.network_bind_address,
+            )
+            for generation in self.active_generations
+        }
+        self._dht_by_generation = {
+            generation: DHTClient(
+                self.swarm_hashes[generation],
+                private=self.torrent.private or not self.enable_dht,
+                preferred_port=self.preferred_listen_port,
+                bind_address=self.network_bind_address,
+            )
+            for generation in self.active_generations
+        }
+        self._lpd = self._lpd_by_generation[self.active_generations[0]]
+        self._dht = self._dht_by_generation[self.active_generations[0]]
         self.local_peers_discovered: int = 0
         self.error_message: str = ""
 
         # BEP-10/11 Peer Exchange telemetry and deduplication. PEX is disabled
         # for private torrents, matching the conventional private-torrent rule.
-        self._pex_seen_endpoints: Set[Tuple[str, int]] = set()
+        self._pex_seen_endpoints: Set[Tuple[str, int, str]] = set()
         self._pex_last_at: float = 0.0
         self._pex_messages_received: int = 0
         self._pex_messages_sent: int = 0
@@ -380,6 +419,125 @@ class TorrentSession:
         # Old asynchronous work is prevented from overwriting a newer run.
         self._run_token = 0
         self._fast_resume_notice_shown = False
+
+    def _normalise_generation(self, generation: object = None) -> str:
+        value = str(generation or self.active_generations[0]).strip().lower()
+        return value if value in self.active_generations else self.active_generations[0]
+
+    def _tracker_for_generation(self, generation: object = None) -> TrackerClient:
+        return self._trackers_by_generation[self._normalise_generation(generation)]
+
+    def _dht_for_generation(self, generation: object = None) -> DHTClient:
+        return self._dht_by_generation[self._normalise_generation(generation)]
+
+    def _lpd_for_generation(self, generation: object = None) -> LocalPeerDiscovery:
+        return self._lpd_by_generation[self._normalise_generation(generation)]
+
+    def _peer_connection_for_generation(
+        self,
+        ip: str,
+        port: int,
+        *,
+        generation: object = None,
+        source: str = "Unknown",
+        direction: str = "Outgoing",
+    ) -> PeerConnection:
+        generation = self._normalise_generation(generation)
+        return PeerConnection(
+            ip,
+            port,
+            self.swarm_hashes[generation],
+            self.peer_id,
+            source=source,
+            direction=direction,
+            advertise_dht=self.enable_dht,
+            enable_pex=self.enable_pex,
+            encryption_policy=self.encryption_policy,
+            bind_address=self.network_bind_address,
+            v1_info_hash=self.torrent.v1_info_hash,
+            v2_info_hash=self.torrent.v2_info_hash,
+            protocol_generation=generation,
+        )
+
+    def _v2_hash_response(self, request: object) -> Optional[dict]:
+        """Return a safe piece-layer HASHES response or ``None`` for reject.
+
+        Phase 9 needs the BEP-52 piece layer for v2 magnet completion. The
+        top-level .torrent already contains these hashes for normal torrent
+        adds, so serving that validated layer is enough to bootstrap btmh
+        metadata without re-hashing payload data on the network event loop.
+        """
+        if not self.torrent.is_v2 or not isinstance(request, dict):
+            return None
+        try:
+            root = bytes(request.get("pieces_root", b""))
+            base_layer = int(request.get("base_layer", -1))
+            index = int(request.get("index", -1))
+            length = int(request.get("length", 0))
+            proof_layers = int(request.get("proof_layers", -1))
+        except (TypeError, ValueError):
+            return None
+        if (
+            len(root) != 32
+            or index < 0
+            or length < 2
+            or length > 512
+            or (length & (length - 1))
+            or index % length
+        ):
+            return None
+        if proof_layers != 0 or base_layer != piece_layer_depth(self.torrent.piece_length):
+            return None
+
+        file_entry = next(
+            (entry for entry in self.torrent.v2_files if bytes(entry.get("pieces_root", b"")) == root),
+            None,
+        )
+        if file_entry is None:
+            return None
+        count = expected_piece_layer_count(int(file_entry.get("length", 0)), self.torrent.piece_length)
+        if count <= 0 or index >= count:
+            return None
+        if count == 1:
+            hashes = [root]
+        else:
+            hashes = list(self.torrent.v2_piece_layers.get(root, ()))
+        if len(hashes) != count:
+            return None
+        selected = list(hashes[index:min(count, index + length)])
+        if not selected:
+            return None
+        if len(selected) < length:
+            selected.extend([zero_hash(base_layer)] * (length - len(selected)))
+        return {
+            "pieces_root": root,
+            "base_layer": base_layer,
+            "index": index,
+            "length": length,
+            "proof_layers": 0,
+            "hashes": selected,
+        }
+
+    async def _serve_peer_hash_request(self, peer: PeerConnection, request: object):
+        response = self._v2_hash_response(request)
+        if response is None:
+            if isinstance(request, dict):
+                await peer.send_hash_reject(
+                    request.get("pieces_root", b""),
+                    request.get("base_layer", 0),
+                    request.get("index", 0),
+                    request.get("length", 0),
+                    request.get("proof_layers", 0),
+                )
+            return
+        await peer.send_hashes(
+            response["pieces_root"],
+            response["base_layer"],
+            response["index"],
+            response["length"],
+            response["proof_layers"],
+            response["hashes"],
+        )
 
     def _begin_activity_clock(self):
         if self._activity_started_at is None:
@@ -495,18 +653,20 @@ class TorrentSession:
         self.interface_lock = bool(interface_lock)
         self.mask_peer_ips = bool(mask_peer_ips)
 
-        self.tracker.set_bind_address(self.network_bind_address)
-        self.tracker.set_encryption_policy(self.encryption_policy)
-        self._lpd.set_bind_address(self.network_bind_address)
-        self._dht.set_bind_address(self.network_bind_address)
+        for tracker in self._trackers_by_generation.values():
+            tracker.set_bind_address(self.network_bind_address)
+            tracker.set_encryption_policy(self.encryption_policy)
+        for lpd in self._lpd_by_generation.values():
+            lpd.set_bind_address(self.network_bind_address)
+        for dht in self._dht_by_generation.values():
+            dht.set_bind_address(self.network_bind_address)
+            # DHT's private flag is also used as its hard-disable switch.
+            dht.private = bool(self.torrent.private or not self.enable_dht)
+            dht.set_preferred_port(self.preferred_listen_port)
 
         for peer in list(self.active_peers):
             peer.enable_pex = self.enable_pex
             peer.advertise_dht = self.enable_dht
-
-        # DHT's private flag is also used as its hard-disable switch.
-        self._dht.private = bool(self.torrent.private or not self.enable_dht)
-        self._dht.set_preferred_port(self.preferred_listen_port)
 
         if (
             self.interface_lock
@@ -533,24 +693,26 @@ class TorrentSession:
             self._inbound_peer_records.clear()
             self.piece_mgr.clear_peer_availability()
             await self._close_seed_server()
-            await self._lpd.close()
-            await self._dht.close()
+            for lpd in self._lpd_by_generation.values():
+                await lpd.close()
+            for dht in self._dht_by_generation.values():
+                await dht.close()
 
         if not self.enable_lan_discovery:
-            await self._lpd.close()
+            for lpd in self._lpd_by_generation.values():
+                await lpd.close()
         elif self.is_running and self.state in (SessionState.DOWNLOADING, SessionState.SEEDING):
-            await self._lpd.start(
-                listen_port=self._seed_port if self.state == SessionState.SEEDING else 0
-            )
+            for lpd in self._lpd_by_generation.values():
+                await lpd.start(listen_port=self._seed_port)
 
         if not self.enable_dht:
-            await self._dht.close()
-            self._dht.status = "Disabled"
-            self._dht.last_error = "Disabled in Preferences"
+            for dht in self._dht_by_generation.values():
+                await dht.close()
+                dht.status = "Disabled"
+                dht.last_error = "Disabled in Preferences"
         elif self.is_running and self.state in (SessionState.DOWNLOADING, SessionState.SEEDING):
-            await self._dht.start(
-                announce_port=self._seed_port if self.state == SessionState.SEEDING else 0
-            )
+            for dht in self._dht_by_generation.values():
+                await dht.start(announce_port=self._seed_port)
 
         if (
             (port_changed or bind_changed or encryption_changed)
@@ -560,9 +722,11 @@ class TorrentSession:
             await self._close_seed_server()
             await self._open_seed_server(self._run_token)
             if self.enable_lan_discovery:
-                self._lpd.update_listen_port(self._seed_port)
+                for lpd in self._lpd_by_generation.values():
+                    lpd.update_listen_port(self._seed_port)
             if self.enable_dht:
-                self._dht.update_announce_port(self._seed_port)
+                for dht in self._dht_by_generation.values():
+                    dht.update_announce_port(self._seed_port)
 
         self._detail_telemetry_cached_at = 0.0
         self._emit_snapshot(force_detail_refresh=True)
@@ -759,32 +923,41 @@ class TorrentSession:
         self._emit_snapshot()
 
     async def manual_announce(self) -> int:
-        """Ask trackers for a fresh peer list without restarting the torrent."""
+        """Ask every active generation's trackers for fresh peers."""
         if self.state not in (SessionState.DOWNLOADING, SessionState.SEEDING):
             return 0
 
-        try:
-            downloaded = self.piece_mgr.downloaded_bytes
-            peers = await self.tracker.announce(
-                uploaded=self.uploaded_bytes,
-                downloaded=downloaded,
-                left=max(0, self.torrent.total_length - downloaded),
-                event=None,
-            )
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            # TrackerClient records per-source failures for the Sources tab. A
-            # manual announce failure is not a terminal torrent error.
-            self._emit_snapshot()
-            return 0
+        downloaded = self.piece_mgr.downloaded_bytes
+        left = max(0, self.torrent.total_length - downloaded)
+        results: list[tuple[str, list[tuple[str, int]]]] = []
+        for generation in self.active_generations:
+            tracker = self._trackers_by_generation[generation]
+            try:
+                peers = await tracker.announce(
+                    uploaded=self.uploaded_bytes,
+                    downloaded=downloaded,
+                    left=left,
+                    event=None,
+                )
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                peers = []
+            results.append((generation, peers))
 
-        if self.state == SessionState.DOWNLOADING:
-            self._start_download_workers(self._run_token, peers, source="Tracker")
-        elif self.state == SessionState.SEEDING:
-            self._start_outbound_seed_workers(self._run_token, peers, source="Tracker")
+        total = 0
+        for generation, peers in results:
+            total += len(peers)
+            if self.state == SessionState.DOWNLOADING:
+                self._start_download_workers(
+                    self._run_token, peers, source="Tracker", generation=generation
+                )
+            elif self.state == SessionState.SEEDING:
+                self._start_outbound_seed_workers(
+                    self._run_token, peers, source="Tracker", generation=generation
+                )
         self._emit_snapshot()
-        return len(peers)
+        return total
 
     async def force_recheck(self) -> bool:
         """Hash existing payload data after fast-resume state is invalidated.
@@ -978,6 +1151,7 @@ class TorrentSession:
                 "ip_family": "IPv6" if ip_family(peer.ip) == socket.AF_INET6 else "IPv4",
                 "client": peer.client_name,
                 "transport_security": str(getattr(peer, "transport_security", "Plaintext")),
+                "protocol_generation": self._normalise_generation(getattr(peer, "protocol_generation", None)),
                 "source": str(getattr(peer, "source", "Unknown")),
                 "direction": str(getattr(peer, "direction", "Outgoing")),
                 "progress": progress,
@@ -1026,6 +1200,7 @@ class TorrentSession:
                 "ip_family": "IPv6" if ip_family(record.get("ip", "")) == socket.AF_INET6 else "IPv4",
                 "client": str(record.get("client", "Unknown")),
                 "transport_security": str(record.get("transport_security", "Plaintext")),
+                "protocol_generation": self._normalise_generation(record.get("protocol_generation")),
                 "source": str(record.get("source", "Incoming")),
                 "direction": str(record.get("direction", "Incoming")),
                 "progress": progress,
@@ -1118,12 +1293,16 @@ class TorrentSession:
             self._sources_view_cache,
         )
 
-    def apply_tracker_scrape_result(self, tracker_url: str, result: dict):
-        """Apply cached scrape telemetry without initiating UI-driven network work."""
-        self.tracker.apply_scrape_result(tracker_url, result)
-        # Detail snapshots are otherwise cached for performance. Invalidation is
-        # O(1) and lets the next ordinary telemetry emission expose new scrape
-        # data without forcing an extra UI message here.
+    def apply_tracker_scrape_result(
+        self,
+        tracker_url: str,
+        result: dict,
+        *,
+        generation: Optional[str] = None,
+    ):
+        """Apply cached scrape telemetry to one generation-aware tracker."""
+        tracker = self._tracker_for_generation(generation)
+        tracker.apply_scrape_result(tracker_url, result)
         self._detail_telemetry_cached_at = 0.0
 
     def _build_pex_source_snapshot(self) -> dict:
@@ -1175,25 +1354,47 @@ class TorrentSession:
         }
 
     def _build_sources_view_snapshot(self) -> dict:
-        tracker_sources = self.tracker.get_source_snapshots()
-        dht_source = self._dht.get_source_snapshot()
-        if not self.enable_dht and not self.torrent.private:
-            dht_source = dict(dht_source)
-            dht_source.update(
-                status="Disabled",
-                last_error="Disabled in Preferences",
-                detail="Disabled in Preferences",
-            )
+        tracker_sources: List[dict] = []
+        dht_sources: List[dict] = []
+        lan_sources: List[dict] = []
+
+        for generation in self.active_generations:
+            tracker = self._trackers_by_generation[generation]
+            for source in tracker.get_source_snapshots():
+                item = dict(source)
+                item["generation"] = generation
+                item["id"] = f"{item.get('id', item.get('source', 'tracker'))}:{generation}"
+                item["source"] = f"{item.get('source', 'Tracker')} ({generation})"
+                tracker_sources.append(item)
+
+            dht = self._dht_by_generation[generation]
+            dht_source = dict(dht.get_source_snapshot())
+            dht_source["generation"] = generation
+            dht_source["id"] = f"dht:{generation}"
+            dht_source["source"] = f"DHT ({generation})"
+            if not self.enable_dht and not self.torrent.private:
+                dht_source.update(
+                    status="Disabled",
+                    last_error="Disabled in Preferences",
+                    detail="Disabled in Preferences",
+                )
+            dht_sources.append(dht_source)
+
+            lpd = self._lpd_by_generation[generation]
+            lan_source = dict(lpd.get_source_snapshot())
+            lan_source["generation"] = generation
+            lan_source["id"] = f"lan:{generation}"
+            lan_source["source"] = f"LAN Discovery ({generation})"
+            if not self.enable_lan_discovery:
+                lan_source.update(
+                    status="Disabled",
+                    last_error="Disabled in Preferences",
+                    detail="Disabled in Preferences",
+                )
+            lan_sources.append(lan_source)
+
         pex_source = self._build_pex_source_snapshot()
-        lan_source = self._lpd.get_source_snapshot()
-        if not self.enable_lan_discovery:
-            lan_source = dict(lan_source)
-            lan_source.update(
-                status="Disabled",
-                last_error="Disabled in Preferences",
-                detail="Disabled in Preferences",
-            )
-        sources = list(tracker_sources) + [dht_source, pex_source, lan_source]
+        sources = list(tracker_sources) + dht_sources + [pex_source] + lan_sources
 
         active_statuses = {"Active", "No Peers"}
         pending_statuses = {"Waiting", "Announcing"}
@@ -1210,8 +1411,6 @@ class TorrentSession:
         scrape_error_count = 0
         freshest_scrape = None
 
-        # Sources is deliberately tiny (trackers + DHT + PEX + LAN), but keep
-        # classification and tracker-peer accounting in one pass anyway.
         tracker_count = len(tracker_sources)
         for index, source in enumerate(sources):
             status = str(source.get("status", ""))
@@ -1246,8 +1445,6 @@ class TorrentSession:
                     scrape_warning_count += 1
                 elif scrape_status == "Error":
                     scrape_error_count += 1
-                # Unsupported means the tracker has no standards-defined scrape
-                # endpoint; it is informational, not a source failure.
 
         scrape_source = freshest_scrape[1] if freshest_scrape is not None else {}
         return {
@@ -1269,9 +1466,11 @@ class TorrentSession:
             "scrape_source": scrape_source.get("source", ""),
             "scrape_age_seconds": scrape_source.get("scrape_last_success_seconds"),
             "scrape_batch_size": int(scrape_source.get("scrape_batch_size", 0) or 0),
-            "dht_peers_seen": int(dht_source.get("peers", 0) or 0),
+            "dht_peers_seen": sum(int(source.get("peers", 0) or 0) for source in dht_sources),
             "pex_peers_seen": int(pex_source.get("peers", 0) or 0),
-            "lan_peers_seen": int(lan_source.get("peers", 0) or 0),
+            "lan_peers_seen": sum(int(source.get("peers", 0) or 0) for source in lan_sources),
+            "active_generations": list(self.active_generations),
+            "protocol_policy": self.protocol_policy,
         }
 
     @staticmethod
@@ -1298,12 +1497,19 @@ class TorrentSession:
             out.append(normalized)
         return out
 
-    def _record_pex_payload(self, payload: dict) -> List[Tuple[str, int]]:
+    def _record_pex_payload(
+        self,
+        payload: dict,
+        generation: Optional[str] = None,
+    ) -> List[Tuple[str, int]]:
         if self.torrent.private or not self.enable_pex or not isinstance(payload, dict):
             return []
+        resolved_generation = self._normalise_generation(generation)
         added = self._normalise_peer_endpoints(payload.get("added", []))
         if added:
-            self._pex_seen_endpoints.update(added)
+            self._pex_seen_endpoints.update(
+                (ip, port, resolved_generation) for ip, port in added
+            )
         self._pex_messages_received += 1
         self._pex_last_at = time.monotonic()
         return added
@@ -1311,14 +1517,21 @@ class TorrentSession:
     def _pex_export_endpoints(
         self,
         exclude: Optional[Tuple[str, int]] = None,
+        generation: Optional[str] = None,
     ) -> List[Tuple[str, int]]:
         if self.torrent.private or not self.enable_pex:
             return []
 
+        resolved_generation = self._normalise_generation(generation)
         endpoints: List[Tuple[str, int]] = []
         seen: Set[Tuple[str, int]] = set()
         for peer in self.active_peers:
             if not peer.is_connected:
+                continue
+            peer_generation = self._normalise_generation(
+                getattr(peer, "protocol_generation", resolved_generation)
+            )
+            if peer_generation != resolved_generation:
                 continue
             endpoint = (str(peer.ip), int(peer.port))
             if exclude and endpoint == exclude:
@@ -1328,10 +1541,10 @@ class TorrentSession:
             seen.add(endpoint)
             endpoints.append(endpoint)
 
-        # Include useful endpoints learned from other discovery mechanisms even
-        # when a TCP connection has already ended. The PEX encoder itself caps
-        # messages to a conservative maximum.
-        for endpoint in list(self._pex_seen_endpoints):
+        for ip, port, endpoint_generation in list(self._pex_seen_endpoints):
+            if self._normalise_generation(endpoint_generation) != resolved_generation:
+                continue
+            endpoint = (ip, port)
             if exclude and endpoint == exclude:
                 continue
             if endpoint in seen:
@@ -1347,7 +1560,13 @@ class TorrentSession:
         now = time.monotonic()
         if peer.last_pex_sent_at and now - peer.last_pex_sent_at < PEX_SEND_INTERVAL:
             return
-        endpoints = self._pex_export_endpoints(exclude=(str(peer.ip), int(peer.port)))
+        generation = self._normalise_generation(
+            getattr(peer, "protocol_generation", None)
+        )
+        endpoints = self._pex_export_endpoints(
+            exclude=(str(peer.ip), int(peer.port)),
+            generation=generation,
+        )
         if await peer.send_pex(endpoints):
             self._pex_messages_sent += 1
             self._pex_last_at = time.monotonic()
@@ -1770,8 +1989,10 @@ class TorrentSession:
             self._seed_outbound_endpoints.clear()
 
             await self._close_seed_server()
-            await self._lpd.close()
-            await self._dht.close()
+            for lpd in self._lpd_by_generation.values():
+                await lpd.close()
+            for dht in self._dht_by_generation.values():
+                await dht.close()
 
             if local_telemetry_task and not local_telemetry_task.done():
                 local_telemetry_task.cancel()
@@ -1814,35 +2035,34 @@ class TorrentSession:
                 self._main_task = None
 
     async def _run_downloading(self, run_token: int):
-        """Keep discovering peers while a torrent is incomplete.
-
-        Tracker, DHT, PEX and LAN discovery all feed the same peer-worker
-        scheduler. Slow/dead public infrastructure therefore cannot block a
-        peer learned from another source.
-        """
+        """Discover and download independently from every active swarm generation."""
         self.state = SessionState.DOWNLOADING
         self._pause_event.set()
 
-        # Accept inbound BitTorrent peers while downloading as well as while
-        # seeding. This makes automatic port mapping useful during the entire
-        # transfer lifecycle and lets us upload already-verified pieces to the
-        # swarm instead of remaining an outbound-only downloader.
         await self._open_seed_server(run_token)
         listen_port = self._seed_port if self._seed_server else 0
 
         if self.enable_lan_discovery:
-            await self._lpd.start(listen_port=listen_port)
-            self._lpd.update_listen_port(listen_port)
+            for lpd in self._lpd_by_generation.values():
+                await lpd.start(listen_port=listen_port)
+                lpd.update_listen_port(listen_port)
         if self.enable_dht:
-            await self._dht.start(announce_port=listen_port)
-            self._dht.update_announce_port(listen_port)
+            for dht in self._dht_by_generation.values():
+                await dht.start(announce_port=listen_port)
+                dht.update_announce_port(listen_port)
         self._emit_snapshot()
 
-        tracker_task: Optional[asyncio.Task] = None
-        dht_task: Optional[asyncio.Task] = None
-        next_tracker_announce = 0.0
-        next_dht_lookup = 0.0
-        tracker_event: Optional[str] = "started"
+        tracker_tasks: Dict[str, Optional[asyncio.Task]] = {
+            generation: None for generation in self.active_generations
+        }
+        dht_tasks: Dict[str, Optional[asyncio.Task]] = {
+            generation: None for generation in self.active_generations
+        }
+        next_tracker_announce = {generation: 0.0 for generation in self.active_generations}
+        next_dht_lookup = {generation: 0.0 for generation in self.active_generations}
+        tracker_events: Dict[str, Optional[str]] = {
+            generation: "started" for generation in self.active_generations
+        }
 
         try:
             while self._is_current_run(run_token) and not self.piece_mgr.wanted_is_finished:
@@ -1859,83 +2079,98 @@ class TorrentSession:
                 if self.state != SessionState.PAUSED:
                     self.state = SessionState.DOWNLOADING
 
-                # Local peers are available without Internet tracker access.
-                local_peers = self._lpd.drain_peers() if self.enable_lan_discovery else []
-                if local_peers:
-                    self.local_peers_discovered += len(local_peers)
-                    self._start_download_workers(run_token, local_peers, source="LAN")
-                    self._emit_snapshot()
+                for generation in self.active_generations:
+                    if self.enable_lan_discovery:
+                        local_peers = self._lpd_by_generation[generation].drain_peers()
+                        if local_peers:
+                            self.local_peers_discovered += len(local_peers)
+                            self._start_download_workers(
+                                run_token, local_peers, source="LAN", generation=generation
+                            )
+                            self._emit_snapshot()
 
-                # Our minimal DHT listener can also receive direct announce_peer
-                # traffic while an iterative lookup is not currently running.
-                announced_dht_peers = self._dht.drain_peers() if self.enable_dht else []
-                if announced_dht_peers:
-                    self._start_download_workers(
-                        run_token,
-                        announced_dht_peers,
-                        source="DHT",
-                    )
-                    self._emit_snapshot()
+                    if self.enable_dht:
+                        announced = self._dht_by_generation[generation].drain_peers()
+                        if announced:
+                            self._start_download_workers(
+                                run_token, announced, source="DHT", generation=generation
+                            )
+                            self._emit_snapshot()
 
                 now = time.monotonic()
-                if tracker_task is None and now >= next_tracker_announce:
-                    downloaded = self.piece_mgr.downloaded_bytes
-                    left = max(0, self.torrent.total_length - downloaded)
-                    tracker_task = asyncio.create_task(
-                        self.tracker.fetch_peers(
-                            uploaded=self.uploaded_bytes,
-                            downloaded=downloaded,
-                            left=left,
-                            event=tracker_event,
+                downloaded = self.piece_mgr.downloaded_bytes
+                left = max(0, self.torrent.total_length - downloaded)
+
+                for generation in self.active_generations:
+                    if (
+                        tracker_tasks[generation] is None
+                        and now >= next_tracker_announce[generation]
+                    ):
+                        tracker_tasks[generation] = asyncio.create_task(
+                            self._trackers_by_generation[generation].fetch_peers(
+                                uploaded=self.uploaded_bytes,
+                                downloaded=downloaded,
+                                left=left,
+                                event=tracker_events[generation],
+                            )
                         )
-                    )
 
-                if (
-                    self.enable_dht
-                    and not self.torrent.private
-                    and dht_task is None
-                    and now >= next_dht_lookup
-                ):
-                    dht_task = asyncio.create_task(
-                        self._dht.discover_peers(announce_port=listen_port)
-                    )
+                    if (
+                        self.enable_dht
+                        and not self.torrent.private
+                        and dht_tasks[generation] is None
+                        and now >= next_dht_lookup[generation]
+                    ):
+                        dht_tasks[generation] = asyncio.create_task(
+                            self._dht_by_generation[generation].discover_peers(
+                                announce_port=listen_port
+                            )
+                        )
 
-                if tracker_task is not None and tracker_task.done():
-                    try:
-                        tracker_peers = tracker_task.result()
-                    except asyncio.CancelledError:
-                        raise
-                    except Exception:
-                        tracker_peers = []
+                for generation in self.active_generations:
+                    tracker_task = tracker_tasks[generation]
+                    if tracker_task is not None and tracker_task.done():
+                        try:
+                            tracker_peers = tracker_task.result()
+                        except asyncio.CancelledError:
+                            raise
+                        except Exception:
+                            tracker_peers = []
+                        tracker_tasks[generation] = None
+                        tracker_events[generation] = None
+                        next_tracker_announce[generation] = time.monotonic() + 5 * 60
+                        self._start_download_workers(
+                            run_token, tracker_peers, source="Tracker", generation=generation
+                        )
 
-                    tracker_task = None
-                    tracker_event = None
-                    next_tracker_announce = time.monotonic() + 5 * 60
-                    self._start_download_workers(run_token, tracker_peers, source="Tracker")
+                    dht_task = dht_tasks[generation]
+                    if dht_task is not None and dht_task.done():
+                        try:
+                            dht_peers = dht_task.result()
+                        except asyncio.CancelledError:
+                            raise
+                        except Exception:
+                            dht_peers = []
+                        dht_tasks[generation] = None
+                        next_dht_lookup[generation] = time.monotonic() + DHT_REFRESH_INTERVAL
+                        self._start_download_workers(
+                            run_token, dht_peers, source="DHT", generation=generation
+                        )
+                        self._emit_snapshot()
 
-                if dht_task is not None and dht_task.done():
-                    try:
-                        dht_peers = dht_task.result()
-                    except asyncio.CancelledError:
-                        raise
-                    except Exception:
-                        dht_peers = []
-
-                    dht_task = None
-                    next_dht_lookup = time.monotonic() + DHT_REFRESH_INTERVAL
-                    self._start_download_workers(run_token, dht_peers, source="DHT")
-                    self._emit_snapshot()
-
-                self._worker_tasks = [
-                    task for task in self._worker_tasks if not task.done()
-                ]
+                self._worker_tasks = [task for task in self._worker_tasks if not task.done()]
                 await asyncio.sleep(0.20)
 
         finally:
-            for discovery_task in (tracker_task, dht_task):
-                if discovery_task is not None and not discovery_task.done():
-                    discovery_task.cancel()
-                    await asyncio.gather(discovery_task, return_exceptions=True)
+            tasks = [
+                task
+                for task in list(tracker_tasks.values()) + list(dht_tasks.values())
+                if task is not None and not task.done()
+            ]
+            for task in tasks:
+                task.cancel()
+            if tasks:
+                await asyncio.gather(*tasks, return_exceptions=True)
 
 
     def _start_download_workers(
@@ -1943,7 +2178,9 @@ class TorrentSession:
         run_token: int,
         peers: List[Tuple[str, int]],
         source: str = "Tracker",
+        generation: Optional[str] = None,
     ):
+        generation = self._normalise_generation(generation)
         available_slots = max(0, self.max_peers - len(self._download_endpoints))
         if available_slots <= 0:
             return
@@ -1962,21 +2199,22 @@ class TorrentSession:
             if port <= 0 or port > 65535:
                 continue
 
-            endpoint = (str(ip), port)
-            if endpoint in self._download_endpoints:
+            endpoint_key = (str(ip), port, generation)
+            if endpoint_key in self._download_endpoints:
                 continue
 
-            self._download_endpoints.add(endpoint)
+            self._download_endpoints.add(endpoint_key)
             task = asyncio.create_task(
                 self._peer_worker(
                     run_token,
-                    endpoint[0],
-                    endpoint[1],
+                    endpoint_key[0],
+                    endpoint_key[1],
                     source=source,
+                    generation=generation,
                 )
             )
             task.add_done_callback(
-                lambda _task, ep=endpoint: self._download_endpoints.discard(ep)
+                lambda _task, ep=endpoint_key: self._download_endpoints.discard(ep)
             )
             self._worker_tasks.append(task)
             available_slots -= 1
@@ -2382,6 +2620,7 @@ class TorrentSession:
             piece_index,
             begin,
             length,
+            self._normalise_generation(getattr(peer, "protocol_generation", None)),
         )
         if not block_data:
             return False
@@ -2440,6 +2679,7 @@ class TorrentSession:
             piece_index,
             begin,
             length,
+            self._normalise_generation(inbound_record.get("protocol_generation")),
         )
         if not block_data:
             return False
@@ -2522,18 +2762,15 @@ class TorrentSession:
         ip: str,
         port: int,
         source: str = "Tracker",
+        generation: Optional[str] = None,
     ):
-        peer = PeerConnection(
+        generation = self._normalise_generation(generation)
+        peer = self._peer_connection_for_generation(
             ip,
             port,
-            self.torrent.info_hash,
-            self.peer_id,
+            generation=generation,
             source=source,
             direction="Outgoing",
-            advertise_dht=self.enable_dht,
-            enable_pex=self.enable_pex,
-            encryption_policy=self.encryption_policy,
-            bind_address=self.network_bind_address,
         )
         peer_key = id(peer)
         owned_requests: Dict[Tuple[int, int], Block] = {}
@@ -2568,7 +2805,9 @@ class TorrentSession:
                 if not peer.is_connected:
                     return
                 if self.enable_dht:
-                    await peer.send_port(self._dht_port_for_peer(peer.ip))
+                    await peer.send_port(
+                        self._dht_port_for_peer(peer.ip, peer.protocol_generation)
+                    )
                 if not peer.is_connected:
                     return
 
@@ -2692,12 +2931,15 @@ class TorrentSession:
                     await self._handle_metadata_message(peer, data)
 
                 elif msg_type == "PEX":
-                    pex_peers = self._record_pex_payload(data)
+                    pex_peers = self._record_pex_payload(
+                        data, generation=peer.protocol_generation
+                    )
                     if pex_peers:
                         self._start_download_workers(
                             run_token,
                             pex_peers,
                             source="PEX",
+                            generation=peer.protocol_generation,
                         )
                         self._emit_snapshot()
 
@@ -2706,7 +2948,13 @@ class TorrentSession:
 
                 elif msg_type == "PORT":
                     if self.enable_dht and not self.torrent.private:
-                        self._dht.add_known_node((str(peer.ip), int(data)))
+                        self._dht_for_generation(peer.protocol_generation).add_known_node(
+                            (str(peer.ip), int(data))
+                        )
+
+                elif msg_type == "HASH_REQUEST":
+                    if peer.protocol_generation == "v2":
+                        await self._serve_peer_hash_request(peer, data)
 
         except asyncio.CancelledError:
             pass
@@ -2736,18 +2984,27 @@ class TorrentSession:
         await self._open_seed_server(run_token)
         listen_port = self._seed_port if self._seed_server else 0
         if self.enable_lan_discovery:
-            await self._lpd.start(listen_port=listen_port)
-            self._lpd.update_listen_port(listen_port)
+            for lpd in self._lpd_by_generation.values():
+                await lpd.start(listen_port=listen_port)
+                lpd.update_listen_port(listen_port)
         if self.enable_dht:
-            await self._dht.start(announce_port=listen_port)
-            self._dht.update_announce_port(listen_port)
+            for dht in self._dht_by_generation.values():
+                await dht.start(announce_port=listen_port)
+                dht.update_announce_port(listen_port)
         self._emit_snapshot()
 
         first_event = "completed" if completion_event else "started"
-        next_announce = 0.0
-        next_dht_lookup = 0.0
-        announce_event: Optional[str] = first_event
-        dht_task: Optional[asyncio.Task] = None
+        tracker_tasks: Dict[str, Optional[asyncio.Task]] = {
+            generation: None for generation in self.active_generations
+        }
+        dht_tasks: Dict[str, Optional[asyncio.Task]] = {
+            generation: None for generation in self.active_generations
+        }
+        next_announce = {generation: 0.0 for generation in self.active_generations}
+        next_dht_lookup = {generation: 0.0 for generation in self.active_generations}
+        announce_events: Dict[str, Optional[str]] = {
+            generation: first_event for generation in self.active_generations
+        }
 
         try:
             while self._is_current_run(run_token):
@@ -2758,75 +3015,103 @@ class TorrentSession:
                 if self.state != SessionState.PAUSED:
                     self.state = SessionState.SEEDING
 
-                local_peers = self._lpd.drain_peers() if self.enable_lan_discovery else []
-                if local_peers:
-                    self.local_peers_discovered += len(local_peers)
-                    self._start_outbound_seed_workers(run_token, local_peers, source="LAN")
-                    self._emit_snapshot()
+                for generation in self.active_generations:
+                    if self.enable_lan_discovery:
+                        local_peers = self._lpd_by_generation[generation].drain_peers()
+                        if local_peers:
+                            self.local_peers_discovered += len(local_peers)
+                            self._start_outbound_seed_workers(
+                                run_token, local_peers, source="LAN", generation=generation
+                            )
+                            self._emit_snapshot()
 
-                announced_dht_peers = self._dht.drain_peers() if self.enable_dht else []
-                if announced_dht_peers:
-                    self._start_outbound_seed_workers(
-                        run_token,
-                        announced_dht_peers,
-                        source="DHT",
-                    )
-                    self._emit_snapshot()
+                    if self.enable_dht:
+                        announced = self._dht_by_generation[generation].drain_peers()
+                        if announced:
+                            self._start_outbound_seed_workers(
+                                run_token, announced, source="DHT", generation=generation
+                            )
+                            self._emit_snapshot()
 
                 now = time.monotonic()
-                if now >= next_announce:
-                    try:
-                        peers = await self.tracker.announce(
-                            uploaded=self.uploaded_bytes,
-                            downloaded=self.piece_mgr.downloaded_bytes,
-                            left=0,
-                            event=announce_event,
+                for generation in self.active_generations:
+                    if tracker_tasks[generation] is None and now >= next_announce[generation]:
+                        tracker_tasks[generation] = asyncio.create_task(
+                            self._trackers_by_generation[generation].announce(
+                                uploaded=self.uploaded_bytes,
+                                downloaded=self.piece_mgr.downloaded_bytes,
+                                left=0,
+                                event=announce_events[generation],
+                            )
                         )
-                    except asyncio.CancelledError:
-                        raise
-                    except Exception:
-                        peers = []
+                    if (
+                        self.enable_dht
+                        and not self.torrent.private
+                        and dht_tasks[generation] is None
+                        and now >= next_dht_lookup[generation]
+                    ):
+                        dht_tasks[generation] = asyncio.create_task(
+                            self._dht_by_generation[generation].discover_peers(
+                                announce_port=listen_port
+                            )
+                        )
 
-                    announce_event = None
-                    next_announce = time.monotonic() + 15 * 60
-                    self._start_outbound_seed_workers(run_token, peers, source="Tracker")
+                for generation in self.active_generations:
+                    tracker_task = tracker_tasks[generation]
+                    if tracker_task is not None and tracker_task.done():
+                        try:
+                            peers = tracker_task.result()
+                        except asyncio.CancelledError:
+                            raise
+                        except Exception:
+                            peers = []
+                        tracker_tasks[generation] = None
+                        announce_events[generation] = None
+                        next_announce[generation] = time.monotonic() + 15 * 60
+                        self._start_outbound_seed_workers(
+                            run_token, peers, source="Tracker", generation=generation
+                        )
 
-                if (
-                    self.enable_dht
-                    and not self.torrent.private
-                    and dht_task is None
-                    and now >= next_dht_lookup
-                ):
-                    dht_task = asyncio.create_task(
-                        self._dht.discover_peers(announce_port=listen_port)
-                    )
-
-                if dht_task is not None and dht_task.done():
-                    try:
-                        dht_peers = dht_task.result()
-                    except asyncio.CancelledError:
-                        raise
-                    except Exception:
-                        dht_peers = []
-                    dht_task = None
-                    next_dht_lookup = time.monotonic() + DHT_REFRESH_INTERVAL
-                    self._start_outbound_seed_workers(run_token, dht_peers, source="DHT")
-                    self._emit_snapshot()
+                    dht_task = dht_tasks[generation]
+                    if dht_task is not None and dht_task.done():
+                        try:
+                            dht_peers = dht_task.result()
+                        except asyncio.CancelledError:
+                            raise
+                        except Exception:
+                            dht_peers = []
+                        dht_tasks[generation] = None
+                        next_dht_lookup[generation] = time.monotonic() + DHT_REFRESH_INTERVAL
+                        self._start_outbound_seed_workers(
+                            run_token, dht_peers, source="DHT", generation=generation
+                        )
+                        self._emit_snapshot()
 
                 self._worker_tasks = [task for task in self._worker_tasks if not task.done()]
                 await asyncio.sleep(0.5)
 
         finally:
-            if dht_task is not None and not dht_task.done():
-                dht_task.cancel()
-                await asyncio.gather(dht_task, return_exceptions=True)
+            tasks = [
+                task
+                for task in list(tracker_tasks.values()) + list(dht_tasks.values())
+                if task is not None and not task.done()
+            ]
+            for task in tasks:
+                task.cancel()
+            if tasks:
+                await asyncio.gather(*tasks, return_exceptions=True)
 
 
-    def _dht_port_for_peer(self, peer_ip: object) -> int:
-        """Return the local DHT UDP port matching a peer's address family."""
+    def _dht_port_for_peer(
+        self,
+        peer_ip: object,
+        generation: Optional[str] = None,
+    ) -> int:
+        """Return the generation-specific local DHT UDP port for a peer."""
+        dht = self._dht_for_generation(generation)
         if ip_family(peer_ip) == socket.AF_INET6:
-            return int(self._dht.local_udp_port_v6 or 0)
-        return int(self._dht.local_udp_port_v4 or 0)
+            return int(dht.local_udp_port_v6 or 0)
+        return int(dht.local_udp_port_v4 or 0)
 
     def _listener_specs(self) -> List[Tuple[int, str]]:
         if self.network_bind_address:
@@ -2924,7 +3209,8 @@ class TorrentSession:
                 if self.network_bind_address
                 else addresses.get(socket.AF_INET, addresses.get(socket.AF_INET6, ""))
             )
-            self.tracker.port = port
+            for tracker in self._trackers_by_generation.values():
+                tracker.port = port
             if self._listen_port_callback:
                 try:
                     self._listen_port_callback(port, True)
@@ -2939,7 +3225,8 @@ class TorrentSession:
 
         # Outbound transfers remain possible when no inbound listener is available.
         self._seed_port = preferred
-        self.tracker.port = preferred
+        for tracker in self._trackers_by_generation.values():
+            tracker.port = preferred
 
     async def _close_seed_server(self):
         closed_port = self._seed_port if self._seed_servers else 0
@@ -2979,7 +3266,9 @@ class TorrentSession:
         run_token: int,
         peers: List[Tuple[str, int]],
         source: str = "Tracker",
+        generation: Optional[str] = None,
     ):
+        resolved_generation = self._normalise_generation(generation)
         available_slots = max(0, self.max_peers - self._connected_peer_count())
         if available_slots <= 0:
             return
@@ -2987,13 +3276,20 @@ class TorrentSession:
         for endpoint in peers:
             if available_slots <= 0:
                 break
-            if endpoint in self._seed_outbound_endpoints:
+            ip, port = endpoint
+            endpoint_key = (str(ip), int(port), resolved_generation)
+            if endpoint_key in self._seed_outbound_endpoints:
                 continue
 
-            ip, port = endpoint
-            self._seed_outbound_endpoints.add(endpoint)
+            self._seed_outbound_endpoints.add(endpoint_key)
             task = asyncio.create_task(
-                self._seed_peer_worker(run_token, ip, port, source=source)
+                self._seed_peer_worker(
+                    run_token,
+                    str(ip),
+                    int(port),
+                    source=source,
+                    generation=resolved_generation,
+                )
             )
             self._worker_tasks.append(task)
             available_slots -= 1
@@ -3004,19 +3300,16 @@ class TorrentSession:
         ip: str,
         port: int,
         source: str = "Tracker",
+        generation: Optional[str] = None,
     ):
-        endpoint = (ip, port)
-        peer = PeerConnection(
+        resolved_generation = self._normalise_generation(generation)
+        endpoint_key = (str(ip), int(port), resolved_generation)
+        peer = self._peer_connection_for_generation(
             ip,
             port,
-            self.torrent.info_hash,
-            self.peer_id,
+            generation=resolved_generation,
             source=source,
             direction="Outgoing",
-            advertise_dht=self.enable_dht,
-            enable_pex=self.enable_pex,
-            encryption_policy=self.encryption_policy,
-            bind_address=self.network_bind_address,
         )
         upload_state = _UploadRequestState()
 
@@ -3026,6 +3319,9 @@ class TorrentSession:
             if not self._is_current_run(run_token):
                 return
 
+            resolved_generation = self._normalise_generation(
+                getattr(peer, "protocol_generation", resolved_generation)
+            )
             self.active_peers.append(peer)
             if not self.torrent.private:
                 await peer.send_extended_handshake(
@@ -3035,7 +3331,9 @@ class TorrentSession:
                 if not peer.is_connected:
                     return
                 if self.enable_dht:
-                    await peer.send_port(self._dht_port_for_peer(peer.ip))
+                    await peer.send_port(
+                        self._dht_port_for_peer(peer.ip, resolved_generation)
+                    )
                 if not peer.is_connected:
                     return
 
@@ -3073,12 +3371,15 @@ class TorrentSession:
                     continue
 
                 if msg_type == "PEX":
-                    pex_peers = self._record_pex_payload(data)
+                    pex_peers = self._record_pex_payload(
+                        data, generation=resolved_generation
+                    )
                     if pex_peers:
                         self._start_outbound_seed_workers(
                             run_token,
                             pex_peers,
                             source="PEX",
+                            generation=resolved_generation,
                         )
                         self._emit_snapshot()
                     continue
@@ -3089,7 +3390,16 @@ class TorrentSession:
 
                 if msg_type == "PORT":
                     if self.enable_dht and not self.torrent.private:
-                        self._dht.add_known_node((str(peer.ip), int(data)))
+                        self._dht_for_generation(resolved_generation).add_known_node(
+                            (str(peer.ip), int(data))
+                        )
+                    continue
+
+                if msg_type == "HASH_REQUEST":
+                    if resolved_generation == "v2":
+                        await self._serve_peer_hash_request(peer, data)
+                    else:
+                        await peer.send_hash_reject(data)
                     continue
 
                 if msg_type == "REQUEST" and self.state == SessionState.SEEDING:
@@ -3124,7 +3434,7 @@ class TorrentSession:
             if peer in self.active_peers:
                 self.active_peers.remove(peer)
             await peer.close()
-            self._seed_outbound_endpoints.discard(endpoint)
+            self._seed_outbound_endpoints.discard(endpoint_key)
 
     async def _handle_inbound_seed_peer(
         self,
@@ -3158,7 +3468,7 @@ class TorrentSession:
                 stream = await mse_responder_handshake(
                     reader,
                     writer,
-                    self.torrent.info_hash,
+                    [self.swarm_hashes[generation] for generation in self.active_generations],
                     first_bytes=first_bytes,
                     timeout=8.0,
                 )
@@ -3170,11 +3480,35 @@ class TorrentSession:
             remote_reserved = bytes(handshake[20:28])
             remote_supports_extensions = reserved_supports_extensions(remote_reserved)
             remote_supports_dht = reserved_supports_dht(remote_reserved)
-            info_hash = handshake[28:48]
+            remote_supports_v2 = reserved_supports_v2(remote_reserved)
+            info_hash = bytes(handshake[28:48])
             remote_peer_id = bytes(handshake[48:68])
 
-            if info_hash != self.torrent.info_hash:
+            incoming_generation = next(
+                (
+                    generation
+                    for generation in self.active_generations
+                    if self.swarm_hashes[generation] == info_hash
+                ),
+                None,
+            )
+            if incoming_generation is None:
                 return
+            if stream.selected_info_hash and stream.selected_info_hash != info_hash:
+                return
+
+            negotiated_generation = incoming_generation
+            response_hash = self.swarm_hashes[incoming_generation]
+            if (
+                incoming_generation == "v1"
+                and "v2" in self.active_generations
+                and remote_supports_v2
+            ):
+                # BEP-52 hybrid handshake upgrade: a connection discovered in
+                # the v1 swarm can immediately switch to the v2 wire identity.
+                negotiated_generation = "v2"
+                response_hash = self.swarm_hashes["v2"]
+
             if not self._is_current_run(run_token):
                 return
             if self.state not in {SessionState.DOWNLOADING, SessionState.SEEDING}:
@@ -3194,11 +3528,12 @@ class TorrentSession:
             response_reserved = build_reserved_bytes(
                 enable_extensions=not self.torrent.private,
                 enable_dht=self.enable_dht and not self.torrent.private,
+                enable_v2=("v2" in self.active_generations),
             )
             response = (
                 plaintext_prefix
                 + response_reserved
-                + self.torrent.info_hash
+                + response_hash
                 + self.peer_id
             )
             stream.write(response)
@@ -3224,10 +3559,15 @@ class TorrentSession:
                 remote_supports_dht
                 and self.enable_dht
                 and not self.torrent.private
-                and self._dht_port_for_peer(peer_ip)
+                and self._dht_port_for_peer(peer_ip, negotiated_generation)
             ):
                 stream.write(
-                    struct.pack(">IBH", 3, PeerMessageID.PORT, self._dht_port_for_peer(peer_ip))
+                    struct.pack(
+                        ">IBH",
+                        3,
+                        PeerMessageID.PORT,
+                        self._dht_port_for_peer(peer_ip, negotiated_generation),
+                    )
                 )
             await stream.drain()
 
@@ -3251,6 +3591,7 @@ class TorrentSession:
                 "source": "Incoming",
                 "direction": "Incoming",
                 "transport_security": stream.transport_security,
+                "protocol_generation": negotiated_generation,
                 "stream": stream,
                 "connected_at": time.monotonic(),
                 "last_activity_at": time.monotonic(),
@@ -3331,7 +3672,9 @@ class TorrentSession:
                 ):
                     (remote_dht_port,) = struct.unpack(">H", body)
                     if peer_ip != "?" and remote_dht_port:
-                        self._dht.add_known_node((peer_ip, remote_dht_port))
+                        self._dht_for_generation(negotiated_generation).add_known_node(
+                            (peer_ip, remote_dht_port)
+                        )
                     continue
 
                 if (
@@ -3374,7 +3717,8 @@ class TorrentSession:
                         if self.enable_pex and remote_pex_id > 0:
                             pex_payload = encode_pex_payload(
                                 self._pex_export_endpoints(
-                                    exclude=(peer_ip, peer_port) if peer_port else None
+                                    exclude=(peer_ip, peer_port) if peer_port else None,
+                                    generation=negotiated_generation,
                                 )
                             )
                             stream.write(build_extended_message(remote_pex_id, pex_payload))
@@ -3392,19 +3736,23 @@ class TorrentSession:
                         inbound_record["pex_messages_received"] = int(
                             inbound_record.get("pex_messages_received", 0)
                         ) + 1
-                        pex_peers = self._record_pex_payload(pex_payload)
+                        pex_peers = self._record_pex_payload(
+                            pex_payload, generation=negotiated_generation
+                        )
                         if pex_peers:
                             if self.state == SessionState.DOWNLOADING:
                                 self._start_download_workers(
                                     run_token,
                                     pex_peers,
                                     source="PEX",
+                                    generation=negotiated_generation,
                                 )
                             else:
                                 self._start_outbound_seed_workers(
                                     run_token,
                                     pex_peers,
                                     source="PEX",
+                                    generation=negotiated_generation,
                                 )
                         self._emit_snapshot()
                         continue
@@ -3455,6 +3803,50 @@ class TorrentSession:
                                 )
                             await stream.drain()
                         continue
+
+                if msg_id == PeerMessageID.HASH_REQUEST:
+                    request = parse_hash_request_payload(body)
+                    if request is None:
+                        continue
+                    response = (
+                        self._v2_hash_response(request)
+                        if negotiated_generation == "v2"
+                        else None
+                    )
+                    if response is None:
+                        response_payload = build_hash_request_payload(
+                            request["pieces_root"],
+                            request["base_layer"],
+                            request["index"],
+                            request["length"],
+                            request["proof_layers"],
+                        )
+                        stream.write(
+                            struct.pack(
+                                ">IB",
+                                1 + len(response_payload),
+                                PeerMessageID.HASH_REJECT,
+                            )
+                            + response_payload
+                        )
+                    else:
+                        response_payload = build_hash_request_payload(
+                            response["pieces_root"],
+                            response["base_layer"],
+                            response["index"],
+                            response["length"],
+                            response["proof_layers"],
+                        ) + b"".join(response["hashes"])
+                        stream.write(
+                            struct.pack(
+                                ">IB",
+                                1 + len(response_payload),
+                                PeerMessageID.HASHES,
+                            )
+                            + response_payload
+                        )
+                    await stream.drain()
+                    continue
 
                 if msg_id == PeerMessageID.CANCEL and len(body) == 12:
                     piece_index, begin, length = struct.unpack(">III", body)
@@ -3561,3 +3953,5 @@ class TorrentSession:
 
         except asyncio.CancelledError:
             pass
+
+

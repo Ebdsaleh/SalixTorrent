@@ -1,8 +1,6 @@
 # app/engine/gui_engine.py
 
 from typing import Optional
-import os
-import sys
 import time
 import traceback
 from pathlib import Path
@@ -12,6 +10,7 @@ from app.engine.scene_manager import SceneManager
 from app.engine.desktop_integration import DesktopIntegration
 from app.engine.ui_typography import UiTypography
 from app.engine.responsive_layout import ResponsiveLayout
+from app.engine.runtime_paths import state_directory
 
 
 class GuiEngine:
@@ -128,15 +127,7 @@ class GuiEngine:
 
     @staticmethod
     def _ui_error_log_path() -> Path:
-        if os.name == "nt":
-            base = os.environ.get("LOCALAPPDATA")
-            root = Path(base) / "SalixTorrent" if base else Path.home() / "AppData" / "Local" / "SalixTorrent"
-        elif sys.platform == "darwin":
-            root = Path.home() / "Library" / "Application Support" / "SalixTorrent"
-        else:
-            base = os.environ.get("XDG_STATE_HOME")
-            root = Path(base) / "SalixTorrent" if base else Path.home() / ".local" / "state" / "SalixTorrent"
-        return root / "ui_errors.log"
+        return state_directory() / "ui_errors.log"
 
     def _report_ui_exception(self, context: str, exc: BaseException):
         now = time.monotonic()
@@ -253,3 +244,5 @@ class GuiEngine:
         finally:
             self.desktop.stop()
             dpg.destroy_context()
+
+

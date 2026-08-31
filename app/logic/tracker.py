@@ -42,9 +42,15 @@ class TrackerClient:
         *,
         bind_address: str = "",
         encryption_policy: str = "Prefer Encryption",
+        info_hash: bytes | None = None,
+        generation: str = "v1",
     ):
         self.torrent = torrent
         self.peer_id = peer_id
+        self.info_hash = bytes(info_hash if info_hash is not None else torrent.info_hash)
+        if len(self.info_hash) != 20:
+            raise ValueError("Tracker announces require a 20-byte swarm identity.")
+        self.generation = str(generation or "v1").lower()
         self.port = port
         self.bind_address = normalise_bind_address(bind_address)
         self.encryption_policy = normalise_peer_encryption_policy(encryption_policy)
@@ -341,7 +347,7 @@ class TrackerClient:
         event: Optional[str],
     ) -> Tuple[List[Tuple[str, int]], dict]:
         params = [
-            ("info_hash", urllib.parse.quote_from_bytes(self.torrent.info_hash, safe="")),
+            ("info_hash", urllib.parse.quote_from_bytes(self.info_hash, safe="")),
             ("peer_id", urllib.parse.quote_from_bytes(self.peer_id, safe="")),
             ("port", str(self.port)),
             ("uploaded", str(max(0, int(uploaded)))),
@@ -689,7 +695,7 @@ class TrackerClient:
                 connection_id,
                 1,
                 transaction_id,
-                self.torrent.info_hash,
+                self.info_hash,
                 self.peer_id,
                 max(0, int(downloaded)),
                 max(0, int(left)),
@@ -778,3 +784,5 @@ class TrackerClient:
         if isinstance(raw_peers, list):
             return self._parse_peer_dicts(raw_peers)
         return self._parse_compact_peers(raw_peers, socket.AF_INET)
+
+

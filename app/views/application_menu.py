@@ -15,6 +15,8 @@ import dearpygui.dearpygui as dpg
 
 from app.logic.network_binding import format_endpoint
 from app.engine.responsive_layout import DialogMetrics, ResponsiveLayout
+from app.engine.runtime_paths import runtime_snapshot
+from app.engine.shell_integration import ShellIntegration
 from app.logic.torrent_manager import TorrentManager
 from app.version import APP_VERSION
 from app.views.help_terms import add_help_tooltip, add_text_tooltip
@@ -718,6 +720,8 @@ class ApplicationMenu:
             dpg_version = str(dpg.get_dearpygui_version())
         except Exception:
             dpg_version = "unknown"
+        runtime = runtime_snapshot()
+        shell_status = ShellIntegration().status()
 
         selected = self._selected_hash()
         selected_stats = self.download_view.latest_stats.get(selected, {}) if selected else {}
@@ -746,7 +750,15 @@ class ApplicationMenu:
             f"Python: {platform.python_version()}\n"
             f"Dear PyGui: {dpg_version}\n"
             f"Platform: {platform.platform()}\n"
-            f"Executable: {sys.executable}\n\n"
+            f"Executable: {sys.executable}\n"
+            f"Frozen build: {'Yes' if runtime.get('frozen') else 'No'}\n"
+            f"Portable mode: {'Yes' if runtime.get('portable') else 'No'}\n"
+            f"Application directory: {runtime.get('application_directory')}\n"
+            f"Bundle directory: {runtime.get('bundle_directory')}\n"
+            f"State directory: {runtime.get('state_directory')}\n"
+            f"Default download directory: {runtime.get('default_download_directory')}\n"
+            f".torrent handler: {'Registered' if shell_status.torrent_handler_registered else ('Not registered' if shell_status.supported else 'Unsupported')}\n"
+            f"magnet handler: {'Registered' if shell_status.magnet_handler_registered else ('Not registered' if shell_status.supported else 'Unsupported')}\n\n"
             f"Current view: {self.gui.scene_mgr.current_scene or '--'}\n"
             f"Loaded torrents: {len(self.download_view.torrent_order)}\n"
             f"Selected torrent: {selected_name}\n"
@@ -838,5 +850,7 @@ class ApplicationMenu:
             dpg.set_clipboard_text(self._diagnostics_string())
         except Exception:
             pass
+
+
 
 

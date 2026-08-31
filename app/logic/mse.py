@@ -16,7 +16,7 @@ import hashlib
 import secrets
 import struct
 from dataclasses import dataclass
-from typing import Optional
+from typing import Iterable, Optional
 
 class _RC4Context:
     """Small stateful RC4 stream used only for BitTorrent MSE/PE.
@@ -200,6 +200,7 @@ class PeerWireStream:
     decryptor: object | None = None
     initial_plaintext: bytes = b""
     transport_security: str = "Plaintext"
+    selected_info_hash: bytes = b""
 
     def __post_init__(self):
         self._initial = bytearray(self.initial_plaintext or b"")
@@ -332,7 +333,7 @@ async def mse_initiator_handshake(
 async def mse_responder_handshake(
     reader: asyncio.StreamReader,
     writer: asyncio.StreamWriter,
-    info_hash: bytes,
+    info_hash: bytes | Iterable[bytes],
     *,
     first_bytes: bytes = b"",
     timeout: float = 8.0,
@@ -342,7 +343,12 @@ async def mse_responder_handshake(
     ``first_bytes`` contains bytes already consumed while distinguishing a
     plaintext BitTorrent handshake from an MSE public key.
     """
-    info_hash = bytes(info_hash)
+    if isinstance(info_hash, (bytes, bytearray, memoryview)):
+        candidate_hashes = [bytes(info_hash)]
+    else:
+        candidate_hashes = [bytes(value) for value in info_hash]
+    if not candidate_hashes or any(len(value) != 20 for value in candidate_hashes):
+        raise MSEError("MSE responder requires one or more 20-byte swarm identities.")
     prefix = bytes(first_bytes or b"")
     if len(prefix) > MSE_DH_KEY_BYTES:
         raise MSEError("Too many prefetched bytes for MSE responder handshake.")
@@ -370,10 +376,14 @@ async def mse_responder_handshake(
         raise MSEError("Timed out receiving the MSE torrent selector.") from exc
 
     recovered_req2 = _xor_bytes(obfuscated, _sha1(b"req3", shared))
-    if recovered_req2 != _sha1(b"req2", info_hash):
+    selected_info_hash = next(
+        (candidate for candidate in candidate_hashes if recovered_req2 == _sha1(b"req2", candidate)),
+        None,
+    )
+    if selected_info_hash is None:
         raise MSEError("MSE initiator requested a different torrent info hash.")
 
-    encrypt_key, decrypt_key = _mse_keys(shared, info_hash, initiator=False)
+    encrypt_key, decrypt_key = _mse_keys(shared, selected_info_hash, initiator=False)
     encryptor = _rc4_context(encrypt_key)
     decryptor = _rc4_context(decrypt_key)
 
@@ -419,4 +429,7 @@ async def mse_responder_handshake(
         decryptor=decryptor,
         initial_plaintext=initial_payload,
         transport_security="MSE/RC4",
+        selected_info_hash=selected_info_hash,
     )
+
+

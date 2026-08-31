@@ -30,6 +30,10 @@ from app.logic.network_binding import (
 )
 from app.logic.peer import PEER_ENCRYPTION_POLICIES
 from app.logic.torrent_manager import TorrentManager
+from app.logic.transfer_add import (
+    TORRENT_PROTOCOL_AUTO,
+    TORRENT_PROTOCOL_POLICIES,
+)
 from app.views.help_terms import add_help_tooltip, add_text_tooltip
 from app.views.transfer_rate import TRANSFER_RATE_UNITS
 
@@ -79,7 +83,7 @@ class SettingsView:
 
             dpg.add_spacer(height=7)
             with dpg.group(horizontal=True):
-                with dpg.child_window(width=530, height=250, border=True) as self.networking_panel:
+                with dpg.child_window(width=530, height=290, border=True) as self.networking_panel:
                     dpg.add_text("NETWORKING", color=(255, 200, 100))
                     dpg.add_separator()
                     with dpg.group(horizontal=True):
@@ -96,6 +100,18 @@ class SettingsView:
                         add_help_tooltip(self.listen_port_input, "LISTEN_PORT")
                         fallback_ports = dpg.add_text("Fallback: next 10 ports", color=(140, 140, 145))
                         add_text_tooltip(fallback_ports, "Listen-port fallback\n\nIf the preferred TCP port is already occupied, SalixTorrent tries the next ten port numbers rather than failing the entire torrent subsystem.")
+
+                    with dpg.group(horizontal=True):
+                        protocol_label = dpg.add_text("Torrent protocol")
+                        add_help_tooltip(protocol_label, "TORRENT_PROTOCOL_POLICY")
+                        self.torrent_protocol_combo = dpg.add_combo(
+                            items=list(TORRENT_PROTOCOL_POLICIES),
+                            default_value=self.settings.get(
+                                "torrent_protocol_policy", TORRENT_PROTOCOL_AUTO
+                            ),
+                            width=220,
+                        )
+                        add_help_tooltip(self.torrent_protocol_combo, "TORRENT_PROTOCOL_POLICY")
 
                     with dpg.group(horizontal=True):
                         max_peers_label = dpg.add_text("Default max peers")
@@ -523,6 +539,9 @@ class SettingsView:
             "peer_encryption": str(
                 dpg.get_value(self.peer_encryption_combo) or "Prefer Encryption"
             ),
+            "torrent_protocol_policy": str(
+                dpg.get_value(self.torrent_protocol_combo) or TORRENT_PROTOCOL_AUTO
+            ),
             "network_bind_address": self._bind_option_to_address.get(
                 str(dpg.get_value(self.network_bind_combo) or ""), ""
             ),
@@ -568,6 +587,9 @@ class SettingsView:
             ),
             self.listen_port_input: settings["listen_port"],
             self.peer_encryption_combo: settings.get("peer_encryption", "Prefer Encryption"),
+            self.torrent_protocol_combo: settings.get(
+                "torrent_protocol_policy", TORRENT_PROTOCOL_AUTO
+            ),
             self.network_bind_combo: bind_selected,
             self.interface_lock_checkbox: settings.get("interface_lock", False),
             self.mask_peer_ips_checkbox: settings.get("mask_peer_ips", False),
@@ -760,5 +782,7 @@ class SettingsView:
         if now - self._last_connectivity_refresh >= 1.0:
             self._last_connectivity_refresh = now
             self._render_connectivity()
+
+
 
 

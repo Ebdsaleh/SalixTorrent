@@ -6,29 +6,28 @@ Notable SalixTorrent changes are recorded here.
 
 ### Added
 
-- Phase 8 BEP-52 BitTorrent v2 metainfo foundation with version-aware `TorrentIdentity` storage for v1 SHA-1, full v2 SHA-256, hybrid dual identities, and the 20-byte truncated v2 wire form without discarding the canonical 32-byte hash.
-- Strict v2 `meta version` / `file tree` parsing with traversal-safe path components, non-empty-file `pieces root` validation, file-aligned v2 piece counting, and explicit rejection of unsupported future meta versions.
-- BEP-52 Merkle primitives for 16 KiB SHA-256 leaf blocks, layer-specific zero-subtree hashes, full file-root construction, piece-layer construction, piece-layer/root validation, and sibling-proof verification.
-- Required top-level v2 `piece layers` parsing with exact 32-byte hash framing, file-size-derived layer counts, correct short-final-piece subtree padding, unreferenced-layer rejection, and cryptographic reconstruction of each declared pieces root.
-- Dedicated Phase 8 regression coverage for exact raw-info SHA-256 identity, hybrid identity storage, file-tree safety, piece-layer corruption, Merkle proofs, future meta-version handling, and the Phase-9 networking gate.
-
-- Phase 7 presentation-neutral `TransferAddRequest` / `TransferAddHandle` contract and shared `TorrentManager.add_transfer()` path for desktop `.torrent`, desktop magnet, startup-target, and headless inputs.
-- Headless BitTorrent v1 magnet resolution through the existing BEP-9 metadata engine, including structured magnet progress/error events and non-persistent resolved metainfo.
-- Dear-PyGui-free `app/cli/headless.py` presentation layer with rate-limited human-readable status, optional JSON Lines output, download-directory/max-peer overrides, and optional exit-on-complete behavior.
-- Clean headless SIGINT/SIGTERM/Windows SIGBREAK handling that routes process termination through centralized TorrentManager shutdown.
-- Phase 7 regression coverage for source classification, shared add routing, headless event presentation, magnet resolution, persistence isolation, and shutdown ownership.
+- Phase 10 centralized runtime-path policy for source, frozen installed and portable execution, removing process-working-directory assumptions from state, default downloads, UI error logs and documentation media resources.
+- PyInstaller release specification plus Windows build script producing a windowed standalone `SalixTorrent.exe`, console `SalixTorrentCLI.exe`, and portable ZIP with `portable.flag`.
+- Inno Setup 6 installer definition with per-user installation, Start Menu/optional desktop shortcuts, optional `.torrent` and `magnet:` integration, and clean unregister behavior.
+- Dependency-free Windows shell integration commands: `--shell-status`, `--register-torrent-handler`, `--unregister-torrent-handler`, `--register-magnet-handler`, and `--unregister-magnet-handler`.
+- Conservative `.torrent` OpenWith ProgID registration and opt-in `magnet:` ownership with previous-handler backup/restore protection.
+- Phase 10 regression coverage for portable/frozen path behavior, cwd-independent defaults, resource resolution, shell command construction and packaging contracts.
+- Phase 9 BitTorrent v2 peer networking, BEP-52 hash exchange, `btmh` magnets with verified piece-layer acquisition, v2-only transfers, dual-swarm hybrid operation, protocol provenance and v1/v2/hybrid torrent creation.
+- Phase 9 real-wire regression coverage for v2 seeding/downloading, BEP-52 hash servicing, hybrid v1-to-v2 upgrade, btmh piece-layer acquisition and BEP-47 virtual padding.
+- Phase 8 BEP-52 metainfo/SHA-256/file-tree/Merkle/piece-layer validation foundation.
+- Phase 7 shared desktop/headless transfer-add architecture and clean headless lifecycle.
 
 ### Changed
 
-- `TorrentFile` no longer assumes every torrent identity is a 20-byte SHA-1 value; v1 compatibility properties remain intact while new code can query canonical version-aware identity explicitly.
-- v2/hybrid metainfo is parsed and validated before session construction, then deliberately rejected by `TorrentSession` with a clear Phase-9 message so the existing v1 tracker/DHT/peer/piece engine cannot accidentally operate on BEP-52 semantics.
-
-- Desktop Open Torrent, Open Magnet, and command-line startup targets now use the same transfer-add API instead of maintaining separate add/start flows.
-- Torrent-session persistence now tracks persistent sessions explicitly, allowing transient/headless sessions to coexist without leaking into `session.json`.
+- New installations no longer derive their default download directory from the process working directory; installed profiles default to the user's Downloads/SalixTorrent folder while portable profiles default beside the executable.
+- UI error logging and application state now share one centralized state-directory policy.
+- Documentation image resources resolve relative to the application/bundle instead of the launch working directory.
+- `TorrentFile`, `TorrentSession`, storage verification, tracker/DHT/PEX discovery and torrent creation are generation-aware across v1, v2 and hybrid metainfo.
 
 ### Fixed
 
-- Headless mode no longer risks overwriting the desktop transfer queue during shutdown, and non-persistent magnet resolution no longer leaves cached metainfo in SalixTorrent application data.
+- Frozen launches from Start Menu shortcuts, Explorer `.torrent` handlers or `magnet:` protocol handlers cannot accidentally place writable state/download defaults in an unrelated working directory.
+- Hybrid BEP-47 padding remains virtual storage while still being serviceable to v1 peers, and v2 disk recheck uses generation-aware verification rather than a hard-coded SHA-1 assumption.
 
 ## v0.3.0 - 2026-08-31
 

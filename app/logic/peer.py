@@ -28,7 +28,11 @@ class PeerMessageID:
     PIECE = 7
     CANCEL = 8
     PORT = 9
+    REJECT = 16
     EXTENDED = 20
+    HASH_REQUEST = 21
+    HASHES = 22
+    HASH_REJECT = 23
 
 
 # BEP-10 uses bit 0x10 in reserved byte 5 to advertise the extension protocol.
@@ -38,12 +42,22 @@ class PeerMessageID:
 EXTENSION_RESERVED_BYTES = b"\x00\x00\x00\x00\x00\x10\x00\x01"
 
 
-def build_reserved_bytes(*, enable_extensions: bool = True, enable_dht: bool = True) -> bytes:
+def build_reserved_bytes(
+    *,
+    enable_extensions: bool = True,
+    enable_dht: bool = True,
+    enable_v2: bool = False,
+) -> bytes:
     reserved = bytearray(8)
     if enable_extensions:
         reserved[5] |= 0x10
     if enable_dht:
         reserved[7] |= 0x01
+    # BEP-52 hybrid upgrade signal: fourth most-significant bit of the final
+    # reserved byte. A v1 hybrid initiator may receive the truncated v2 hash in
+    # the peer's handshake response and upgrade that connection to v2.
+    if enable_v2:
+        reserved[7] |= 0x10
     return bytes(reserved)
 UT_PEX_EXTENSION_NAME = b"ut_pex"
 UT_METADATA_EXTENSION_NAME = b"ut_metadata"
@@ -163,6 +177,59 @@ def reserved_supports_dht(reserved: bytes) -> bool:
     except Exception:
         return False
     return len(raw) >= 8 and bool(raw[7] & 0x01)
+
+
+def reserved_supports_v2(reserved: bytes) -> bool:
+    try:
+        raw = bytes(reserved)
+    except Exception:
+        return False
+    return len(raw) >= 8 and bool(raw[7] & 0x10)
+
+
+def build_hash_request_payload(
+    pieces_root: bytes,
+    base_layer: int,
+    index: int,
+    length: int,
+    proof_layers: int,
+) -> bytes:
+    root = bytes(pieces_root)
+    if len(root) != 32:
+        raise ValueError("BEP-52 hash requests require a 32-byte pieces root.")
+    values = tuple(int(value) for value in (base_layer, index, length, proof_layers))
+    if any(value < 0 or value > 0xFFFFFFFF for value in values):
+        raise ValueError("BEP-52 hash-request integers must fit uint32.")
+    return root + struct.pack(">IIII", *values)
+
+
+def parse_hash_request_payload(payload: bytes) -> Optional[dict]:
+    raw = bytes(payload)
+    if len(raw) != 48:
+        return None
+    root = raw[:32]
+    base_layer, index, length, proof_layers = struct.unpack(">IIII", raw[32:])
+    return {
+        "pieces_root": root,
+        "base_layer": base_layer,
+        "index": index,
+        "length": length,
+        "proof_layers": proof_layers,
+    }
+
+
+def parse_hashes_payload(payload: bytes) -> Optional[dict]:
+    raw = bytes(payload)
+    if len(raw) < 48 or (len(raw) - 48) % 32:
+        return None
+    header = parse_hash_request_payload(raw[:48])
+    if header is None:
+        return None
+    header["hashes"] = [
+        raw[offset:offset + 32]
+        for offset in range(48, len(raw), 32)
+    ]
+    return header
 
 
 def build_extended_message(extension_id: int, payload: bytes) -> bytes:
@@ -361,10 +428,23 @@ class PeerConnection:
         enable_pex: bool = True,
         encryption_policy: str = PEER_ENCRYPTION_PREFER,
         bind_address: str = "",
+        v1_info_hash: bytes = b"",
+        v2_info_hash: bytes = b"",
+        protocol_generation: str = "v1",
     ):
         self.ip = ip
         self.port = port
-        self.info_hash = info_hash
+        self.info_hash = bytes(info_hash)
+        if len(self.info_hash) != 20:
+            raise ValueError("Peer-wire info hashes must be exactly 20 bytes.")
+        self.v1_info_hash = bytes(v1_info_hash or b"")
+        self.v2_info_hash = bytes(v2_info_hash or b"")
+        if self.v1_info_hash and len(self.v1_info_hash) != 20:
+            raise ValueError("BitTorrent v1 identity must be 20 bytes.")
+        if self.v2_info_hash and len(self.v2_info_hash) != 32:
+            raise ValueError("BitTorrent v2 identity must be 32 bytes.")
+        generation = str(protocol_generation or "v1").strip().lower()
+        self.protocol_generation = "v2" if generation == "v2" else "v1"
         self.peer_id = peer_id
         self.remote_peer_id: bytes = b""
 
@@ -394,6 +474,7 @@ class PeerConnection:
         self.remote_reserved: bytes = b"\x00" * 8
         self.supports_extensions: bool = False
         self.supports_dht: bool = False
+        self.supports_v2: bool = False
         self.remote_extensions: Dict[bytes, int] = {}
         self.remote_client_version: str = ""
         self.remote_listen_port: int = 0
@@ -477,7 +558,11 @@ class PeerConnection:
         return (
             bytes([len(pstr)])
             + pstr
-            + build_reserved_bytes(enable_extensions=True, enable_dht=self.advertise_dht)
+            + build_reserved_bytes(
+                enable_extensions=True,
+                enable_dht=self.advertise_dht,
+                enable_v2=bool(self.v2_info_hash),
+            )
             + self.info_hash
             + self.peer_id
         )
@@ -503,12 +588,25 @@ class PeerConnection:
     async def _finish_peer_handshake(self, response: bytes) -> bool:
         if len(response) != 68 or response[:20] != b"\x13BitTorrent protocol":
             return False
-        if response[28:48] != self.info_hash:
-            return False
 
         self.remote_reserved = bytes(response[20:28])
         self.supports_extensions = reserved_supports_extensions(self.remote_reserved)
         self.supports_dht = reserved_supports_dht(self.remote_reserved)
+        self.supports_v2 = reserved_supports_v2(self.remote_reserved)
+
+        response_hash = bytes(response[28:48])
+        if response_hash == self.info_hash:
+            pass
+        elif (
+            self.protocol_generation == "v1"
+            and self.v2_info_hash
+            and self.supports_v2
+            and response_hash == self.v2_info_hash[:20]
+        ):
+            # BEP-52 hybrid v1 -> v2 handshake upgrade.
+            self.protocol_generation = "v2"
+        else:
+            return False
         self.remote_peer_id = bytes(response[48:68])
         self.is_connected = True
         self.connected_at = time.monotonic()
@@ -648,6 +746,71 @@ class PeerConnection:
                 block_offset,
                 length,
             )
+        )
+
+    async def send_hash_request(
+        self,
+        pieces_root: bytes,
+        base_layer: int,
+        index: int,
+        length: int,
+        proof_layers: int = 0,
+    ) -> bool:
+        if not self.is_connected or not self.writer or self.protocol_generation != "v2":
+            return False
+        try:
+            payload = build_hash_request_payload(
+                pieces_root, base_layer, index, length, proof_layers
+            )
+        except (TypeError, ValueError):
+            return False
+        return await self._write_and_drain(
+            struct.pack(">IB", 1 + len(payload), PeerMessageID.HASH_REQUEST) + payload
+        )
+
+    async def send_hashes(
+        self,
+        pieces_root: bytes,
+        base_layer: int,
+        index: int,
+        length: int,
+        proof_layers: int,
+        hashes: Iterable[bytes],
+    ) -> bool:
+        if not self.is_connected or not self.writer or self.protocol_generation != "v2":
+            return False
+        try:
+            header = build_hash_request_payload(
+                pieces_root, base_layer, index, length, proof_layers
+            )
+            hash_blob = b"".join(bytes(item) for item in hashes)
+        except (TypeError, ValueError):
+            return False
+        if len(hash_blob) % 32:
+            return False
+        payload = header + hash_blob
+        return await self._write_and_drain(
+            struct.pack(">IB", 1 + len(payload), PeerMessageID.HASHES) + payload
+        )
+
+    async def send_hash_reject(
+        self,
+        pieces_root: bytes,
+        base_layer: int,
+        index: int,
+        length: int,
+        proof_layers: int = 0,
+    ) -> bool:
+        if not self.is_connected or not self.writer or self.protocol_generation != "v2":
+            return False
+        try:
+            payload = build_hash_request_payload(
+                pieces_root, base_layer, index, length, proof_layers
+            )
+        except (TypeError, ValueError):
+            return False
+        return await self._write_and_drain(
+            struct.pack(">IB", 1 + len(payload), PeerMessageID.HASH_REJECT) + payload
         )
 
     async def send_bitfield(self, bitfield: bytes) -> bool:
@@ -926,6 +1089,11 @@ class PeerConnection:
                     return ("UNKNOWN", body)
                 index, begin, req_length = struct.unpack(">III", body)
                 return ("CANCEL", (index, begin, req_length))
+            if msg_id == PeerMessageID.REJECT:
+                if len(body) != 12:
+                    return ("UNKNOWN", body)
+                index, begin, req_length = struct.unpack(">III", body)
+                return ("REJECT", (index, begin, req_length))
             if msg_id == PeerMessageID.PIECE:
                 if len(body) < 8:
                     return ("UNKNOWN", body)
@@ -938,6 +1106,15 @@ class PeerConnection:
                     return ("UNKNOWN", body)
                 (dht_port,) = struct.unpack(">H", body)
                 return ("PORT", dht_port)
+            if msg_id == PeerMessageID.HASH_REQUEST:
+                parsed = parse_hash_request_payload(body)
+                return ("HASH_REQUEST", parsed) if parsed is not None else ("UNKNOWN", body)
+            if msg_id == PeerMessageID.HASHES:
+                parsed = parse_hashes_payload(body)
+                return ("HASHES", parsed) if parsed is not None else ("UNKNOWN", body)
+            if msg_id == PeerMessageID.HASH_REJECT:
+                parsed = parse_hash_request_payload(body)
+                return ("HASH_REJECT", parsed) if parsed is not None else ("UNKNOWN", body)
             if msg_id == PeerMessageID.EXTENDED:
                 return self._handle_extended_message(body)
 
@@ -958,6 +1135,8 @@ class PeerConnection:
         self.reader = None
         self.writer = None
         self.stream = None
+
+
 
 
 

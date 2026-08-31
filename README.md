@@ -1,27 +1,27 @@
 # SalixTorrent (Salix_T) v0.3.0
 
-SalixTorrent is a desktop BitTorrent client written in Python with a custom asynchronous protocol engine and a Dear PyGui interface. The live transfer engine remains BitTorrent v1 in v0.3.x, while the BEP-52 BitTorrent v2 metainfo/identity/Merkle foundation is now implemented ahead of Phase 9 networking. The project aims to expose what a torrent client is doing rather than hiding the protocol behind a single progress bar: transfers, peers, pieces, files, trackers, discovery sources, bandwidth history, connectivity, and protocol terminology are all inspectable from the application.
+SalixTorrent is a desktop BitTorrent client written in Python with a custom asynchronous protocol engine and a Dear PyGui interface. Its transfer engine is generation-aware across BitTorrent v1, BitTorrent v2 and hybrid torrents, while keeping protocol identity, storage verification, discovery provenance and torrent creation explicit. The project aims to expose what a torrent client is doing rather than hiding the protocol behind a single progress bar: transfers, peers, pieces, files, trackers, discovery sources, bandwidth history, connectivity, and protocol terminology are all inspectable from the application.
 
-> **Release status:** v0.3.0 is a development release and a major capability milestone for the BitTorrent v1 engine and desktop framework. Core v1 downloading, concurrent uploading, seeding, torrent creation, magnet metadata retrieval, rarest-first/endgame scheduling, bounded asynchronous disk I/O, dual-stack IPv4/IPv6 networking, tracker scrape telemetry, responsive Dear PyGui layouts, and the offline Documentation subsystem are functional. Phase 8 additionally provides strict BEP-52 v2 metainfo parsing, SHA-256 torrent identity, file-tree handling, Merkle verification primitives, and piece-layer validation. v2 peer networking/magnets/hybrid transfers remain intentionally gated until Phase 9.
+> **Release status:** v0.3.0 remains the current development version string while the post-v0.3.0 roadmap work is integrated. Phases 1-9 are implemented, including BEP-52 v2 networking, btmh magnets, v2/hybrid metadata exchange, dual-swarm hybrid transfers and v1/v2/hybrid torrent creation. Phase 10 adds frozen executable/portable/installer tooling plus Windows `.torrent` and `magnet:` registration support.
 
 ## Highlights
 
 **v0.3.0 milestone:** SalixTorrent now combines a substantially more capable BitTorrent v1 engine with a reusable responsive Dear PyGui presentation foundation. The release adds rarest-first/endgame scheduling, bounded adaptive request pipelines, asynchronous disk backpressure/caching, MSE/PE transport, network-interface binding and Interface Lock, dual-stack IPv6 peer/tracker/DHT support, batched tracker scrape statistics, event-driven seeding/connectivity telemetry, and the semantic responsive Documentation subsystem.
 
-- Load `.torrent` files or BitTorrent v1 magnet links.
-- BEP-9 magnet metadata retrieval with info-hash verification and local metadata caching.
+- Load v1, v2 or hybrid `.torrent` files and `btih`/`btmh` magnet links.
+- Generation-aware magnet metadata retrieval with info-hash and BEP-52 piece-layer verification.
 - HTTP/HTTPS and UDP tracker announce support plus batched tracker scrape statistics, DHT, PEX, and Local Peer Discovery for public torrents.
 - Private-torrent isolation: no public fallback trackers, DHT, PEX, or LPD leakage.
 - Concurrent downloading and uploading over bidirectional peer connections.
 - Incoming peer listener, seeding, and external-source seeding.
-- Fast resume with SHA-1 recheck fallback.
+- Fast resume with generation-aware SHA-1 / SHA-256-Merkle recheck fallback.
 - Single-file and multi-file torrents with selective file downloading and file priorities.
 - Torrent queue priorities, move up/down ordering, and configurable active download slots.
 - Per-torrent and true global upload/download rate limits.
 - Live General, Peers, Pieces, Files, Sources, and Speed views.
 - Compact piece map, peer client identification, source diagnostics, and rolling speed history.
 - Incremental piece-availability accounting with file-priority-preserving rarest-first scheduling and randomized equal-rarity tie-breaking.
-- Torrent creation from a file/archive or directory.
+- v1, v2 and recommended hybrid torrent creation from a file/archive or directory.
 - Persistent session restoration and application preferences.
 - UPnP / NAT-PMP mapping for each active torrent listener, with per-listener incoming-connectivity reporting, structured failure diagnosis, and automatic lease renewal.
 - Event-driven seeding telemetry: uploaded total/session bytes, upload requests served/received, last upload, incoming peers, and exact listener endpoint.
@@ -59,7 +59,7 @@ Open a `.torrent` at launch:
 python main.py path/to/file.torrent
 ```
 
-Open a BitTorrent v1 magnet at launch:
+Open a magnet at launch (`btih`, `btmh`, or hybrid):
 
 ```bash
 python main.py "magnet:?xt=urn:btih:..."
@@ -71,7 +71,7 @@ Show the release version:
 python main.py --version
 ```
 
-Headless mode uses the same transfer-add API and BitTorrent engine as the desktop interface. It accepts either `.torrent` files or BitTorrent v1 magnets:
+Headless mode uses the same transfer-add API and BitTorrent engine as the desktop interface. It accepts v1/v2/hybrid `.torrent` files and compatible magnets:
 
 ```bash
 python main.py --cli path/to/file.torrent
@@ -94,13 +94,33 @@ The headless layer lives under `app/cli/` and consumes the same `MAGNET_*` and `
 
 ## BitTorrent v2 foundation (Phase 8)
 
-Phase 8 introduces the BEP-52 foundation without pretending that the v1 peer engine is already a v2 client. `TorrentFile` can parse and validate v2 metainfo, preserve the exact raw `info` bytes, calculate the full 32-byte SHA-256 v2 info hash, and represent v1/v2 identities without forcing every torrent identifier into a 20-byte field. Hybrid metainfo can therefore carry both SHA-1 and SHA-256 identities internally even though hybrid swarm participation is reserved for Phase 9.
+Phase 8 established strict BEP-52 parsing and validation. `TorrentFile` preserves exact raw `info` bytes, calculates the complete 32-byte SHA-256 v2 info hash, represents hybrid SHA-1/SHA-256 identities without truncating canonical storage, traverses file-aligned BEP-52 file trees safely, and validates required piece layers against file size and declared Merkle roots.
 
-BEP-52 file trees are traversed as file-aligned metadata rather than flattened into the v1 continuous byte-stream model. Path traversal components are rejected before they can become filesystem paths, non-empty files require 32-byte `pieces root` values, empty files must omit them, and meta versions newer than 2 fail with a version-specific error before generic validation. The required top-level `piece layers` dictionary is parsed into 32-byte SHA-256 hashes and validated against file length, configured piece size, and each file's declared Merkle root.
+`app/logic/torrent_v2.py` contains presentation-neutral Merkle primitives for 16 KiB SHA-256 leaf blocks, layer-specific zero-subtree hashes, file-root construction, piece-layer construction/verification and sibling-proof verification. Short final pieces are padded only inside the appropriate Merkle subtree.
 
-`app/logic/torrent_v2.py` contains presentation-neutral Merkle primitives: BEP-52 16 KiB leaf hashing, layer-specific zero-subtree hashes, file-root construction, piece-layer construction/verification, and sibling-proof verification. A short final piece is padded inside its piece-sized Merkle subtree before reduction, while hashes covering only data beyond EOF are omitted from the serialized piece layer. These primitives are independent of Dear PyGui and the current v1 session scheduler so Phase 9 can integrate v2 peer-wire hash messages without rewriting metainfo validation.
+## BitTorrent v2 networking & hybrid swarms (Phase 9)
 
-For safety, `TorrentSession` currently rejects any v2/hybrid metainfo after successful parsing with an explicit Phase-9 message. v2-only `btmh` magnet generation is likewise deliberately not exposed yet. This prevents the existing v1 tracker/DHT/MSE/piece engine from silently treating a 32-byte identity or file-aligned piece space as if it were BEP-3.
+Phase 9 carries that foundation through the live engine. Auto / Best Compatible chooses v1 for v1-only metainfo, v2 for v2-only metainfo, and both compatible swarms for hybrid metainfo; explicit v1 Only / v2 Only overrides remain available for compatibility and testing. Tracker/DHT discovery, PEX provenance, peer handshakes, storage verification and scrape identities remain generation-aware.
+
+The peer wire supports BEP-52 `HASH_REQUEST`, `HASHES` and `HASH_REJECT`, including hybrid v1-to-v2 upgrading. `btmh` magnet resolution can obtain and verify the top-level v2 piece layers that BEP-9 metadata alone does not carry. v2-only downloads/seeding and hybrid operation use the same storage engine, while BEP-47 alignment padding is virtual zero data: it is not written as payload files but remains serviceable to legacy v1 peers.
+
+Create Torrent can emit BitTorrent v1, BitTorrent v2, or recommended hybrid metainfo. v2 output includes file trees, pieces roots and piece layers; hybrid output carries both identities and BEP-47 alignment entries.
+
+## Packaging & Windows integration (Phase 10)
+
+Phase 10 centralizes runtime paths so source runs, PyInstaller one-file executables, Start Menu launches, Explorer `.torrent` opens and `magnet:` URL launches do not depend on the process working directory. Installed builds keep settings/session/cache/error state in the platform per-user state location. A `portable.flag` beside the executable switches state to `.\data` and makes `.\downloads` the default for a new portable profile; `--portable` can request the same mode for one launch.
+
+`packaging/build_windows.ps1` builds two one-file executables through PyInstaller: `SalixTorrent.exe` is the windowed desktop/file-handler target, while `SalixTorrentCLI.exe` preserves the existing console/headless interface without forcing a console window on normal desktop users. The script then creates a portable ZIP and can compile the Inno Setup installer. Build-only dependencies live in `requirements-build.txt`.
+
+The Windows installer is per-user by default and offers `.torrent` handler registration plus explicit opt-in `magnet:` registration. `.torrent` registration uses SalixTorrent's own ProgID/Open With entry rather than silently replacing another client's default. Because `magnet:` is a single-owner URL scheme, SalixTorrent backs up the previous standard handler values and restores them on unregister only when the current scheme still belongs to that SalixTorrent executable. Portable users can use `--register-torrent-handler`, `--register-magnet-handler`, matching unregister commands, and `--shell-status`.
+
+To build Windows release artifacts from PowerShell:
+
+```powershell
+.\packaging\build_windows.ps1
+```
+
+PyInstaller builds must be produced on the target operating system; the script therefore refuses to pretend it can cross-build Windows executables from Linux/macOS. Inno Setup 6 is required only for the installer step; `-SkipInstaller` still produces the standalone and portable artifacts.
 
 ## Interface
 
@@ -205,7 +225,7 @@ On Windows, persistent application state is stored under:
 %LOCALAPPDATA%\SalixTorrent\
 ```
 
-This includes settings, session state, cached magnet metadata, and the UI error log. Download payloads use the configured download directory.
+This includes settings, session state, cached magnet metadata, shell-integration backup state, and the UI error log. Download payloads use the configured download directory. A portable build instead keeps writable state in `data/` beside the executable and defaults new portable profiles to `downloads/` beside it.
 
 Fast-resume information trusts previously verified pieces only while the relevant file metadata still matches. A Force Recheck discards that trust and verifies the payload again from disk without deleting it.
 
@@ -241,13 +261,13 @@ On Windows, a remote BitTorrent peer can reset a TCP connection while the applic
 
 ## Create Torrent
 
-The Create Torrent view can build a BitTorrent v1 `.torrent` from:
+The Create Torrent view can build BitTorrent v1, v2, or recommended hybrid `.torrent` metainfo from:
 
 - a single file;
 - an archive such as ZIP/7z (treated as an ordinary file payload);
 - a directory tree.
 
-Users can choose piece size, trackers, privacy, comment, output path, and optionally start seeding the original source after creation.
+Users can choose generation, piece size, trackers, privacy, comment, output path, and optionally start seeding the original source after creation. Hybrid output uses BEP-47 alignment padding while v2 output includes BEP-52 file-tree/Merkle metadata.
 
 ## Tests
 
@@ -265,20 +285,24 @@ python test_responsive_layout.py
 python test_documentation.py
 python test_headless_cli.py
 python test_torrent_v2.py
+python test_phase9.py
+python test_phase10.py
 ```
 
 The release-critical regression coverage includes strict BEP-52 v2 identity/file-tree/piece-layer/Merkle validation, MSE/RC4 interoperability, rarest-first/endgame scheduling, bounded request pipelines, asynchronous disk backpressure/caching, source binding, encryption fallback rules, multi-torrent port mappings, finite/permanent mapping-lease handling, structured UPnP/NAT-PMP diagnostics, source-severity accounting, Interface Lock, real inbound seeding uploads, IPv6 peer TCP, BEP-7/BEP-15 tracker peers, BEP-11 IPv6 PEX, BEP-32 DHT behavior, BEP-48 HTTP scrape batching, BEP-15 UDP scrape batching, scrape/announce telemetry isolation, Windows Proactor reset handling, responsive content-bounds geometry, framework property-cascade fallback/provenance, per-page documentation layout overrides, and semantic documentation typography/media sizing.
 
 ## Current scope
 
-v0.3.x still uses the BitTorrent v1 peer/session engine for live transfers. Phase 8 now implements the BEP-52 v2 metainfo, SHA-256 identity, file-tree, Merkle, and piece-layer foundation, but v2 `btmh` magnets, v2 peer-wire hash exchange, v2-only downloads/seeding, and hybrid swarm participation are intentionally reserved for Phase 9. Standalone executable packaging, file associations, magnet URI registration, and installer work remain planned for a later release pass.
+Phases 1-9 are implemented in the live source tree. Phase 10 provides the source/runtime integration and reproducible Windows packaging definitions for standalone GUI/CLI executables, portable distribution, installer, `.torrent` handler registration and opt-in `magnet:` registration. Final Windows binary/installer release validation must be performed on Windows because PyInstaller does not cross-build Windows binaries. Phase 11 remains the cross-platform native-tray abstraction/implementation pass.
 
 ## Project structure
 
 ```text
 SalixTorrent/
 ├── main.py
+├── cli_main.py
 ├── requirements.txt
+├── requirements-build.txt
 ├── foundation_test.py
 ├── test_piece_selection.py
 ├── test_request_scheduling.py
@@ -290,6 +314,12 @@ SalixTorrent/
 ├── test_documentation.py
 ├── test_headless_cli.py
 ├── test_torrent_v2.py
+├── test_phase9.py
+├── test_phase10.py
+├── packaging/
+│   ├── SalixTorrent.spec
+│   ├── build_windows.ps1
+│   └── windows/SalixTorrent.iss
 ├── app/
 │   ├── version.py
 │   ├── cli/
@@ -305,6 +335,8 @@ SalixTorrent/
 │   │   ├── master_viewport.py
 │   │   ├── property_cascade.py
 │   │   ├── responsive_layout.py
+│   │   ├── runtime_paths.py
+│   │   ├── shell_integration.py
 │   │   ├── scene_manager.py
 │   │   ├── texture_manager.py
 │   │   └── ui_typography.py

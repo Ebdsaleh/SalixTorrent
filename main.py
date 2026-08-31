@@ -1,12 +1,15 @@
 # main.py
 
 import argparse
+import json
+import os
 import queue
+from typing import Optional
 
 from app.version import APP_NAME, APP_VERSION
 
 
-def main():
+def _build_argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="SalixTorrent (Salix_T) BitTorrent Client"
     )
@@ -53,7 +56,109 @@ def main():
         action="store_true",
         help="In headless mode, exit after the download becomes complete instead of continuing to seed",
     )
+
+    # Phase 10 runtime/desktop integration controls. These are intentionally
+    # handled before TorrentManager/Dear PyGui imports so the installer can use
+    # the frozen executable as a lightweight registration helper.
+    parser.add_argument(
+        "--portable",
+        action="store_true",
+        help="Store SalixTorrent state/download defaults beside the executable for this launch",
+    )
+    parser.add_argument(
+        "--shell-status",
+        action="store_true",
+        help="Report Windows .torrent/magnet handler registration status and exit",
+    )
+    parser.add_argument(
+        "--register-torrent-handler",
+        action="store_true",
+        help="Register SalixTorrent as a per-user .torrent handler and exit",
+    )
+    parser.add_argument(
+        "--unregister-torrent-handler",
+        action="store_true",
+        help="Remove this SalixTorrent executable's per-user .torrent handler and exit",
+    )
+    parser.add_argument(
+        "--register-magnet-handler",
+        action="store_true",
+        help="Register this SalixTorrent executable for magnet: links and exit",
+    )
+    parser.add_argument(
+        "--unregister-magnet-handler",
+        action="store_true",
+        help="Restore/remove this SalixTorrent executable's magnet: handler and exit",
+    )
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help=argparse.SUPPRESS,
+    )
+    return parser
+
+
+def _handle_phase10_commands(args: argparse.Namespace) -> Optional[int]:
+    if args.portable:
+        # Must be set before TorrentManager/runtime_paths is imported.
+        os.environ["SALIX_T_PORTABLE"] = "1"
+
+    requested = any(
+        (
+            args.shell_status,
+            args.register_torrent_handler,
+            args.unregister_torrent_handler,
+            args.register_magnet_handler,
+            args.unregister_magnet_handler,
+        )
+    )
+    if not requested:
+        return None
+
+    from app.engine.shell_integration import ShellIntegration
+
+    shell = ShellIntegration()
+    operation_requested = False
+    success = True
+
+    if args.register_torrent_handler:
+        operation_requested = True
+        success = shell.register_torrent_handler() and success
+    if args.unregister_torrent_handler:
+        operation_requested = True
+        success = shell.unregister_torrent_handler() and success
+    if args.register_magnet_handler:
+        operation_requested = True
+        success = shell.register_magnet_handler() and success
+    if args.unregister_magnet_handler:
+        operation_requested = True
+        success = shell.unregister_magnet_handler() and success
+
+    status = shell.status()
+    if args.shell_status and not args.quiet:
+        print(json.dumps(status.to_dict(), indent=2, sort_keys=True))
+    elif operation_requested and not args.quiet:
+        if not status.supported:
+            print(status.message)
+        else:
+            print(
+                "SalixTorrent shell integration: "
+                f".torrent={'registered' if status.torrent_handler_registered else 'not registered'}, "
+                f"magnet={'registered' if status.magnet_handler_registered else 'not registered'}"
+            )
+
+    if operation_requested and (not shell.supported or not success):
+        return 2
+    return 0
+
+
+def main():
+    parser = _build_argument_parser()
     args = parser.parse_args()
+
+    phase10_exit = _handle_phase10_commands(args)
+    if phase10_exit is not None:
+        raise SystemExit(phase10_exit)
 
     # Defer engine/UI imports until after argument parsing so lightweight
     # commands such as --version do not require Dear PyGui to be imported.
@@ -107,7 +212,8 @@ def main():
         manager.restore_previous_session()
 
         # An explicit startup target uses the exact same add path as Open
-        # Torrent/Open Magnet and the headless CLI.
+        # Torrent/Open Magnet and the headless CLI. This is also what Windows
+        # file/URL handlers invoke in frozen builds.
         if args.torrent:
             try:
                 handle = manager.add_transfer(

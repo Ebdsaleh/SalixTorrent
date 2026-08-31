@@ -623,8 +623,8 @@ HELP_TOPICS: Tuple[HelpTopic, ...] = (
         key="torrent_creation",
         title="Torrent Creation",
         summary=(
-            "Creating standards-compatible BitTorrent v1 metadata from a file or folder and becoming "
-            "the initial seed without copying the source."
+            "Creating standards-compatible BitTorrent v1, v2 or hybrid metadata from a file or folder "
+            "and becoming the initial seed without copying the source."
         ),
         sections=(
             (
@@ -635,10 +635,11 @@ HELP_TOPICS: Tuple[HelpTopic, ...] = (
             ),
             (
                 "Piece size and hashing",
-                "SalixTorrent reads the source and produces SHA-1 hashes for each BitTorrent v1 "
-                "piece. Auto piece size balances metadata size and verification granularity. The "
-                "source is monitored so changing data is not silently published with inconsistent "
-                "hashes.",
+                "SalixTorrent reads the source using the selected generation. v1 emits SHA-1 piece "
+                "hashes, v2 emits BEP-52 SHA-256 Merkle roots/piece layers, and hybrid emits both while "
+                "using BEP-47 alignment padding. Auto piece size balances metadata size and verification "
+                "granularity. The source is monitored so changing data is not silently published with "
+                "inconsistent hashes.",
             ),
             (
                 "Trackers, comments and privacy",
@@ -709,10 +710,10 @@ HELP_TOPICS: Tuple[HelpTopic, ...] = (
     ),
     HelpTopic(
         key="bittorrent_v2",
-        title="BitTorrent v2 Foundation",
+        title="BitTorrent v2 & Hybrid Transfers",
         summary=(
-            "What BEP-52 changes compared with BitTorrent v1, what SalixTorrent Phase 8 "
-            "already validates, and which networking pieces are intentionally deferred to Phase 9."
+            "How the Phase-8 BEP-52 validation foundation is used by Phase 9 for v2 networking, "
+            "btmh magnets, hybrid swarms and torrent creation."
         ),
         sections=(
             (
@@ -743,12 +744,24 @@ HELP_TOPICS: Tuple[HelpTopic, ...] = (
                 "pieces root so corrupted layer metadata is rejected immediately.",
             ),
             (
-                "Why v2 transfers are still gated",
-                "Parsing a v2 torrent safely is not the same as joining a v2 swarm. Phase 9 still has "
-                "to implement btmh magnets, v2 peer-wire hash messages, v2-only transfers, hybrid "
-                "cross-format validation and torrent creation. Until then TorrentSession rejects v2 or "
-                "hybrid metainfo explicitly after successful Phase-8 validation rather than routing it "
-                "through the v1 engine incorrectly.",
+                "Phase 9 networking and hybrid operation",
+                "Phase 9 carries the validated v2 identity into tracker, DHT and peer-wire discovery, "
+                "supports BEP-52 HASH_REQUEST / HASHES / HASH_REJECT exchange, and resolves btmh "
+                "magnets with verified piece layers. Hybrid torrents can participate in both the v1 "
+                "and v2 swarms; peer provenance follows the generation actually negotiated.",
+            ),
+            (
+                "Auto / Best Compatible",
+                "The default protocol policy needs no generation knowledge from the user: v1-only "
+                "metainfo uses v1, v2-only metainfo uses v2, and hybrid metainfo joins both compatible "
+                "swarms. Advanced v1 Only and v2 Only overrides are available for testing or "
+                "compatibility, but a missing generation is never fabricated.",
+            ),
+            (
+                "Creating v2 and hybrid torrents",
+                "Create Torrent can emit v1, v2 or recommended hybrid metainfo. Hybrid creation uses "
+                "BEP-47 padding entries so the v1 piece stream preserves BEP-52 file alignment while "
+                "SalixTorrent treats padding as virtual zero bytes rather than user payload files.",
             ),
         ),
         related_terms=(
@@ -758,6 +771,8 @@ HELP_TOPICS: Tuple[HelpTopic, ...] = (
             "PIECES_ROOT",
             "PIECE_LAYERS_V2",
             "MERKLE_TREE",
+            "TORRENT_PROTOCOL_POLICY",
+            "TORRENT_GENERATION",
         ),
     ),
     HelpTopic(
@@ -777,7 +792,8 @@ HELP_TOPICS: Tuple[HelpTopic, ...] = (
             ),
             (
                 "Headless magnet resolution",
-                '`python main.py --cli "magnet:?xt=urn:btih:..."` uses the ordinary BEP-9 magnet '
+                '`python main.py --cli "magnet:?xt=urn:btih:..."` in source builds, or '
+                '`SalixTorrentCLI.exe "magnet:?xt=..."` in the frozen Windows build, uses the ordinary magnet '
                 "resolver, tracker/DHT discovery, peer-encryption policy and network binding settings without "
                 "requiring Dear PyGui. Resolved metainfo is temporary in headless mode and is removed when "
                 "the process shuts down.",
@@ -809,6 +825,62 @@ HELP_TOPICS: Tuple[HelpTopic, ...] = (
             "JSON_STATUS",
             "EXIT_ON_COMPLETE",
             "CLEAN_SIGNAL_SHUTDOWN",
+        ),
+    ),
+    HelpTopic(
+        key="distribution",
+        title="Standalone, Portable & Windows Integration",
+        summary=(
+            "How Phase 10 freezes SalixTorrent into executable builds, keeps writable state separate "
+            "from bundled resources, and integrates .torrent files and magnet links on Windows."
+        ),
+        sections=(
+            (
+                "Standalone executables",
+                "Phase 10 provides a windowed SalixTorrent executable for normal desktop use and a "
+                "console SalixTorrentCLI executable for the existing headless interface. Both are built "
+                "from the same application/transfer engine rather than maintaining a second protocol path.",
+            ),
+            (
+                "Resource and state paths",
+                "Frozen application resources are treated as read-only bundle data. Settings, session "
+                "state, cached torrent metadata and UI errors remain in the native per-user SalixTorrent "
+                "state directory, so launching from Explorer, the Start Menu or a magnet link does not "
+                "depend on the process working directory.",
+            ),
+            (
+                "Portable mode",
+                "A portable.flag file beside SalixTorrent.exe switches writable state to a data folder "
+                "beside the executable and makes downloads beside the executable the default for a new "
+                "portable profile. --portable can request the same behavior for one launch. Existing "
+                "explicit download-directory preferences still win.",
+            ),
+            (
+                ".torrent registration",
+                "On Windows, SalixTorrent registers a unique per-user .torrent ProgID and advertises it "
+                "through Open With instead of silently overwriting another client's default choice. The "
+                "installer offers this registration as a normal install task.",
+            ),
+            (
+                "magnet URI registration",
+                "Windows exposes magnet: as a single-owner URL protocol. The installer therefore leaves "
+                "magnet registration as an explicit opt-in. SalixTorrent backs up the previous standard "
+                "handler values and restores them on unregister only if the current handler still points "
+                "to that SalixTorrent executable.",
+            ),
+            (
+                "Portable registration commands",
+                "Portable users can run --register-torrent-handler or --register-magnet-handler on the "
+                "desktop executable. Matching --unregister-* commands remove only registrations still "
+                "owned by that executable. --shell-status reports the current state without starting the UI.",
+            ),
+        ),
+        related_terms=(
+            "STANDALONE_BUILD",
+            "PORTABLE_MODE",
+            "TORRENT_FILE_ASSOCIATION",
+            "MAGNET_URI_REGISTRATION",
+            "APPLICATION_STATE",
         ),
     ),
     HelpTopic(
@@ -1463,3 +1535,7 @@ class HelpTopicsView:
         # Documentation layout is resize-event driven; there is intentionally no
         # per-frame geometry/typography polling in the Help view.
         del dt
+
+
+
+

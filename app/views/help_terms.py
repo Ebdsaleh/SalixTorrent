@@ -93,18 +93,32 @@ HELP_TERMS = {
         "small pieces, reconstructs it, and verifies that its SHA-1 info hash "
         "matches the magnet before accepting it.",
     ),
+    "TORRENT_PROTOCOL_POLICY": (
+        "Torrent Protocol Policy",
+        "Controls which compatible swarm generation a transfer may use. Auto / Best Compatible "
+        "uses v1 for v1 torrents, v2 for v2 torrents, and both swarms for hybrid torrents. "
+        "The v1 Only and v2 Only choices are advanced compatibility/debugging overrides; they "
+        "cannot invent a generation that the torrent does not contain.",
+    ),
+    "TORRENT_GENERATION": (
+        "Torrent Generation",
+        "Selects the metainfo produced by Create Torrent. Hybrid v1/v2 is recommended for broad "
+        "compatibility and contains both SHA-1 and SHA-256 identities with BEP-47 padding for v1 "
+        "alignment. BitTorrent v1 and BitTorrent v2 create single-generation torrents.",
+    ),
     "BITTORRENT_V2": (
         "BitTorrent v2 / BEP-52",
         "The second BitTorrent metainfo and peer-protocol generation. v2 uses SHA-256 "
         "torrent identity, file-aligned pieces, per-file Merkle trees and piece layers. "
-        "SalixTorrent Phase 8 parses and validates this foundation; live v2/hybrid swarm "
-        "networking is deliberately reserved for Phase 9.",
+        "SalixTorrent validates this Phase-8 foundation and Phase 9 uses it for live "
+        "v2-only and hybrid swarm networking, hash exchange, magnets and creation.",
     ),
     "BEP52": (
         "BEP-52 - BitTorrent Protocol Specification v2",
         "Defines BitTorrent v2 metainfo, SHA-256 info hashes, the file tree, per-file "
-        "pieces roots, piece layers and hash-proof peer messages. SalixTorrent validates "
-        "BEP-52 metainfo independently of the current v1 session engine.",
+        "pieces roots, piece layers and hash peer messages. SalixTorrent keeps the full "
+        "SHA-256 identity while using the required 20-byte truncated identity on tracker, "
+        "DHT and peer-wire surfaces.",
     ),
     "TORRENT_IDENTITY_V2": (
         "v2 SHA-256 Torrent Identity",
@@ -891,9 +905,9 @@ HELP_TERMS = {
     # ------------------------------------------------------------------
     "CREATE_TORRENT": (
         "Create Torrent",
-        "Builds a standard BitTorrent v1 .torrent metainfo file from an existing "
-        "file or folder. SalixTorrent hashes the source in the background; the "
-        "payload itself is not copied merely to create the .torrent file.",
+        "Builds BitTorrent v1, v2 or recommended hybrid .torrent metainfo from an existing "
+        "file or folder. SalixTorrent hashes the source in the background using the selected "
+        "generation; the payload itself is not copied merely to create the .torrent file.",
     ),
     "TORRENT_SOURCE_FILE": (
         "Single-file Torrent Source",
@@ -1037,6 +1051,32 @@ HELP_TERMS = {
         "torrent payloads.",
     ),
 
+    "STANDALONE_BUILD": (
+        "Standalone Build",
+        "A frozen SalixTorrent executable containing the Python runtime and application dependencies. "
+        "The desktop build is windowed; SalixTorrentCLI.exe keeps console/headless behavior separate.",
+    ),
+    "PORTABLE_MODE": (
+        "Portable Mode",
+        "Activated by portable.flag beside the executable or --portable for one launch. Writable state "
+        "uses a data folder beside the executable and a new profile defaults downloads beside it.",
+    ),
+    "TORRENT_FILE_ASSOCIATION": (
+        ".torrent File Association",
+        "Windows per-user registration advertising SalixTorrent as an Open With handler through its own "
+        "ProgID. It does not silently overwrite another torrent client's default application choice.",
+    ),
+    "MAGNET_URI_REGISTRATION": (
+        "magnet: URI Registration",
+        "Windows URL-protocol registration used when clicking magnet links. Because the scheme has one "
+        "active owner, SalixTorrent makes this opt-in and restores a captured previous handler only when safe.",
+    ),
+    "APPLICATION_STATE": (
+        "Application State Directory",
+        "Writable settings, session metadata, cached torrent metainfo, shell-integration backup state and "
+        "UI error logs. Installed and portable builds deliberately use different state-directory policies.",
+    ),
+
     # ------------------------------------------------------------------
     # Commands / actions
     # ------------------------------------------------------------------
@@ -1048,9 +1088,9 @@ HELP_TERMS = {
     ),
     "OPEN_MAGNET": (
         "Open Magnet",
-        "Paste a v1 magnet URI. SalixTorrent first resolves the missing torrent "
-        "metadata through peers, then creates a normal persistent torrent session "
-        "and begins the usual checking/download process.",
+        "Paste a compatible btih, btmh or hybrid magnet URI. SalixTorrent resolves the "
+        "missing metainfo through compatible peers, verifies the advertised identity and any "
+        "required v2 piece layers, then creates the normal persistent torrent session.",
     ),
     "START_RESUME": (
         "Start / Resume Torrent",
@@ -1089,13 +1129,13 @@ HELP_TERMS = {
     ),
     "COPY_INFO_HASH": (
         "Copy Info Hash",
-        "Copies the torrent's v1 SHA-1 info hash to the clipboard. This identifier "
-        "names the swarm but does not itself contain the full torrent metadata.",
+        "Copies the selected torrent's canonical info-hash identity. v1 uses SHA-1, v2 uses "
+        "the full SHA-256 identity, and hybrid torrents carry both identities internally.",
     ),
     "COPY_MAGNET": (
         "Copy Magnet Link",
-        "Builds and copies a standard v1 magnet URI containing the torrent's btih "
-        "info hash plus useful display-name/tracker parameters where available.",
+        "Builds and copies a generation-aware magnet URI: btih for v1, btmh for v2, and "
+        "both compatible exact-topic identities for hybrid torrents, plus display/tracker parameters.",
     ),
     "PROPERTIES": (
         "Torrent Properties",
@@ -1161,9 +1201,10 @@ HELP_TERMS = {
     ),
     "HEADLESS_MODE": (
         "Headless Mode",
-        "Runs SalixTorrent without Dear PyGui. Headless mode accepts .torrent files or BitTorrent v1 "
-        "magnet URIs, uses the same TorrentManager/peer/tracker/DHT engine as the desktop interface, "
-        "and owns only terminal presentation and process lifecycle.",
+        "Runs SalixTorrent without Dear PyGui. Headless mode accepts v1/v2/hybrid .torrent files "
+        "or compatible magnets, uses the same TorrentManager/peer/tracker/DHT engine as the desktop "
+        "interface, and owns only terminal presentation and process lifecycle. Frozen Windows builds "
+        "expose this path through SalixTorrentCLI.exe.",
     ),
     "TRANSFER_ADD_API": (
         "Shared Transfer-Add API",
@@ -1272,3 +1313,7 @@ def add_context_tooltip(
         contextual_text(title, body, facts=facts, footer=footer),
         wrap=wrap,
     )
+
+
+
+

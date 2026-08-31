@@ -12,6 +12,8 @@ import dearpygui.dearpygui as dpg
 
 from app.engine.responsive_layout import ResponsiveLayout, clamp
 from app.logic.torrent_creator import (
+    TORRENT_GENERATION_HYBRID,
+    TORRENT_GENERATIONS,
     TorrentCreationCancelled,
     TorrentCreationProgress,
     TorrentCreator,
@@ -58,7 +60,7 @@ class CreateTorrentView:
             create_heading = dpg.add_text("CREATE TORRENT", color=(0, 255, 128))
             add_help_tooltip(create_heading, "CREATE_TORRENT")
             self.create_intro = dpg.add_text(
-                "Create a shareable BitTorrent v1 .torrent from a file, archive, or folder.",
+                "Create a BitTorrent v1, v2, or hybrid .torrent from a file, archive, or folder.",
                 color=(170, 170, 170),
             )
             add_help_tooltip(self.create_intro, "CREATE_TORRENT")
@@ -92,7 +94,7 @@ class CreateTorrentView:
 
             dpg.add_spacer(height=8)
 
-            with dpg.child_window(height=155, width=-1, border=True) as self.output_panel:
+            with dpg.child_window(height=190, width=-1, border=True) as self.output_panel:
                 dpg.add_text("OUTPUT", color=(100, 180, 255))
                 dpg.add_separator()
                 with dpg.group(horizontal=True):
@@ -103,6 +105,16 @@ class CreateTorrentView:
                     add_help_tooltip(self.choose_output_button, "TORRENT_OUTPUT")
                     self.output_text = dpg.add_text("No output selected", wrap=830)
                     add_help_tooltip(self.output_text, "TORRENT_OUTPUT")
+
+                with dpg.group(horizontal=True):
+                    generation_label = dpg.add_text("Torrent Generation")
+                    add_help_tooltip(generation_label, "TORRENT_GENERATION")
+                    self.generation_combo = dpg.add_combo(
+                        items=list(TORRENT_GENERATIONS),
+                        default_value=TORRENT_GENERATION_HYBRID,
+                        width=235,
+                    )
+                    add_help_tooltip(self.generation_combo, "TORRENT_GENERATION")
 
                 with dpg.group(horizontal=True):
                     piece_size_label = dpg.add_text("Piece Size")
@@ -196,7 +208,7 @@ class CreateTorrentView:
 
         # Source/output/progress stay compact; the tracker editor absorbs extra
         # vertical room because it is the genuinely expandable workspace here.
-        tracker_height = clamp(height - 505, 175, 430)
+        tracker_height = clamp(height - 540, 175, 430)
         self.layout.height(self.trackers_panel, tracker_height)
         self.layout.height(self.trackers_input, max(105, tracker_height - 70))
 
@@ -298,6 +310,7 @@ class CreateTorrentView:
             self.select_file_button,
             self.select_folder_button,
             self.choose_output_button,
+            self.generation_combo,
             self.piece_size_combo,
             self.private_checkbox,
             self.comment_input,
@@ -319,6 +332,7 @@ class CreateTorrentView:
             dpg.set_value(self.status_text, "Choose where to save the .torrent file.")
             return
 
+        generation = dpg.get_value(self.generation_combo) or TORRENT_GENERATION_HYBRID
         piece_label = dpg.get_value(self.piece_size_combo) or "Auto"
         piece_length = self.PIECE_SIZE_OPTIONS.get(piece_label)
         comment = dpg.get_value(self.comment_input) or ""
@@ -348,6 +362,7 @@ class CreateTorrentView:
                     piece_length=piece_length,
                     comment=comment,
                     private=private,
+                    generation=generation,
                     cancel_event=self._cancel_event,
                     progress_callback=on_progress,
                 )
@@ -465,6 +480,7 @@ class CreateTorrentView:
                         f"{result.total_bytes / (1024 * 1024):,.2f} MiB | "
                         f"{result.piece_count:,} pieces @ "
                         f"{self._piece_size_text(result.piece_length)} | "
+                        f"{result.generation} | "
                         f"Info Hash: {result.info_hash}{skipped}\n"
                         f"Saved: {result.output_path}"
                     ),
@@ -485,3 +501,5 @@ class CreateTorrentView:
                 dpg.set_value(self.status_text, "Creation failed")
                 dpg.set_value(self.detail_text, str(payload))
                 self._set_creation_controls_busy(False)
+
+

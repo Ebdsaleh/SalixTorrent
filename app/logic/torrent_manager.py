@@ -12,13 +12,16 @@ import tempfile
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from app.engine.runtime_paths import default_download_directory, state_directory
 from app.logic.connectivity import ConnectivityManager
 from app.logic.network_binding import normalise_bind_address
 from app.logic.tracker_scrape import TrackerScrapeCoordinator
 from app.logic.transfer_add import (
+    TORRENT_PROTOCOL_AUTO,
     TransferAddHandle,
     TransferAddRequest,
     TransferSourceKind,
+    normalise_torrent_protocol_policy,
 )
 from app.logic.magnet import (
     MagnetCancelled,
@@ -71,7 +74,7 @@ class SessionIntent:
 
 class TorrentManager:
     _instance: Optional["TorrentManager"] = None
-    SESSION_STATE_VERSION = 5
+    SESSION_STATE_VERSION = 6
     DEFAULT_MAX_ACTIVE_DOWNLOADS = 2
     PRIORITY_RANK = {
         TORRENT_PRIORITY_HIGH: 0,
@@ -166,32 +169,13 @@ class TorrentManager:
 
     @staticmethod
     def _get_state_directory() -> Path:
-        """Return a native per-user state directory without extra dependencies.
-
-        SALIX_T_STATE_DIR is intentionally supported for development/testing.
-        """
-        override = os.environ.get("SALIX_T_STATE_DIR")
-        if override:
-            return Path(override).expanduser().resolve()
-
-        if os.name == "nt":
-            base = os.environ.get("LOCALAPPDATA")
-            if base:
-                return Path(base) / "SalixTorrent"
-            return Path.home() / "AppData" / "Local" / "SalixTorrent"
-
-        if sys.platform == "darwin":
-            return Path.home() / "Library" / "Application Support" / "SalixTorrent"
-
-        xdg_state_home = os.environ.get("XDG_STATE_HOME")
-        if xdg_state_home:
-            return Path(xdg_state_home) / "SalixTorrent"
-        return Path.home() / ".local" / "state" / "SalixTorrent"
+        """Return the centralized Phase-10 writable state directory."""
+        return state_directory()
 
     @classmethod
     def _default_app_settings(cls) -> dict:
         return {
-            "download_dir": os.path.abspath("downloads"),
+            "download_dir": str(default_download_directory()),
             "default_max_peers": 25,
             "max_active_downloads": cls.DEFAULT_MAX_ACTIVE_DOWNLOADS,
             "auto_resume_active": True,
@@ -206,6 +190,7 @@ class TorrentManager:
             "enable_upnp": True,
             "enable_natpmp": True,
             "peer_encryption": "Prefer Encryption",
+            "torrent_protocol_policy": TORRENT_PROTOCOL_AUTO,
             "network_bind_address": "",
             "interface_lock": False,
             "mask_peer_ips": False,
@@ -259,6 +244,9 @@ class TorrentManager:
         valid_encryption = {"Disabled", "Prefer Encryption", "Require Encryption"}
         out["peer_encryption"] = (
             encryption if encryption in valid_encryption else "Prefer Encryption"
+        )
+        out["torrent_protocol_policy"] = normalise_torrent_protocol_policy(
+            data.get("torrent_protocol_policy", TORRENT_PROTOCOL_AUTO)
         )
 
         bind_address = normalise_bind_address(data.get("network_bind_address", ""))
@@ -552,6 +540,7 @@ class TorrentManager:
                     "upload_limit_unit": session.upload_limit_unit,
                     "uploaded_bytes": int(session.uploaded_bytes),
                     "seed_source_path": session.seed_source_path,
+                    "protocol_policy": session.protocol_policy,
                     "file_priorities": session.piece_mgr.get_file_priorities(),
                     "queue_priority": session.queue_priority,
                 }
@@ -602,7 +591,7 @@ class TorrentManager:
 
         if not isinstance(data, dict):
             return None
-        if data.get("version") not in (1, 2, 3, 4, self.SESSION_STATE_VERSION):
+        if data.get("version") not in (1, 2, 3, 4, 5, self.SESSION_STATE_VERSION):
             print("[Salix_T Notice] Previous session uses an unsupported format.")
             return None
         if not isinstance(data.get("torrents", []), list):
@@ -678,7 +667,7 @@ class TorrentManager:
                     download_dir = str(
                         entry.get("download_dir")
                         or self._settings.get("download_dir")
-                        or os.path.abspath("downloads")
+                        or str(default_download_directory())
                     )
                     session = TorrentSession(
                         restore_path,
@@ -694,6 +683,10 @@ class TorrentManager:
                         network_bind_address=self._settings.get("network_bind_address", ""),
                         interface_lock=self._settings.get("interface_lock", False),
                         mask_peer_ips=self._settings.get("mask_peer_ips", False),
+                        protocol_policy=entry.get(
+                            "protocol_policy",
+                            self._settings.get("torrent_protocol_policy", TORRENT_PROTOCOL_AUTO),
+                        ),
                         global_download_limiter=self._global_download_limiter,
                         global_upload_limiter=self._global_upload_limiter,
                         listen_port_callback=self._on_session_listen_port,
@@ -1236,6 +1229,7 @@ class TorrentManager:
         persist: bool = True,
         max_peers: Optional[int] = None,
         download_dir: Optional[str] = None,
+        protocol_policy: Optional[str] = None,
     ):
         magnet = MagnetLink.parse(magnet_uri)
         info_hash = magnet.hex_info_hash
@@ -1293,7 +1287,11 @@ class TorrentManager:
             )
 
             raw_info = await fetcher.resolve()
-            torrent_bytes = build_torrent_bytes(magnet, raw_info)
+            torrent_bytes = build_torrent_bytes(
+                magnet,
+                raw_info,
+                piece_layers=getattr(fetcher, "resolved_piece_layers", None),
+            )
 
             if persist:
                 self._ensure_state_directories()
@@ -1320,6 +1318,7 @@ class TorrentManager:
                 max_peers=max_peers,
                 persist=persist,
                 download_dir=download_dir,
+                protocol_policy=protocol_policy,
             )
             if session.torrent.hex_info_hash != info_hash:
                 raise MagnetError("Resolved metadata did not reproduce the magnet info hash.")
@@ -1482,6 +1481,7 @@ class TorrentManager:
                             persist=bool(payload.get("persist", True)),
                             max_peers=payload.get("max_peers"),
                             download_dir=payload.get("download_dir"),
+                            protocol_policy=payload.get("protocol_policy"),
                         )
                     )
                     self._magnet_tasks[actual_hash] = task
@@ -1639,6 +1639,7 @@ class TorrentManager:
         persist: bool = True,
         max_peers: Optional[int] = None,
         download_dir: Optional[str] = None,
+        protocol_policy: Optional[str] = None,
     ) -> str:
         """Begin non-blocking BEP-9 metadata retrieval for a magnet URI.
 
@@ -1664,6 +1665,11 @@ class TorrentManager:
                     "persist": bool(persist),
                     "max_peers": max_peers,
                     "download_dir": download_dir,
+                    "protocol_policy": normalise_torrent_protocol_policy(
+                        protocol_policy
+                        if protocol_policy is not None
+                        else self._settings.get("torrent_protocol_policy", TORRENT_PROTOCOL_AUTO)
+                    ),
                 },
             ),
         )
@@ -1696,6 +1702,7 @@ class TorrentManager:
                 persist=add_request.persist,
                 max_peers=add_request.max_peers,
                 download_dir=add_request.download_dir,
+                protocol_policy=add_request.protocol_policy,
             )
             return TransferAddHandle(
                 kind=TransferSourceKind.MAGNET,
@@ -1709,6 +1716,7 @@ class TorrentManager:
             max_peers=add_request.max_peers,
             persist=add_request.persist,
             download_dir=add_request.download_dir,
+            protocol_policy=add_request.protocol_policy,
         )
         info_hash = session.torrent.hex_info_hash
         if add_request.start:
@@ -1733,6 +1741,7 @@ class TorrentManager:
         persist: bool = True,
         seed_source_path: Optional[str] = None,
         download_dir: Optional[str] = None,
+        protocol_policy: Optional[str] = None,
     ) -> TorrentSession:
         torrent_path = os.path.abspath(os.path.expanduser(torrent_path))
         seed_source_path = (
@@ -1746,7 +1755,7 @@ class TorrentManager:
         else:
             max_peers = max(1, int(max_peers))
         if download_dir is None:
-            download_dir = str(self._settings.get("download_dir") or os.path.abspath("downloads"))
+            download_dir = str(self._settings.get("download_dir") or str(default_download_directory()))
         download_dir = os.path.abspath(os.path.expanduser(download_dir))
 
         # TorrentSession construction is lightweight: it parses .torrent
@@ -1767,6 +1776,11 @@ class TorrentManager:
             network_bind_address=self._settings.get("network_bind_address", ""),
             interface_lock=self._settings.get("interface_lock", False),
             mask_peer_ips=self._settings.get("mask_peer_ips", False),
+            protocol_policy=normalise_torrent_protocol_policy(
+                protocol_policy
+                if protocol_policy is not None
+                else self._settings.get("torrent_protocol_policy", TORRENT_PROTOCOL_AUTO)
+            ),
             global_download_limiter=self._global_download_limiter,
             global_upload_limiter=self._global_upload_limiter,
             listen_port_callback=self._on_session_listen_port,
@@ -2077,4 +2091,8 @@ class TorrentManager:
 
         self._connectivity.close()
         self._cleanup_ephemeral_torrents()
+
+
+
+
 
