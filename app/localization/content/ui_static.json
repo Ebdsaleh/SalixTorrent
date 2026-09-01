@@ -1,0 +1,12 @@
+{
+  "strings": {
+    "language.english_au": "English (Australia)",
+    "language.english_gb": "English (United Kingdom)",
+    "language.english_us": "English (United States)",
+    "language.filipino": "Filipino",
+    "language.portuguese_br": "Português (Brasil)",
+    "language.system_default": "System Default",
+    "menu.help.about": "About SalixTorrent",
+    "view.download_view.all": "All"
+  }
+}

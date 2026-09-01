@@ -11,6 +11,8 @@ from tkinter import filedialog
 
 import dearpygui.dearpygui as dpg
 
+from app.localization import canonical_choice, localized_choices, tr, tr_value
+
 from app.logic.network_binding import format_endpoint
 from app.logic.torrent_manager import TorrentManager
 from app.logic.transfer_add import TransferAddRequest
@@ -54,6 +56,10 @@ class DownloadView:
         "Seeding",
         "Paused",
     }
+    QUEUE_STATE_FILTERS = (
+        "All", "Active", "Downloading", "Seeding", "Checking",
+        "Queued", "Paused", "Stopped", "Completed", "Error",
+    )
 
     def __init__(self, ui_queue: queue.Queue):
         self.ui_queue = ui_queue
@@ -108,33 +114,33 @@ class DownloadView:
             # Top Controls
             with dpg.group(horizontal=True):
                 open_torrent_button = dpg.add_button(
-                    label=" + Open Torrent ",
+                    label=tr('view.download_view.open_torrent', " + Open Torrent "),
                     callback=self._open_native_file_dialog,
                 )
                 add_help_tooltip(open_torrent_button, "OPEN_TORRENT")
                 open_magnet_button = dpg.add_button(
-                    label=" + Open Magnet ",
+                    label=tr('view.download_view.open_magnet', " + Open Magnet "),
                     callback=self._show_magnet_dialog,
                 )
                 add_help_tooltip(open_magnet_button, "OPEN_MAGNET")
                 dpg.add_spacer(width=10)
                 start_resume_button = dpg.add_button(
-                    label=" Start / Resume ",
+                    label=tr('view.download_view.start_resume', " Start / Resume "),
                     callback=self._on_resume_clicked,
                 )
                 add_help_tooltip(start_resume_button, "START_RESUME")
                 pause_button = dpg.add_button(
-                    label=" Pause ",
+                    label=tr('view.download_view.pause_9645aa87', " Pause "),
                     callback=self._on_pause_clicked,
                 )
                 add_help_tooltip(pause_button, "PAUSE_TORRENT")
                 stop_button = dpg.add_button(
-                    label=" Stop ",
+                    label=tr('view.download_view.stop_57cd4489', " Stop "),
                     callback=self._on_stop_clicked,
                 )
                 add_help_tooltip(stop_button, "STOP_TORRENT")
                 dpg.add_spacer(width=18)
-                slots_label = dpg.add_text("Active DL Slots")
+                slots_label = dpg.add_text(tr('view.download_view.active_dl_slots', "Active DL Slots"))
                 add_help_tooltip(slots_label, "ACTIVE_DL_SLOTS")
                 self.queue_slots_input = dpg.add_input_int(
                     default_value=self._queue_slots_value,
@@ -144,47 +150,44 @@ class DownloadView:
                 )
                 add_help_tooltip(self.queue_slots_input, "ACTIVE_DL_SLOTS")
                 apply_queue_button = dpg.add_button(
-                    label=" Apply Queue ",
+                    label=tr('view.download_view.apply_queue', " Apply Queue "),
                     callback=self._on_apply_queue_slots_clicked,
                 )
                 add_help_tooltip(apply_queue_button, "ACTIVE_DL_SLOTS")
-                unlimited_slots = dpg.add_text("0 = Unlimited", color=(140, 140, 140))
+                unlimited_slots = dpg.add_text(tr('view.download_view.0_unlimited', "0 = Unlimited"), color=(140, 140, 140))
                 add_help_tooltip(unlimited_slots, "ACTIVE_DL_SLOTS")
 
             with dpg.group(horizontal=True):
-                search_label = dpg.add_text("Search")
+                search_label = dpg.add_text(tr('view.download_view.search', "Search"))
                 add_help_tooltip(search_label, "QUEUE_SEARCH")
                 self.queue_search_input = dpg.add_input_text(
-                    hint="Filter torrent names...",
+                    hint=tr('view.download_view.filter_torrent_names', "Filter torrent names..."),
                     width=260,
                     callback=self._on_queue_filter_changed,
                 )
                 add_help_tooltip(self.queue_search_input, "QUEUE_SEARCH")
                 dpg.add_spacer(width=8)
-                status_filter_label = dpg.add_text("Status")
+                status_filter_label = dpg.add_text(tr('view.download_view.status', "Status"))
                 add_help_tooltip(status_filter_label, "QUEUE_STATUS_FILTER")
                 self.queue_state_filter = dpg.add_combo(
-                    items=[
-                        "All", "Active", "Downloading", "Seeding", "Checking",
-                        "Queued", "Paused", "Stopped", "Completed", "Error",
-                    ],
-                    default_value="All",
+                    items=localized_choices(self.QUEUE_STATE_FILTERS),
+                    default_value=tr_value("All"),
                     width=135,
                     callback=self._on_queue_filter_changed,
                 )
                 add_help_tooltip(self.queue_state_filter, "QUEUE_STATUS_FILTER")
-                clear_filter_button = dpg.add_button(label=" Clear Filter ", callback=self._clear_queue_filter)
-                add_text_tooltip(clear_filter_button, "Clear filters\n\nRemoves the torrent-name search and status filter. This changes only what is visible in the queue and never changes transfer state.")
-                queue_order_button = dpg.add_button(label=" Queue Order ", callback=self._clear_queue_sort)
+                clear_filter_button = dpg.add_button(label=tr('view.download_view.clear_filter', " Clear Filter "), callback=self._clear_queue_filter)
+                add_text_tooltip(clear_filter_button, tr('view.download_view.clear_filters_removes_the_torrent_name_search', "Clear filters\n\nRemoves the torrent-name search and status filter. This changes only what is visible in the queue and never changes transfer state."))
+                queue_order_button = dpg.add_button(label=tr('view.download_view.queue_order', " Queue Order "), callback=self._clear_queue_sort)
                 add_help_tooltip(queue_order_button, "QUEUE_ORDER")
-                self.queue_filter_summary = dpg.add_text("Showing 0 / 0")
+                self.queue_filter_summary = dpg.add_text(tr('view.download_view.showing_0_0', "Showing 0 / 0"))
                 add_help_tooltip(self.queue_filter_summary, "QUEUE_SORT")
 
             dpg.add_spacer(height=5)
 
             # Queue Table
             with dpg.child_window(height=140, width=-1, border=True) as self.queue_panel:
-                dpg.add_text("TRANSFERS QUEUE", color=(100, 180, 255))
+                dpg.add_text(tr('view.download_view.transfers_queue', "TRANSFERS QUEUE"), color=(100, 180, 255))
                 with dpg.table(
                     header_row=True,
                     resizable=True,
@@ -196,22 +199,22 @@ class DownloadView:
                     tag="torrent_queue_table",
                 ) as self.queue_table:
                     name_col = dpg.add_table_column(
-                        label="Name", width_stretch=True, init_width_or_weight=0.4
+                        label=tr('view.download_view.name', "Name"), width_stretch=True, init_width_or_weight=0.4
                     )
                     size_col = dpg.add_table_column(
-                        label="Size", width_fixed=True, init_width_or_weight=90
+                        label=tr('view.download_view.size', "Size"), width_fixed=True, init_width_or_weight=90
                     )
                     progress_col = dpg.add_table_column(
-                        label="Progress", width_fixed=True, init_width_or_weight=120
+                        label=tr('view.download_view.progress', "Progress"), width_fixed=True, init_width_or_weight=120
                     )
                     priority_col = dpg.add_table_column(
-                        label="Priority", width_fixed=True, init_width_or_weight=90
+                        label=tr('view.download_view.priority', "Priority"), width_fixed=True, init_width_or_weight=90
                     )
                     status_col = dpg.add_table_column(
-                        label="Status", width_fixed=True, init_width_or_weight=150
+                        label=tr('view.download_view.status', "Status"), width_fixed=True, init_width_or_weight=150
                     )
                     speed_col = dpg.add_table_column(
-                        label="Down / Up", width_fixed=True, init_width_or_weight=190
+                        label=tr('view.download_view.down_up', "Down / Up"), width_fixed=True, init_width_or_weight=190
                     )
                     self._sort_column_ids = {
                         name_col: "name",
@@ -221,24 +224,24 @@ class DownloadView:
                         status_col: "status",
                         speed_col: "speed",
                     }
-                    add_text_tooltip(name_col, "Name\n\nThe torrent payload name. Click a column header to sort the visible table; click a row to select it. Right-click any row cell for torrent actions.")
-                    add_text_tooltip(size_col, "Size\n\nTotal payload size described by the torrent metadata. This is not the size of the .torrent metadata file itself.")
-                    add_text_tooltip(progress_col, "Progress\n\nVerified completion of the torrent payload. During selective downloading, the selected-files completion state can finish before the full torrent reaches 100%.")
+                    add_text_tooltip(name_col, tr('view.download_view.name_the_torrent_payload_name_click_a', "Name\n\nThe torrent payload name. Click a column header to sort the visible table; click a row to select it. Right-click any row cell for torrent actions."))
+                    add_text_tooltip(size_col, tr('view.download_view.size_total_payload_size_described_by_the', "Size\n\nTotal payload size described by the torrent metadata. This is not the size of the .torrent metadata file itself."))
+                    add_text_tooltip(progress_col, tr('view.download_view.progress_verified_completion_of_the_torrent_payload', "Progress\n\nVerified completion of the torrent payload. During selective downloading, the selected-files completion state can finish before the full torrent reaches 100%."))
                     add_help_tooltip(priority_col, "QUEUE_PRIORITY")
                     add_help_tooltip(status_col, "TORRENT_STATUS")
-                    add_text_tooltip(speed_col, "Down / Up\n\nThe selected display unit is used for both the torrent's current download and upload rates. Right-click a torrent row to change Transfer Rate Units.")
+                    add_text_tooltip(speed_col, tr('view.download_view.down_up_the_selected_display_unit_is', "Down / Up\n\nThe selected display unit is used for both the torrent's current download and upload rates. Right-click a torrent row to change Transfer Rate Units."))
 
             dpg.add_spacer(height=10)
 
             # Inspector
             with dpg.child_window(height=115, width=-1, border=True) as self.inspector_panel:
                 self.title_text = dpg.add_text(
-                    "Torrent: Waiting for selection...",
+                    tr('view.download_view.torrent_waiting_for_selection', "Torrent: Waiting for selection..."),
                     color=(0, 255, 128),
                 )
-                add_text_tooltip(self.title_text, "Selected torrent\n\nThis inspector and the detail tabs below always describe the torrent currently selected in the transfer queue.")
+                add_text_tooltip(self.title_text, tr('view.download_view.selected_torrent_this_inspector_and_the_detail', "Selected torrent\n\nThis inspector and the detail tabs below always describe the torrent currently selected in the transfer queue."))
                 self.status_text = dpg.add_text(
-                    "Status: Idle",
+                    tr('view.download_view.status_idle', "Status: Idle"),
                     color=(180, 180, 180),
                 )
                 add_help_tooltip(self.status_text, "TORRENT_STATUS")
@@ -251,7 +254,7 @@ class DownloadView:
                 )
                 add_help_tooltip(self.progress_bar, "PIECE")
                 self.progress_label = dpg.add_text(
-                    "0.0% Complete (0 / 0 Pieces)",
+                    tr('view.download_view.0_0_complete_0_0_pieces', "0.0% Complete (0 / 0 Pieces)"),
                     color=(200, 200, 200),
                 )
                 add_help_tooltip(self.progress_label, "PIECE")
@@ -263,99 +266,99 @@ class DownloadView:
             # retaining a launch-time pixel height.
             with dpg.child_window(width=-1, height=-1, border=False) as self.detail_host:
                 with dpg.tab_bar(callback=self._on_detail_tab_changed) as self.detail_tab_bar:
-                    with dpg.tab(label="General") as general_tab:
+                    with dpg.tab(label=tr('view.download_view.general', "General")) as general_tab:
                         with dpg.group(horizontal=True) as self.general_split:
                             with dpg.child_window(width=410, height=-1, border=True) as self.general_transfer_panel:
-                                transfer_heading = dpg.add_text("TRANSFER", color=(100, 180, 255))
-                                add_text_tooltip(transfer_heading, "Transfer metrics\n\nLive payload rates, byte totals, remaining data, ETA, elapsed active time, share ratio and current connected-peer count for the selected torrent.")
+                                transfer_heading = dpg.add_text(tr('view.download_view.transfer', "TRANSFER"), color=(100, 180, 255))
+                                add_text_tooltip(transfer_heading, tr('view.download_view.transfer_metrics_live_payload_rates_byte_totals', "Transfer metrics\n\nLive payload rates, byte totals, remaining data, ETA, elapsed active time, share ratio and current connected-peer count for the selected torrent."))
                                 dpg.add_separator()
-                                self.speed_text = dpg.add_text("Download Speed: 0.0 KB/s")
-                                self.upload_speed_text = dpg.add_text("Upload Speed: 0.0 KB/s")
+                                self.speed_text = dpg.add_text(tr('view.download_view.download_speed_0_0_kb_s', "Download Speed: 0.0 KB/s"))
+                                self.upload_speed_text = dpg.add_text(tr('view.download_view.upload_speed_0_0_kb_s', "Upload Speed: 0.0 KB/s"))
                                 add_help_tooltip(self.speed_text, "TRANSFER_RATE")
                                 add_help_tooltip(self.upload_speed_text, "TRANSFER_RATE")
-                                self.downloaded_text = dpg.add_text("Downloaded: 0 B / 0 B")
+                                self.downloaded_text = dpg.add_text(tr('view.download_view.downloaded_0_b_0_b', "Downloaded: 0 B / 0 B"))
                                 add_help_tooltip(self.downloaded_text, "DOWNLOADED")
-                                self.remaining_text = dpg.add_text("Remaining: 0 B")
+                                self.remaining_text = dpg.add_text(tr('view.download_view.remaining_0_b', "Remaining: 0 B"))
                                 add_help_tooltip(self.remaining_text, "REMAINING")
-                                self.uploaded_text = dpg.add_text("Uploaded Total: 0 B")
+                                self.uploaded_text = dpg.add_text(tr('view.download_view.uploaded_total_0_b', "Uploaded Total: 0 B"))
                                 add_help_tooltip(self.uploaded_text, "UPLOADED")
-                                self.uploaded_session_text = dpg.add_text("Uploaded This Session: 0 B")
+                                self.uploaded_session_text = dpg.add_text(tr('view.download_view.uploaded_this_session_0_b', "Uploaded This Session: 0 B"))
                                 add_help_tooltip(self.uploaded_session_text, "UPLOADED_SESSION")
-                                self.upload_requests_text = dpg.add_text("Upload Requests: 0 served / 0 received")
+                                self.upload_requests_text = dpg.add_text(tr('view.download_view.upload_requests_0_served_0_received', "Upload Requests: 0 served / 0 received"))
                                 add_help_tooltip(self.upload_requests_text, "UPLOAD_REQUESTS")
-                                self.last_upload_text = dpg.add_text("Last Upload: --")
+                                self.last_upload_text = dpg.add_text(tr('view.download_view.last_upload', "Last Upload: --"))
                                 add_help_tooltip(self.last_upload_text, "LAST_UPLOAD")
-                                self.eta_text = dpg.add_text("ETA: --")
+                                self.eta_text = dpg.add_text(tr('view.download_view.eta', "ETA: --"))
                                 add_help_tooltip(self.eta_text, "ETA")
-                                self.elapsed_text = dpg.add_text("Active Time: 00:00")
+                                self.elapsed_text = dpg.add_text(tr('view.download_view.active_time_00_00', "Active Time: 00:00"))
                                 add_help_tooltip(self.elapsed_text, "ELAPSED")
-                                self.ratio_text = dpg.add_text("Share Ratio: --")
+                                self.ratio_text = dpg.add_text(tr('view.download_view.share_ratio', "Share Ratio: --"))
                                 add_help_tooltip(self.ratio_text, "SHARE_RATIO")
-                                self.peers_text = dpg.add_text("Connected Peers: 0")
+                                self.peers_text = dpg.add_text(tr('view.download_view.connected_peers_0', "Connected Peers: 0"))
                                 add_help_tooltip(self.peers_text, "CONNECTED_PEERS")
                                 self.error_text = dpg.add_text("", color=(255, 105, 105), wrap=390)
-                                add_text_tooltip(self.error_text, "Error / Notice\n\nWhen SalixTorrent encounters a recoverable problem, the human-readable reason appears here. Use it to understand what failed before choosing Retry.")
+                                add_text_tooltip(self.error_text, tr('view.download_view.error_notice_when_salixtorrent_encounters_a_recoverable', "Error / Notice\n\nWhen SalixTorrent encounters a recoverable problem, the human-readable reason appears here. Use it to understand what failed before choosing Retry."))
                                 self.retry_button = dpg.add_button(
-                                    label=" Retry Torrent ",
+                                    label=tr('view.download_view.retry_torrent', " Retry Torrent "),
                                     enabled=False,
                                     callback=lambda: self._on_resume_clicked(),
                                 )
                                 add_help_tooltip(self.retry_button, "RETRY_TORRENT")
-    
+
                             with dpg.child_window(width=430, height=-1, border=True) as self.general_swarm_panel:
-                                swarm_heading = dpg.add_text("SWARM STATUS", color=(255, 200, 100))
-                                add_text_tooltip(swarm_heading, "Swarm status\n\nHow the selected torrent is participating in the BitTorrent swarm: lifecycle state, discovery, peers, availability, connectivity and storage mode.")
+                                swarm_heading = dpg.add_text(tr('view.download_view.swarm_status', "SWARM STATUS"), color=(255, 200, 100))
+                                add_text_tooltip(swarm_heading, tr('view.download_view.swarm_status_how_the_selected_torrent_is', "Swarm status\n\nHow the selected torrent is participating in the BitTorrent swarm: lifecycle state, discovery, peers, availability, connectivity and storage mode."))
                                 dpg.add_separator()
-                                self.state_text = dpg.add_text("Session State: Idle")
+                                self.state_text = dpg.add_text(tr('view.download_view.session_state_idle', "Session State: Idle"))
                                 add_help_tooltip(self.state_text, "SESSION_STATE")
-                                self.client_id_text = dpg.add_text("Client ID: Salix_T 1.0")
-                                add_text_tooltip(self.client_id_text, "Client ID\n\nThe peer identity prefix SalixTorrent presents during BitTorrent handshakes. Remote clients can use peer IDs and extension metadata to identify the software they are connected to.")
-                                self.seed_leech_text = dpg.add_text("Seeds / Leechers: -- / --")
+                                self.client_id_text = dpg.add_text(tr('view.download_view.client_id_salix_t_1_0', "Client ID: Salix_T 1.0"))
+                                add_text_tooltip(self.client_id_text, tr('view.download_view.client_id_the_peer_identity_prefix_salixtorrent', "Client ID\n\nThe peer identity prefix SalixTorrent presents during BitTorrent handshakes. Remote clients can use peer IDs and extension metadata to identify the software they are connected to."))
+                                self.seed_leech_text = dpg.add_text(tr('view.download_view.seeds_leechers', "Seeds / Leechers: -- / --"))
                                 add_help_tooltip(self.seed_leech_text, "SEEDS_LEECHERS")
-                                self.tracker_scrape_text = dpg.add_text("Tracker Scrape S/L/C: -- / -- / --")
+                                self.tracker_scrape_text = dpg.add_text(tr('view.download_view.tracker_scrape_s_l_c', "Tracker Scrape S/L/C: -- / -- / --"))
                                 add_help_tooltip(self.tracker_scrape_text, "TRACKER_SCRAPE")
-                                self.availability_text = dpg.add_text("Availability: --")
+                                self.availability_text = dpg.add_text(tr('view.download_view.availability', "Availability: --"))
                                 add_help_tooltip(self.availability_text, "AVAILABILITY")
-                                self.discovery_text = dpg.add_text("Discovery: --")
+                                self.discovery_text = dpg.add_text(tr('view.download_view.discovery', "Discovery: --"))
                                 add_help_tooltip(self.discovery_text, "DISCOVERY")
-                                self.listen_port_text = dpg.add_text("Listen Port: --")
+                                self.listen_port_text = dpg.add_text(tr('view.download_view.listen_port', "Listen Port: --"))
                                 add_help_tooltip(self.listen_port_text, "LISTEN_PORT")
-                                self.listener_endpoint_text = dpg.add_text("Listeners: --")
+                                self.listener_endpoint_text = dpg.add_text(tr('view.download_view.listeners', "Listeners: --"))
                                 add_help_tooltip(self.listener_endpoint_text, "LISTENER_ENDPOINT")
-                                self.ip_family_text = dpg.add_text("IP Families: --")
+                                self.ip_family_text = dpg.add_text(tr('view.download_view.ip_families', "IP Families: --"))
                                 add_help_tooltip(self.ip_family_text, "IPV6")
-                                self.transport_text = dpg.add_text("Transport: --")
+                                self.transport_text = dpg.add_text(tr('view.download_view.transport', "Transport: --"))
                                 add_help_tooltip(self.transport_text, "TRANSPORT_SECURITY")
-                                self.network_path_text = dpg.add_text("Network Path: --")
+                                self.network_path_text = dpg.add_text(tr('view.download_view.network_path', "Network Path: --"))
                                 add_help_tooltip(self.network_path_text, "NETWORK_BINDING")
-                                self.connectivity_text = dpg.add_text("Incoming: --")
+                                self.connectivity_text = dpg.add_text(tr('view.download_view.incoming', "Incoming: --"))
                                 add_help_tooltip(self.connectivity_text, "PORT_MAPPING")
-                                self.incoming_peers_text = dpg.add_text("Incoming Peers: 0 active / 0 this session")
+                                self.incoming_peers_text = dpg.add_text(tr('view.download_view.incoming_peers_0_active_0_this_session', "Incoming Peers: 0 active / 0 this session"))
                                 add_help_tooltip(self.incoming_peers_text, "INCOMING_CONNECTIONS")
-                                self.mapping_methods_text = dpg.add_text("Mapping Methods: UPnP -- | NAT-PMP --")
+                                self.mapping_methods_text = dpg.add_text(tr('view.download_view.mapping_methods_upnp_nat_pmp', "Mapping Methods: UPnP -- | NAT-PMP --"))
                                 add_help_tooltip(self.mapping_methods_text, "MAPPING_METHOD_STATUS")
-                                self.mapping_detail_text = dpg.add_text("Mapping Detail: --", wrap=405)
+                                self.mapping_detail_text = dpg.add_text(tr('view.download_view.mapping_detail', "Mapping Detail: --"), wrap=405)
                                 add_help_tooltip(self.mapping_detail_text, "MAPPING_DIAGNOSIS")
-                                self.connectivity_hint_text = dpg.add_text("Connectivity Hint: --", color=(155, 155, 160), wrap=405)
+                                self.connectivity_hint_text = dpg.add_text(tr('view.download_view.connectivity_hint', "Connectivity Hint: --"), color=(155, 155, 160), wrap=405)
                                 add_help_tooltip(self.connectivity_hint_text, "CONNECTIVITY_ACTION")
-                                self.external_port_text = dpg.add_text("External: --")
+                                self.external_port_text = dpg.add_text(tr('view.download_view.external', "External: --"))
                                 add_help_tooltip(self.external_port_text, "EXTERNAL_ENDPOINT")
-                                self.storage_text = dpg.add_text("Storage: Downloads")
+                                self.storage_text = dpg.add_text(tr('view.download_view.storage_downloads', "Storage: Downloads"))
                                 add_help_tooltip(self.storage_text, "STORAGE_MODE")
-                                self.lpd_text = dpg.add_text("LAN Discovery: --")
+                                self.lpd_text = dpg.add_text(tr('view.download_view.lan_discovery', "LAN Discovery: --"))
                                 add_help_tooltip(self.lpd_text, "LPD")
-                                self.health_text = dpg.add_text("Swarm Health: --")
+                                self.health_text = dpg.add_text(tr('view.download_view.swarm_health', "Swarm Health: --"))
                                 add_help_tooltip(self.health_text, "SWARM_HEALTH")
-    
+
                                 dpg.add_spacer(height=5)
                                 dpg.add_separator()
-                                limits_heading = dpg.add_text("TRANSFER LIMITS", color=(180, 160, 255))
+                                limits_heading = dpg.add_text(tr('view.download_view.transfer_limits', "TRANSFER LIMITS"), color=(180, 160, 255))
                                 add_help_tooltip(limits_heading, "TRANSFER_LIMITS")
-                                limits_unlimited = dpg.add_text("0 = Unlimited", color=(150, 150, 150))
+                                limits_unlimited = dpg.add_text(tr('view.download_view.0_unlimited', "0 = Unlimited"), color=(150, 150, 150))
                                 add_help_tooltip(limits_unlimited, "TRANSFER_LIMITS")
-    
+
                                 with dpg.group(horizontal=True):
-                                    dpg.add_text("Down")
+                                    dpg.add_text(tr('view.download_view.down', "Down"))
                                     self.download_limit_input = dpg.add_input_float(
                                         default_value=0.0,
                                         min_value=0.0,
@@ -370,9 +373,9 @@ class DownloadView:
                                     )
                                     add_help_tooltip(self.download_limit_input, "TRANSFER_LIMITS")
                                     add_help_tooltip(self.download_limit_unit, "TRANSFER_LIMITS")
-    
+
                                 with dpg.group(horizontal=True):
-                                    dpg.add_text("Up  ")
+                                    dpg.add_text(tr('view.download_view.up', "Up  "))
                                     self.upload_limit_input = dpg.add_input_float(
                                         default_value=0.0,
                                         min_value=0.0,
@@ -387,65 +390,65 @@ class DownloadView:
                                     )
                                     add_help_tooltip(self.upload_limit_input, "TRANSFER_LIMITS")
                                     add_help_tooltip(self.upload_limit_unit, "TRANSFER_LIMITS")
-    
+
                                 with dpg.group(horizontal=True):
-                                    apply_limits_button = dpg.add_button(label=" Apply Limits ", callback=self._on_apply_limits_clicked)
+                                    apply_limits_button = dpg.add_button(label=tr('view.download_view.apply_limits', " Apply Limits "), callback=self._on_apply_limits_clicked)
                                     add_help_tooltip(apply_limits_button, "TRANSFER_LIMITS")
-                                    unlimited_limits_button = dpg.add_button(label=" Unlimited ", callback=self._on_unlimited_limits_clicked)
+                                    unlimited_limits_button = dpg.add_button(label=tr('view.download_view.unlimited', " Unlimited "), callback=self._on_unlimited_limits_clicked)
                                     add_help_tooltip(unlimited_limits_button, "TRANSFER_LIMITS")
-    
+
                                 self.limit_status_text = dpg.add_text(
-                                    "Limits: Down Unlimited | Up Unlimited",
+                                    tr('view.download_view.limits_down_unlimited_up_unlimited', "Limits: Down Unlimited | Up Unlimited"),
                                     color=(170, 170, 170),
                                 )
                                 add_help_tooltip(self.limit_status_text, "TRANSFER_LIMITS")
-    
+
                             with dpg.child_window(width=-1, height=-1, border=True) as self.general_info_panel:
-                                torrent_info_heading = dpg.add_text("TORRENT INFO", color=(0, 255, 128))
-                                add_text_tooltip(torrent_info_heading, "Torrent metadata\n\nDescriptive and protocol metadata read from the .torrent or resolved magnet, plus the local storage and cached metadata paths used by SalixTorrent.")
+                                torrent_info_heading = dpg.add_text(tr('view.download_view.torrent_info', "TORRENT INFO"), color=(0, 255, 128))
+                                add_text_tooltip(torrent_info_heading, tr('view.download_view.torrent_metadata_descriptive_and_protocol_metadata_read', "Torrent metadata\n\nDescriptive and protocol metadata read from the .torrent or resolved magnet, plus the local storage and cached metadata paths used by SalixTorrent."))
                                 dpg.add_separator()
-                                self.info_hash_text = dpg.add_text("Info Hash: --", wrap=500)
+                                self.info_hash_text = dpg.add_text(tr('view.download_view.info_hash', "Info Hash: --"), wrap=500)
                                 add_help_tooltip(self.info_hash_text, "INFO_HASH")
-                                self.piece_info_text = dpg.add_text("Pieces: --")
+                                self.piece_info_text = dpg.add_text(tr('view.download_view.pieces', "Pieces: --"))
                                 add_help_tooltip(self.piece_info_text, "PIECE")
-                                self.file_info_text = dpg.add_text("Files: --")
+                                self.file_info_text = dpg.add_text(tr('view.download_view.files', "Files: --"))
                                 add_help_tooltip(self.file_info_text, "FILE_COUNT")
-                                self.private_text = dpg.add_text("Private: --")
+                                self.private_text = dpg.add_text(tr('view.download_view.private', "Private: --"))
                                 add_help_tooltip(self.private_text, "PRIVATE_TORRENT")
-                                self.created_by_text = dpg.add_text("Created By: --", wrap=500)
+                                self.created_by_text = dpg.add_text(tr('view.download_view.created_by', "Created By: --"), wrap=500)
                                 add_help_tooltip(self.created_by_text, "CREATED_BY")
-                                self.created_date_text = dpg.add_text("Created: --")
+                                self.created_date_text = dpg.add_text(tr('view.download_view.created', "Created: --"))
                                 add_help_tooltip(self.created_date_text, "CREATION_DATE")
-                                self.comment_text = dpg.add_text("Comment: --", wrap=500)
+                                self.comment_text = dpg.add_text(tr('view.download_view.comment', "Comment: --"), wrap=500)
                                 add_help_tooltip(self.comment_text, "TORRENT_COMMENT")
                                 dpg.add_spacer(height=4)
                                 dpg.add_separator()
-                                self.storage_path_text = dpg.add_text("Storage Path: --", wrap=500)
+                                self.storage_path_text = dpg.add_text(tr('view.download_view.storage_path', "Storage Path: --"), wrap=500)
                                 add_help_tooltip(self.storage_path_text, "STORAGE_PATH")
-                                self.torrent_path_text = dpg.add_text(".torrent: --", wrap=500)
+                                self.torrent_path_text = dpg.add_text(tr('view.download_view.torrent', ".torrent: --"), wrap=500)
                                 add_help_tooltip(self.torrent_path_text, "TORRENT_PATH")
                                 dpg.add_spacer(height=6)
                                 with dpg.group(horizontal=True):
-                                    open_folder_button = dpg.add_button(label=" Open Folder ", callback=self._on_open_folder_clicked)
+                                    open_folder_button = dpg.add_button(label=tr('view.download_view.open_folder', " Open Folder "), callback=self._on_open_folder_clicked)
                                     add_help_tooltip(open_folder_button, "OPEN_FOLDER")
-                                    properties_button = dpg.add_button(label=" Properties... ", callback=self._on_properties_clicked)
+                                    properties_button = dpg.add_button(label=tr('view.download_view.properties_7c12bbf6', " Properties... "), callback=self._on_properties_clicked)
                                     add_help_tooltip(properties_button, "PROPERTIES")
-    
-                    with dpg.tab(label="Peers") as peers_tab:
+
+                    with dpg.tab(label=tr('view.download_view.peers', "Peers")) as peers_tab:
                         self.peer_view.build_view(parent_tag=peers_tab)
-    
-                    with dpg.tab(label="Pieces") as pieces_tab:
+
+                    with dpg.tab(label=tr('view.download_view.pieces_cfb369a5', "Pieces")) as pieces_tab:
                         self.piece_view.build_view(parent_tag=pieces_tab)
-    
-                    with dpg.tab(label="Files") as files_tab:
+
+                    with dpg.tab(label=tr('view.download_view.files_6ce6c512', "Files")) as files_tab:
                         self.file_view.build_view(parent_tag=files_tab)
-    
-                    with dpg.tab(label="Sources") as sources_tab:
+
+                    with dpg.tab(label=tr('view.download_view.sources', "Sources")) as sources_tab:
                         self.source_view.build_view(parent_tag=sources_tab)
-    
-                    with dpg.tab(label="Speed") as speed_tab:
+
+                    with dpg.tab(label=tr('view.download_view.speed', "Speed")) as speed_tab:
                         self.speed_view.build_view(parent_tag=speed_tab)
-    
+
                 self._detail_tab_ids = {
                     general_tab: "General",
                     peers_tab: "Peers",
@@ -454,25 +457,25 @@ class DownloadView:
                     sources_tab: "Sources",
                     speed_tab: "Speed",
                 }
-                add_text_tooltip(general_tab, "General\n\nOverall transfer, swarm, connectivity and torrent metadata for the selected torrent.")
-                add_text_tooltip(peers_tab, "Peers\n\nLive BitTorrent peer connections: client identity, discovery source, direction, piece completion, per-peer rates and protocol state.")
-                add_text_tooltip(pieces_tab, "Pieces\n\nA compact map and focused table showing piece verification, requests, blocks and current swarm availability.")
-                add_text_tooltip(files_tab, "Files\n\nPer-file verified progress, storage paths and selective-download priority controls for the selected torrent.")
-                add_text_tooltip(sources_tab, "Sources\n\nTrackers, DHT, PEX and Local Peer Discovery with live status and discovery diagnostics.")
-                add_text_tooltip(speed_tab, "Speed\n\nRolling download/upload history, recent averages, peaks and transfer-limit reference lines.")
-    
+                add_text_tooltip(general_tab, tr('view.download_view.general_overall_transfer_swarm_connectivity_and_torrent', "General\n\nOverall transfer, swarm, connectivity and torrent metadata for the selected torrent."))
+                add_text_tooltip(peers_tab, tr('view.download_view.peers_live_bittorrent_peer_connections_client_identity', "Peers\n\nLive BitTorrent peer connections: client identity, discovery source, direction, piece completion, per-peer rates and protocol state."))
+                add_text_tooltip(pieces_tab, tr('view.download_view.pieces_a_compact_map_and_focused_table', "Pieces\n\nA compact map and focused table showing piece verification, requests, blocks and current swarm availability."))
+                add_text_tooltip(files_tab, tr('view.download_view.files_per_file_verified_progress_storage_paths', "Files\n\nPer-file verified progress, storage paths and selective-download priority controls for the selected torrent."))
+                add_text_tooltip(sources_tab, tr('view.download_view.sources_trackers_dht_pex_and_local_peer', "Sources\n\nTrackers, DHT, PEX and Local Peer Discovery with live status and discovery diagnostics."))
+                add_text_tooltip(speed_tab, tr('view.download_view.speed_rolling_download_upload_history_recent_averages', "Speed\n\nRolling download/upload history, recent averages, peaks and transfer-limit reference lines."))
+
         with dpg.window(
-            label="Open Magnet Link",
+            label=tr('view.download_view.open_magnet_link', "Open Magnet Link"),
             modal=True,
             show=False,
             width=680,
             height=285,
             min_size=[560, 250],
         ) as self.magnet_modal:
-            dpg.add_text("MAGNET LINK", color=(0, 255, 128))
+            dpg.add_text(tr('view.download_view.magnet_link', "MAGNET LINK"), color=(0, 255, 128))
             self.magnet_intro = dpg.add_text(
-                "Paste a BitTorrent v1 magnet link. SalixTorrent will discover peers "
-                "through its trackers, DHT and LAN, then retrieve BEP-9 metadata.",
+                tr('view.download_view.paste_a_bittorrent_v1_magnet_link_salixtorrent', "Paste a BitTorrent v1 magnet link. SalixTorrent will discover peers "
+                "through its trackers, DHT and LAN, then retrieve BEP-9 metadata."),
                 color=(160, 160, 165),
                 wrap=630,
             )
@@ -481,42 +484,42 @@ class DownloadView:
                 multiline=True,
                 height=70,
                 width=-1,
-                hint="magnet:?xt=urn:btih:...",
+                hint=tr('view.download_view.magnet_xt_urn_btih', "magnet:?xt=urn:btih:..."),
             )
             add_help_tooltip(self.magnet_input, "MAGNET_LINK")
             with dpg.group(horizontal=True):
                 self.magnet_add_button = dpg.add_button(
-                    label=" Add Magnet ",
+                    label=tr('view.download_view.add_magnet', " Add Magnet "),
                     callback=self._submit_magnet,
                 )
                 add_help_tooltip(self.magnet_add_button, "OPEN_MAGNET")
-                paste_magnet_button = dpg.add_button(label=" Paste ", callback=self._paste_magnet)
-                add_text_tooltip(paste_magnet_button, "Paste magnet link\n\nCopies the current clipboard text into the magnet field. SalixTorrent does not begin network activity until Add Magnet is pressed.")
+                paste_magnet_button = dpg.add_button(label=tr('view.download_view.paste', " Paste "), callback=self._paste_magnet)
+                add_text_tooltip(paste_magnet_button, tr('view.download_view.paste_magnet_link_copies_the_current_clipboard', "Paste magnet link\n\nCopies the current clipboard text into the magnet field. SalixTorrent does not begin network activity until Add Magnet is pressed."))
                 self.magnet_cancel_button = dpg.add_button(
-                    label=" Cancel Lookup ",
+                    label=tr('view.download_view.cancel_lookup', " Cancel Lookup "),
                     enabled=False,
                     callback=self._cancel_magnet,
                 )
                 add_help_tooltip(self.magnet_cancel_button, "BEP9")
                 dpg.add_button(
-                    label=" Close ",
+                    label=tr('view.download_view.close', " Close "),
                     callback=self._close_magnet_dialog,
                 )
             self.magnet_progress = dpg.add_progress_bar(
                 default_value=0.0,
                 width=-1,
-                overlay="Idle",
+                overlay=tr('view.download_view.idle', "Idle"),
             )
             add_help_tooltip(self.magnet_progress, "BEP9")
             self.magnet_status_text = dpg.add_text(
-                "Paste a magnet link to begin.",
+                tr('view.download_view.paste_a_magnet_link_to_begin', "Paste a magnet link to begin."),
                 wrap=630,
             )
             add_help_tooltip(self.magnet_status_text, "BEP9")
 
         # Shared confirmation dialog for destructive queue actions.
         with dpg.window(
-            label="Remove Torrent",
+            label=tr('view.download_view.remove_torrent', "Remove Torrent"),
             modal=True,
             show=False,
             no_resize=True,
@@ -524,7 +527,7 @@ class DownloadView:
             height=230,
         ) as self.remove_torrent_modal:
             self.remove_torrent_title = dpg.add_text(
-                "Remove torrent?",
+                tr('view.download_view.remove_torrent_e028c702', "Remove torrent?"),
                 color=(255, 200, 100),
             )
             dpg.add_spacer(height=4)
@@ -537,23 +540,23 @@ class DownloadView:
             dpg.add_spacer(height=8)
             with dpg.group(horizontal=True):
                 remove_only_button = dpg.add_button(
-                    label=" Remove from SalixTorrent ",
+                    label=tr('view.download_view.remove_from_salixtorrent', " Remove from SalixTorrent "),
                     callback=lambda: self._confirm_remove_torrent(False),
                 )
                 add_help_tooltip(remove_only_button, "REMOVE_TORRENT")
                 remove_delete_button = dpg.add_button(
-                    label=" Remove + Delete Data ",
+                    label=tr('view.download_view.remove_delete_data', " Remove + Delete Data "),
                     callback=lambda: self._confirm_remove_torrent(True),
                 )
                 add_help_tooltip(remove_delete_button, "DELETE_DATA")
                 cancel_remove_button = dpg.add_button(
-                    label=" Cancel ",
+                    label=tr('view.download_view.cancel', " Cancel "),
                     callback=lambda: dpg.hide_item(self.remove_torrent_modal),
                 )
-                add_text_tooltip(cancel_remove_button, "Cancel removal\n\nCloses this confirmation window without changing the torrent, payload, resume data or queue.")
+                add_text_tooltip(cancel_remove_button, tr('view.download_view.cancel_removal_closes_this_confirmation_window_without', "Cancel removal\n\nCloses this confirmation window without changing the torrent, payload, resume data or queue."))
 
         with dpg.window(
-            label="Removal Notice",
+            label=tr('view.download_view.removal_notice', "Removal Notice"),
             modal=True,
             show=False,
             no_resize=True,
@@ -563,72 +566,72 @@ class DownloadView:
             self.remove_notice_text = dpg.add_text("", wrap=480)
             dpg.add_spacer(height=10)
             dpg.add_button(
-                label=" OK ",
+                label=tr('view.download_view.ok', " OK "),
                 callback=lambda: dpg.hide_item(self.remove_notice_modal),
             )
 
         with dpg.window(
-            label="Force Recheck",
+            label=tr('view.download_view.force_recheck', "Force Recheck"),
             modal=True,
             show=False,
             no_resize=True,
             width=560,
             height=190,
         ) as self.recheck_modal:
-            self.recheck_title = dpg.add_text("Force recheck?", color=(255, 200, 100))
+            self.recheck_title = dpg.add_text(tr('view.download_view.force_recheck_8cf6d61e', "Force recheck?"), color=(255, 200, 100))
             add_help_tooltip(self.recheck_title, "FORCE_RECHECK")
             dpg.add_spacer(height=4)
             dpg.add_text(
-                "This discards SalixTorrent's fast-resume trust and SHA-1 checks the "
+                tr('view.download_view.this_discards_salixtorrent_s_fast_resume_trust', "This discards SalixTorrent's fast-resume trust and SHA-1 checks the "
                 "existing payload again. No downloaded data is deleted. An active "
-                "torrent will resume automatically after a successful recheck.",
+                "torrent will resume automatically after a successful recheck."),
                 wrap=520,
             )
             dpg.add_spacer(height=10)
             with dpg.group(horizontal=True):
-                force_recheck_button = dpg.add_button(label=" Force Recheck ", callback=self._confirm_force_recheck)
+                force_recheck_button = dpg.add_button(label=tr('view.download_view.force_recheck_809b7185', " Force Recheck "), callback=self._confirm_force_recheck)
                 add_help_tooltip(force_recheck_button, "FORCE_RECHECK")
-                cancel_recheck_button = dpg.add_button(label=" Cancel ", callback=lambda: dpg.hide_item(self.recheck_modal))
-                add_text_tooltip(cancel_recheck_button, "Cancel recheck\n\nCloses this confirmation window without invalidating fast-resume state or starting a verification pass.")
+                cancel_recheck_button = dpg.add_button(label=tr('view.download_view.cancel', " Cancel "), callback=lambda: dpg.hide_item(self.recheck_modal))
+                add_text_tooltip(cancel_recheck_button, tr('view.download_view.cancel_recheck_closes_this_confirmation_window_without', "Cancel recheck\n\nCloses this confirmation window without invalidating fast-resume state or starting a verification pass."))
 
         with dpg.window(
-            label="Torrent Properties",
+            label=tr('view.download_view.torrent_properties', "Torrent Properties"),
             modal=True,
             show=False,
             width=720,
             height=520,
             min_size=[620, 360],
         ) as self.properties_modal:
-            self.properties_title = dpg.add_text("Torrent Properties", color=(0, 255, 128))
+            self.properties_title = dpg.add_text(tr('view.download_view.torrent_properties', "Torrent Properties"), color=(0, 255, 128))
             dpg.add_separator()
             with dpg.child_window(height=400, width=-1, border=False) as self.properties_body:
                 self.properties_text = dpg.add_text("", wrap=660)
             dpg.add_spacer(height=8)
             with dpg.group(horizontal=True):
-                properties_hash_button = dpg.add_button(label=" Copy Info Hash ", callback=self._properties_copy_info_hash)
+                properties_hash_button = dpg.add_button(label=tr('view.download_view.copy_info_hash_888f9ec6', " Copy Info Hash "), callback=self._properties_copy_info_hash)
                 add_help_tooltip(properties_hash_button, "COPY_INFO_HASH")
-                properties_magnet_button = dpg.add_button(label=" Copy Magnet Link ", callback=self._properties_copy_magnet)
+                properties_magnet_button = dpg.add_button(label=tr('view.download_view.copy_magnet_link_ab7cfab9', " Copy Magnet Link "), callback=self._properties_copy_magnet)
                 add_help_tooltip(properties_magnet_button, "COPY_MAGNET")
-                properties_folder_button = dpg.add_button(label=" Open Folder ", callback=self._properties_open_folder)
+                properties_folder_button = dpg.add_button(label=tr('view.download_view.open_folder', " Open Folder "), callback=self._properties_open_folder)
                 add_help_tooltip(properties_folder_button, "OPEN_FOLDER")
-                dpg.add_button(label=" Close ", callback=lambda: dpg.hide_item(self.properties_modal))
+                dpg.add_button(label=tr('view.download_view.close', " Close "), callback=lambda: dpg.hide_item(self.properties_modal))
 
         with dpg.window(
-            label="Download Complete",
+            label=tr('view.download_view.download_complete', "Download Complete"),
             show=False,
             no_resize=True,
             width=480,
             height=150,
         ) as self.completion_notice_modal:
             self.completion_notice_title = dpg.add_text(
-                "Download completed", color=(0, 255, 128)
+                tr('view.download_view.download_completed', "Download completed"), color=(0, 255, 128)
             )
             self.completion_notice_text = dpg.add_text("", wrap=440)
             dpg.add_spacer(height=8)
             with dpg.group(horizontal=True):
-                completion_folder_button = dpg.add_button(label=" Open Folder ", callback=self._completion_open_folder)
+                completion_folder_button = dpg.add_button(label=tr('view.download_view.open_folder', " Open Folder "), callback=self._completion_open_folder)
                 add_help_tooltip(completion_folder_button, "OPEN_FOLDER")
-                dpg.add_button(label=" Dismiss ", callback=lambda: dpg.hide_item(self.completion_notice_modal))
+                dpg.add_button(label=tr('view.download_view.dismiss', " Dismiss "), callback=lambda: dpg.hide_item(self.completion_notice_modal))
 
         self._layout_root = parent_tag
         self.layout.watch_item(
@@ -773,8 +776,8 @@ class DownloadView:
     def _show_magnet_dialog(self):
         self._magnet_close_at = 0.0
         dpg.set_value(self.magnet_progress, 0.0)
-        dpg.configure_item(self.magnet_progress, overlay="Idle")
-        dpg.set_value(self.magnet_status_text, "Paste a magnet link to begin.")
+        dpg.configure_item(self.magnet_progress, overlay=tr('view.download_view.idle', "Idle"))
+        dpg.set_value(self.magnet_status_text, tr('view.download_view.paste_a_magnet_link_to_begin', "Paste a magnet link to begin."))
         dpg.configure_item(self.magnet_add_button, enabled=True)
         dpg.configure_item(self.magnet_cancel_button, enabled=False)
         dpg.show_item(self.magnet_modal)
@@ -804,9 +807,9 @@ class DownloadView:
             )
             info_hash = handle.info_hash
         except Exception as exc:
-            dpg.set_value(self.magnet_status_text, f"Error: {exc}")
+            dpg.set_value(self.magnet_status_text, tr('view.download_view.error_value', 'Error: {exc}', exc=exc))
             dpg.set_value(self.magnet_progress, 0.0)
-            dpg.configure_item(self.magnet_progress, overlay="Error")
+            dpg.configure_item(self.magnet_progress, overlay=tr('view.download_view.error', "Error"))
             return
 
         self._magnet_info_hash = info_hash
@@ -814,17 +817,17 @@ class DownloadView:
         dpg.configure_item(self.magnet_add_button, enabled=False)
         dpg.configure_item(self.magnet_cancel_button, enabled=True)
         dpg.set_value(self.magnet_progress, 0.01)
-        dpg.configure_item(self.magnet_progress, overlay="Starting")
+        dpg.configure_item(self.magnet_progress, overlay=tr('view.download_view.starting', "Starting"))
         dpg.set_value(
             self.magnet_status_text,
-            f"Resolving metadata for {info_hash[:12]}...",
+            tr('view.download_view.resolving_metadata_for_value', 'Resolving metadata for {value0}...', value0=info_hash[:12]),
         )
 
     def _cancel_magnet(self):
         if self._magnet_info_hash:
             self.manager.cancel_magnet(self._magnet_info_hash)
         dpg.configure_item(self.magnet_cancel_button, enabled=False)
-        dpg.set_value(self.magnet_status_text, "Cancelling magnet lookup...")
+        dpg.set_value(self.magnet_status_text, tr('view.download_view.cancelling_magnet_lookup', "Cancelling magnet lookup..."))
 
     def _close_magnet_dialog(self):
         if self._magnet_info_hash:
@@ -871,7 +874,7 @@ class DownloadView:
         root.withdraw()
         root.attributes("-topmost", True)
         file_path = filedialog.askopenfilename(
-            title="Select Torrent File",
+            title=tr('view.download_view.select_torrent_file', "Select Torrent File"),
             filetypes=[("Torrent Files", "*.torrent"), ("All Files", "*.*")],
         )
         root.destroy()
@@ -987,12 +990,12 @@ class DownloadView:
 
     def _on_queue_filter_changed(self, sender=None, app_data=None, user_data=None):
         self._search_query = str(dpg.get_value(self.queue_search_input) or "").strip().lower()
-        self._state_filter = str(dpg.get_value(self.queue_state_filter) or "All")
+        self._state_filter = canonical_choice(dpg.get_value(self.queue_state_filter), self.QUEUE_STATE_FILTERS, "All")
         self._apply_queue_filters()
 
     def _clear_queue_filter(self):
         dpg.set_value(self.queue_search_input, "")
-        dpg.set_value(self.queue_state_filter, "All")
+        dpg.set_value(self.queue_state_filter, tr_value("All"))
         self._search_query = ""
         self._state_filter = "All"
         self._apply_queue_filters()
@@ -1087,7 +1090,7 @@ class DownloadView:
                     sort_suffix = ""
             dpg.set_value(
                 self.queue_filter_summary,
-                f"Showing {visible} / {len(self.torrent_rows)}{sort_suffix}",
+                tr('view.download_view.showing_value_value_value', 'Showing {visible} / {value1}{sort_suffix}', visible=visible, value1=len(self.torrent_rows), sort_suffix=sort_suffix),
             )
 
     @staticmethod
@@ -1144,7 +1147,7 @@ class DownloadView:
         if not stats:
             return
         self._select_torrent(info_hash)
-        dpg.set_value(self.properties_title, f"Torrent Properties - {stats.get('torrent_name', '')}")
+        dpg.set_value(self.properties_title, tr('view.download_view.torrent_properties_value', 'Torrent Properties - {value0}', value0=stats.get('torrent_name', '')))
 
         trackers = list(stats.get("trackers") or [])
         tracker_text = "\n    ".join(trackers) if trackers else "--"
@@ -1158,39 +1161,7 @@ class DownloadView:
         scrape_age = self._format_age(stats.get("scrape_age_seconds"))
         scrape_source = stats.get("scrape_source") or "--"
         properties = (
-            f"Name: {stats.get('torrent_name', '--')}\n"
-            f"State: {stats.get('state_label', stats.get('state', '--'))}\n"
-            f"Info Hash: {stats.get('info_hash', '--')}\n"
-            f"Private: {'Yes' if stats.get('private') else 'No'}\n"
-            f"Total Size: {self._format_bytes(stats.get('total_bytes'))}\n"
-            f"Downloaded: {self._format_bytes(stats.get('downloaded_bytes'))}\n"
-            f"Uploaded Total: {self._format_bytes(stats.get('uploaded_bytes'))}\n"
-            f"Uploaded This Session: {self._format_bytes(stats.get('uploaded_this_session_bytes'))}\n"
-            f"Upload Requests: {int(stats.get('upload_requests_served', 0) or 0)} served / "
-            f"{int(stats.get('upload_requests_received', 0) or 0)} received\n"
-            f"Last Upload: {self._format_age(stats.get('last_upload_seconds'))}\n"
-            f"Share Ratio: {ratio_text}\n"
-            f"Pieces: {stats.get('total_pieces', 0)} x {self._format_bytes(stats.get('piece_length'))}\n"
-            f"Files: {stats.get('file_count', 0)}\n"
-            f"Seeds / Leechers: {seeders if seeders is not None else '--'} / "
-            f"{leechers if leechers is not None else '--'}\n"
-            f"Tracker Scrape S/L/C: {scrape_seeders if scrape_seeders is not None else '--'} / "
-            f"{scrape_leechers if scrape_leechers is not None else '--'} / "
-            f"{scrape_completed if scrape_completed is not None else '--'}\n"
-            f"Tracker Scrape Source: {scrape_source} | {scrape_age}\n"
-            f"Availability: {float(stats.get('swarm_availability', 0.0) or 0.0):.2f}\n"
-            f"Discovery: {stats.get('discovery_summary', '--')}\n"
-            f"Active Time: {self._format_duration(stats.get('elapsed_seconds'))}\n"
-            f"Incoming Peers: {int(stats.get('incoming_peers', 0) or 0)} active / "
-            f"{int(stats.get('incoming_connections_total', 0) or 0)} this session\n"
-            f"ETA: {self._format_duration(stats.get('eta_seconds'))}\n\n"
-            f"Storage Mode: {stats.get('storage_mode', '--')}\n"
-            f"Storage Path: {stats.get('storage_path', '--')}\n"
-            f".torrent File: {stats.get('torrent_path', '--')}\n\n"
-            f"Created By: {stats.get('created_by') or '--'}\n"
-            f"Created: {self._format_creation_date(stats.get('creation_date'))}\n"
-            f"Comment: {stats.get('comment') or '--'}\n\n"
-            f"Trackers:\n    {tracker_text}"
+            tr('view.download_view.name_value_state_value_info_hash_value_private_value', 'Name: {value0}\nState: {value1}\nInfo Hash: {value2}\nPrivate: {value3}\nTotal Size: {value4}\nDownloaded: {value5}\nUploaded Total: {value6}\nUploaded This Session: {value7}\nUpload Requests: {value8} served / {value9} received\nLast Upload: {value10}\nShare Ratio: {ratio_text}\nPieces: {value12} x {value13}\nFiles: {value14}\nSeeds / Leechers: {value15} / {value16}\nTracker Scrape S/L/C: {value17} / {value18} / {value19}\nTracker Scrape Source: {scrape_source} | {scrape_age}\nAvailability: {value22:.2f}\nDiscovery: {value23}\nActive Time: {value24}\nIncoming Peers: {value25} active / {value26} this session\nETA: {value27}\n\nStorage Mode: {value28}\nStorage Path: {value29}\n.torrent File: {value30}\n\nCreated By: {value31}\nCreated: {value32}\nComment: {value33}\n\nTrackers:\n    {tracker_text}', value0=stats.get('torrent_name', '--'), value1=stats.get('state_label', stats.get('state', '--')), value2=stats.get('info_hash', '--'), value3=tr_value('Yes' if stats.get('private') else 'No'), value4=self._format_bytes(stats.get('total_bytes')), value5=self._format_bytes(stats.get('downloaded_bytes')), value6=self._format_bytes(stats.get('uploaded_bytes')), value7=self._format_bytes(stats.get('uploaded_this_session_bytes')), value8=int(stats.get('upload_requests_served', 0) or 0), value9=int(stats.get('upload_requests_received', 0) or 0), value10=self._format_age(stats.get('last_upload_seconds')), ratio_text=ratio_text, value12=stats.get('total_pieces', 0), value13=self._format_bytes(stats.get('piece_length')), value14=stats.get('file_count', 0), value15=seeders if seeders is not None else '--', value16=leechers if leechers is not None else '--', value17=scrape_seeders if scrape_seeders is not None else '--', value18=scrape_leechers if scrape_leechers is not None else '--', value19=scrape_completed if scrape_completed is not None else '--', scrape_source=scrape_source, scrape_age=scrape_age, value22=float(stats.get('swarm_availability', 0.0) or 0.0), value23=stats.get('discovery_summary', '--'), value24=self._format_duration(stats.get('elapsed_seconds')), value25=int(stats.get('incoming_peers', 0) or 0), value26=int(stats.get('incoming_connections_total', 0) or 0), value27=self._format_duration(stats.get('eta_seconds')), value28=stats.get('storage_mode', '--'), value29=stats.get('storage_path', '--'), value30=stats.get('torrent_path', '--'), value31=stats.get('created_by') or '--', value32=self._format_creation_date(stats.get('creation_date')), value33=stats.get('comment') or '--', tracker_text=tracker_text)
         )
         dpg.set_value(self.properties_text, properties)
         dpg.show_item(self.properties_modal)
@@ -1223,8 +1194,8 @@ class DownloadView:
         # or vice versa. The Windows backend uses the native shell tray API.
         if settings.get("native_notifications", True):
             self.desktop.notify(
-                "SalixTorrent - Download complete",
-                f"{torrent_name} - {state} ({downloaded})",
+                tr("notification.download_complete.title", "SalixTorrent - Download complete"),
+                tr("notification.download_complete.body", "{torrent_name} - {state} ({downloaded})", torrent_name=torrent_name, state=state, downloaded=downloaded),
             )
 
         if not self.manager.completion_notifications_enabled():
@@ -1233,12 +1204,11 @@ class DownloadView:
         self._completion_notice_info_hash = info_hash
         dpg.set_value(
             self.completion_notice_title,
-            f"Download completed - {torrent_name}",
+            tr('view.download_view.download_completed_value', 'Download completed - {torrent_name}', torrent_name=torrent_name),
         )
         dpg.set_value(
             self.completion_notice_text,
-            f"{state}. Downloaded {downloaded}. "
-            "You can open the payload folder now or dismiss this notice.",
+            tr('view.download_view.value_downloaded_value_you_can_open_the_payload', '{state}. Downloaded {downloaded}. You can open the payload folder now or dismiss this notice.', state=state, downloaded=downloaded),
         )
         dpg.show_item(self.completion_notice_modal)
 
@@ -1250,7 +1220,7 @@ class DownloadView:
         stats = self.latest_stats.get(info_hash, {})
         dpg.set_value(
             self.recheck_title,
-            f"Force Recheck - {stats.get('torrent_name', 'Torrent')}",
+            tr('view.download_view.force_recheck_value', 'Force Recheck - {value0}', value0=stats.get('torrent_name', 'Torrent')),
         )
         dpg.show_item(self.recheck_modal)
 
@@ -1280,12 +1250,12 @@ class DownloadView:
             no_title_bar=True,
         ) as popup_id:
             move_up_item = dpg.add_menu_item(
-                label="Move Up",
+                label=tr('view.download_view.move_up', "Move Up"),
                 user_data=info_hash,
                 callback=lambda s, a, u: self._move_torrent_up(u),
             )
             move_down_item = dpg.add_menu_item(
-                label="Move Down",
+                label=tr('view.download_view.move_down', "Move Down"),
                 user_data=info_hash,
                 callback=lambda s, a, u: self._move_torrent_down(u),
             )
@@ -1293,22 +1263,22 @@ class DownloadView:
             dpg.add_separator()
 
             priority_high_item = dpg.add_menu_item(
-                label="Priority: High",
+                label=tr('view.download_view.priority_high', "Priority: High"),
                 user_data=info_hash,
                 callback=lambda s, a, u: self._context_set_priority(u, "High"),
             )
             priority_normal_item = dpg.add_menu_item(
-                label="Priority: Normal",
+                label=tr('view.download_view.priority_normal', "Priority: Normal"),
                 user_data=info_hash,
                 callback=lambda s, a, u: self._context_set_priority(u, "Normal"),
             )
             priority_low_item = dpg.add_menu_item(
-                label="Priority: Low",
+                label=tr('view.download_view.priority_low', "Priority: Low"),
                 user_data=info_hash,
                 callback=lambda s, a, u: self._context_set_priority(u, "Low"),
             )
 
-            with dpg.menu(label="Transfer Rate Units") as rate_menu:
+            with dpg.menu(label=tr('view.download_view.transfer_rate_units', "Transfer Rate Units")) as rate_menu:
                 rate_items = {}
                 rate_labels = {
                     "Auto": "Automatic",
@@ -1330,27 +1300,27 @@ class DownloadView:
             dpg.add_separator()
 
             start_item = dpg.add_menu_item(
-                label="Start",
+                label=tr('view.download_view.start', "Start"),
                 user_data=info_hash,
                 callback=lambda s, a, u: self._context_start(u),
             )
             pause_item = dpg.add_menu_item(
-                label="Pause",
+                label=tr('view.download_view.pause', "Pause"),
                 user_data=info_hash,
                 callback=lambda s, a, u: self._context_pause(u),
             )
             resume_item = dpg.add_menu_item(
-                label="Resume",
+                label=tr('view.download_view.resume', "Resume"),
                 user_data=info_hash,
                 callback=lambda s, a, u: self._context_resume(u),
             )
             stop_item = dpg.add_menu_item(
-                label="Stop",
+                label=tr('view.download_view.stop', "Stop"),
                 user_data=info_hash,
                 callback=lambda s, a, u: self._context_stop(u),
             )
             retry_item = dpg.add_menu_item(
-                label="Retry",
+                label=tr('view.download_view.retry', "Retry"),
                 user_data=info_hash,
                 callback=lambda s, a, u: self._context_retry(u),
             )
@@ -1358,17 +1328,17 @@ class DownloadView:
             dpg.add_separator()
 
             open_folder_item = dpg.add_menu_item(
-                label="Open Download Folder",
+                label=tr('view.download_view.open_download_folder', "Open Download Folder"),
                 user_data=info_hash,
                 callback=lambda s, a, u: self._context_open_folder(u),
             )
             announce_item = dpg.add_menu_item(
-                label="Update Trackers",
+                label=tr('view.download_view.update_trackers', "Update Trackers"),
                 user_data=info_hash,
                 callback=lambda s, a, u: self._context_update_trackers(u),
             )
             recheck_item = dpg.add_menu_item(
-                label="Force Recheck...",
+                label=tr('view.download_view.force_recheck_936f1ee0', "Force Recheck..."),
                 user_data=info_hash,
                 callback=lambda s, a, u: self._context_force_recheck(u),
             )
@@ -1376,17 +1346,17 @@ class DownloadView:
             dpg.add_separator()
 
             copy_hash_item = dpg.add_menu_item(
-                label="Copy Info Hash",
+                label=tr('view.download_view.copy_info_hash', "Copy Info Hash"),
                 user_data=info_hash,
                 callback=lambda s, a, u: self._context_copy_info_hash(u),
             )
             copy_magnet_item = dpg.add_menu_item(
-                label="Copy Magnet Link",
+                label=tr('view.download_view.copy_magnet_link', "Copy Magnet Link"),
                 user_data=info_hash,
                 callback=lambda s, a, u: self._context_copy_magnet(u),
             )
             properties_item = dpg.add_menu_item(
-                label="Properties...",
+                label=tr('view.download_view.properties', "Properties..."),
                 user_data=info_hash,
                 callback=lambda s, a, u: self._context_properties(u),
             )
@@ -1394,7 +1364,7 @@ class DownloadView:
             dpg.add_separator()
 
             remove_item = dpg.add_menu_item(
-                label="Remove Torrent...",
+                label=tr('view.download_view.remove_torrent_413fbe4e', "Remove Torrent..."),
                 user_data=info_hash,
                 callback=lambda s, a, u: self._context_remove(u),
             )
@@ -1560,23 +1530,16 @@ class DownloadView:
         name = self.latest_stats.get(info_hash, {}).get("torrent_name", "this torrent")
         dpg.set_value(
             self.remove_torrent_title,
-            f"Remove: {name}",
+            tr('view.download_view.remove_value', 'Remove: {name}', name=name),
         )
         stats = self.latest_stats.get(info_hash, {})
         if stats.get("seed_source_path"):
             removal_text = (
-                "Remove from SalixTorrent removes the transfer from the queue and leaves "
-                "the original seed source untouched.\n\n"
-                "Remove + Delete Data only deletes SalixTorrent-managed data under the "
-                "downloads folder and resume metadata. The external seed source and your "
-                "original .torrent file are NEVER deleted."
+                tr("view.download_view.remove_external_seed_explanation", "Remove from SalixTorrent removes the transfer from the queue and leaves the original seed source untouched.\n\nRemove + Delete Data only deletes SalixTorrent-managed data under the downloads folder and resume metadata. The external seed source and your original .torrent file are NEVER deleted.")
             )
         else:
             removal_text = (
-                "Remove from SalixTorrent removes the transfer from the queue but keeps "
-                "downloaded data on disk.\n\n"
-                "Remove + Delete Data permanently deletes the downloaded payload and its "
-                "SalixTorrent resume metadata. Your original .torrent file is NOT deleted."
+                tr("view.download_view.remove_managed_data_explanation", "Remove from SalixTorrent removes the transfer from the queue but keeps downloaded data on disk.\n\nRemove + Delete Data permanently deletes the downloaded payload and its SalixTorrent resume metadata. Your original .torrent file is NOT deleted.")
             )
 
         dpg.set_value(self.remove_torrent_message, removal_text)
@@ -1600,7 +1563,7 @@ class DownloadView:
             return
 
         row = self.torrent_rows[info_hash]
-        dpg.set_value(row["status"], "Removing...")
+        dpg.set_value(row["status"], tr('view.download_view.removing', "Removing..."))
         self.manager.remove_torrent(info_hash, delete_data=delete_data)
 
     def _move_torrent_up(self, info_hash: str):
@@ -1708,59 +1671,59 @@ class DownloadView:
             self._refresh_context_menu_state(info_hash)
 
     def _reset_inspector(self):
-        dpg.set_value(self.title_text, "Torrent: Waiting for selection...")
-        dpg.set_value(self.status_text, "Status: Idle")
+        dpg.set_value(self.title_text, tr('view.download_view.torrent_waiting_for_selection', "Torrent: Waiting for selection..."))
+        dpg.set_value(self.status_text, tr('view.download_view.status_idle', "Status: Idle"))
         dpg.set_value(self.progress_bar, 0.0)
-        dpg.set_value(self.progress_label, "0.0% Complete (0 / 0 Pieces)")
+        dpg.set_value(self.progress_label, tr('view.download_view.0_0_complete_0_0_pieces', "0.0% Complete (0 / 0 Pieces)"))
         dpg.set_value(
             self.speed_text,
-            f"Download Speed: {format_transfer_rate(0.0, self._transfer_rate_unit)}",
+            tr('view.download_view.download_speed_value', 'Download Speed: {value0}', value0=format_transfer_rate(0.0, self._transfer_rate_unit)),
         )
         dpg.set_value(
             self.upload_speed_text,
-            f"Upload Speed: {format_transfer_rate(0.0, self._transfer_rate_unit)}",
+            tr('view.download_view.upload_speed_value', 'Upload Speed: {value0}', value0=format_transfer_rate(0.0, self._transfer_rate_unit)),
         )
-        dpg.set_value(self.downloaded_text, "Downloaded: 0 B / 0 B")
-        dpg.set_value(self.remaining_text, "Remaining: 0 B")
-        dpg.set_value(self.uploaded_text, "Uploaded Total: 0 B")
-        dpg.set_value(self.uploaded_session_text, "Uploaded This Session: 0 B")
-        dpg.set_value(self.upload_requests_text, "Upload Requests: 0 served / 0 received")
-        dpg.set_value(self.last_upload_text, "Last Upload: --")
-        dpg.set_value(self.eta_text, "ETA: --")
-        dpg.set_value(self.elapsed_text, "Active Time: 00:00")
-        dpg.set_value(self.ratio_text, "Share Ratio: --")
-        dpg.set_value(self.peers_text, "Connected Peers: 0")
+        dpg.set_value(self.downloaded_text, tr('view.download_view.downloaded_0_b_0_b', "Downloaded: 0 B / 0 B"))
+        dpg.set_value(self.remaining_text, tr('view.download_view.remaining_0_b', "Remaining: 0 B"))
+        dpg.set_value(self.uploaded_text, tr('view.download_view.uploaded_total_0_b', "Uploaded Total: 0 B"))
+        dpg.set_value(self.uploaded_session_text, tr('view.download_view.uploaded_this_session_0_b', "Uploaded This Session: 0 B"))
+        dpg.set_value(self.upload_requests_text, tr('view.download_view.upload_requests_0_served_0_received', "Upload Requests: 0 served / 0 received"))
+        dpg.set_value(self.last_upload_text, tr('view.download_view.last_upload', "Last Upload: --"))
+        dpg.set_value(self.eta_text, tr('view.download_view.eta', "ETA: --"))
+        dpg.set_value(self.elapsed_text, tr('view.download_view.active_time_00_00', "Active Time: 00:00"))
+        dpg.set_value(self.ratio_text, tr('view.download_view.share_ratio', "Share Ratio: --"))
+        dpg.set_value(self.peers_text, tr('view.download_view.connected_peers_0', "Connected Peers: 0"))
         dpg.set_value(self.error_text, "")
         dpg.configure_item(self.retry_button, enabled=False)
-        dpg.set_value(self.state_text, "Session State: Idle")
-        dpg.set_value(self.seed_leech_text, "Seeds / Leechers: -- / --")
-        dpg.set_value(self.tracker_scrape_text, "Tracker Scrape S/L/C: -- / -- / --")
-        dpg.set_value(self.availability_text, "Availability: --")
-        dpg.set_value(self.discovery_text, "Discovery: --")
-        dpg.set_value(self.listen_port_text, "Listen Port: --")
-        dpg.set_value(self.listener_endpoint_text, "Listeners: --")
-        dpg.set_value(self.ip_family_text, "IP Families: --")
-        dpg.set_value(self.transport_text, "Transport: --")
-        dpg.set_value(self.network_path_text, "Network Path: --")
-        dpg.set_value(self.connectivity_text, "Incoming: --")
-        dpg.set_value(self.incoming_peers_text, "Incoming Peers: 0 active / 0 this session")
-        dpg.set_value(self.mapping_methods_text, "Mapping Methods: UPnP -- | NAT-PMP --")
-        dpg.set_value(self.mapping_detail_text, "Mapping Detail: --")
-        dpg.set_value(self.connectivity_hint_text, "Connectivity Hint: --")
-        dpg.set_value(self.external_port_text, "External: --")
-        dpg.set_value(self.storage_text, "Storage: Downloads")
-        dpg.set_value(self.lpd_text, "LAN Discovery: --")
-        dpg.set_value(self.health_text, "Swarm Health: --")
-        dpg.set_value(self.info_hash_text, "Info Hash: --")
-        dpg.set_value(self.piece_info_text, "Pieces: --")
-        dpg.set_value(self.file_info_text, "Files: --")
-        dpg.set_value(self.private_text, "Private: --")
-        dpg.set_value(self.created_by_text, "Created By: --")
-        dpg.set_value(self.created_date_text, "Created: --")
-        dpg.set_value(self.comment_text, "Comment: --")
-        dpg.set_value(self.storage_path_text, "Storage Path: --")
-        dpg.set_value(self.torrent_path_text, ".torrent: --")
-        dpg.set_value(self.limit_status_text, "Limits: Down Unlimited | Up Unlimited")
+        dpg.set_value(self.state_text, tr('view.download_view.session_state_idle', "Session State: Idle"))
+        dpg.set_value(self.seed_leech_text, tr('view.download_view.seeds_leechers', "Seeds / Leechers: -- / --"))
+        dpg.set_value(self.tracker_scrape_text, tr('view.download_view.tracker_scrape_s_l_c', "Tracker Scrape S/L/C: -- / -- / --"))
+        dpg.set_value(self.availability_text, tr('view.download_view.availability', "Availability: --"))
+        dpg.set_value(self.discovery_text, tr('view.download_view.discovery', "Discovery: --"))
+        dpg.set_value(self.listen_port_text, tr('view.download_view.listen_port', "Listen Port: --"))
+        dpg.set_value(self.listener_endpoint_text, tr('view.download_view.listeners', "Listeners: --"))
+        dpg.set_value(self.ip_family_text, tr('view.download_view.ip_families', "IP Families: --"))
+        dpg.set_value(self.transport_text, tr('view.download_view.transport', "Transport: --"))
+        dpg.set_value(self.network_path_text, tr('view.download_view.network_path', "Network Path: --"))
+        dpg.set_value(self.connectivity_text, tr('view.download_view.incoming', "Incoming: --"))
+        dpg.set_value(self.incoming_peers_text, tr('view.download_view.incoming_peers_0_active_0_this_session', "Incoming Peers: 0 active / 0 this session"))
+        dpg.set_value(self.mapping_methods_text, tr('view.download_view.mapping_methods_upnp_nat_pmp', "Mapping Methods: UPnP -- | NAT-PMP --"))
+        dpg.set_value(self.mapping_detail_text, tr('view.download_view.mapping_detail', "Mapping Detail: --"))
+        dpg.set_value(self.connectivity_hint_text, tr('view.download_view.connectivity_hint', "Connectivity Hint: --"))
+        dpg.set_value(self.external_port_text, tr('view.download_view.external', "External: --"))
+        dpg.set_value(self.storage_text, tr('view.download_view.storage_downloads', "Storage: Downloads"))
+        dpg.set_value(self.lpd_text, tr('view.download_view.lan_discovery', "LAN Discovery: --"))
+        dpg.set_value(self.health_text, tr('view.download_view.swarm_health', "Swarm Health: --"))
+        dpg.set_value(self.info_hash_text, tr('view.download_view.info_hash', "Info Hash: --"))
+        dpg.set_value(self.piece_info_text, tr('view.download_view.pieces', "Pieces: --"))
+        dpg.set_value(self.file_info_text, tr('view.download_view.files', "Files: --"))
+        dpg.set_value(self.private_text, tr('view.download_view.private', "Private: --"))
+        dpg.set_value(self.created_by_text, tr('view.download_view.created_by', "Created By: --"))
+        dpg.set_value(self.created_date_text, tr('view.download_view.created', "Created: --"))
+        dpg.set_value(self.comment_text, tr('view.download_view.comment', "Comment: --"))
+        dpg.set_value(self.storage_path_text, tr('view.download_view.storage_path', "Storage Path: --"))
+        dpg.set_value(self.torrent_path_text, tr('view.download_view.torrent', ".torrent: --"))
+        dpg.set_value(self.limit_status_text, tr('view.download_view.limits_down_unlimited_up_unlimited', "Limits: Down Unlimited | Up Unlimited"))
         dpg.set_value(self.download_limit_input, 0.0)
         dpg.set_value(self.upload_limit_input, 0.0)
         self._limit_controls_hash = ""
@@ -1811,8 +1774,7 @@ class DownloadView:
             dpg.set_value(
                 self.remove_notice_text,
                 (
-                    "The torrent was removed from SalixTorrent, but downloaded-data "
-                    f"cleanup was not fully completed:\n\n{cleanup_error}"
+                    tr('view.download_view.the_torrent_was_removed_from_salixtorrent_but_downloaded', 'The torrent was removed from SalixTorrent, but downloaded-data cleanup was not fully completed:\n\n{cleanup_error}', cleanup_error=cleanup_error)
                 ),
             )
             dpg.show_item(self.remove_notice_modal)
@@ -1849,7 +1811,7 @@ class DownloadView:
     def _update_table_row(self, msg: dict):
         h = msg["info_hash"]
         size_str = f"{msg['total_bytes'] / (1024 * 1024):.1f} MB"
-        prog_str = f"{msg['progress'] * 100:.1f}%"
+        prog_str = tr('view.download_view.value', '{value0:.1f}%', value0=msg['progress'] * 100)
         down_kbps = msg.get("speed_kbps", 0.0)
         up_kbps = msg.get("upload_speed_kbps", 0.0)
         speed_str = format_transfer_rate_pair(
@@ -1873,8 +1835,8 @@ class DownloadView:
                 status_cell = dpg.add_text(state_label)
                 speed_cell = dpg.add_text(speed_str)
 
-            add_text_tooltip(name_cell, "Torrent row\n\nClick to select this torrent and populate the inspector below. Right-click any cell in this row for queue, transfer, recheck, copy, properties and removal actions.")
-            add_text_tooltip(size_cell, "Payload size\n\nTotal size described by this torrent's metadata, not the size of the .torrent file itself.")
+            add_text_tooltip(name_cell, tr('view.download_view.torrent_row_click_to_select_this_torrent', "Torrent row\n\nClick to select this torrent and populate the inspector below. Right-click any cell in this row for queue, transfer, recheck, copy, properties and removal actions."))
+            add_text_tooltip(size_cell, tr('view.download_view.payload_size_total_size_described_by_this', "Payload size\n\nTotal size described by this torrent's metadata, not the size of the .torrent file itself."))
             add_help_tooltip(prog_cell, "PIECE")
             add_help_tooltip(priority_cell, "QUEUE_PRIORITY")
             add_help_tooltip(status_cell, "TORRENT_STATUS")
@@ -1902,7 +1864,7 @@ class DownloadView:
             dpg.set_value(row["size"], size_str)
             dpg.set_value(row["progress"], prog_str)
             dpg.set_value(row["priority"], msg.get("queue_priority", "Normal"))
-            dpg.set_value(row["status"], state_label)
+            dpg.set_value(row["status"], tr_value(state_label))
             dpg.set_value(row["speed"], speed_str)
             dpg.set_value(row["name"], self.active_info_hash == h)
             self._refresh_context_menu_state(h)
@@ -1922,15 +1884,15 @@ class DownloadView:
             self._render_inspector(self.latest_stats[info_hash], force_detail=True)
 
     def _render_inspector(self, msg: dict, force_detail: bool = False):
-        dpg.set_value(self.title_text, f"Torrent: {msg['torrent_name']}")
+        dpg.set_value(self.title_text, tr('view.download_view.torrent_value', 'Torrent: {torrent_name}', torrent_name=msg['torrent_name']))
 
         state = msg["state"]
         state_label = msg.get("state_label", state)
         dpg.set_value(
             self.status_text,
-            f"Status: {state_label} ({msg['connected_peers']} peers)",
+            tr('view.download_view.status_value_value_peers', 'Status: {state_label} ({connected_peers} peers)', state_label=state_label, connected_peers=msg['connected_peers']),
         )
-        dpg.set_value(self.state_text, f"Session State: {state_label}")
+        dpg.set_value(self.state_text, tr('view.download_view.session_state_value', 'Session State: {state_label}', state_label=state_label))
 
         # During a payload verification pass, the main progress bar shows the
         # *checking operation* rather than download completion. Download
@@ -1946,8 +1908,7 @@ class DownloadView:
             dpg.set_value(
                 self.progress_label,
                 (
-                    f"{checking_progress * 100:.1f}% Checked "
-                    f"({checked_pieces} / {check_total_pieces} Pieces Scanned)"
+                    tr('view.download_view.value_checked_value_value_pieces_scanned', '{value0:.1f}% Checked ({checked_pieces} / {check_total_pieces} Pieces Scanned)', value0=checking_progress * 100, checked_pieces=checked_pieces, check_total_pieces=check_total_pieces)
                 ),
             )
         elif state == "Fast Resume":
@@ -1956,8 +1917,7 @@ class DownloadView:
             dpg.set_value(
                 self.progress_label,
                 (
-                    "Fast resume restored - "
-                    f"{msg['completed_pieces']} / {msg['total_pieces']} Pieces Verified"
+                    tr('view.download_view.fast_resume_restored_value_value_pieces_verified', 'Fast resume restored - {completed_pieces} / {total_pieces} Pieces Verified', completed_pieces=msg['completed_pieces'], total_pieces=msg['total_pieces'])
                 ),
             )
         elif state == "Completed" and msg.get("wanted_finished") and msg.get("progress", 0.0) < 1.0:
@@ -1967,10 +1927,7 @@ class DownloadView:
             dpg.set_value(
                 self.progress_label,
                 (
-                    f"{wanted_prog * 100:.2f}% Selected Files Complete "
-                    f"({msg.get('wanted_completed_pieces', 0)} / "
-                    f"{msg.get('wanted_total_pieces', 0)} Wanted Pieces) - "
-                    f"{total_prog * 100:.2f}% of full torrent"
+                    tr('view.download_view.value_selected_files_complete_value_value_wanted_pieces', '{value0:.2f}% Selected Files Complete ({value1} / {value2} Wanted Pieces) - {value3:.2f}% of full torrent', value0=wanted_prog * 100, value1=msg.get('wanted_completed_pieces', 0), value2=msg.get('wanted_total_pieces', 0), value3=total_prog * 100)
                 ),
             )
         else:
@@ -1981,8 +1938,7 @@ class DownloadView:
             dpg.set_value(
                 self.progress_label,
                 (
-                    f"{prog * 100:.2f}% Complete "
-                    f"({msg['completed_pieces']} / {msg['total_pieces']} Pieces){suffix}"
+                    tr('view.download_view.value_complete_value_value_pieces_value', '{value0:.2f}% Complete ({completed_pieces} / {total_pieces} Pieces){suffix}', value0=prog * 100, completed_pieces=msg['completed_pieces'], total_pieces=msg['total_pieces'], suffix=suffix)
                 ),
             )
 
@@ -2004,41 +1960,39 @@ class DownloadView:
         )
         dpg.set_value(
             self.downloaded_text,
-            f"Downloaded: {self._format_bytes(msg.get('downloaded_bytes'))} / "
-            f"{self._format_bytes(msg.get('total_bytes'))}",
+            tr('view.download_view.downloaded_value_value', 'Downloaded: {value0} / {value1}', value0=self._format_bytes(msg.get('downloaded_bytes')), value1=self._format_bytes(msg.get('total_bytes'))),
         )
         dpg.set_value(
             self.remaining_text,
-            f"Remaining: {self._format_bytes(msg.get('remaining_bytes'))}",
+            tr('view.download_view.remaining_value', 'Remaining: {value0}', value0=self._format_bytes(msg.get('remaining_bytes'))),
         )
         dpg.set_value(
             self.uploaded_text,
-            f"Uploaded Total: {self._format_bytes(msg.get('uploaded_bytes'))}",
+            tr('view.download_view.uploaded_total_value', 'Uploaded Total: {value0}', value0=self._format_bytes(msg.get('uploaded_bytes'))),
         )
         dpg.set_value(
             self.uploaded_session_text,
-            f"Uploaded This Session: {self._format_bytes(msg.get('uploaded_this_session_bytes'))}",
+            tr('view.download_view.uploaded_this_session_value', 'Uploaded This Session: {value0}', value0=self._format_bytes(msg.get('uploaded_this_session_bytes'))),
         )
         dpg.set_value(
             self.upload_requests_text,
-            f"Upload Requests: {int(msg.get('upload_requests_served', 0) or 0):,} served / "
-            f"{int(msg.get('upload_requests_received', 0) or 0):,} received",
+            tr('view.download_view.upload_requests_value_served_value_received', 'Upload Requests: {value0:,} served / {value1:,} received', value0=int(msg.get('upload_requests_served', 0) or 0), value1=int(msg.get('upload_requests_received', 0) or 0)),
         )
         dpg.set_value(
             self.last_upload_text,
-            f"Last Upload: {self._format_age(msg.get('last_upload_seconds'))}",
+            tr('view.download_view.last_upload_value', 'Last Upload: {value0}', value0=self._format_age(msg.get('last_upload_seconds'))),
         )
-        dpg.set_value(self.eta_text, f"ETA: {self._format_duration(msg.get('eta_seconds'))}")
+        dpg.set_value(self.eta_text, tr('view.download_view.eta_value', 'ETA: {value0}', value0=self._format_duration(msg.get('eta_seconds'))))
         dpg.set_value(
             self.elapsed_text,
-            f"Active Time: {self._format_duration(msg.get('elapsed_seconds'))}",
+            tr('view.download_view.active_time_value', 'Active Time: {value0}', value0=self._format_duration(msg.get('elapsed_seconds'))),
         )
         ratio = msg.get("share_ratio")
         ratio_text = f"{float(ratio):.3f}" if ratio is not None else "--"
-        dpg.set_value(self.ratio_text, f"Share Ratio: {ratio_text}")
+        dpg.set_value(self.ratio_text, tr('view.download_view.share_ratio_value', 'Share Ratio: {ratio_text}', ratio_text=ratio_text))
         dpg.set_value(
             self.peers_text,
-            f"Connected Peers: {msg['connected_peers']}",
+            tr('view.download_view.connected_peers_value', 'Connected Peers: {connected_peers}', connected_peers=msg['connected_peers']),
         )
 
         error_message = str(msg.get("error_message") or "")
@@ -2052,27 +2006,23 @@ class DownloadView:
         leechers = msg.get("swarm_leechers")
         dpg.set_value(
             self.seed_leech_text,
-            f"Seeds / Leechers: {seeders if seeders is not None else '--'} / "
-            f"{leechers if leechers is not None else '--'}",
+            tr('view.download_view.seeds_leechers_value_value', 'Seeds / Leechers: {value0} / {value1}', value0=seeders if seeders is not None else '--', value1=leechers if leechers is not None else '--'),
         )
         scrape_seeders = msg.get("scrape_seeders")
         scrape_leechers = msg.get("scrape_leechers")
         scrape_completed = msg.get("scrape_completed")
         scrape_age = msg.get("scrape_age_seconds")
         scrape_text = (
-            f"Tracker Scrape S/L/C: "
-            f"{scrape_seeders if scrape_seeders is not None else '--'} / "
-            f"{scrape_leechers if scrape_leechers is not None else '--'} / "
-            f"{scrape_completed if scrape_completed is not None else '--'}"
+            tr('view.download_view.tracker_scrape_s_l_c_value_value_value', 'Tracker Scrape S/L/C: {value0} / {value1} / {value2}', value0=scrape_seeders if scrape_seeders is not None else '--', value1=scrape_leechers if scrape_leechers is not None else '--', value2=scrape_completed if scrape_completed is not None else '--')
         )
         if scrape_seeders is not None and scrape_age is not None:
             scrape_text += f" | {self._format_age(scrape_age)}"
         dpg.set_value(self.tracker_scrape_text, scrape_text)
         availability = float(msg.get("swarm_availability", 0.0) or 0.0)
-        dpg.set_value(self.availability_text, f"Availability: {availability:.2f}")
+        dpg.set_value(self.availability_text, tr('view.download_view.availability_value', 'Availability: {availability:.2f}', availability=availability))
         dpg.set_value(
             self.discovery_text,
-            f"Discovery: {msg.get('discovery_summary', '--')}",
+            tr('view.download_view.discovery_value', 'Discovery: {value0}', value0=msg.get('discovery_summary', '--')),
         )
 
         self._sync_limit_controls(msg)
@@ -2086,7 +2036,7 @@ class DownloadView:
         )
         dpg.set_value(
             self.limit_status_text,
-            f"Limits: Down {download_limit_text} | Up {upload_limit_text}",
+            tr('view.download_view.limits_down_value_up_value', 'Limits: Down {download_limit_text} | Up {upload_limit_text}', download_limit_text=download_limit_text, upload_limit_text=upload_limit_text),
         )
 
         listen_port = int(msg.get("listen_port", 0) or 0)
@@ -2095,7 +2045,7 @@ class DownloadView:
         port_suffix = "" if listen_port or not preferred_port else " (configured)"
         dpg.set_value(
             self.listen_port_text,
-            f"Listen Port: {shown_port if shown_port else '--'}{port_suffix}",
+            tr('view.download_view.listen_port_value_value', 'Listen Port: {value0}{port_suffix}', value0=shown_port if shown_port else '--', port_suffix=port_suffix),
         )
         listener_v4 = str(msg.get("listener_ipv4_endpoint") or "").strip()
         listener_v6 = str(msg.get("listener_ipv6_endpoint") or "").strip()
@@ -2109,9 +2059,9 @@ class DownloadView:
         if listener_parts:
             listener_value = "Listeners: " + " | ".join(listener_parts)
         elif listen_port:
-            listener_value = f"Listeners: port {listen_port}"
+            listener_value = tr('view.download_view.listeners_port_value', 'Listeners: port {listen_port}', listen_port=listen_port)
         else:
-            listener_value = "Listeners: Not listening"
+            listener_value = tr("view.download_view.listeners_not_listening", "Listeners: Not listening")
         dpg.set_value(self.listener_endpoint_text, listener_value)
 
         ipv4_peers = int(msg.get("ipv4_peer_count", 0) or 0)
@@ -2120,8 +2070,7 @@ class DownloadView:
         dht_v6 = int(msg.get("dht_udp_port_ipv6", 0) or 0)
         dpg.set_value(
             self.ip_family_text,
-            f"IP Families: peers IPv4 {ipv4_peers} / IPv6 {ipv6_peers} | "
-            f"DHT UDP IPv4 {dht_v4 or '--'} / IPv6 {dht_v6 or '--'}",
+            tr('view.download_view.ip_families_peers_ipv4_value_ipv6_value_dht', 'IP Families: peers IPv4 {ipv4_peers} / IPv6 {ipv6_peers} | DHT UDP IPv4 {value2} / IPv6 {value3}', ipv4_peers=ipv4_peers, ipv6_peers=ipv6_peers, value2=dht_v4 or '--', value3=dht_v6 or '--'),
         )
 
         encrypted_count = int(msg.get("encrypted_peer_count", 0) or 0)
@@ -2129,7 +2078,7 @@ class DownloadView:
         encryption_policy = str(msg.get("encryption_policy") or "Prefer Encryption")
         dpg.set_value(
             self.transport_text,
-            f"Transport: {encryption_policy} | MSE/RC4 {encrypted_count} | Plaintext {plaintext_count}",
+            tr('view.download_view.transport_value_mse_rc4_value_plaintext_value', 'Transport: {encryption_policy} | MSE/RC4 {encrypted_count} | Plaintext {plaintext_count}', encryption_policy=encryption_policy, encrypted_count=encrypted_count, plaintext_count=plaintext_count),
         )
 
         bind_address = str(msg.get("network_bind_address") or "").strip()
@@ -2137,9 +2086,9 @@ class DownloadView:
         lock_active = bool(msg.get("interface_lock_active", False))
         if bind_address:
             lock_label = "Locked" if lock_enabled and lock_active else ("Lock enabled" if lock_enabled else "Lock off")
-            network_path = f"Network Path: {bind_address} | {lock_label}"
+            network_path = tr('view.download_view.network_path_value_value', 'Network Path: {bind_address} | {lock_label}', bind_address=bind_address, lock_label=lock_label)
         else:
-            network_path = "Network Path: Any interface (system routing) | Lock off"
+            network_path = tr("view.download_view.network_path_any_interface_lock_off", "Network Path: Any interface (system routing) | Lock off")
         dpg.set_value(self.network_path_text, network_path)
 
         if listen_port:
@@ -2154,20 +2103,19 @@ class DownloadView:
         connectivity_status = str(connectivity.get("status") or "Waiting")
         mapping_method = str(connectivity.get("method") or "").strip()
         if mapping_method and mapping_method not in {"--", "None"}:
-            incoming_value = f"Incoming: {connectivity_status} ({mapping_method})"
+            incoming_value = tr('view.download_view.incoming_value_value', 'Incoming: {connectivity_status} ({mapping_method})', connectivity_status=connectivity_status, mapping_method=mapping_method)
         else:
-            incoming_value = f"Incoming: {connectivity_status}"
+            incoming_value = tr('view.download_view.incoming_value', 'Incoming: {connectivity_status}', connectivity_status=connectivity_status)
         dpg.set_value(self.connectivity_text, incoming_value)
         incoming_active = int(msg.get("incoming_peers", 0) or 0)
         incoming_total = int(msg.get("incoming_connections_total", 0) or 0)
         dpg.set_value(
             self.incoming_peers_text,
-            f"Incoming Peers: {incoming_active:,} active / {incoming_total:,} this session",
+            tr('view.download_view.incoming_peers_value_active_value_this_session', 'Incoming Peers: {incoming_active:,} active / {incoming_total:,} this session', incoming_active=incoming_active, incoming_total=incoming_total),
         )
         dpg.set_value(
             self.mapping_methods_text,
-            f"Mapping Methods: UPnP {connectivity.get('upnp_status', '--')} | "
-            f"NAT-PMP {connectivity.get('natpmp_status', '--')}",
+            tr('view.download_view.mapping_methods_upnp_value_nat_pmp_value', 'Mapping Methods: UPnP {value0} | NAT-PMP {value1}', value0=connectivity.get('upnp_status', '--'), value1=connectivity.get('natpmp_status', '--')),
         )
         upnp_summary = str(connectivity.get("upnp_summary") or "").strip()
         natpmp_summary = str(connectivity.get("natpmp_summary") or "").strip()
@@ -2177,12 +2125,12 @@ class DownloadView:
         ]
         dpg.set_value(
             self.mapping_detail_text,
-            f"Mapping Detail: {' | '.join(method_details) if method_details else '--'}",
+            tr('view.download_view.mapping_detail_value', 'Mapping Detail: {value0}', value0=' | '.join(method_details) if method_details else '--'),
         )
         action_hint = str(connectivity.get("action_hint") or "").strip()
         dpg.set_value(
             self.connectivity_hint_text,
-            f"Connectivity Hint: {action_hint or '--'}",
+            tr('view.download_view.connectivity_hint_value', 'Connectivity Hint: {value0}', value0=action_hint or '--'),
         )
 
         external_ip = str(connectivity.get("external_ip") or "").strip()
@@ -2190,67 +2138,67 @@ class DownloadView:
         external_scope = str(connectivity.get("external_scope") or "Unknown")
         if external_ip and external_port:
             scope_suffix = f" ({external_scope})" if external_scope != "Unknown" else ""
-            external_value = f"External: {format_endpoint(external_ip, external_port)}{scope_suffix}"
+            external_value = tr('view.download_view.external_value_value', 'External: {value0}{scope_suffix}', value0=format_endpoint(external_ip, external_port), scope_suffix=scope_suffix)
         elif external_port:
-            external_value = f"External: port {external_port}"
+            external_value = tr('view.download_view.external_port_value', 'External: port {external_port}', external_port=external_port)
         else:
-            external_value = "External: --"
+            external_value = tr("view.download_view.external_unknown", "External: --")
         dpg.set_value(self.external_port_text, external_value)
 
         storage_mode = msg.get("storage_mode", "Download")
         if storage_mode == "External Seed":
-            dpg.set_value(self.storage_text, "Storage: External Seed (read-only)")
+            dpg.set_value(self.storage_text, tr('view.download_view.storage_external_seed_read_only', "Storage: External Seed (read-only)"))
         else:
-            dpg.set_value(self.storage_text, "Storage: Downloads")
+            dpg.set_value(self.storage_text, tr('view.download_view.storage_downloads', "Storage: Downloads"))
 
         local_count = int(msg.get("local_peers_discovered", 0))
         lan_enabled = bool(msg.get("lan_discovery_enabled", msg.get("local_discovery_enabled", False)))
         if not lan_enabled:
-            dpg.set_value(self.lpd_text, "LAN Discovery: Disabled")
+            dpg.set_value(self.lpd_text, tr('view.download_view.lan_discovery_disabled', "LAN Discovery: Disabled"))
         elif msg.get("local_discovery_enabled"):
             dpg.set_value(
                 self.lpd_text,
-                f"LAN Discovery: Active ({local_count} peer(s) found)",
+                tr('view.download_view.lan_discovery_active_value_peer_s_found', 'LAN Discovery: Active ({local_count} peer(s) found)', local_count=local_count),
             )
         else:
-            dpg.set_value(self.lpd_text, "LAN Discovery: Starting")
+            dpg.set_value(self.lpd_text, tr('view.download_view.lan_discovery_starting', "LAN Discovery: Starting"))
 
         if error_message:
-            dpg.set_value(self.health_text, "Swarm Health: Attention required")
+            dpg.set_value(self.health_text, tr('view.download_view.swarm_health_attention_required', "Swarm Health: Attention required"))
         elif state in {"Downloading", "Seeding"}:
             if availability and availability < 1.0 and msg.get("progress", 0.0) < 1.0:
-                dpg.set_value(self.health_text, "Swarm Health: Incomplete availability")
+                dpg.set_value(self.health_text, tr('view.download_view.swarm_health_incomplete_availability', "Swarm Health: Incomplete availability"))
             elif availability >= 2.0:
-                dpg.set_value(self.health_text, "Swarm Health: Healthy")
+                dpg.set_value(self.health_text, tr('view.download_view.swarm_health_healthy', "Swarm Health: Healthy"))
             else:
-                dpg.set_value(self.health_text, "Swarm Health: Active")
+                dpg.set_value(self.health_text, tr('view.download_view.swarm_health_active', "Swarm Health: Active"))
         else:
-            dpg.set_value(self.health_text, "Swarm Health: --")
+            dpg.set_value(self.health_text, tr('view.download_view.swarm_health', "Swarm Health: --"))
 
-        dpg.set_value(self.info_hash_text, f"Info Hash: {msg.get('info_hash', '--')}")
+        dpg.set_value(self.info_hash_text, tr('view.download_view.info_hash_value', 'Info Hash: {value0}', value0=msg.get('info_hash', '--')))
         dpg.set_value(
             self.piece_info_text,
-            f"Pieces: {msg.get('total_pieces', 0):,} x {self._format_bytes(msg.get('piece_length'))}",
+            tr('view.download_view.pieces_value_x_value', 'Pieces: {value0:,} x {value1}', value0=msg.get('total_pieces', 0), value1=self._format_bytes(msg.get('piece_length'))),
         )
         file_kind = "multi-file" if msg.get("is_multi_file") else "single-file"
         dpg.set_value(
             self.file_info_text,
-            f"Files: {msg.get('file_count', 0):,} ({file_kind})",
+            tr('view.download_view.files_value_value', 'Files: {value0:,} ({file_kind})', value0=msg.get('file_count', 0), file_kind=file_kind),
         )
-        dpg.set_value(self.private_text, f"Private: {'Yes' if msg.get('private') else 'No'}")
-        dpg.set_value(self.created_by_text, f"Created By: {msg.get('created_by') or '--'}")
+        dpg.set_value(self.private_text, tr('view.download_view.private_value', 'Private: {value0}', value0=tr_value('Yes' if msg.get('private') else 'No')))
+        dpg.set_value(self.created_by_text, tr('view.download_view.created_by_value', 'Created By: {value0}', value0=msg.get('created_by') or '--'))
         dpg.set_value(
             self.created_date_text,
-            f"Created: {self._format_creation_date(msg.get('creation_date'))}",
+            tr('view.download_view.created_value', 'Created: {value0}', value0=self._format_creation_date(msg.get('creation_date'))),
         )
-        dpg.set_value(self.comment_text, f"Comment: {msg.get('comment') or '--'}")
+        dpg.set_value(self.comment_text, tr('view.download_view.comment_value', 'Comment: {value0}', value0=msg.get('comment') or '--'))
         dpg.set_value(
             self.storage_path_text,
-            f"Storage Path: {msg.get('storage_path') or '--'}",
+            tr('view.download_view.storage_path_value', 'Storage Path: {value0}', value0=msg.get('storage_path') or '--'),
         )
         dpg.set_value(
             self.torrent_path_text,
-            f".torrent: {msg.get('torrent_path') or '--'}",
+            tr('view.download_view.torrent_value_bf323ba3', '.torrent: {value0}', value0=msg.get('torrent_path') or '--'),
         )
 
         self._render_active_detail(msg, force=force_detail)

@@ -15,6 +15,8 @@ import time
 from dataclasses import asdict, dataclass
 from typing import Optional
 
+from app.localization import tr
+
 
 TRAY_ACTION_RESTORE = "restore"
 TRAY_ACTION_PAUSE_ALL = "pause_all"
@@ -1184,22 +1186,22 @@ class _WindowsTrayBackend(_TrayBackend):
                             menu = user32.CreatePopupMenu()
                             if menu:
                                 user32.AppendMenuW(
-                                    menu, self.MF_STRING, self.CMD_OPEN, "Open SalixTorrent"
+                                    menu, self.MF_STRING, self.CMD_OPEN, tr("tray.open", "Open SalixTorrent")
                                 )
                                 user32.AppendMenuW(
                                     menu, self.MF_SEPARATOR, 0, None
                                 )
                                 user32.AppendMenuW(
-                                    menu, self.MF_STRING, self.CMD_PAUSE_ALL, "Pause All"
+                                    menu, self.MF_STRING, self.CMD_PAUSE_ALL, tr("tray.pause_all", "Pause All")
                                 )
                                 user32.AppendMenuW(
-                                    menu, self.MF_STRING, self.CMD_RESUME_ALL, "Resume All"
+                                    menu, self.MF_STRING, self.CMD_RESUME_ALL, tr("tray.resume_all", "Resume All")
                                 )
                                 user32.AppendMenuW(
                                     menu, self.MF_SEPARATOR, 0, None
                                 )
                                 user32.AppendMenuW(
-                                    menu, self.MF_STRING, self.CMD_EXIT, "Exit"
+                                    menu, self.MF_STRING, self.CMD_EXIT, tr("tray.exit", "Exit")
                                 )
                                 point = wintypes.POINT()
                                 user32.GetCursorPos(ctypes.byref(point))
@@ -1273,7 +1275,7 @@ class _WindowsTrayBackend(_TrayBackend):
             nid.uFlags = self.NIF_MESSAGE | self.NIF_ICON | self.NIF_TIP
             nid.uCallbackMessage = self.WM_TRAYICON
             nid.hIcon = icon
-            nid.szTip = "SalixTorrent (Salix_T)"
+            nid.szTip = tr("tray.tooltip", "SalixTorrent (Salix_T)")
             self._nid = nid
             if not shell32.Shell_NotifyIconW(self.NIM_ADD, ctypes.byref(nid)):
                 raise ctypes.WinError()
@@ -1405,20 +1407,20 @@ class _PystrayTrayBackend(_TrayBackend):
 
         menu = Menu(
             MenuItem(
-                "Open SalixTorrent",
+                tr("tray.open", "Open SalixTorrent"),
                 enqueue(TRAY_ACTION_RESTORE),
                 default=True,
             ),
             Menu.SEPARATOR,
-            MenuItem("Pause All", enqueue(TRAY_ACTION_PAUSE_ALL)),
-            MenuItem("Resume All", enqueue(TRAY_ACTION_RESUME_ALL)),
+            MenuItem(tr("tray.pause_all", "Pause All"), enqueue(TRAY_ACTION_PAUSE_ALL)),
+            MenuItem(tr("tray.resume_all", "Resume All"), enqueue(TRAY_ACTION_RESUME_ALL)),
             Menu.SEPARATOR,
-            MenuItem("Exit", enqueue(TRAY_ACTION_EXIT)),
+            MenuItem(tr("tray.exit", "Exit"), enqueue(TRAY_ACTION_EXIT)),
         )
         return self._pystray.Icon(
             "SalixTorrent",
             self._icon_image(),
-            "SalixTorrent (Salix_T)",
+            tr("tray.tooltip", "SalixTorrent (Salix_T)"),
             menu,
         )
 

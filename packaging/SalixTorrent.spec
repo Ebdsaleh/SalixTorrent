@@ -20,6 +20,12 @@ console = TARGET == "cli"
 datas = [
     (str(ROOT / "README.md"), "."),
     (str(ROOT / "LICENSE"), "."),
+    # Phase 12 locale packs are immutable runtime resources. They are bundled
+    # into every frozen build so language selection never needs the network.
+    (str(ROOT / "app" / "localization" / "locales"), "app/localization/locales"),
+    # Locale-neutral semantic Help/Glossary topology and canonical authoring text.
+    # Runtime locale catalogs overlay these stable IDs entirely offline.
+    (str(ROOT / "app" / "localization" / "content"), "app/localization/content"),
 ]
 binaries = []
 hiddenimports = []

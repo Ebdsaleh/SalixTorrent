@@ -387,3 +387,217 @@ SalixTorrent/
 ├── CHANGELOG.md
 └── README.md
 ```
+
+
+## Phase 12 localization foundation
+
+SalixTorrent now has an offline-first localization layer. The application never
+contacts a translation service at runtime: locale JSON files are bundled into
+source/frozen releases and `en-AU` is the canonical fallback when a translated
+entry is missing or invalid.
+
+Initial locale identifiers are:
+
+```text
+en-AU   English (Australia)       canonical source
+en-GB   English (United Kingdom)
+en-US   English (United States)
+pt-BR   Português (Brasil)
+fil-PH  Filipino
+```
+
+Preferences exposes **Application language** with **System Default** plus the
+explicit locale choices. A language change is persisted immediately and the UI
+asks for a restart while the Phase-12 migration is in progress, which avoids
+partially rebuilding live Dear PyGui controls.
+
+Translation generation is development-only:
+
+```bat
+python -m pip install -r requirements-localization.txt
+python tools\localization\build_locales.py --extract
+python tools\localization\build_locales.py --check
+python tools\localization\build_locales.py --report
+python tools\localization\build_locales.py --translate
+python tools\localization\build_locales.py --validate
+```
+
+Or run the complete pipeline:
+
+```bat
+python tools\localization\build_locales.py --all
+```
+
+The Google Cloud adapter uses Application Default Credentials and the
+`GOOGLE_CLOUD_PROJECT` environment variable. Credentials are never stored in
+SalixTorrent, locale packs, the portable bundle or the installer.
+
+Useful offline/maintenance modes include:
+
+```bat
+python tools\localization\build_locales.py --validate
+python tools\localization\build_locales.py --translate --no-network
+python tools\localization\build_locales.py --translate --locale pt-BR
+```
+
+The pipeline translates only explicitly marked `tr(key, source)` strings plus
+the semantic Help and Glossary data. It does **not** scrape arbitrary Python
+string literals. Named format placeholders and protected BitTorrent/network
+terms are validated before generated locale data is accepted.
+
+Machine translation remains a draft layer. Reviewed wording can be placed in
+`tools/localization/manual_overrides/<locale>.json`; unchanged strings are
+reused through `translation_cache.json` so routine runs do not repeatedly send
+the whole application to the translation provider.
+
+The complete architecture and Phase-12 completion checklist are documented in
+`SalixTorrent-Phase12-Localization-Design.md`.
+
+### Phase 12 Stage 2 - UI string migration
+
+Stage 2 routes the primary application views through semantic localization keys
+instead of embedding user-facing English directly in Dear PyGui calls. The
+canonical `en-AU` UI catalog currently contains **649 entries**, including a
+presentation-only catalog for stable torrent states, priorities and protocol
+choices.
+
+Internal values remain canonical and locale-independent. For example, the engine
+and settings still store `Downloading`, `High`, `Prefer Encryption` and
+`BitTorrent v2 Only`; the view layer translates those values only when they are
+displayed and maps localized combo choices back to their canonical values before
+saving them. This prevents a language change from altering persistence, protocol
+logic or state comparisons.
+
+Stage 2 covers the main transfer queue/detail views, Preferences, dialogs,
+status/progress text, Create Torrent, completion notifications and human-facing
+CLI output. Machine-readable CLI/JSON output, torrent metadata, paths, hashes,
+tracker URLs and protocol identifiers remain locale-independent.
+
+The four non-canonical locale packs intentionally remain incomplete until the
+canonical migration is stable. Missing Stage-2 entries therefore fall back to
+bundled `en-AU` text offline; the Google translation step has **not** been run as
+part of this migration. The catalog validator reports missing-translation
+warnings but no structural errors.
+
+Localization source resources, manual overrides, protected terminology, the
+translation cache and this design document are intended to be committed. Google
+credentials, local build output, torrent payloads, virtual environments and the
+project's existing local regression-test files remain ignored by `.gitignore`.
+
+### Phase 12 Stage 3 - semantic documentation migration
+
+Stage 3 moves canonical Help and Glossary prose out of the Dear PyGui view
+modules and into renderer-neutral semantic source documents:
+
+```text
+app/localization/content/help.json
+app/localization/content/glossary.json
+```
+
+Help topics, Help sections and Glossary terms have stable locale-neutral IDs.
+Translated locale catalogs contain wording only; navigation relationships,
+related-term links, topic order and section structure are shared across every
+language. Help section translation keys now use stable section IDs rather than
+list positions, so reordering an article does not rename its translations.
+
+`help_topics_view.py` and `help_terms.py` therefore render semantic objects and
+no longer own the canonical English manual/glossary text. The same Glossary
+source continues to power both the A-Z manual and contextual hover help.
+
+The localization validator now checks documentation topology as well as locale
+catalogs: duplicate/missing IDs, broken related-term links and canonical catalog
+drift are release errors. PyInstaller bundles both the locale packs and the
+semantic document sources, so Help/Glossary remain fully offline in standalone,
+portable and installed builds.
+
+The Stage 3 documentation-shell cleanup adds four localized navigation/tool-tip
+strings, bringing the current canonical UI catalog to **653 entries**.
+
+Target-language Help and Glossary prose is intentionally still ungenerated at
+this checkpoint; missing entries continue to fall back to bundled `en-AU` until
+the translation-generation stage.
+
+
+### Phase 12 Stage 4 - reproducible extraction
+
+Stage 4 makes the canonical `en-AU` catalogs reproducible from authoritative
+source. The extractor reads literal `tr(key, source)` calls through Python AST,
+the semantic Help/Glossary documents, presentation-value sources and the small
+`app/localization/content/ui_static.json` source for intentionally indirect UI
+text. It no longer carries unknown entries forward from a previously generated
+catalog.
+
+The committed `tools/localization/extraction_manifest.json` records each key's
+SHA-256 source hash, placeholders/format fields and source locations. Conflicting
+duplicate keys are rejected; exact same-text reuse is recorded for audit. Dynamic
+direct `tr()` calls are also surfaced instead of silently disappearing from the
+canonical catalog.
+
+Useful offline developer commands are:
+
+```bat
+python tools\localization\build_locales.py --extract
+python tools\localization\build_locales.py --check
+python tools\localization\build_locales.py --report
+python tools\localization\build_locales.py --validate
+```
+
+`--check` is non-mutating and fails when the generated canonical catalogs or
+manifest no longer match source. `--report` prints extraction counts, placeholder
+coverage, safe key reuse and the dynamic-call audit.
+
+
+### Phase 12 Stage 5 - changed-only translation pipeline
+
+Stage 5 turns the development-only Google adapter into a safe, reproducible
+translation pipeline. The default provider path uses Cloud Translation v3 with
+Google's `general/translation-llm` model so the regional English targets
+(`en-AU`, `en-GB`, `en-US`) can be treated as real locale targets alongside
+`pt-BR` and Filipino. Translation remains a build/development operation only;
+none of these Google dependencies or credentials are needed by SalixTorrent at
+runtime.
+
+Before contacting Google, inspect the changed-only plan without credentials or
+network access:
+
+```bat
+python tools\localization\build_locales.py --dry-run
+python tools\localization\build_locales.py --dry-run --locale pt-BR
+```
+
+The checked-in `translation_cache.json` is keyed by the Stage-4 source hashes.
+Unchanged strings are reused, changed/new strings are scheduled for translation,
+and reviewed entries in `manual_overrides/<locale>.json` always win even when
+`--force` is requested. Stage 5 bootstraps the 113 pre-existing UI translations
+for each target locale into that cache, so the first Google run starts with
+1,158 untranslated strings per locale rather than retranslating known wording.
+
+For a real Google run, install only the development dependency and configure
+Application Default Credentials plus a project:
+
+```bat
+python -m pip install -r requirements-localization.txt
+gcloud auth application-default login
+set SALIX_T_GOOGLE_PROJECT=your-google-cloud-project-id
+python tools\localization\build_locales.py --dry-run --locale pt-BR
+python tools\localization\build_locales.py --translate --locale pt-BR
+python tools\localization\build_locales.py --validate --locale pt-BR
+```
+
+`--project-id` can be supplied instead of the environment variable. Project
+discovery precedence is explicit `--project-id`, `SALIX_T_GOOGLE_PROJECT`,
+`GOOGLE_CLOUD_PROJECT`, `GCLOUD_PROJECT`, then the project supplied by Google
+Application Default Credentials. `SALIX_T_GOOGLE_LOCATION` / `--location` and
+`SALIX_T_GOOGLE_MODEL` / `--model` are available for advanced development use.
+
+`--no-network` never loads the Google client and rebuilds locale files only from
+source-hash-valid cache entries plus manual overrides. It deliberately refuses
+to trust an old generated translation whose source hash is no longer current;
+that entry is omitted and runtime `en-AU` fallback remains available.
+
+Provider calls are batched, protected placeholders/technical tokens are restored
+and validated before acceptance, HTML entities returned by the provider are
+unescaped, transient Google failures receive bounded retries, and provider/auth
+failures occur before locale/cache files are committed. The cache is written
+last so an interrupted artifact write can at worst cause harmless retranslation
+on the next development run.

@@ -6,12 +6,13 @@ import os
 import queue
 from typing import Optional
 
+from app.localization import localization_manager, tr, tr_value
 from app.version import APP_NAME, APP_VERSION
 
 
 def _build_argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="SalixTorrent (Salix_T) BitTorrent Client"
+        description=tr("cli.parser.description", "SalixTorrent (Salix_T) BitTorrent Client")
     )
     parser.add_argument(
         "--version",
@@ -22,39 +23,39 @@ def _build_argument_parser() -> argparse.ArgumentParser:
         "torrent",
         nargs="?",
         default=None,
-        help="Optional .torrent path or magnet URI to open at launch",
+        help=tr("cli.parser.torrent", "Optional .torrent path or magnet URI to open at launch"),
     )
     parser.add_argument(
         "--cli",
         action="store_true",
-        help="Run in headless CLI mode",
+        help=tr("cli.parser.headless", "Run in headless CLI mode"),
     )
     parser.add_argument(
         "--max-peers",
         type=int,
         default=25,
-        help="Maximum concurrent peer connections",
+        help=tr("cli.parser.max_peers", "Maximum concurrent peer connections"),
     )
     parser.add_argument(
         "--download-dir",
         default=None,
-        help="Override the download directory for this launch",
+        help=tr("cli.parser.download_dir", "Override the download directory for this launch"),
     )
     parser.add_argument(
         "--status-interval",
         type=float,
         default=1.0,
-        help="Headless status output interval in seconds (default: 1.0)",
+        help=tr("cli.parser.status_interval", "Headless status output interval in seconds (default: 1.0)"),
     )
     parser.add_argument(
         "--json-status",
         action="store_true",
-        help="Emit headless progress/status as JSON Lines",
+        help=tr("cli.parser.json_status", "Emit headless progress/status as JSON Lines"),
     )
     parser.add_argument(
         "--exit-on-complete",
         action="store_true",
-        help="In headless mode, exit after the download becomes complete instead of continuing to seed",
+        help=tr("cli.parser.exit_complete", "In headless mode, exit after the download becomes complete instead of continuing to seed"),
     )
 
     # Phase 10 runtime/desktop integration controls. These are intentionally
@@ -63,32 +64,32 @@ def _build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--portable",
         action="store_true",
-        help="Store SalixTorrent state/download defaults beside the executable for this launch",
+        help=tr("cli.parser.portable", "Store SalixTorrent state/download defaults beside the executable for this launch"),
     )
     parser.add_argument(
         "--shell-status",
         action="store_true",
-        help="Report Windows .torrent/magnet handler registration status and exit",
+        help=tr("cli.parser.shell_status", "Report Windows .torrent/magnet handler registration status and exit"),
     )
     parser.add_argument(
         "--register-torrent-handler",
         action="store_true",
-        help="Register SalixTorrent as a per-user .torrent handler and exit",
+        help=tr("cli.parser.register_torrent", "Register SalixTorrent as a per-user .torrent handler and exit"),
     )
     parser.add_argument(
         "--unregister-torrent-handler",
         action="store_true",
-        help="Remove this SalixTorrent executable's per-user .torrent handler and exit",
+        help=tr("cli.parser.unregister_torrent", "Remove this SalixTorrent executable's per-user .torrent handler and exit"),
     )
     parser.add_argument(
         "--register-magnet-handler",
         action="store_true",
-        help="Register this SalixTorrent executable for magnet: links and exit",
+        help=tr("cli.parser.register_magnet", "Register this SalixTorrent executable for magnet: links and exit"),
     )
     parser.add_argument(
         "--unregister-magnet-handler",
         action="store_true",
-        help="Restore/remove this SalixTorrent executable's magnet: handler and exit",
+        help=tr("cli.parser.unregister_magnet", "Restore/remove this SalixTorrent executable's magnet: handler and exit"),
     )
     parser.add_argument(
         "--quiet",
@@ -142,9 +143,12 @@ def _handle_phase10_commands(args: argparse.Namespace) -> Optional[int]:
             print(status.message)
         else:
             print(
-                "SalixTorrent shell integration: "
-                f".torrent={'registered' if status.torrent_handler_registered else 'not registered'}, "
-                f"magnet={'registered' if status.magnet_handler_registered else 'not registered'}"
+                tr(
+                    "cli.shell.integration_status",
+                    "SalixTorrent shell integration: .torrent={torrent}, magnet={magnet}",
+                    torrent=tr_value("Registered" if status.torrent_handler_registered else "Not registered"),
+                    magnet=tr_value("Registered" if status.magnet_handler_registered else "Not registered"),
+                )
             )
 
     if operation_requested and (not shell.supported or not success):
@@ -183,9 +187,10 @@ def main():
             event_queue=event_queue,
             session_persistence_enabled=False,
         )
+        localization_manager().configure(manager.get_app_settings().get("language", "auto"))
         source = args.torrent or "test.torrent"
         if not args.json_status:
-            print("Launching Salix_T in Headless CLI Mode...")
+            print(tr("cli.launch.headless", "Launching Salix_T in Headless CLI Mode..."))
 
         from app.cli.headless import HeadlessOptions, HeadlessRunner
 
@@ -203,7 +208,8 @@ def main():
         raise SystemExit(exit_code)
 
     manager = TorrentManager(event_queue=event_queue)
-    print("Launching Salix_T DearPyGui Desktop Interface...")
+    localization_manager().configure(manager.get_app_settings().get("language", "auto"))
+    print(tr("cli.launch.desktop", "Launching Salix_T DearPyGui Desktop Interface..."))
     manager.start_engine()
 
     try:

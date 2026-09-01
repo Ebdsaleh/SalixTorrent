@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from app.engine.runtime_paths import default_download_directory, state_directory
+from app.localization import AUTO_LOCALE, normalise_locale_code
 from app.logic.connectivity import ConnectivityManager
 from app.logic.network_binding import normalise_bind_address
 from app.logic.tracker_scrape import TrackerScrapeCoordinator
@@ -207,6 +208,7 @@ class TorrentManager:
             "transfer_rate_display_unit": "Auto",
             "ui_font_size": 15,
             "documentation_scale": 100,
+            "language": AUTO_LOCALE,
         }
 
     @classmethod
@@ -314,6 +316,11 @@ class TorrentManager:
             valid_documentation_scales,
             key=lambda scale: abs(scale - requested_documentation_scale),
         )
+
+        # ``auto`` follows the local operating-system user locale. Explicit
+        # values are normalized to one of SalixTorrent's bundled locale packs;
+        # unsupported values fail safely to the canonical en-AU catalog.
+        out["language"] = normalise_locale_code(data.get("language", AUTO_LOCALE))
         return out
 
     def _load_app_settings(self) -> dict:

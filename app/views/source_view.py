@@ -6,6 +6,8 @@ import urllib.parse
 
 import dearpygui.dearpygui as dpg
 
+from app.localization import tr, tr_value
+
 from app.views.help_terms import add_help_tooltip, add_text_tooltip
 
 
@@ -71,12 +73,12 @@ class SourceView:
     def build_view(self, parent_tag):
         with dpg.child_window(parent=parent_tag, height=-1, border=True):
             self.summary_text = dpg.add_text(
-                "Sources: select a torrent to inspect peer discovery",
+                tr('view.source_view.sources_select_a_torrent_to_inspect_peer', "Sources: select a torrent to inspect peer discovery"),
                 color=(100, 180, 255),
             )
             self.note_text = dpg.add_text(
-                "Discovery sources are independent. Waiting is neutral; Timeout is a warning for that "
-                "source, not a torrent failure, while other trackers/DHT/PEX/LAN continue.",
+                tr('view.source_view.discovery_sources_are_independent_waiting_is_neutral', "Discovery sources are independent. Waiting is neutral; Timeout is a warning for that "
+                "source, not a torrent failure, while other trackers/DHT/PEX/LAN continue."),
                 color=(150, 150, 150),
                 wrap=1200,
             )
@@ -94,47 +96,47 @@ class SourceView:
                 height=-1,
             ) as self.table_id:
                 dpg.add_table_column(
-                    label="Source",
+                    label=tr('view.source_view.source', "Source"),
                     width_stretch=True,
                     init_width_or_weight=0.38,
                 )
                 dpg.add_table_column(
-                    label="Type",
+                    label=tr('view.source_view.type', "Type"),
                     width_fixed=True,
                     init_width_or_weight=65,
                 )
                 dpg.add_table_column(
-                    label="Discovery",
+                    label=tr('view.source_view.discovery', "Discovery"),
                     width_fixed=True,
                     init_width_or_weight=95,
                 )
                 dpg.add_table_column(
-                    label="Peers",
+                    label=tr('view.source_view.peers', "Peers"),
                     width_fixed=True,
                     init_width_or_weight=65,
                 )
                 dpg.add_table_column(
-                    label="Swarm S/L",
+                    label=tr('view.source_view.swarm_s_l', "Swarm S/L"),
                     width_fixed=True,
                     init_width_or_weight=95,
                 )
                 dpg.add_table_column(
-                    label="Scrape S/L/C",
+                    label=tr('view.source_view.scrape_s_l_c', "Scrape S/L/C"),
                     width_fixed=True,
                     init_width_or_weight=125,
                 )
                 dpg.add_table_column(
-                    label="Response",
+                    label=tr('view.source_view.response', "Response"),
                     width_fixed=True,
                     init_width_or_weight=90,
                 )
                 dpg.add_table_column(
-                    label="Last Update",
+                    label=tr('view.source_view.last_update', "Last Update"),
                     width_fixed=True,
                     init_width_or_weight=90,
                 )
                 dpg.add_table_column(
-                    label="Detail",
+                    label=tr('view.source_view.detail', "Detail"),
                     width_stretch=True,
                     init_width_or_weight=0.22,
                 )
@@ -460,7 +462,7 @@ class SourceView:
         if self.summary_text and dpg.does_item_exist(self.summary_text):
             dpg.set_value(
                 self.summary_text,
-                "Sources: select a torrent to inspect peer discovery",
+                tr('view.source_view.sources_select_a_torrent_to_inspect_peer', "Sources: select a torrent to inspect peer discovery"),
             )
 
     def render(self, snapshot: dict):
@@ -485,15 +487,10 @@ class SourceView:
 
         if sources:
             summary = (
-                f"Sources: {tracker_count} tracker(s) + DHT + PEX + LAN | "
-                f"Responding: {active_count} | Pending: {pending_count} | "
-                f"Warnings: {warning_count} | Errors: {error_count} | "
-                f"Scrape A/P/W/E: {scrape_active}/{scrape_pending}/{scrape_warnings}/{scrape_errors} | "
-                f"Peers seen - Tracker {tracker_peers} | DHT {dht_peers} | "
-                f"PEX {pex_peers} | LAN {lan_peers}"
+                tr('view.source_view.sources_value_tracker_s_dht_pex_lan_responding_value', 'Sources: {tracker_count} tracker(s) + DHT + PEX + LAN | Responding: {active_count} | Pending: {pending_count} | Warnings: {warning_count} | Errors: {error_count} | Scrape A/P/W/E: {scrape_active}/{scrape_pending}/{scrape_warnings}/{scrape_errors} | Peers seen - Tracker {tracker_peers} | DHT {dht_peers} | PEX {pex_peers} | LAN {lan_peers}', tracker_count=tracker_count, active_count=active_count, pending_count=pending_count, warning_count=warning_count, error_count=error_count, scrape_active=scrape_active, scrape_pending=scrape_pending, scrape_warnings=scrape_warnings, scrape_errors=scrape_errors, tracker_peers=tracker_peers, dht_peers=dht_peers, pex_peers=pex_peers, lan_peers=lan_peers)
             )
         else:
-            summary = "Sources: no peer-discovery telemetry available"
+            summary = tr("view.source_view.sources_no_telemetry", "Sources: no peer-discovery telemetry available")
         dpg.set_value(self.summary_text, summary)
 
         self._clear_rows()
@@ -527,7 +524,7 @@ class SourceView:
                     self._type_help_term(source_type),
                 )
 
-                status_item = dpg.add_text(status, color=color)
+                status_item = dpg.add_text(tr_value(status), color=color)
                 add_text_tooltip(status_item, self._status_tooltip(source), wrap=460)
 
                 peers_item = dpg.add_text(str(peers))

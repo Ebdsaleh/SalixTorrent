@@ -16,6 +16,7 @@ import time
 from dataclasses import dataclass
 from typing import IO, Optional
 
+from app.localization import tr, tr_value
 from app.logic.session import SessionState
 from app.logic.transfer_add import TransferAddRequest
 
@@ -121,7 +122,7 @@ class HeadlessReporter:
         self._last_magnet_stage = stage
         self._last_magnet_at = now
         pct = f" {progress * 100:.0f}%" if 0.0 < progress < 1.0 else ""
-        self.stream.write(f"[Magnet] {stage}{pct}: {message}\n")
+        self.stream.write(tr("cli.magnet.progress", "[Magnet] {stage}{pct}: {message}", stage=stage, pct=pct, message=message) + "\n")
         self.stream.flush()
 
     def transfer_event(self, event: dict, *, force: bool = False) -> bool:
@@ -139,16 +140,20 @@ class HeadlessReporter:
             return True
 
         progress = max(0.0, min(1.0, float(payload["progress"] or 0.0))) * 100.0
-        line = (
-            f"{payload['name']} | {payload['state']} | {progress:6.2f}% | "
-            f"Down {payload['download_kib_s']:.1f} KiB/s | "
-            f"Up {payload['upload_kib_s']:.1f} KiB/s | "
-            f"Peers {payload['peers']} | "
-            f"{self._format_bytes(payload['downloaded_bytes'])} / "
-            f"{self._format_bytes(payload['total_bytes'])}"
+        line = tr(
+            "cli.transfer.status",
+            "{name} | {state} | {progress:6.2f}% | Down {down:.1f} KiB/s | Up {up:.1f} KiB/s | Peers {peers} | {downloaded} / {total}",
+            name=payload["name"],
+            state=tr_value(payload["state"]),
+            progress=progress,
+            down=payload["download_kib_s"],
+            up=payload["upload_kib_s"],
+            peers=payload["peers"],
+            downloaded=self._format_bytes(payload["downloaded_bytes"]),
+            total=self._format_bytes(payload["total_bytes"]),
         )
         if payload["error"]:
-            line += f" | Error: {payload['error']}"
+            line += tr("cli.transfer.error_suffix", " | Error: {error}", error=payload["error"])
         self.stream.write(line + "\n")
         self.stream.flush()
         return True
@@ -225,7 +230,7 @@ class HeadlessRunner:
             )
             target_hash = handle.info_hash
             reporter.message(
-                f"Headless transfer submitted: {source}",
+                tr("cli.transfer.submitted", "Headless transfer submitted: {source}", source=source),
                 event_type="started",
             )
 
@@ -270,17 +275,17 @@ class HeadlessRunner:
 
             if self._stop_requested.is_set():
                 result_code = 128 + self._exit_signal if self._exit_signal else 130
-                reporter.message("Shutdown requested; stopping torrent networking...", event_type="shutdown")
+                reporter.message(tr("cli.shutdown", "Shutdown requested; stopping torrent networking..."), event_type="shutdown")
             elif last_snapshot is not None and str(last_snapshot.get("state") or "") == SessionState.ERROR:
                 result_code = 2
 
             return result_code
         except KeyboardInterrupt:
             self._stop_requested.set()
-            reporter.message("Shutdown requested; stopping torrent networking...", event_type="shutdown")
+            reporter.message(tr("cli.shutdown", "Shutdown requested; stopping torrent networking..."), event_type="shutdown")
             return 130
         except Exception as exc:
-            reporter.message(f"Headless transfer failed: {exc}", event_type="error")
+            reporter.message(tr("cli.transfer.failed", "Headless transfer failed: {error}", error=exc), event_type="error")
             return 2
         finally:
             # TorrentManager owns all networking tasks/sockets.  The headless

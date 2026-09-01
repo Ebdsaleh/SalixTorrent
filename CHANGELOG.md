@@ -4,8 +4,34 @@ Notable SalixTorrent changes are recorded here.
 
 ## Unreleased
 
+### Phase 12 Stage 5 - Translation Pipeline
+
+- Added changed-only Google Cloud Translation v3 generation with `general/translation-llm`, Application Default Credential/project discovery, configurable model/location, bounded batching and transient retry handling.
+- Added non-mutating `--dry-run` translation planning and strict `--no-network` rebuilding from source-hash-valid cache/manual overrides only.
+- Upgraded `translation_cache.json` to a deterministic locale/catalog/key schema tied to the Stage-4 extraction hashes and bootstrapped the existing 113 UI translations per target locale.
+- Made reviewed manual overrides authoritative even under forced regeneration, with placeholder/protected-token validation before generated translations are accepted.
+- Made translation generation fail safely: provider/auth failures occur before target locale artifacts are written, generated JSON uses atomic replacement, and the cache is committed last.
+- Added Stage 5 regression coverage for project discovery, protected-token round trips, cache bootstrap, changed-only translation, manual-override precedence, offline rebuilds, provider-failure rollback and credential-free dry-run planning.
+
+### Phase 12 Stage 4 - Development Extraction Tool
+
+- Made canonical `en-AU` extraction fully reproducible from explicit source declarations rather than retaining stale generated catalog entries.
+- Added deterministic `extraction_manifest.json` source hashes, source locations, placeholder/format contracts, duplicate-key reuse records, and dynamic `tr()` auditing.
+- Added `build_locales.py --check` for non-mutating extraction drift checks and `--report` for extraction diagnostics.
+- Added explicit `ui_static.json` for intentionally indirect canonical UI strings and centralized source-hash/placeholder contracts for extraction, validation, and translation tooling.
+- Added Stage 4 regression coverage for AST extraction, source hashes, duplicate conflicts, dynamic-call auditing, deterministic generation, and extraction validation.
+
 ### Added
 
+- Phase 12 offline localization foundation with a bundled `LocalizationManager`, canonical `en-AU` fallback, `System Default`/explicit locale persistence, and initial `en-AU`, `en-GB`, `en-US`, `pt-BR`, and `fil-PH` locale packs.
+- Development-only localization toolchain under `tools/localization/` for explicit `tr()` AST extraction, semantic Help/Glossary extraction, Google Cloud Translation generation, changed-string caching, protected technical terminology, manual overrides, and catalog/placeholder validation.
+- Separate `requirements-localization.txt` so Google translation tooling is never required or bundled for normal SalixTorrent runtime/build use.
+- Phase 12 localization diagnostics reporting requested/active/canonical locale, bundled catalog size, English fallbacks, format errors, and catalog health.
+- Phase 12 regression coverage for locale normalization, offline fallback, translated UI loading, placeholder safety, developer extraction/protection tools, settings persistence, and PyInstaller locale packaging.
+- Phase 12 Stage 2 presentation-only translation helpers for stable torrent states, priorities, protocol policies and combo values, keeping engine/persistence tokens locale-independent.
+- Phase 12 Stage 2 regression coverage auditing direct Dear PyGui user-facing literals, canonical-value round trips, CLI extraction and localization-aware `.gitignore` policy.
+- Phase 12 Stage 3 renderer-neutral semantic documentation sources under `app/localization/content/`, with stable Help topic/section IDs, stable Glossary term IDs, and locale-neutral cross-links.
+- Phase 12 Stage 3 documentation validation for duplicate/missing semantic IDs, broken related-term links, canonical catalog drift, and frozen-resource packaging.
 - Phase 11 platform-neutral desktop integration controller with semantic tray actions, independent tray/window capability tracking and fail-safe hide/restore policy.
 - Linux/BSD pystray desktop backend with X11 viewport hide/restore/focus support, backend capability reporting and desktop-notification fallback.
 - macOS menu-bar backend with pystray plus AppKit window restore/activation and notification capability detection.
@@ -24,6 +50,13 @@ Notable SalixTorrent changes are recorded here.
 
 ### Changed
 
+- Phase 12 Stage 2 migrates the primary transfer/detail views, Preferences, dialogs, status/progress text, Create Torrent, completion notifications and human-facing CLI output to semantic `tr()` calls; structured/machine-readable data remains locale-independent.
+- Canonical `en-AU` UI extraction now includes presentation values and currently produces 653 UI strings, while incomplete target locales continue to fall back offline to `en-AU` until translation generation is run.
+- `.gitignore` now tracks the Phase 12 design document, locale catalogs, manual overrides, protected terminology and deterministic translation cache while excluding localization credentials and retaining existing build/payload/local-test exclusions.
+- Windows tray/menu commands, the main application menu/toolbar, core Desktop preferences, Help/Glossary shell navigation and diagnostics now consume semantic localization keys while preserving stable internal protocol/state values.
+- Semantic Help topics and the shared hover-help glossary can now be overlaid from bundled locale catalogs without changing topic/term IDs, renderer structure, links or layout policy.
+- Canonical Help/Glossary prose no longer lives in Dear PyGui view modules: `help_topics_view.py` and `help_terms.py` now consume semantic source documents through `app.localization.documents`, while locale catalogs overlay wording by stable IDs.
+- Help section translation keys now use explicit stable section IDs instead of list positions, so article reordering or heading translation does not invalidate existing locale entries.
 - Windows tray actions now restore, raise and focus the Dear PyGui viewport, and tray lifetime is monitored so source and frozen builds share the same recovery behavior.
 - System-tray and native-notification preference wording is platform-neutral and unsupported desktop controls are capability-gated instead of silently accepting unusable settings.
 - The CMD `packaging/build_windows.bat` workflow is tracked as the primary Windows release builder while the PowerShell builder remains available.

@@ -2,6 +2,8 @@
 
 import dearpygui.dearpygui as dpg
 
+from app.localization import tr, tr_value
+
 from app.views.help_terms import add_help_tooltip, add_text_tooltip
 from app.views.transfer_rate import format_transfer_rate, normalize_transfer_rate_unit
 
@@ -18,13 +20,13 @@ class PeerView:
     def build_view(self, parent_tag):
         with dpg.child_window(parent=parent_tag, height=-1, border=True):
             self.summary_text = dpg.add_text(
-                "Peers: select a torrent to inspect its connections",
+                tr('view.peer_view.peers_select_a_torrent_to_inspect_its', "Peers: select a torrent to inspect its connections"),
                 color=(100, 180, 255),
             )
             add_help_tooltip(self.summary_text, "CONNECTED_PEERS")
             flags_help = dpg.add_text(
-                "Flags: I = we are interested | i = peer interested | "
-                "C = peer chokes us | c = we choke peer",
+                tr('view.peer_view.flags_i_we_are_interested_i_peer', "Flags: I = we are interested | i = peer interested | "
+                "C = peer chokes us | c = we choke peer"),
                 color=(150, 150, 150),
             )
             add_help_tooltip(flags_help, "PEER_FLAGS")
@@ -41,57 +43,57 @@ class PeerView:
                 height=-1,
             ) as self.table_id:
                 address_col = dpg.add_table_column(
-                    label="Address",
+                    label=tr('view.peer_view.address', "Address"),
                     width_stretch=True,
                     init_width_or_weight=0.18,
                 )
                 client_col = dpg.add_table_column(
-                    label="Client",
+                    label=tr('view.peer_view.client', "Client"),
                     width_stretch=True,
                     init_width_or_weight=0.16,
                 )
                 source_col = dpg.add_table_column(
-                    label="Source",
+                    label=tr('view.peer_view.source', "Source"),
                     width_fixed=True,
                     init_width_or_weight=85,
                 )
                 direction_col = dpg.add_table_column(
-                    label="Direction",
+                    label=tr('view.peer_view.direction', "Direction"),
                     width_fixed=True,
                     init_width_or_weight=85,
                 )
                 transport_col = dpg.add_table_column(
-                    label="Transport",
+                    label=tr('view.peer_view.transport', "Transport"),
                     width_fixed=True,
                     init_width_or_weight=105,
                 )
                 pieces_col = dpg.add_table_column(
-                    label="Pieces",
+                    label=tr('view.peer_view.pieces', "Pieces"),
                     width_fixed=True,
                     init_width_or_weight=75,
                 )
                 down_col = dpg.add_table_column(
-                    label="Down",
+                    label=tr('view.peer_view.down', "Down"),
                     width_fixed=True,
                     init_width_or_weight=95,
                 )
                 up_col = dpg.add_table_column(
-                    label="Up",
+                    label=tr('view.peer_view.up', "Up"),
                     width_fixed=True,
                     init_width_or_weight=95,
                 )
                 state_col = dpg.add_table_column(
-                    label="State",
+                    label=tr('view.peer_view.state', "State"),
                     width_fixed=True,
                     init_width_or_weight=95,
                 )
                 flags_col = dpg.add_table_column(
-                    label="Flags",
+                    label=tr('view.peer_view.flags', "Flags"),
                     width_fixed=True,
                     init_width_or_weight=70,
                 )
                 age_col = dpg.add_table_column(
-                    label="Age",
+                    label=tr('view.peer_view.age', "Age"),
                     width_fixed=True,
                     init_width_or_weight=70,
                 )
@@ -143,7 +145,7 @@ class PeerView:
         if self.summary_text and dpg.does_item_exist(self.summary_text):
             dpg.set_value(
                 self.summary_text,
-                "Peers: select a torrent to inspect its connections",
+                tr('view.peer_view.peers_select_a_torrent_to_inspect_its', "Peers: select a torrent to inspect its connections"),
             )
 
     def render(self, snapshot: dict):
@@ -162,13 +164,11 @@ class PeerView:
 
         if connected:
             summary = (
-                f"Peers: {connected} connected | IPv4: {ipv4_count} | IPv6: {ipv6_count} | "
-                f"MSE/RC4: {encrypted} | Plaintext: {plaintext} | Policy: {policy} | Torrent state: {state_label}"
+                tr('view.peer_view.peers_value_connected_ipv4_value_ipv6_value_mse_rc4', 'Peers: {connected} connected | IPv4: {ipv4_count} | IPv6: {ipv6_count} | MSE/RC4: {encrypted} | Plaintext: {plaintext} | Policy: {policy} | Torrent state: {state_label}', connected=connected, ipv4_count=ipv4_count, ipv6_count=ipv6_count, encrypted=encrypted, plaintext=plaintext, policy=policy, state_label=state_label)
             )
         else:
             summary = (
-                f"Peers: 0 connected | IPv4: 0 | IPv6: 0 | MSE/RC4: 0 | Plaintext: 0 | Policy: {policy} | "
-                f"Torrent state: {state_label} - waiting for peer connections"
+                tr('view.peer_view.peers_0_connected_ipv4_0_ipv6_0_mse_rc4', 'Peers: 0 connected | IPv4: 0 | IPv6: 0 | MSE/RC4: 0 | Plaintext: 0 | Policy: {policy} | Torrent state: {state_label} - waiting for peer connections', policy=policy, state_label=state_label)
             )
 
         dpg.set_value(self.summary_text, summary)
@@ -180,14 +180,14 @@ class PeerView:
                 client_item = dpg.add_text(str(peer.get("client", "Unknown")))
                 add_text_tooltip(
                     address_item,
-                    f"Peer address\n\nRemote endpoint for this live connection: {peer.get('address', '?')}\n\nThis is a network endpoint, not a user identity. BitTorrent peers can disconnect and reconnect on different ports.",
+                    tr('view.peer_view.peer_address_remote_endpoint_for_this_live_connection', 'Peer address\n\nRemote endpoint for this live connection: {get}\n\nThis is a network endpoint, not a user identity. BitTorrent peers can disconnect and reconnect on different ports.', get=peer.get('address', '?')),
                 )
                 add_text_tooltip(
                     client_item,
-                    f"Peer client\n\nThe remote peer identifies itself as: {peer.get('client', 'Unknown')}\n\nClient identification is decoded from self-reported BitTorrent peer/extension metadata and should be treated as informative rather than cryptographically authenticated.",
+                    tr('view.peer_view.peer_client_the_remote_peer_identifies_itself_as', 'Peer client\n\nThe remote peer identifies itself as: {get}\n\nClient identification is decoded from self-reported BitTorrent peer/extension metadata and should be treated as informative rather than cryptographically authenticated.', get=peer.get('client', 'Unknown')),
                 )
                 source_name = str(peer.get("source", "Unknown"))
-                source_item = dpg.add_text(source_name)
+                source_item = dpg.add_text(tr_value(source_name))
                 source_term = {
                     "Tracker": "TRACKER",
                     "DHT": "DHT",
@@ -196,8 +196,8 @@ class PeerView:
                 }.get(source_name)
                 if source_term:
                     add_help_tooltip(source_item, source_term)
-                direction_item = dpg.add_text(str(peer.get("direction", "--")))
-                transport_item = dpg.add_text(str(peer.get("transport_security", "Plaintext")))
+                direction_item = dpg.add_text(tr_value(peer.get("direction", "--")))
+                transport_item = dpg.add_text(tr_value(peer.get("transport_security", "Plaintext")))
                 progress_item = dpg.add_text(self._format_progress(peer.get("progress")))
                 add_help_tooltip(direction_item, "PEER_DIRECTION")
                 add_help_tooltip(transport_item, "TRANSPORT_SECURITY")

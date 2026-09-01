@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import dearpygui.dearpygui as dpg
 
+from app.localization import canonical_choice, localized_choices, tr
+
 from app.views.help_terms import add_help_tooltip, add_text_tooltip
 from app.views.transfer_rate import (
     choose_plot_unit,
@@ -41,28 +43,28 @@ class SpeedView:
         with dpg.child_window(parent=parent_tag, height=-1, border=True):
             with dpg.group(horizontal=True):
                 self.summary_text = dpg.add_text(
-                    "Speed: select a torrent to inspect transfer history",
+                    tr('view.speed_view.speed_select_a_torrent_to_inspect_transfer', "Speed: select a torrent to inspect transfer history"),
                     color=(100, 180, 255),
                 )
                 add_help_tooltip(self.summary_text, "TRANSFER_RATE")
                 dpg.add_spacer(width=20)
-                window_label = dpg.add_text("Window", color=(160, 160, 160))
+                window_label = dpg.add_text(tr('view.speed_view.window', "Window"), color=(160, 160, 160))
                 add_help_tooltip(window_label, "SPEED_WINDOW")
                 self.window_combo = dpg.add_combo(
-                    items=list(self.WINDOW_OPTIONS.keys()),
-                    default_value="1 minute",
+                    items=localized_choices(self.WINDOW_OPTIONS.keys()),
+                    default_value=localized_choices(("1 minute",))[0],
                     width=115,
                     callback=self._on_window_changed,
                 )
                 add_help_tooltip(self.window_combo, "SPEED_WINDOW")
 
             self.stats_text = dpg.add_text(
-                "Average: Down 0.0 KB/s | Up 0.0 KB/s   Peak: Down 0.0 KB/s | Up 0.0 KB/s",
+                tr('view.speed_view.average_down_0_0_kb_s_up', "Average: Down 0.0 KB/s | Up 0.0 KB/s   Peak: Down 0.0 KB/s | Up 0.0 KB/s"),
                 color=(170, 170, 170),
             )
             add_help_tooltip(self.stats_text, "AVERAGE_PEAK")
             self.limit_text = dpg.add_text(
-                "Limits: Down Unlimited | Up Unlimited",
+                tr('view.speed_view.limits_down_unlimited_up_unlimited', "Limits: Down Unlimited | Up Unlimited"),
                 color=(170, 170, 170),
             )
             add_help_tooltip(self.limit_text, "TRANSFER_LIMITS")
@@ -72,47 +74,47 @@ class SpeedView:
                 dpg.add_plot_legend()
                 self.x_axis = dpg.add_plot_axis(
                     dpg.mvXAxis,
-                    label="Seconds ago",
+                    label=tr('view.speed_view.seconds_ago', "Seconds ago"),
                 )
                 self.y_axis = dpg.add_plot_axis(
                     dpg.mvYAxis,
-                    label="KB/s",
+                    label=tr('view.speed_view.kb_s', "KB/s"),
                 )
 
                 self.download_series = dpg.add_line_series(
                     [],
                     [],
-                    label="Download",
+                    label=tr('view.speed_view.download', "Download"),
                     parent=self.y_axis,
                 )
                 self.upload_series = dpg.add_line_series(
                     [],
                     [],
-                    label="Upload",
+                    label=tr('view.speed_view.upload', "Upload"),
                     parent=self.y_axis,
                 )
                 self.download_limit_series = dpg.add_line_series(
                     [],
                     [],
-                    label="Down Limit",
+                    label=tr('view.speed_view.down_limit', "Down Limit"),
                     parent=self.y_axis,
                 )
                 self.upload_limit_series = dpg.add_line_series(
                     [],
                     [],
-                    label="Up Limit",
+                    label=tr('view.speed_view.up_limit', "Up Limit"),
                     parent=self.y_axis,
                 )
 
-            add_text_tooltip(self.download_series, "Download history\n\nMeasured payload download rate for the selected torrent across the visible time window.")
-            add_text_tooltip(self.upload_series, "Upload history\n\nMeasured payload upload rate for the selected torrent across the visible time window. Upload can occur while downloading as soon as verified pieces are available.")
-            add_text_tooltip(self.download_limit_series, "Download limit line\n\nReference line showing the selected torrent's configured download ceiling when one is active. The global shared limit is reported in the text summary above.")
-            add_text_tooltip(self.upload_limit_series, "Upload limit line\n\nReference line showing the selected torrent's configured upload ceiling when one is active. The global shared limit is reported in the text summary above.")
+            add_text_tooltip(self.download_series, tr('view.speed_view.download_history_measured_payload_download_rate_for', "Download history\n\nMeasured payload download rate for the selected torrent across the visible time window."))
+            add_text_tooltip(self.upload_series, tr('view.speed_view.upload_history_measured_payload_upload_rate_for', "Upload history\n\nMeasured payload upload rate for the selected torrent across the visible time window. Upload can occur while downloading as soon as verified pieces are available."))
+            add_text_tooltip(self.download_limit_series, tr('view.speed_view.download_limit_line_reference_line_showing_the', "Download limit line\n\nReference line showing the selected torrent's configured download ceiling when one is active. The global shared limit is reported in the text summary above."))
+            add_text_tooltip(self.upload_limit_series, tr('view.speed_view.upload_limit_line_reference_line_showing_the', "Upload limit line\n\nReference line showing the selected torrent's configured upload ceiling when one is active. The global shared limit is reported in the text summary above."))
             add_help_tooltip(self.plot_id, "SPEED_HISTORY")
-            add_text_tooltip(self.x_axis, "Time axis\n\nThe graph runs from older samples on the left toward the current moment at 0 seconds on the right.")
+            add_text_tooltip(self.x_axis, tr('view.speed_view.time_axis_the_graph_runs_from_older', "Time axis\n\nThe graph runs from older samples on the left toward the current moment at 0 seconds on the right."))
             add_help_tooltip(self.y_axis, "TRANSFER_RATE")
             history_note = dpg.add_text(
-                "Rolling session history sampled every 0.5 seconds. History resets when SalixTorrent restarts.",
+                tr('view.speed_view.rolling_session_history_sampled_every_0_5', "Rolling session history sampled every 0.5 seconds. History resets when SalixTorrent restarts."),
                 color=(140, 140, 145),
             )
             add_help_tooltip(history_note, "SPEED_HISTORY")
@@ -131,7 +133,7 @@ class SpeedView:
     def _window_seconds(self) -> float:
         if not self.window_combo or not dpg.does_item_exist(self.window_combo):
             return 60.0
-        return self.WINDOW_OPTIONS.get(dpg.get_value(self.window_combo), 60.0)
+        return self.WINDOW_OPTIONS.get(canonical_choice(dpg.get_value(self.window_combo), self.WINDOW_OPTIONS.keys(), "1 minute"), 60.0)
 
     def _on_window_changed(self, sender=None, app_data=None, user_data=None):
         if self._latest_snapshot:
@@ -142,15 +144,15 @@ class SpeedView:
         if self.summary_text and dpg.does_item_exist(self.summary_text):
             dpg.set_value(
                 self.summary_text,
-                "Speed: select a torrent to inspect transfer history",
+                tr('view.speed_view.speed_select_a_torrent_to_inspect_transfer', "Speed: select a torrent to inspect transfer history"),
             )
         if self.stats_text and dpg.does_item_exist(self.stats_text):
             dpg.set_value(
                 self.stats_text,
-                "Average: Down 0.0 KB/s | Up 0.0 KB/s   Peak: Down 0.0 KB/s | Up 0.0 KB/s",
+                tr('view.speed_view.average_down_0_0_kb_s_up', "Average: Down 0.0 KB/s | Up 0.0 KB/s   Peak: Down 0.0 KB/s | Up 0.0 KB/s"),
             )
         if self.limit_text and dpg.does_item_exist(self.limit_text):
-            dpg.set_value(self.limit_text, "Limits: Down Unlimited | Up Unlimited")
+            dpg.set_value(self.limit_text, tr('view.speed_view.limits_down_unlimited_up_unlimited', "Limits: Down Unlimited | Up Unlimited"))
 
         for series in (
             self.download_series,
@@ -178,17 +180,13 @@ class SpeedView:
         dpg.set_value(
             self.summary_text,
             (
-                f"Current: Down {self._format_rate(current_down)} | "
-                f"Up {self._format_rate(current_up)}"
+                tr('view.speed_view.current_down_value_up_value', 'Current: Down {value0} | Up {value1}', value0=self._format_rate(current_down), value1=self._format_rate(current_up))
             ),
         )
         dpg.set_value(
             self.stats_text,
             (
-                f"2-minute average: Down {self._format_rate(average_down)} | "
-                f"Up {self._format_rate(average_up)}   "
-                f"Peak: Down {self._format_rate(peak_down)} | "
-                f"Up {self._format_rate(peak_up)}"
+                tr('view.speed_view.2_minute_average_down_value_up_value_peak', '2-minute average: Down {value0} | Up {value1}   Peak: Down {value2} | Up {value3}', value0=self._format_rate(average_down), value1=self._format_rate(average_up), value2=self._format_rate(peak_down), value3=self._format_rate(peak_up))
             ),
         )
 

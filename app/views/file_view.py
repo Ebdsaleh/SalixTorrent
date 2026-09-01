@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import dearpygui.dearpygui as dpg
 
+from app.localization import tr, tr_value
+
 from app.logic.torrent_manager import TorrentManager
 from app.views.help_terms import add_help_tooltip, add_text_tooltip, contextual_text
 
@@ -42,17 +44,17 @@ class FileView:
     def build_view(self, parent_tag):
         with dpg.child_window(parent=parent_tag, height=-1, border=True):
             self.summary_text = dpg.add_text(
-                "Files: select a torrent to inspect payload files",
+                tr('view.file_view.files_select_a_torrent_to_inspect_payload', "Files: select a torrent to inspect payload files"),
                 color=(100, 180, 255),
             )
-            add_text_tooltip(self.summary_text, "Files view\n\nShows the selected torrent's real payload files, SHA-1-verified progress and selective-download priorities. BitTorrent pieces can cross file boundaries, so file progress is derived from verified piece coverage rather than only file length on disk.")
+            add_text_tooltip(self.summary_text, tr('view.file_view.files_view_shows_the_selected_torrent_s', "Files view\n\nShows the selected torrent's real payload files, SHA-1-verified progress and selective-download priorities. BitTorrent pieces can cross file boundaries, so file progress is derived from verified piece coverage rather than only file length on disk."))
             self.storage_text = dpg.add_text(
-                "Storage Root: --",
+                tr('view.file_view.storage_root', "Storage Root: --"),
                 color=(180, 180, 180),
             )
             add_help_tooltip(self.storage_text, "STORAGE_ROOT")
             self.note_text = dpg.add_text(
-                "Right-click a file to set High, Normal, Low, or Don't Download.",
+                tr('view.file_view.right_click_a_file_to_set_high', "Right-click a file to set High, Normal, Low, or Don't Download."),
                 color=(150, 150, 150),
             )
             add_help_tooltip(self.note_text, "FILE_PRIORITY")
@@ -69,37 +71,37 @@ class FileView:
                 height=-1,
             ) as self.table_id:
                 file_col = dpg.add_table_column(
-                    label="File",
+                    label=tr('view.file_view.file', "File"),
                     width_stretch=True,
                     init_width_or_weight=0.45,
                 )
                 size_col = dpg.add_table_column(
-                    label="Size",
+                    label=tr('view.file_view.size', "Size"),
                     width_fixed=True,
                     init_width_or_weight=95,
                 )
                 progress_col = dpg.add_table_column(
-                    label="Progress",
+                    label=tr('view.file_view.progress', "Progress"),
                     width_fixed=True,
                     init_width_or_weight=90,
                 )
                 pieces_col = dpg.add_table_column(
-                    label="Pieces",
+                    label=tr('view.file_view.pieces', "Pieces"),
                     width_fixed=True,
                     init_width_or_weight=90,
                 )
                 priority_col = dpg.add_table_column(
-                    label="Priority",
+                    label=tr('view.file_view.priority', "Priority"),
                     width_fixed=True,
                     init_width_or_weight=125,
                 )
                 state_col = dpg.add_table_column(
-                    label="State",
+                    label=tr('view.file_view.state', "State"),
                     width_fixed=True,
                     init_width_or_weight=115,
                 )
-                add_text_tooltip(file_col, "File\n\nRelative payload path described by the torrent. Right-click a file row to change selective-download priority.")
-                add_text_tooltip(size_col, "File size\n\nPayload bytes assigned to this file by the torrent metadata.")
+                add_text_tooltip(file_col, tr('view.file_view.file_relative_payload_path_described_by_the', "File\n\nRelative payload path described by the torrent. Right-click a file row to change selective-download priority."))
+                add_text_tooltip(size_col, tr('view.file_view.file_size_payload_bytes_assigned_to_this', "File size\n\nPayload bytes assigned to this file by the torrent metadata."))
                 add_help_tooltip(progress_col, "FILE_PROGRESS")
                 add_help_tooltip(pieces_col, "FILE_PIECES")
                 add_help_tooltip(priority_col, "FILE_PRIORITY")
@@ -150,14 +152,14 @@ class FileView:
         if self.summary_text and dpg.does_item_exist(self.summary_text):
             dpg.set_value(
                 self.summary_text,
-                "Files: select a torrent to inspect payload files",
+                tr('view.file_view.files_select_a_torrent_to_inspect_payload', "Files: select a torrent to inspect payload files"),
             )
         if self.storage_text and dpg.does_item_exist(self.storage_text):
-            dpg.set_value(self.storage_text, "Storage Root: --")
+            dpg.set_value(self.storage_text, tr('view.file_view.storage_root', "Storage Root: --"))
         if self.note_text and dpg.does_item_exist(self.note_text):
             dpg.set_value(
                 self.note_text,
-                "Right-click a file to set High, Normal, Low, or Don't Download.",
+                tr('view.file_view.right_click_a_file_to_set_high', "Right-click a file to set High, Normal, Low, or Don't Download."),
             )
 
     def _set_priority(self, file_index: int, priority: str):
@@ -201,7 +203,7 @@ class FileView:
             autosize=True,
             no_title_bar=True,
         ) as popup_id:
-            priority_title = dpg.add_text("File Priority", color=(180, 160, 255))
+            priority_title = dpg.add_text(tr('view.file_view.file_priority', "File Priority"), color=(180, 160, 255))
             add_help_tooltip(priority_title, "FILE_PRIORITY")
             dpg.add_separator()
             priority_items = {}
@@ -260,7 +262,7 @@ class FileView:
         with dpg.table_row(parent=self.table_id) as row_id:
             path_cell = dpg.add_text(str(record.get("path", "")))
             size_cell = dpg.add_text(self._format_size(record.get("length", 0)))
-            progress_cell = dpg.add_text("0.0%")
+            progress_cell = dpg.add_text(tr('view.file_view.0_0', "0.0%"))
             pieces_cell = dpg.add_text(str(record.get("piece_span", "--")))
             priority_cell = dpg.add_text(priority, color=priority_color)
             state_cell = dpg.add_text(state, color=state_color)
@@ -328,29 +330,25 @@ class FileView:
         dpg.set_value(
             self.summary_text,
             (
-                f"Files: {file_count:,} ({kind}) | "
-                f"Verified: {self._format_size(verified_bytes)} / {self._format_size(total_bytes)} "
-                f"({progress * 100:.2f}%) | Wanted pieces: {wanted_done:,}/{wanted_total:,}"
+                tr('view.file_view.files_value_value_verified_value_value_value_wanted', 'Files: {file_count:,} ({kind}) | Verified: {value2} / {value3} ({value4:.2f}%) | Wanted pieces: {wanted_done:,}/{wanted_total:,}', file_count=file_count, kind=kind, value2=self._format_size(verified_bytes), value3=self._format_size(total_bytes), value4=progress * 100, wanted_done=wanted_done, wanted_total=wanted_total)
             ),
         )
         dpg.set_value(
             self.storage_text,
-            f"Storage Root: {file_view.get('backing_path') or '--'}",
+            tr('view.file_view.storage_root_value', 'Storage Root: {value0}', value0=file_view.get('backing_path') or '--'),
         )
 
         if self._storage_mode == "External Seed":
             note = (
-                "External seed source is read-only; file priorities are disabled while seeding it."
+                tr("view.file_view.external_seed_priority_disabled", "External seed source is read-only; file priorities are disabled while seeding it.")
             )
         elif file_view.get("truncated"):
             note = (
-                f"Showing {displayed_count:,} of {file_count:,} files. Right-click a file to set priority. "
-                "Don't Download skips pieces used only by skipped files."
+                tr('view.file_view.showing_value_of_value_files_right_click_a_file', "Showing {displayed_count:,} of {file_count:,} files. Right-click a file to set priority. Don't Download skips pieces used only by skipped files.", displayed_count=displayed_count, file_count=file_count)
             )
         else:
             note = (
-                "Right-click a file to set priority. Boundary pieces shared with a wanted file may still "
-                "write a small amount into a skipped neighbouring file."
+                tr("view.file_view.priority_boundary_note", "Right-click a file to set priority. Boundary pieces shared with a wanted file may still write a small amount into a skipped neighbouring file.")
             )
         dpg.set_value(self.note_text, note)
 
@@ -374,11 +372,11 @@ class FileView:
 
             dpg.set_value(row["path"], str(record.get("path", "")))
             dpg.set_value(row["size"], self._format_size(record.get("length", 0)))
-            dpg.set_value(row["progress"], f"{progress_value * 100:.1f}%")
+            dpg.set_value(row["progress"], tr('view.file_view.value', '{value0:.1f}%', value0=progress_value * 100))
             dpg.set_value(row["pieces"], str(record.get("piece_span", "--")))
-            dpg.set_value(row["priority"], priority)
+            dpg.set_value(row["priority"], tr_value(priority))
             dpg.configure_item(row["priority"], color=priority_color)
-            dpg.set_value(row["state"], state)
+            dpg.set_value(row["state"], tr_value(state))
             dpg.configure_item(row["state"], color=state_color)
             row["priority_value"] = priority
             self._refresh_priority_menu(row, priority)

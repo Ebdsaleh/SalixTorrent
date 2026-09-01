@@ -1,0 +1,2285 @@
+{
+  "_meta": {
+    "provider": "google-cloud-translate-v3",
+    "schema": 2,
+    "source_locale": "en-AU"
+  },
+  "entries": {
+    "en-GB": {
+      "ui": {
+        "about.summary": {
+          "source_hash": "de1ab0318543077aac0c8698066d456f435b83aa49bafc404447919c11eb2b8e",
+          "status": "seeded-existing",
+          "translation": "A lightweight BitTorrent client and protocol engine written in Python with a Dear PyGui desktop interface."
+        },
+        "about.title": {
+          "source_hash": "f4b4fa7ddff54f6ece0bbaa16aef8a141036bb3cab1415170530e680391c90e1",
+          "status": "seeded-existing",
+          "translation": "About SalixTorrent"
+        },
+        "common.close": {
+          "source_hash": "b6105258a5b0725e7ed48fdd5dbe7443774d9c1742b69e558886c262ad9af658",
+          "status": "seeded-existing",
+          "translation": " Close "
+        },
+        "diagnostics.active_locale": {
+          "source_hash": "88eb544efbdf941752d423fd1bc65dc0ea07a9571430f30b53db03ad483ef73c",
+          "status": "seeded-existing",
+          "translation": "Active locale: {value}"
+        },
+        "diagnostics.canonical_locale": {
+          "source_hash": "3255765fbb7b8ab3b77ee3a93b155f37c49411cf0b394b4a5fea523ebb82b6e4",
+          "status": "seeded-existing",
+          "translation": "Canonical locale: {value}"
+        },
+        "diagnostics.catalog_entries": {
+          "source_hash": "41190b38705eca5fd6e202fd4ba8a57c7690bf0982be3af6e212932bd16bc44f",
+          "status": "seeded-existing",
+          "translation": "Catalog entries loaded: {value}"
+        },
+        "diagnostics.catalog_validation": {
+          "source_hash": "d5a059af41277aaac015cab15ee553ab357c985c91a244c0aca6c6e271df247f",
+          "status": "seeded-existing",
+          "translation": "Catalog validation: {value}"
+        },
+        "diagnostics.copy": {
+          "source_hash": "1259c9b8afbef05b62338a6d7cb043d52e10005fa4dc6408ccaec6f43bbb62ed",
+          "status": "seeded-existing",
+          "translation": " Copy Diagnostics "
+        },
+        "diagnostics.fallback_entries": {
+          "source_hash": "488d45059a4c7d71bf78613a41f7ef3be777a93876796a2b6d104e5b7eedcd9d",
+          "status": "seeded-existing",
+          "translation": "English fallbacks used: {value}"
+        },
+        "diagnostics.format_errors": {
+          "source_hash": "fc0478b653e378026dbfc2b4780be2387035f9fb5fa829d942419bb7ce8fbee5",
+          "status": "seeded-existing",
+          "translation": "Localization format errors: {value}"
+        },
+        "diagnostics.heading": {
+          "source_hash": "5433e7093df6b02c4133e0c1c28d0f9a0cd00e1207036b0843f1bcc61df082d6",
+          "status": "seeded-existing",
+          "translation": "SALIXTORRENT DIAGNOSTICS"
+        },
+        "diagnostics.locale_pack": {
+          "source_hash": "4e2aaba14adaeb830ca62b9e3e4305afe638967a9e872148b2749e3c90cba319",
+          "status": "seeded-existing",
+          "translation": "Locale pack: Bundled"
+        },
+        "diagnostics.locale_source": {
+          "source_hash": "5338861601fb03888b2c3a7f7bc68427adfcfbf2446afa00f19f6803b5e39d49",
+          "status": "seeded-existing",
+          "translation": "Locale source: {value}"
+        },
+        "diagnostics.locale_source_system": {
+          "source_hash": "d8081c667c73359f755864913dd9e6be70e785e8b864d7715b5c41c2b143245b",
+          "status": "seeded-existing",
+          "translation": "System Default"
+        },
+        "diagnostics.locale_source_user": {
+          "source_hash": "66fe732d24717bb8c0c6626938246d34f4d612ad3b3776b56b010da7ce95186b",
+          "status": "seeded-existing",
+          "translation": "User preference"
+        },
+        "diagnostics.localization_heading": {
+          "source_hash": "031c2d79d71a06afcb07712e2125db23368a1f14dd96ce0140027b36bdfb5d30",
+          "status": "seeded-existing",
+          "translation": "Localization"
+        },
+        "diagnostics.open_data": {
+          "source_hash": "0fcd40dfb25968c65a8cadee56f83688b466ad378c7e16f8d3013bf66bf2bdb9",
+          "status": "seeded-existing",
+          "translation": " Open Application Data "
+        },
+        "diagnostics.requested_locale": {
+          "source_hash": "099976f67c06c9ae109ad7e2fa606d1998bea93303ccd0f1313b28a44242e253",
+          "status": "seeded-existing",
+          "translation": "Requested locale: {value}"
+        },
+        "diagnostics.title": {
+          "source_hash": "27fdf72ca0dc95051d04c25397b7419d0e24af298793c3235861fa14718929a5",
+          "status": "seeded-existing",
+          "translation": "SalixTorrent Diagnostics"
+        },
+        "diagnostics.validation_ok": {
+          "source_hash": "565339bc4d33d72817b583024112eb7f5cdf3e5eef0252d6ec1b9c9a94e12bb3",
+          "status": "seeded-existing",
+          "translation": "OK"
+        },
+        "diagnostics.validation_warning": {
+          "source_hash": "e981ddae45d8f4ca53f1ccbe613ad254a041dacf65a06026099a6302d332113b",
+          "status": "seeded-existing",
+          "translation": "Warning"
+        },
+        "help.browse_glossary_index": {
+          "source_hash": "d6802ab328580d4a863e2c8b3ccabb2ddb59f98f2356bdf6e12cf48bb7d9f8e2",
+          "status": "seeded-existing",
+          "translation": "Browse the alphabetical index"
+        },
+        "help.clear": {
+          "source_hash": "6ffeafad9231676b511376ef7f62ca2b4abb4a750346a98f6ffd277084d07b68",
+          "status": "seeded-existing",
+          "translation": " Clear "
+        },
+        "help.contents": {
+          "source_hash": "437aea62a5bd6ad4762e494c81b88532809a231477c82bdecf6fd6636908b7ab",
+          "status": "seeded-existing",
+          "translation": "Contents"
+        },
+        "help.contents_heading": {
+          "source_hash": "eabe6aca2f0dcdbddb32c8f06e6edfa1b78618efaf57d677950d443b91d99175",
+          "status": "seeded-existing",
+          "translation": "CONTENTS"
+        },
+        "help.documentation": {
+          "source_hash": "c205924de0fe636ccdde4ed616fef66f75b78e98b03620637965c033fd161141",
+          "status": "seeded-existing",
+          "translation": "Documentation"
+        },
+        "help.glossary": {
+          "source_hash": "afdbc159ddc4ea6f044d6db900685cfaafe8d71cbb52667cbf50938b69b31301",
+          "status": "seeded-existing",
+          "translation": "Glossary A-Z"
+        },
+        "help.glossary_definition": {
+          "source_hash": "a72e3813d551ff85caa7e049a088a7d0973420099a2431c751177581689f0eff",
+          "status": "seeded-existing",
+          "translation": "Glossary definition"
+        },
+        "help.glossary_heading": {
+          "source_hash": "e3a79fbd7b2b5fbe785cfd2041e06a3db9bb99be9b14b87af006f86dcfa68acd",
+          "status": "seeded-existing",
+          "translation": "GLOSSARY A-Z"
+        },
+        "help.heading": {
+          "source_hash": "b4751753a5c56bdc59cf9938b1c5cd9b6d7584e0e224568abdd747e6c2f1e0ea",
+          "status": "seeded-existing",
+          "translation": "SALIXTORRENT HELP & GLOSSARY"
+        },
+        "help.intro": {
+          "source_hash": "e1381a4c04ac733ea6250de769e5d8fdef19f6de7e665fe7f08510c21c659f81",
+          "status": "seeded-existing",
+          "translation": "Built-in offline reference for BitTorrent concepts, SalixTorrent controls and the technical detail behind the live interface."
+        },
+        "help.related_terms": {
+          "source_hash": "6ab2a2ac3ae81c2bbb7ce6f18aba9b8b476606995bddcb192bdafe091e2c0459",
+          "status": "seeded-existing",
+          "translation": "Related glossary terms"
+        },
+        "help.related_topic": {
+          "source_hash": "bb8a3be88ce376eb6ccde5f6c02a019f69da13e730d0b77da11032fbad125421",
+          "status": "seeded-existing",
+          "translation": "Related help topic"
+        },
+        "help.search": {
+          "source_hash": "49c266baaaa70981ea188fa714d5c40cf13830d786a861c9943ae0d26a7f3fe9",
+          "status": "seeded-existing",
+          "translation": "Search"
+        },
+        "help.search_hint": {
+          "source_hash": "98335d8dc79c2eeef30ad72bbb2c3738572b3bb1e2dc59f6aa0051bb8ee0ea20",
+          "status": "seeded-existing",
+          "translation": "Search topics and glossary..."
+        },
+        "help.search_results": {
+          "source_hash": "16f79ca1812d0d520f86da602ba8471a284a53ad1a57f1bd3d5a6c15df41be16",
+          "status": "seeded-existing",
+          "translation": "{topics} topic(s), {terms} glossary term(s)"
+        },
+        "language.english_au": {
+          "source_hash": "46327b92baf9c00e15cf150b567e6e41c726b8fb418ce11f995b375075da030a",
+          "status": "seeded-existing",
+          "translation": "English (Australia)"
+        },
+        "language.english_gb": {
+          "source_hash": "5fab3416cebd0543dee97fac0d60c463caef919918e621ab853e40cf7a4fec10",
+          "status": "seeded-existing",
+          "translation": "English (United Kingdom)"
+        },
+        "language.english_us": {
+          "source_hash": "b03fc903f9856b10fdd5f068c34d5550d0261320f1d5fe7b24c33d36b31b9b82",
+          "status": "seeded-existing",
+          "translation": "English (United States)"
+        },
+        "language.filipino": {
+          "source_hash": "e8a6062c5c37291ed3c80c0f2e0b035e27d014ed476d26cdca9ede7da0eb73af",
+          "status": "seeded-existing",
+          "translation": "Filipino"
+        },
+        "language.portuguese_br": {
+          "source_hash": "25c0623b1a614c445212e0a13bba500c174f794963f593e7f13ee39b8fac5f78",
+          "status": "seeded-existing",
+          "translation": "Português (Brasil)"
+        },
+        "language.system_default": {
+          "source_hash": "d8081c667c73359f755864913dd9e6be70e785e8b864d7715b5c41c2b143245b",
+          "status": "seeded-existing",
+          "translation": "System Default"
+        },
+        "menu.edit": {
+          "source_hash": "464c4ffd019e1e9691dcf0537c797353ef2b1c1d4833d3d463e5b74ae4547344",
+          "status": "seeded-existing",
+          "translation": "Edit"
+        },
+        "menu.edit.clear_filter": {
+          "source_hash": "45a27501e803074041fb843559cebf7a07a7aa5ac98b5ef4d4f7453b15fe8124",
+          "status": "seeded-existing",
+          "translation": "Clear Search / Filter"
+        },
+        "menu.edit.copy_hash": {
+          "source_hash": "168b2d1de086dc913cd0ffaab8b1aa36aa64e845afd93f79a9b4b02dc1121685",
+          "status": "seeded-existing",
+          "translation": "Copy Info Hash"
+        },
+        "menu.edit.copy_magnet": {
+          "source_hash": "41835629e01b9620dd5392015a152ad9a28183226b11bd59028db15694ea1d8b",
+          "status": "seeded-existing",
+          "translation": "Copy Magnet Link"
+        },
+        "menu.edit.find": {
+          "source_hash": "f12ba7396240cf94d7bfd419f4840213f3e6f8008d182fea14650f86e035880c",
+          "status": "seeded-existing",
+          "translation": "Find Torrents..."
+        },
+        "menu.edit.restore_order": {
+          "source_hash": "7f7840530aff6cf9de2855a20d8ed3b3d665e02b220f962c5229ad81e4bac370",
+          "status": "seeded-existing",
+          "translation": "Restore Queue Order"
+        },
+        "menu.file": {
+          "source_hash": "50009ce1da4d15e1c4a04024df691eed5f0d598e2c4c67092f205366d0adf99e",
+          "status": "seeded-existing",
+          "translation": "File"
+        },
+        "menu.file.create_torrent": {
+          "source_hash": "1f9ff445a71419e271950374bc0f99042764759c62ca108d3ed380e35ed71329",
+          "status": "seeded-existing",
+          "translation": "Create Torrent..."
+        },
+        "menu.file.exit": {
+          "source_hash": "d17d84a604994b722db37b35860b1ac7e8d9e43e725d0eb50702a9f7228a2999",
+          "status": "seeded-existing",
+          "translation": "Exit"
+        },
+        "menu.file.open_magnet": {
+          "source_hash": "a21569886273752535e577cd16f7381288212f2d4b3f515adaaf932704c02537",
+          "status": "seeded-existing",
+          "translation": "Open Magnet Link..."
+        },
+        "menu.file.open_torrent": {
+          "source_hash": "d5811093fb1d79758b71c1878bfa363261fca3f19ee7fbc0043419daf0d3ae9e",
+          "status": "seeded-existing",
+          "translation": "Open Torrent..."
+        },
+        "menu.help": {
+          "source_hash": "b79cac926e0b2e347e72cc91d5174037c9e17ae7733fd7bdb570f71b10cd7bfc",
+          "status": "seeded-existing",
+          "translation": "Help"
+        },
+        "menu.help.about": {
+          "source_hash": "f4b4fa7ddff54f6ece0bbaa16aef8a141036bb3cab1415170530e680391c90e1",
+          "status": "seeded-existing",
+          "translation": "About SalixTorrent"
+        },
+        "menu.help.diagnostics": {
+          "source_hash": "991d77089ad3ca533f0923b45a514b367cf2a51efac915f4417d906b528dabd2",
+          "status": "seeded-existing",
+          "translation": "Diagnostics..."
+        },
+        "menu.help.glossary": {
+          "source_hash": "40688b4ae317987c7de408c4f7682be471feaa6ca292fbfc8c0f57e07eeee99e",
+          "status": "seeded-existing",
+          "translation": "Glossary A-Z..."
+        },
+        "menu.help.shortcuts": {
+          "source_hash": "59cdaa26dd9dcd4cbcded97a7b91029b396bcfdbfd927356facbeb163283a3df",
+          "status": "seeded-existing",
+          "translation": "Keyboard Shortcuts"
+        },
+        "menu.help.topics": {
+          "source_hash": "8dd1d926b79e5f18ff8fa74e9a3b1df29007c9f33c0079022bf62d17447a4d5a",
+          "status": "seeded-existing",
+          "translation": "Help Topics..."
+        },
+        "menu.tools": {
+          "source_hash": "ea93d6a262ecb87a9fa4d09edbd7654c046597936a8e235fc3949eb01775ff99",
+          "status": "seeded-existing",
+          "translation": "Tools"
+        },
+        "menu.tools.app_data": {
+          "source_hash": "e830a298efdab65d750244e84dadfcd20d6f9fb2e6e34d975bb36c1db4d04d19",
+          "status": "seeded-existing",
+          "translation": "Open Application Data Folder"
+        },
+        "menu.tools.preferences": {
+          "source_hash": "60b516276c8b2dbd4248427a24e021ffeb57a4964090c0286749176cf84778bd",
+          "status": "seeded-existing",
+          "translation": "Preferences..."
+        },
+        "menu.tools.remap": {
+          "source_hash": "a5b3b98d07a9c58aa054228ac9b30d1c3b258710256b887bf9afb07a1fa34ac9",
+          "status": "seeded-existing",
+          "translation": "Refresh / Remap Connectivity"
+        },
+        "menu.transfers": {
+          "source_hash": "c417cb88e3fdd02c335b9b4a6b8a34268d5636e897f5436d5394ed79378a2fd1",
+          "status": "seeded-existing",
+          "translation": "Transfers"
+        },
+        "menu.transfers.announce": {
+          "source_hash": "fb3cc8b1792c5e2bf7348128b422a9725a4ee3cce32527ccc36813f9f4c41eb3",
+          "status": "seeded-existing",
+          "translation": "Update / Announce Trackers"
+        },
+        "menu.transfers.high": {
+          "source_hash": "c4ebc6d4a5832cd9415f906ad03661110c705a72381c8b8b145761d02e2dd23a",
+          "status": "seeded-existing",
+          "translation": "High"
+        },
+        "menu.transfers.low": {
+          "source_hash": "f793de205ead5ac302c4a1627829dea41f176b1068b993a32373fc869918374b",
+          "status": "seeded-existing",
+          "translation": "Low"
+        },
+        "menu.transfers.normal": {
+          "source_hash": "a7248eeb45eb1ce247f81693283e22e8b39e8a50890cecd22d02e75025547d90",
+          "status": "seeded-existing",
+          "translation": "Normal"
+        },
+        "menu.transfers.open_folder": {
+          "source_hash": "ca2e314afc5eb388f58ee6579f736ad708654e2211d4b866a13061913d09e409",
+          "status": "seeded-existing",
+          "translation": "Open Download Folder"
+        },
+        "menu.transfers.pause": {
+          "source_hash": "858e4ba7a29fd38b630ed73a79e2738333b3fc6778fafa90252f5556c1262fdc",
+          "status": "seeded-existing",
+          "translation": "Pause"
+        },
+        "menu.transfers.pause_all": {
+          "source_hash": "4078c10ae4930de11d89afd39b68e3afcdb7623ded6cf92fbb414bb793ad95a6",
+          "status": "seeded-existing",
+          "translation": "Pause All"
+        },
+        "menu.transfers.priority": {
+          "source_hash": "d60dbba079223254d4c49c230a515bc107a997e69f811365da2387f8557b9cec",
+          "status": "seeded-existing",
+          "translation": "Priority"
+        },
+        "menu.transfers.properties": {
+          "source_hash": "75e23dc6ce5177f1cd918e8ae8f0030b98ea68eec0d572d32329b5a42305eb8b",
+          "status": "seeded-existing",
+          "translation": "Properties..."
+        },
+        "menu.transfers.recheck": {
+          "source_hash": "7afae3cd7703ab30d9c9f63481f16d2689fa6355bb410776cff6dae39208a6bd",
+          "status": "seeded-existing",
+          "translation": "Force Recheck..."
+        },
+        "menu.transfers.resume": {
+          "source_hash": "d640c7421da066618a39daf4266da5f61f66a9b1afcd626481b831a17064965d",
+          "status": "seeded-existing",
+          "translation": "Resume"
+        },
+        "menu.transfers.resume_all": {
+          "source_hash": "5322a378a19661bcce62fb2dd9e247bb6f0a42fdd8929bb6777c3244bad926bc",
+          "status": "seeded-existing",
+          "translation": "Resume All"
+        },
+        "menu.transfers.retry": {
+          "source_hash": "942087cc2d41e01304b7195558d093d10c72af8e838c7556d6a02d471ee71852",
+          "status": "seeded-existing",
+          "translation": "Retry"
+        },
+        "menu.transfers.start": {
+          "source_hash": "e4bb9f1ece9af9264a3b9e3913bbdb2cf497457167b14ced5f85688bfde74644",
+          "status": "seeded-existing",
+          "translation": "Start"
+        },
+        "menu.transfers.stop": {
+          "source_hash": "cae7d57bc067a514b8e34c9589631a95c7dc051638ddd2a190773269279a99df",
+          "status": "seeded-existing",
+          "translation": "Stop"
+        },
+        "menu.view": {
+          "source_hash": "dcc839a4015c4b7dd9db959a8f757833b8adb92462a751b973386e453c6d58a3",
+          "status": "seeded-existing",
+          "translation": "View"
+        },
+        "menu.view.active_transfers": {
+          "source_hash": "013a15761f0145a906d67cd83da441ca68367de570f1313cd51f32cc657bed5d",
+          "status": "seeded-existing",
+          "translation": "Active Transfers"
+        },
+        "menu.view.create_torrent": {
+          "source_hash": "59331e00d531b8cba67ac3daa4100ce9d9e44c06c6302a3526000ceb9ef32002",
+          "status": "seeded-existing",
+          "translation": "Create Torrent"
+        },
+        "menu.view.preferences": {
+          "source_hash": "66962f72a08883733c35df6f82a049b929f9579f19c4bc083ac99bead602eab3",
+          "status": "seeded-existing",
+          "translation": "Preferences"
+        },
+        "menu.view.torrent_details": {
+          "source_hash": "89bcf0f2e59b424b50ff940c8c353fadeb4054ff06be9e91ec49a5a9aa1aa2f4",
+          "status": "seeded-existing",
+          "translation": "Torrent Details"
+        },
+        "settings.choose_folder": {
+          "source_hash": "f0cddc508de0816f92477396fd40d52f8a37d6987b8f6d563ce74a22a4978f35",
+          "status": "seeded-existing",
+          "translation": " Choose Folder "
+        },
+        "settings.close_tray": {
+          "source_hash": "9a4ba5c9f3774ba544c1860618510127fa5c7c6684d7f12b5fbeffb191dfaef7",
+          "status": "seeded-existing",
+          "translation": "Close window to system tray"
+        },
+        "settings.completion_notices": {
+          "source_hash": "2316d186b8b636e8bc5c0204150321693aff9f839afe5615cf4da9169b59e9b9",
+          "status": "seeded-existing",
+          "translation": "Show in-app completion notices"
+        },
+        "settings.default_download_directory": {
+          "source_hash": "81bfb19a88cb7fe7a3bd749c7e6d718a0f1263d65f473ca4122281ea4f704a91",
+          "status": "seeded-existing",
+          "translation": "Default download directory"
+        },
+        "settings.defaults_restored": {
+          "source_hash": "c24d28b254289a9f9441af74cabc2cbe97a3c0422a4999abeac8e9df96c5b568",
+          "status": "seeded-existing",
+          "translation": "Defaults restored and applied"
+        },
+        "settings.desktop.heading": {
+          "source_hash": "e689bcfc1a296b4b942120b901ce43cbad04dc0337aacc1f61f643f8abe3500b",
+          "status": "seeded-existing",
+          "translation": "DESKTOP"
+        },
+        "settings.documentation_scale": {
+          "source_hash": "7987bf058030b649be51f86652549bbae3411d677ec11613880e243dc3cc3ba0",
+          "status": "seeded-existing",
+          "translation": "Documentation scale"
+        },
+        "settings.heading": {
+          "source_hash": "c6a8117678d00060231bc199223ad668807eeaf806b057dcc75ac24161ce7934",
+          "status": "seeded-existing",
+          "translation": "PREFERENCES"
+        },
+        "settings.interface_text_size": {
+          "source_hash": "ec54ba683b637a0fda49bd5dc2c8d1ff7dbf8fc6f129a4ec7425295f6260acb7",
+          "status": "seeded-existing",
+          "translation": "Interface text size"
+        },
+        "settings.intro": {
+          "source_hash": "42c4e974a1ef635c9fa09748a59717eba1e2541bbee23abbbcc3b237bf53ab43",
+          "status": "seeded-existing",
+          "translation": "Network toggles and global limits apply to active sessions immediately. New-torrent defaults only affect torrents added later."
+        },
+        "settings.language.label": {
+          "source_hash": "89baa99845c54662fd4f34ad4d3424343e4647d158f5057781dc0f5c40ed2f04",
+          "status": "seeded-existing",
+          "translation": "Application language"
+        },
+        "settings.language.restart_note": {
+          "source_hash": "71be8b70fd20a3b98679f76e4d2609c080d6762519e1e06398758ea5348a239c",
+          "status": "seeded-existing",
+          "translation": "Language changes are applied after the interface is rebuilt. Restart SalixTorrent to update every open control and document safely."
+        },
+        "settings.minimize_tray": {
+          "source_hash": "f77e486c08bf1a34cdea8eaa77383ccb46f6f9bafa905285fe0bd9bd5fbcfbfc",
+          "status": "seeded-existing",
+          "translation": "Minimize to system tray"
+        },
+        "settings.native_notifications": {
+          "source_hash": "e4191935fc829a1afe0243a0e2cb9f669005eaf8cddd4a121d26f61675beb9f2",
+          "status": "seeded-existing",
+          "translation": "Show native desktop completion notifications"
+        },
+        "settings.restore_defaults": {
+          "source_hash": "e2de0c74fe3a1d80ee8ae71f9ced3e252b6c942d5d0665f949dcea46bc9779b0",
+          "status": "seeded-existing",
+          "translation": " Restore Defaults "
+        },
+        "settings.save": {
+          "source_hash": "becfd9d5fb952ff8045c1f7ece8bd8bd8160ef4d1632e86e67648f1410981a8f",
+          "status": "seeded-existing",
+          "translation": " Save Preferences "
+        },
+        "settings.saved": {
+          "source_hash": "4e25395c528d71e3ef94a7da94e8c7f698a8d13e67c92d4c0b5427459a15e936",
+          "status": "seeded-existing",
+          "translation": "Preferences saved and applied"
+        },
+        "settings.saved_restart": {
+          "source_hash": "0a6515aab32549e784725cf7f5663d15e025297e72d04671454bc0ee909cef3c",
+          "status": "seeded-existing",
+          "translation": "Preferences saved. Restart SalixTorrent to apply the selected language everywhere."
+        },
+        "settings.system_tray": {
+          "source_hash": "4d8deb72b11389b601eb4192ab7429406941a4388f86769aad5eb571b952cda0",
+          "status": "seeded-existing",
+          "translation": "Enable system tray / menu bar icon and controls"
+        },
+        "settings.transfer_rate_display": {
+          "source_hash": "ee26f177b70034d943d98b48847475c863eca36fc7213ca3dc964779d8c32a9c",
+          "status": "seeded-existing",
+          "translation": "Transfer rate display"
+        },
+        "toolbar.active_transfers": {
+          "source_hash": "e311bcfb4782f200741a2d2814b05c9b55f53554ad923f26d6f39e4fbdeee1c2",
+          "status": "seeded-existing",
+          "translation": " Active Transfers "
+        },
+        "toolbar.brand": {
+          "source_hash": "4f4d3f2a42e6f1179223ff59d303e6e8bd94110ca32ba3c90b29f720d7f91ff4",
+          "status": "seeded-existing",
+          "translation": "SALIX_T // BITTORRENT CLIENT"
+        },
+        "toolbar.create_torrent": {
+          "source_hash": "0f2a998596def7d060d1a2895926386080d76f4bf177fc1ff3911556816de4c5",
+          "status": "seeded-existing",
+          "translation": " Create Torrent "
+        },
+        "toolbar.preferences": {
+          "source_hash": "a3f5a4b3646d7ac627519a275f712cc49704c65b0dbf00fe37bdc186b5f5e581",
+          "status": "seeded-existing",
+          "translation": " Preferences "
+        },
+        "tray.exit": {
+          "source_hash": "d17d84a604994b722db37b35860b1ac7e8d9e43e725d0eb50702a9f7228a2999",
+          "status": "seeded-existing",
+          "translation": "Exit"
+        },
+        "tray.open": {
+          "source_hash": "3365926fd256a9316a219633baaa0bc671ef7b207b76095c81d6af7ff29897d9",
+          "status": "seeded-existing",
+          "translation": "Open SalixTorrent"
+        },
+        "tray.pause_all": {
+          "source_hash": "4078c10ae4930de11d89afd39b68e3afcdb7623ded6cf92fbb414bb793ad95a6",
+          "status": "seeded-existing",
+          "translation": "Pause All"
+        },
+        "tray.resume_all": {
+          "source_hash": "5322a378a19661bcce62fb2dd9e247bb6f0a42fdd8929bb6777c3244bad926bc",
+          "status": "seeded-existing",
+          "translation": "Resume All"
+        },
+        "tray.tooltip": {
+          "source_hash": "91a83117ca8da638fbcbeb71d63546bb318d3786c6a29128a4ddf2af95bab04f",
+          "status": "seeded-existing",
+          "translation": "SalixTorrent (Salix_T)"
+        }
+      }
+    },
+    "en-US": {
+      "ui": {
+        "about.summary": {
+          "source_hash": "de1ab0318543077aac0c8698066d456f435b83aa49bafc404447919c11eb2b8e",
+          "status": "seeded-existing",
+          "translation": "A lightweight BitTorrent client and protocol engine written in Python with a Dear PyGui desktop interface."
+        },
+        "about.title": {
+          "source_hash": "f4b4fa7ddff54f6ece0bbaa16aef8a141036bb3cab1415170530e680391c90e1",
+          "status": "seeded-existing",
+          "translation": "About SalixTorrent"
+        },
+        "common.close": {
+          "source_hash": "b6105258a5b0725e7ed48fdd5dbe7443774d9c1742b69e558886c262ad9af658",
+          "status": "seeded-existing",
+          "translation": " Close "
+        },
+        "diagnostics.active_locale": {
+          "source_hash": "88eb544efbdf941752d423fd1bc65dc0ea07a9571430f30b53db03ad483ef73c",
+          "status": "seeded-existing",
+          "translation": "Active locale: {value}"
+        },
+        "diagnostics.canonical_locale": {
+          "source_hash": "3255765fbb7b8ab3b77ee3a93b155f37c49411cf0b394b4a5fea523ebb82b6e4",
+          "status": "seeded-existing",
+          "translation": "Canonical locale: {value}"
+        },
+        "diagnostics.catalog_entries": {
+          "source_hash": "41190b38705eca5fd6e202fd4ba8a57c7690bf0982be3af6e212932bd16bc44f",
+          "status": "seeded-existing",
+          "translation": "Catalog entries loaded: {value}"
+        },
+        "diagnostics.catalog_validation": {
+          "source_hash": "d5a059af41277aaac015cab15ee553ab357c985c91a244c0aca6c6e271df247f",
+          "status": "seeded-existing",
+          "translation": "Catalog validation: {value}"
+        },
+        "diagnostics.copy": {
+          "source_hash": "1259c9b8afbef05b62338a6d7cb043d52e10005fa4dc6408ccaec6f43bbb62ed",
+          "status": "seeded-existing",
+          "translation": " Copy Diagnostics "
+        },
+        "diagnostics.fallback_entries": {
+          "source_hash": "488d45059a4c7d71bf78613a41f7ef3be777a93876796a2b6d104e5b7eedcd9d",
+          "status": "seeded-existing",
+          "translation": "English fallbacks used: {value}"
+        },
+        "diagnostics.format_errors": {
+          "source_hash": "fc0478b653e378026dbfc2b4780be2387035f9fb5fa829d942419bb7ce8fbee5",
+          "status": "seeded-existing",
+          "translation": "Localization format errors: {value}"
+        },
+        "diagnostics.heading": {
+          "source_hash": "5433e7093df6b02c4133e0c1c28d0f9a0cd00e1207036b0843f1bcc61df082d6",
+          "status": "seeded-existing",
+          "translation": "SALIXTORRENT DIAGNOSTICS"
+        },
+        "diagnostics.locale_pack": {
+          "source_hash": "4e2aaba14adaeb830ca62b9e3e4305afe638967a9e872148b2749e3c90cba319",
+          "status": "seeded-existing",
+          "translation": "Locale pack: Bundled"
+        },
+        "diagnostics.locale_source": {
+          "source_hash": "5338861601fb03888b2c3a7f7bc68427adfcfbf2446afa00f19f6803b5e39d49",
+          "status": "seeded-existing",
+          "translation": "Locale source: {value}"
+        },
+        "diagnostics.locale_source_system": {
+          "source_hash": "d8081c667c73359f755864913dd9e6be70e785e8b864d7715b5c41c2b143245b",
+          "status": "seeded-existing",
+          "translation": "System Default"
+        },
+        "diagnostics.locale_source_user": {
+          "source_hash": "66fe732d24717bb8c0c6626938246d34f4d612ad3b3776b56b010da7ce95186b",
+          "status": "seeded-existing",
+          "translation": "User preference"
+        },
+        "diagnostics.localization_heading": {
+          "source_hash": "031c2d79d71a06afcb07712e2125db23368a1f14dd96ce0140027b36bdfb5d30",
+          "status": "seeded-existing",
+          "translation": "Localization"
+        },
+        "diagnostics.open_data": {
+          "source_hash": "0fcd40dfb25968c65a8cadee56f83688b466ad378c7e16f8d3013bf66bf2bdb9",
+          "status": "seeded-existing",
+          "translation": " Open Application Data "
+        },
+        "diagnostics.requested_locale": {
+          "source_hash": "099976f67c06c9ae109ad7e2fa606d1998bea93303ccd0f1313b28a44242e253",
+          "status": "seeded-existing",
+          "translation": "Requested locale: {value}"
+        },
+        "diagnostics.title": {
+          "source_hash": "27fdf72ca0dc95051d04c25397b7419d0e24af298793c3235861fa14718929a5",
+          "status": "seeded-existing",
+          "translation": "SalixTorrent Diagnostics"
+        },
+        "diagnostics.validation_ok": {
+          "source_hash": "565339bc4d33d72817b583024112eb7f5cdf3e5eef0252d6ec1b9c9a94e12bb3",
+          "status": "seeded-existing",
+          "translation": "OK"
+        },
+        "diagnostics.validation_warning": {
+          "source_hash": "e981ddae45d8f4ca53f1ccbe613ad254a041dacf65a06026099a6302d332113b",
+          "status": "seeded-existing",
+          "translation": "Warning"
+        },
+        "help.browse_glossary_index": {
+          "source_hash": "d6802ab328580d4a863e2c8b3ccabb2ddb59f98f2356bdf6e12cf48bb7d9f8e2",
+          "status": "seeded-existing",
+          "translation": "Browse the alphabetical index"
+        },
+        "help.clear": {
+          "source_hash": "6ffeafad9231676b511376ef7f62ca2b4abb4a750346a98f6ffd277084d07b68",
+          "status": "seeded-existing",
+          "translation": " Clear "
+        },
+        "help.contents": {
+          "source_hash": "437aea62a5bd6ad4762e494c81b88532809a231477c82bdecf6fd6636908b7ab",
+          "status": "seeded-existing",
+          "translation": "Contents"
+        },
+        "help.contents_heading": {
+          "source_hash": "eabe6aca2f0dcdbddb32c8f06e6edfa1b78618efaf57d677950d443b91d99175",
+          "status": "seeded-existing",
+          "translation": "CONTENTS"
+        },
+        "help.documentation": {
+          "source_hash": "c205924de0fe636ccdde4ed616fef66f75b78e98b03620637965c033fd161141",
+          "status": "seeded-existing",
+          "translation": "Documentation"
+        },
+        "help.glossary": {
+          "source_hash": "afdbc159ddc4ea6f044d6db900685cfaafe8d71cbb52667cbf50938b69b31301",
+          "status": "seeded-existing",
+          "translation": "Glossary A-Z"
+        },
+        "help.glossary_definition": {
+          "source_hash": "a72e3813d551ff85caa7e049a088a7d0973420099a2431c751177581689f0eff",
+          "status": "seeded-existing",
+          "translation": "Glossary definition"
+        },
+        "help.glossary_heading": {
+          "source_hash": "e3a79fbd7b2b5fbe785cfd2041e06a3db9bb99be9b14b87af006f86dcfa68acd",
+          "status": "seeded-existing",
+          "translation": "GLOSSARY A-Z"
+        },
+        "help.heading": {
+          "source_hash": "b4751753a5c56bdc59cf9938b1c5cd9b6d7584e0e224568abdd747e6c2f1e0ea",
+          "status": "seeded-existing",
+          "translation": "SALIXTORRENT HELP & GLOSSARY"
+        },
+        "help.intro": {
+          "source_hash": "e1381a4c04ac733ea6250de769e5d8fdef19f6de7e665fe7f08510c21c659f81",
+          "status": "seeded-existing",
+          "translation": "Built-in offline reference for BitTorrent concepts, SalixTorrent controls and the technical detail behind the live interface."
+        },
+        "help.related_terms": {
+          "source_hash": "6ab2a2ac3ae81c2bbb7ce6f18aba9b8b476606995bddcb192bdafe091e2c0459",
+          "status": "seeded-existing",
+          "translation": "Related glossary terms"
+        },
+        "help.related_topic": {
+          "source_hash": "bb8a3be88ce376eb6ccde5f6c02a019f69da13e730d0b77da11032fbad125421",
+          "status": "seeded-existing",
+          "translation": "Related help topic"
+        },
+        "help.search": {
+          "source_hash": "49c266baaaa70981ea188fa714d5c40cf13830d786a861c9943ae0d26a7f3fe9",
+          "status": "seeded-existing",
+          "translation": "Search"
+        },
+        "help.search_hint": {
+          "source_hash": "98335d8dc79c2eeef30ad72bbb2c3738572b3bb1e2dc59f6aa0051bb8ee0ea20",
+          "status": "seeded-existing",
+          "translation": "Search topics and glossary..."
+        },
+        "help.search_results": {
+          "source_hash": "16f79ca1812d0d520f86da602ba8471a284a53ad1a57f1bd3d5a6c15df41be16",
+          "status": "seeded-existing",
+          "translation": "{topics} topic(s), {terms} glossary term(s)"
+        },
+        "language.english_au": {
+          "source_hash": "46327b92baf9c00e15cf150b567e6e41c726b8fb418ce11f995b375075da030a",
+          "status": "seeded-existing",
+          "translation": "English (Australia)"
+        },
+        "language.english_gb": {
+          "source_hash": "5fab3416cebd0543dee97fac0d60c463caef919918e621ab853e40cf7a4fec10",
+          "status": "seeded-existing",
+          "translation": "English (United Kingdom)"
+        },
+        "language.english_us": {
+          "source_hash": "b03fc903f9856b10fdd5f068c34d5550d0261320f1d5fe7b24c33d36b31b9b82",
+          "status": "seeded-existing",
+          "translation": "English (United States)"
+        },
+        "language.filipino": {
+          "source_hash": "e8a6062c5c37291ed3c80c0f2e0b035e27d014ed476d26cdca9ede7da0eb73af",
+          "status": "seeded-existing",
+          "translation": "Filipino"
+        },
+        "language.portuguese_br": {
+          "source_hash": "25c0623b1a614c445212e0a13bba500c174f794963f593e7f13ee39b8fac5f78",
+          "status": "seeded-existing",
+          "translation": "Português (Brasil)"
+        },
+        "language.system_default": {
+          "source_hash": "d8081c667c73359f755864913dd9e6be70e785e8b864d7715b5c41c2b143245b",
+          "status": "seeded-existing",
+          "translation": "System Default"
+        },
+        "menu.edit": {
+          "source_hash": "464c4ffd019e1e9691dcf0537c797353ef2b1c1d4833d3d463e5b74ae4547344",
+          "status": "seeded-existing",
+          "translation": "Edit"
+        },
+        "menu.edit.clear_filter": {
+          "source_hash": "45a27501e803074041fb843559cebf7a07a7aa5ac98b5ef4d4f7453b15fe8124",
+          "status": "seeded-existing",
+          "translation": "Clear Search / Filter"
+        },
+        "menu.edit.copy_hash": {
+          "source_hash": "168b2d1de086dc913cd0ffaab8b1aa36aa64e845afd93f79a9b4b02dc1121685",
+          "status": "seeded-existing",
+          "translation": "Copy Info Hash"
+        },
+        "menu.edit.copy_magnet": {
+          "source_hash": "41835629e01b9620dd5392015a152ad9a28183226b11bd59028db15694ea1d8b",
+          "status": "seeded-existing",
+          "translation": "Copy Magnet Link"
+        },
+        "menu.edit.find": {
+          "source_hash": "f12ba7396240cf94d7bfd419f4840213f3e6f8008d182fea14650f86e035880c",
+          "status": "seeded-existing",
+          "translation": "Find Torrents..."
+        },
+        "menu.edit.restore_order": {
+          "source_hash": "7f7840530aff6cf9de2855a20d8ed3b3d665e02b220f962c5229ad81e4bac370",
+          "status": "seeded-existing",
+          "translation": "Restore Queue Order"
+        },
+        "menu.file": {
+          "source_hash": "50009ce1da4d15e1c4a04024df691eed5f0d598e2c4c67092f205366d0adf99e",
+          "status": "seeded-existing",
+          "translation": "File"
+        },
+        "menu.file.create_torrent": {
+          "source_hash": "1f9ff445a71419e271950374bc0f99042764759c62ca108d3ed380e35ed71329",
+          "status": "seeded-existing",
+          "translation": "Create Torrent..."
+        },
+        "menu.file.exit": {
+          "source_hash": "d17d84a604994b722db37b35860b1ac7e8d9e43e725d0eb50702a9f7228a2999",
+          "status": "seeded-existing",
+          "translation": "Exit"
+        },
+        "menu.file.open_magnet": {
+          "source_hash": "a21569886273752535e577cd16f7381288212f2d4b3f515adaaf932704c02537",
+          "status": "seeded-existing",
+          "translation": "Open Magnet Link..."
+        },
+        "menu.file.open_torrent": {
+          "source_hash": "d5811093fb1d79758b71c1878bfa363261fca3f19ee7fbc0043419daf0d3ae9e",
+          "status": "seeded-existing",
+          "translation": "Open Torrent..."
+        },
+        "menu.help": {
+          "source_hash": "b79cac926e0b2e347e72cc91d5174037c9e17ae7733fd7bdb570f71b10cd7bfc",
+          "status": "seeded-existing",
+          "translation": "Help"
+        },
+        "menu.help.about": {
+          "source_hash": "f4b4fa7ddff54f6ece0bbaa16aef8a141036bb3cab1415170530e680391c90e1",
+          "status": "seeded-existing",
+          "translation": "About SalixTorrent"
+        },
+        "menu.help.diagnostics": {
+          "source_hash": "991d77089ad3ca533f0923b45a514b367cf2a51efac915f4417d906b528dabd2",
+          "status": "seeded-existing",
+          "translation": "Diagnostics..."
+        },
+        "menu.help.glossary": {
+          "source_hash": "40688b4ae317987c7de408c4f7682be471feaa6ca292fbfc8c0f57e07eeee99e",
+          "status": "seeded-existing",
+          "translation": "Glossary A-Z..."
+        },
+        "menu.help.shortcuts": {
+          "source_hash": "59cdaa26dd9dcd4cbcded97a7b91029b396bcfdbfd927356facbeb163283a3df",
+          "status": "seeded-existing",
+          "translation": "Keyboard Shortcuts"
+        },
+        "menu.help.topics": {
+          "source_hash": "8dd1d926b79e5f18ff8fa74e9a3b1df29007c9f33c0079022bf62d17447a4d5a",
+          "status": "seeded-existing",
+          "translation": "Help Topics..."
+        },
+        "menu.tools": {
+          "source_hash": "ea93d6a262ecb87a9fa4d09edbd7654c046597936a8e235fc3949eb01775ff99",
+          "status": "seeded-existing",
+          "translation": "Tools"
+        },
+        "menu.tools.app_data": {
+          "source_hash": "e830a298efdab65d750244e84dadfcd20d6f9fb2e6e34d975bb36c1db4d04d19",
+          "status": "seeded-existing",
+          "translation": "Open Application Data Folder"
+        },
+        "menu.tools.preferences": {
+          "source_hash": "60b516276c8b2dbd4248427a24e021ffeb57a4964090c0286749176cf84778bd",
+          "status": "seeded-existing",
+          "translation": "Preferences..."
+        },
+        "menu.tools.remap": {
+          "source_hash": "a5b3b98d07a9c58aa054228ac9b30d1c3b258710256b887bf9afb07a1fa34ac9",
+          "status": "seeded-existing",
+          "translation": "Refresh / Remap Connectivity"
+        },
+        "menu.transfers": {
+          "source_hash": "c417cb88e3fdd02c335b9b4a6b8a34268d5636e897f5436d5394ed79378a2fd1",
+          "status": "seeded-existing",
+          "translation": "Transfers"
+        },
+        "menu.transfers.announce": {
+          "source_hash": "fb3cc8b1792c5e2bf7348128b422a9725a4ee3cce32527ccc36813f9f4c41eb3",
+          "status": "seeded-existing",
+          "translation": "Update / Announce Trackers"
+        },
+        "menu.transfers.high": {
+          "source_hash": "c4ebc6d4a5832cd9415f906ad03661110c705a72381c8b8b145761d02e2dd23a",
+          "status": "seeded-existing",
+          "translation": "High"
+        },
+        "menu.transfers.low": {
+          "source_hash": "f793de205ead5ac302c4a1627829dea41f176b1068b993a32373fc869918374b",
+          "status": "seeded-existing",
+          "translation": "Low"
+        },
+        "menu.transfers.normal": {
+          "source_hash": "a7248eeb45eb1ce247f81693283e22e8b39e8a50890cecd22d02e75025547d90",
+          "status": "seeded-existing",
+          "translation": "Normal"
+        },
+        "menu.transfers.open_folder": {
+          "source_hash": "ca2e314afc5eb388f58ee6579f736ad708654e2211d4b866a13061913d09e409",
+          "status": "seeded-existing",
+          "translation": "Open Download Folder"
+        },
+        "menu.transfers.pause": {
+          "source_hash": "858e4ba7a29fd38b630ed73a79e2738333b3fc6778fafa90252f5556c1262fdc",
+          "status": "seeded-existing",
+          "translation": "Pause"
+        },
+        "menu.transfers.pause_all": {
+          "source_hash": "4078c10ae4930de11d89afd39b68e3afcdb7623ded6cf92fbb414bb793ad95a6",
+          "status": "seeded-existing",
+          "translation": "Pause All"
+        },
+        "menu.transfers.priority": {
+          "source_hash": "d60dbba079223254d4c49c230a515bc107a997e69f811365da2387f8557b9cec",
+          "status": "seeded-existing",
+          "translation": "Priority"
+        },
+        "menu.transfers.properties": {
+          "source_hash": "75e23dc6ce5177f1cd918e8ae8f0030b98ea68eec0d572d32329b5a42305eb8b",
+          "status": "seeded-existing",
+          "translation": "Properties..."
+        },
+        "menu.transfers.recheck": {
+          "source_hash": "7afae3cd7703ab30d9c9f63481f16d2689fa6355bb410776cff6dae39208a6bd",
+          "status": "seeded-existing",
+          "translation": "Force Recheck..."
+        },
+        "menu.transfers.resume": {
+          "source_hash": "d640c7421da066618a39daf4266da5f61f66a9b1afcd626481b831a17064965d",
+          "status": "seeded-existing",
+          "translation": "Resume"
+        },
+        "menu.transfers.resume_all": {
+          "source_hash": "5322a378a19661bcce62fb2dd9e247bb6f0a42fdd8929bb6777c3244bad926bc",
+          "status": "seeded-existing",
+          "translation": "Resume All"
+        },
+        "menu.transfers.retry": {
+          "source_hash": "942087cc2d41e01304b7195558d093d10c72af8e838c7556d6a02d471ee71852",
+          "status": "seeded-existing",
+          "translation": "Retry"
+        },
+        "menu.transfers.start": {
+          "source_hash": "e4bb9f1ece9af9264a3b9e3913bbdb2cf497457167b14ced5f85688bfde74644",
+          "status": "seeded-existing",
+          "translation": "Start"
+        },
+        "menu.transfers.stop": {
+          "source_hash": "cae7d57bc067a514b8e34c9589631a95c7dc051638ddd2a190773269279a99df",
+          "status": "seeded-existing",
+          "translation": "Stop"
+        },
+        "menu.view": {
+          "source_hash": "dcc839a4015c4b7dd9db959a8f757833b8adb92462a751b973386e453c6d58a3",
+          "status": "seeded-existing",
+          "translation": "View"
+        },
+        "menu.view.active_transfers": {
+          "source_hash": "013a15761f0145a906d67cd83da441ca68367de570f1313cd51f32cc657bed5d",
+          "status": "seeded-existing",
+          "translation": "Active Transfers"
+        },
+        "menu.view.create_torrent": {
+          "source_hash": "59331e00d531b8cba67ac3daa4100ce9d9e44c06c6302a3526000ceb9ef32002",
+          "status": "seeded-existing",
+          "translation": "Create Torrent"
+        },
+        "menu.view.preferences": {
+          "source_hash": "66962f72a08883733c35df6f82a049b929f9579f19c4bc083ac99bead602eab3",
+          "status": "seeded-existing",
+          "translation": "Preferences"
+        },
+        "menu.view.torrent_details": {
+          "source_hash": "89bcf0f2e59b424b50ff940c8c353fadeb4054ff06be9e91ec49a5a9aa1aa2f4",
+          "status": "seeded-existing",
+          "translation": "Torrent Details"
+        },
+        "settings.choose_folder": {
+          "source_hash": "f0cddc508de0816f92477396fd40d52f8a37d6987b8f6d563ce74a22a4978f35",
+          "status": "seeded-existing",
+          "translation": " Choose Folder "
+        },
+        "settings.close_tray": {
+          "source_hash": "9a4ba5c9f3774ba544c1860618510127fa5c7c6684d7f12b5fbeffb191dfaef7",
+          "status": "seeded-existing",
+          "translation": "Close window to system tray"
+        },
+        "settings.completion_notices": {
+          "source_hash": "2316d186b8b636e8bc5c0204150321693aff9f839afe5615cf4da9169b59e9b9",
+          "status": "seeded-existing",
+          "translation": "Show in-app completion notices"
+        },
+        "settings.default_download_directory": {
+          "source_hash": "81bfb19a88cb7fe7a3bd749c7e6d718a0f1263d65f473ca4122281ea4f704a91",
+          "status": "seeded-existing",
+          "translation": "Default download directory"
+        },
+        "settings.defaults_restored": {
+          "source_hash": "c24d28b254289a9f9441af74cabc2cbe97a3c0422a4999abeac8e9df96c5b568",
+          "status": "seeded-existing",
+          "translation": "Defaults restored and applied"
+        },
+        "settings.desktop.heading": {
+          "source_hash": "e689bcfc1a296b4b942120b901ce43cbad04dc0337aacc1f61f643f8abe3500b",
+          "status": "seeded-existing",
+          "translation": "DESKTOP"
+        },
+        "settings.documentation_scale": {
+          "source_hash": "7987bf058030b649be51f86652549bbae3411d677ec11613880e243dc3cc3ba0",
+          "status": "seeded-existing",
+          "translation": "Documentation scale"
+        },
+        "settings.heading": {
+          "source_hash": "c6a8117678d00060231bc199223ad668807eeaf806b057dcc75ac24161ce7934",
+          "status": "seeded-existing",
+          "translation": "PREFERENCES"
+        },
+        "settings.interface_text_size": {
+          "source_hash": "ec54ba683b637a0fda49bd5dc2c8d1ff7dbf8fc6f129a4ec7425295f6260acb7",
+          "status": "seeded-existing",
+          "translation": "Interface text size"
+        },
+        "settings.intro": {
+          "source_hash": "42c4e974a1ef635c9fa09748a59717eba1e2541bbee23abbbcc3b237bf53ab43",
+          "status": "seeded-existing",
+          "translation": "Network toggles and global limits apply to active sessions immediately. New-torrent defaults only affect torrents added later."
+        },
+        "settings.language.label": {
+          "source_hash": "89baa99845c54662fd4f34ad4d3424343e4647d158f5057781dc0f5c40ed2f04",
+          "status": "seeded-existing",
+          "translation": "Application language"
+        },
+        "settings.language.restart_note": {
+          "source_hash": "71be8b70fd20a3b98679f76e4d2609c080d6762519e1e06398758ea5348a239c",
+          "status": "seeded-existing",
+          "translation": "Language changes are applied after the interface is rebuilt. Restart SalixTorrent to update every open control and document safely."
+        },
+        "settings.minimize_tray": {
+          "source_hash": "f77e486c08bf1a34cdea8eaa77383ccb46f6f9bafa905285fe0bd9bd5fbcfbfc",
+          "status": "seeded-existing",
+          "translation": "Minimize to system tray"
+        },
+        "settings.native_notifications": {
+          "source_hash": "e4191935fc829a1afe0243a0e2cb9f669005eaf8cddd4a121d26f61675beb9f2",
+          "status": "seeded-existing",
+          "translation": "Show native desktop completion notifications"
+        },
+        "settings.restore_defaults": {
+          "source_hash": "e2de0c74fe3a1d80ee8ae71f9ced3e252b6c942d5d0665f949dcea46bc9779b0",
+          "status": "seeded-existing",
+          "translation": " Restore Defaults "
+        },
+        "settings.save": {
+          "source_hash": "becfd9d5fb952ff8045c1f7ece8bd8bd8160ef4d1632e86e67648f1410981a8f",
+          "status": "seeded-existing",
+          "translation": " Save Preferences "
+        },
+        "settings.saved": {
+          "source_hash": "4e25395c528d71e3ef94a7da94e8c7f698a8d13e67c92d4c0b5427459a15e936",
+          "status": "seeded-existing",
+          "translation": "Preferences saved and applied"
+        },
+        "settings.saved_restart": {
+          "source_hash": "0a6515aab32549e784725cf7f5663d15e025297e72d04671454bc0ee909cef3c",
+          "status": "seeded-existing",
+          "translation": "Preferences saved. Restart SalixTorrent to apply the selected language everywhere."
+        },
+        "settings.system_tray": {
+          "source_hash": "4d8deb72b11389b601eb4192ab7429406941a4388f86769aad5eb571b952cda0",
+          "status": "seeded-existing",
+          "translation": "Enable system tray / menu bar icon and controls"
+        },
+        "settings.transfer_rate_display": {
+          "source_hash": "ee26f177b70034d943d98b48847475c863eca36fc7213ca3dc964779d8c32a9c",
+          "status": "seeded-existing",
+          "translation": "Transfer rate display"
+        },
+        "toolbar.active_transfers": {
+          "source_hash": "e311bcfb4782f200741a2d2814b05c9b55f53554ad923f26d6f39e4fbdeee1c2",
+          "status": "seeded-existing",
+          "translation": " Active Transfers "
+        },
+        "toolbar.brand": {
+          "source_hash": "4f4d3f2a42e6f1179223ff59d303e6e8bd94110ca32ba3c90b29f720d7f91ff4",
+          "status": "seeded-existing",
+          "translation": "SALIX_T // BITTORRENT CLIENT"
+        },
+        "toolbar.create_torrent": {
+          "source_hash": "0f2a998596def7d060d1a2895926386080d76f4bf177fc1ff3911556816de4c5",
+          "status": "seeded-existing",
+          "translation": " Create Torrent "
+        },
+        "toolbar.preferences": {
+          "source_hash": "a3f5a4b3646d7ac627519a275f712cc49704c65b0dbf00fe37bdc186b5f5e581",
+          "status": "seeded-existing",
+          "translation": " Preferences "
+        },
+        "tray.exit": {
+          "source_hash": "d17d84a604994b722db37b35860b1ac7e8d9e43e725d0eb50702a9f7228a2999",
+          "status": "seeded-existing",
+          "translation": "Exit"
+        },
+        "tray.open": {
+          "source_hash": "3365926fd256a9316a219633baaa0bc671ef7b207b76095c81d6af7ff29897d9",
+          "status": "seeded-existing",
+          "translation": "Open SalixTorrent"
+        },
+        "tray.pause_all": {
+          "source_hash": "4078c10ae4930de11d89afd39b68e3afcdb7623ded6cf92fbb414bb793ad95a6",
+          "status": "seeded-existing",
+          "translation": "Pause All"
+        },
+        "tray.resume_all": {
+          "source_hash": "5322a378a19661bcce62fb2dd9e247bb6f0a42fdd8929bb6777c3244bad926bc",
+          "status": "seeded-existing",
+          "translation": "Resume All"
+        },
+        "tray.tooltip": {
+          "source_hash": "91a83117ca8da638fbcbeb71d63546bb318d3786c6a29128a4ddf2af95bab04f",
+          "status": "seeded-existing",
+          "translation": "SalixTorrent (Salix_T)"
+        }
+      }
+    },
+    "fil-PH": {
+      "ui": {
+        "about.summary": {
+          "source_hash": "de1ab0318543077aac0c8698066d456f435b83aa49bafc404447919c11eb2b8e",
+          "status": "seeded-existing",
+          "translation": "A lightweight BitTorrent client and protocol engine written in Python with a Dear PyGui desktop interface."
+        },
+        "about.title": {
+          "source_hash": "f4b4fa7ddff54f6ece0bbaa16aef8a141036bb3cab1415170530e680391c90e1",
+          "status": "seeded-existing",
+          "translation": "Tungkol sa SalixTorrent"
+        },
+        "common.close": {
+          "source_hash": "b6105258a5b0725e7ed48fdd5dbe7443774d9c1742b69e558886c262ad9af658",
+          "status": "seeded-existing",
+          "translation": " Isara "
+        },
+        "diagnostics.active_locale": {
+          "source_hash": "88eb544efbdf941752d423fd1bc65dc0ea07a9571430f30b53db03ad483ef73c",
+          "status": "seeded-existing",
+          "translation": "Aktibong wika: {value}"
+        },
+        "diagnostics.canonical_locale": {
+          "source_hash": "3255765fbb7b8ab3b77ee3a93b155f37c49411cf0b394b4a5fea523ebb82b6e4",
+          "status": "seeded-existing",
+          "translation": "Canonical na wika: {value}"
+        },
+        "diagnostics.catalog_entries": {
+          "source_hash": "41190b38705eca5fd6e202fd4ba8a57c7690bf0982be3af6e212932bd16bc44f",
+          "status": "seeded-existing",
+          "translation": "Naka-load na catalog entries: {value}"
+        },
+        "diagnostics.catalog_validation": {
+          "source_hash": "d5a059af41277aaac015cab15ee553ab357c985c91a244c0aca6c6e271df247f",
+          "status": "seeded-existing",
+          "translation": "Catalog validation: {value}"
+        },
+        "diagnostics.copy": {
+          "source_hash": "1259c9b8afbef05b62338a6d7cb043d52e10005fa4dc6408ccaec6f43bbb62ed",
+          "status": "seeded-existing",
+          "translation": " Kopyahin ang Diagnostics "
+        },
+        "diagnostics.fallback_entries": {
+          "source_hash": "488d45059a4c7d71bf78613a41f7ef3be777a93876796a2b6d104e5b7eedcd9d",
+          "status": "seeded-existing",
+          "translation": "English fallbacks na ginamit: {value}"
+        },
+        "diagnostics.format_errors": {
+          "source_hash": "fc0478b653e378026dbfc2b4780be2387035f9fb5fa829d942419bb7ce8fbee5",
+          "status": "seeded-existing",
+          "translation": "Localization format errors: {value}"
+        },
+        "diagnostics.heading": {
+          "source_hash": "5433e7093df6b02c4133e0c1c28d0f9a0cd00e1207036b0843f1bcc61df082d6",
+          "status": "seeded-existing",
+          "translation": "SALIXTORRENT DIAGNOSTICS"
+        },
+        "diagnostics.locale_pack": {
+          "source_hash": "4e2aaba14adaeb830ca62b9e3e4305afe638967a9e872148b2749e3c90cba319",
+          "status": "seeded-existing",
+          "translation": "Locale pack: Bundled"
+        },
+        "diagnostics.locale_source": {
+          "source_hash": "5338861601fb03888b2c3a7f7bc68427adfcfbf2446afa00f19f6803b5e39d49",
+          "status": "seeded-existing",
+          "translation": "Pinagmulan ng wika: {value}"
+        },
+        "diagnostics.locale_source_system": {
+          "source_hash": "d8081c667c73359f755864913dd9e6be70e785e8b864d7715b5c41c2b143245b",
+          "status": "seeded-existing",
+          "translation": "Default ng system"
+        },
+        "diagnostics.locale_source_user": {
+          "source_hash": "66fe732d24717bb8c0c6626938246d34f4d612ad3b3776b56b010da7ce95186b",
+          "status": "seeded-existing",
+          "translation": "Kagustuhan ng user"
+        },
+        "diagnostics.localization_heading": {
+          "source_hash": "031c2d79d71a06afcb07712e2125db23368a1f14dd96ce0140027b36bdfb5d30",
+          "status": "seeded-existing",
+          "translation": "Lokalisasyon"
+        },
+        "diagnostics.open_data": {
+          "source_hash": "0fcd40dfb25968c65a8cadee56f83688b466ad378c7e16f8d3013bf66bf2bdb9",
+          "status": "seeded-existing",
+          "translation": " Buksan ang Application Data "
+        },
+        "diagnostics.requested_locale": {
+          "source_hash": "099976f67c06c9ae109ad7e2fa606d1998bea93303ccd0f1313b28a44242e253",
+          "status": "seeded-existing",
+          "translation": "Hiniling na wika: {value}"
+        },
+        "diagnostics.title": {
+          "source_hash": "27fdf72ca0dc95051d04c25397b7419d0e24af298793c3235861fa14718929a5",
+          "status": "seeded-existing",
+          "translation": "SalixTorrent Diagnostics"
+        },
+        "diagnostics.validation_ok": {
+          "source_hash": "565339bc4d33d72817b583024112eb7f5cdf3e5eef0252d6ec1b9c9a94e12bb3",
+          "status": "seeded-existing",
+          "translation": "OK"
+        },
+        "diagnostics.validation_warning": {
+          "source_hash": "e981ddae45d8f4ca53f1ccbe613ad254a041dacf65a06026099a6302d332113b",
+          "status": "seeded-existing",
+          "translation": "Babala"
+        },
+        "help.browse_glossary_index": {
+          "source_hash": "d6802ab328580d4a863e2c8b3ccabb2ddb59f98f2356bdf6e12cf48bb7d9f8e2",
+          "status": "seeded-existing",
+          "translation": "I-browse ang alphabetical index"
+        },
+        "help.clear": {
+          "source_hash": "6ffeafad9231676b511376ef7f62ca2b4abb4a750346a98f6ffd277084d07b68",
+          "status": "seeded-existing",
+          "translation": " I-clear "
+        },
+        "help.contents": {
+          "source_hash": "437aea62a5bd6ad4762e494c81b88532809a231477c82bdecf6fd6636908b7ab",
+          "status": "seeded-existing",
+          "translation": "Mga Nilalaman"
+        },
+        "help.contents_heading": {
+          "source_hash": "eabe6aca2f0dcdbddb32c8f06e6edfa1b78618efaf57d677950d443b91d99175",
+          "status": "seeded-existing",
+          "translation": "MGA NILALAMAN"
+        },
+        "help.documentation": {
+          "source_hash": "c205924de0fe636ccdde4ed616fef66f75b78e98b03620637965c033fd161141",
+          "status": "seeded-existing",
+          "translation": "Dokumentasyon"
+        },
+        "help.glossary": {
+          "source_hash": "afdbc159ddc4ea6f044d6db900685cfaafe8d71cbb52667cbf50938b69b31301",
+          "status": "seeded-existing",
+          "translation": "Glossary A-Z"
+        },
+        "help.glossary_definition": {
+          "source_hash": "a72e3813d551ff85caa7e049a088a7d0973420099a2431c751177581689f0eff",
+          "status": "seeded-existing",
+          "translation": "Kahulugan sa glossary"
+        },
+        "help.glossary_heading": {
+          "source_hash": "e3a79fbd7b2b5fbe785cfd2041e06a3db9bb99be9b14b87af006f86dcfa68acd",
+          "status": "seeded-existing",
+          "translation": "GLOSSARY A-Z"
+        },
+        "help.heading": {
+          "source_hash": "b4751753a5c56bdc59cf9938b1c5cd9b6d7584e0e224568abdd747e6c2f1e0ea",
+          "status": "seeded-existing",
+          "translation": "TULONG AT GLOSSARY NG SALIXTORRENT"
+        },
+        "help.intro": {
+          "source_hash": "e1381a4c04ac733ea6250de769e5d8fdef19f6de7e665fe7f08510c21c659f81",
+          "status": "seeded-existing",
+          "translation": "Built-in offline reference for BitTorrent concepts, SalixTorrent controls and the technical detail behind the live interface."
+        },
+        "help.related_terms": {
+          "source_hash": "6ab2a2ac3ae81c2bbb7ce6f18aba9b8b476606995bddcb192bdafe091e2c0459",
+          "status": "seeded-existing",
+          "translation": "Kaugnay na glossary terms"
+        },
+        "help.related_topic": {
+          "source_hash": "bb8a3be88ce376eb6ccde5f6c02a019f69da13e730d0b77da11032fbad125421",
+          "status": "seeded-existing",
+          "translation": "Kaugnay na paksa ng tulong"
+        },
+        "help.search": {
+          "source_hash": "49c266baaaa70981ea188fa714d5c40cf13830d786a861c9943ae0d26a7f3fe9",
+          "status": "seeded-existing",
+          "translation": "Maghanap"
+        },
+        "help.search_hint": {
+          "source_hash": "98335d8dc79c2eeef30ad72bbb2c3738572b3bb1e2dc59f6aa0051bb8ee0ea20",
+          "status": "seeded-existing",
+          "translation": "Maghanap sa mga paksa at glossary..."
+        },
+        "help.search_results": {
+          "source_hash": "16f79ca1812d0d520f86da602ba8471a284a53ad1a57f1bd3d5a6c15df41be16",
+          "status": "seeded-existing",
+          "translation": "{topics} paksa, {terms} glossary term"
+        },
+        "language.english_au": {
+          "source_hash": "46327b92baf9c00e15cf150b567e6e41c726b8fb418ce11f995b375075da030a",
+          "status": "seeded-existing",
+          "translation": "English (Australia)"
+        },
+        "language.english_gb": {
+          "source_hash": "5fab3416cebd0543dee97fac0d60c463caef919918e621ab853e40cf7a4fec10",
+          "status": "seeded-existing",
+          "translation": "English (United Kingdom)"
+        },
+        "language.english_us": {
+          "source_hash": "b03fc903f9856b10fdd5f068c34d5550d0261320f1d5fe7b24c33d36b31b9b82",
+          "status": "seeded-existing",
+          "translation": "English (United States)"
+        },
+        "language.filipino": {
+          "source_hash": "e8a6062c5c37291ed3c80c0f2e0b035e27d014ed476d26cdca9ede7da0eb73af",
+          "status": "seeded-existing",
+          "translation": "Filipino"
+        },
+        "language.portuguese_br": {
+          "source_hash": "25c0623b1a614c445212e0a13bba500c174f794963f593e7f13ee39b8fac5f78",
+          "status": "seeded-existing",
+          "translation": "Português (Brasil)"
+        },
+        "language.system_default": {
+          "source_hash": "d8081c667c73359f755864913dd9e6be70e785e8b864d7715b5c41c2b143245b",
+          "status": "seeded-existing",
+          "translation": "System Default"
+        },
+        "menu.edit": {
+          "source_hash": "464c4ffd019e1e9691dcf0537c797353ef2b1c1d4833d3d463e5b74ae4547344",
+          "status": "seeded-existing",
+          "translation": "I-edit"
+        },
+        "menu.edit.clear_filter": {
+          "source_hash": "45a27501e803074041fb843559cebf7a07a7aa5ac98b5ef4d4f7453b15fe8124",
+          "status": "seeded-existing",
+          "translation": "I-clear ang paghahanap / filter"
+        },
+        "menu.edit.copy_hash": {
+          "source_hash": "168b2d1de086dc913cd0ffaab8b1aa36aa64e845afd93f79a9b4b02dc1121685",
+          "status": "seeded-existing",
+          "translation": "Kopyahin ang info hash"
+        },
+        "menu.edit.copy_magnet": {
+          "source_hash": "41835629e01b9620dd5392015a152ad9a28183226b11bd59028db15694ea1d8b",
+          "status": "seeded-existing",
+          "translation": "Kopyahin ang magnet link"
+        },
+        "menu.edit.find": {
+          "source_hash": "f12ba7396240cf94d7bfd419f4840213f3e6f8008d182fea14650f86e035880c",
+          "status": "seeded-existing",
+          "translation": "Maghanap ng torrents..."
+        },
+        "menu.edit.restore_order": {
+          "source_hash": "7f7840530aff6cf9de2855a20d8ed3b3d665e02b220f962c5229ad81e4bac370",
+          "status": "seeded-existing",
+          "translation": "Ibalik ang ayos ng queue"
+        },
+        "menu.file": {
+          "source_hash": "50009ce1da4d15e1c4a04024df691eed5f0d598e2c4c67092f205366d0adf99e",
+          "status": "seeded-existing",
+          "translation": "File"
+        },
+        "menu.file.create_torrent": {
+          "source_hash": "1f9ff445a71419e271950374bc0f99042764759c62ca108d3ed380e35ed71329",
+          "status": "seeded-existing",
+          "translation": "Gumawa ng torrent..."
+        },
+        "menu.file.exit": {
+          "source_hash": "d17d84a604994b722db37b35860b1ac7e8d9e43e725d0eb50702a9f7228a2999",
+          "status": "seeded-existing",
+          "translation": "Lumabas"
+        },
+        "menu.file.open_magnet": {
+          "source_hash": "a21569886273752535e577cd16f7381288212f2d4b3f515adaaf932704c02537",
+          "status": "seeded-existing",
+          "translation": "Buksan ang magnet link..."
+        },
+        "menu.file.open_torrent": {
+          "source_hash": "d5811093fb1d79758b71c1878bfa363261fca3f19ee7fbc0043419daf0d3ae9e",
+          "status": "seeded-existing",
+          "translation": "Buksan ang torrent..."
+        },
+        "menu.help": {
+          "source_hash": "b79cac926e0b2e347e72cc91d5174037c9e17ae7733fd7bdb570f71b10cd7bfc",
+          "status": "seeded-existing",
+          "translation": "Tulong"
+        },
+        "menu.help.about": {
+          "source_hash": "f4b4fa7ddff54f6ece0bbaa16aef8a141036bb3cab1415170530e680391c90e1",
+          "status": "seeded-existing",
+          "translation": "Tungkol sa SalixTorrent"
+        },
+        "menu.help.diagnostics": {
+          "source_hash": "991d77089ad3ca533f0923b45a514b367cf2a51efac915f4417d906b528dabd2",
+          "status": "seeded-existing",
+          "translation": "Diagnostics..."
+        },
+        "menu.help.glossary": {
+          "source_hash": "40688b4ae317987c7de408c4f7682be471feaa6ca292fbfc8c0f57e07eeee99e",
+          "status": "seeded-existing",
+          "translation": "Glossary A-Z..."
+        },
+        "menu.help.shortcuts": {
+          "source_hash": "59cdaa26dd9dcd4cbcded97a7b91029b396bcfdbfd927356facbeb163283a3df",
+          "status": "seeded-existing",
+          "translation": "Mga keyboard shortcut"
+        },
+        "menu.help.topics": {
+          "source_hash": "8dd1d926b79e5f18ff8fa74e9a3b1df29007c9f33c0079022bf62d17447a4d5a",
+          "status": "seeded-existing",
+          "translation": "Mga paksa ng tulong..."
+        },
+        "menu.tools": {
+          "source_hash": "ea93d6a262ecb87a9fa4d09edbd7654c046597936a8e235fc3949eb01775ff99",
+          "status": "seeded-existing",
+          "translation": "Mga Tool"
+        },
+        "menu.tools.app_data": {
+          "source_hash": "e830a298efdab65d750244e84dadfcd20d6f9fb2e6e34d975bb36c1db4d04d19",
+          "status": "seeded-existing",
+          "translation": "Buksan ang application data folder"
+        },
+        "menu.tools.preferences": {
+          "source_hash": "60b516276c8b2dbd4248427a24e021ffeb57a4964090c0286749176cf84778bd",
+          "status": "seeded-existing",
+          "translation": "Mga Kagustuhan..."
+        },
+        "menu.tools.remap": {
+          "source_hash": "a5b3b98d07a9c58aa054228ac9b30d1c3b258710256b887bf9afb07a1fa34ac9",
+          "status": "seeded-existing",
+          "translation": "I-refresh / i-remap ang koneksyon"
+        },
+        "menu.transfers": {
+          "source_hash": "c417cb88e3fdd02c335b9b4a6b8a34268d5636e897f5436d5394ed79378a2fd1",
+          "status": "seeded-existing",
+          "translation": "Transfers"
+        },
+        "menu.transfers.announce": {
+          "source_hash": "fb3cc8b1792c5e2bf7348128b422a9725a4ee3cce32527ccc36813f9f4c41eb3",
+          "status": "seeded-existing",
+          "translation": "I-update / i-announce ang trackers"
+        },
+        "menu.transfers.high": {
+          "source_hash": "c4ebc6d4a5832cd9415f906ad03661110c705a72381c8b8b145761d02e2dd23a",
+          "status": "seeded-existing",
+          "translation": "Mataas"
+        },
+        "menu.transfers.low": {
+          "source_hash": "f793de205ead5ac302c4a1627829dea41f176b1068b993a32373fc869918374b",
+          "status": "seeded-existing",
+          "translation": "Mababa"
+        },
+        "menu.transfers.normal": {
+          "source_hash": "a7248eeb45eb1ce247f81693283e22e8b39e8a50890cecd22d02e75025547d90",
+          "status": "seeded-existing",
+          "translation": "Normal"
+        },
+        "menu.transfers.open_folder": {
+          "source_hash": "ca2e314afc5eb388f58ee6579f736ad708654e2211d4b866a13061913d09e409",
+          "status": "seeded-existing",
+          "translation": "Buksan ang download folder"
+        },
+        "menu.transfers.pause": {
+          "source_hash": "858e4ba7a29fd38b630ed73a79e2738333b3fc6778fafa90252f5556c1262fdc",
+          "status": "seeded-existing",
+          "translation": "I-pause"
+        },
+        "menu.transfers.pause_all": {
+          "source_hash": "4078c10ae4930de11d89afd39b68e3afcdb7623ded6cf92fbb414bb793ad95a6",
+          "status": "seeded-existing",
+          "translation": "I-pause lahat"
+        },
+        "menu.transfers.priority": {
+          "source_hash": "d60dbba079223254d4c49c230a515bc107a997e69f811365da2387f8557b9cec",
+          "status": "seeded-existing",
+          "translation": "Prayoridad"
+        },
+        "menu.transfers.properties": {
+          "source_hash": "75e23dc6ce5177f1cd918e8ae8f0030b98ea68eec0d572d32329b5a42305eb8b",
+          "status": "seeded-existing",
+          "translation": "Mga Property..."
+        },
+        "menu.transfers.recheck": {
+          "source_hash": "7afae3cd7703ab30d9c9f63481f16d2689fa6355bb410776cff6dae39208a6bd",
+          "status": "seeded-existing",
+          "translation": "Pilitin ang muling pag-check..."
+        },
+        "menu.transfers.resume": {
+          "source_hash": "d640c7421da066618a39daf4266da5f61f66a9b1afcd626481b831a17064965d",
+          "status": "seeded-existing",
+          "translation": "Ipagpatuloy"
+        },
+        "menu.transfers.resume_all": {
+          "source_hash": "5322a378a19661bcce62fb2dd9e247bb6f0a42fdd8929bb6777c3244bad926bc",
+          "status": "seeded-existing",
+          "translation": "Ipagpatuloy lahat"
+        },
+        "menu.transfers.retry": {
+          "source_hash": "942087cc2d41e01304b7195558d093d10c72af8e838c7556d6a02d471ee71852",
+          "status": "seeded-existing",
+          "translation": "Subukan muli"
+        },
+        "menu.transfers.start": {
+          "source_hash": "e4bb9f1ece9af9264a3b9e3913bbdb2cf497457167b14ced5f85688bfde74644",
+          "status": "seeded-existing",
+          "translation": "Simulan"
+        },
+        "menu.transfers.stop": {
+          "source_hash": "cae7d57bc067a514b8e34c9589631a95c7dc051638ddd2a190773269279a99df",
+          "status": "seeded-existing",
+          "translation": "Itigil"
+        },
+        "menu.view": {
+          "source_hash": "dcc839a4015c4b7dd9db959a8f757833b8adb92462a751b973386e453c6d58a3",
+          "status": "seeded-existing",
+          "translation": "Tingnan"
+        },
+        "menu.view.active_transfers": {
+          "source_hash": "013a15761f0145a906d67cd83da441ca68367de570f1313cd51f32cc657bed5d",
+          "status": "seeded-existing",
+          "translation": "Aktibong transfers"
+        },
+        "menu.view.create_torrent": {
+          "source_hash": "59331e00d531b8cba67ac3daa4100ce9d9e44c06c6302a3526000ceb9ef32002",
+          "status": "seeded-existing",
+          "translation": "Gumawa ng torrent"
+        },
+        "menu.view.preferences": {
+          "source_hash": "66962f72a08883733c35df6f82a049b929f9579f19c4bc083ac99bead602eab3",
+          "status": "seeded-existing",
+          "translation": "Mga Kagustuhan"
+        },
+        "menu.view.torrent_details": {
+          "source_hash": "89bcf0f2e59b424b50ff940c8c353fadeb4054ff06be9e91ec49a5a9aa1aa2f4",
+          "status": "seeded-existing",
+          "translation": "Detalye ng torrent"
+        },
+        "settings.choose_folder": {
+          "source_hash": "f0cddc508de0816f92477396fd40d52f8a37d6987b8f6d563ce74a22a4978f35",
+          "status": "seeded-existing",
+          "translation": " Pumili ng Folder "
+        },
+        "settings.close_tray": {
+          "source_hash": "9a4ba5c9f3774ba544c1860618510127fa5c7c6684d7f12b5fbeffb191dfaef7",
+          "status": "seeded-existing",
+          "translation": "Isara ang window sa system tray"
+        },
+        "settings.completion_notices": {
+          "source_hash": "2316d186b8b636e8bc5c0204150321693aff9f839afe5615cf4da9169b59e9b9",
+          "status": "seeded-existing",
+          "translation": "Ipakita ang completion notices sa app"
+        },
+        "settings.default_download_directory": {
+          "source_hash": "81bfb19a88cb7fe7a3bd749c7e6d718a0f1263d65f473ca4122281ea4f704a91",
+          "status": "seeded-existing",
+          "translation": "Default na download directory"
+        },
+        "settings.defaults_restored": {
+          "source_hash": "c24d28b254289a9f9441af74cabc2cbe97a3c0422a4999abeac8e9df96c5b568",
+          "status": "seeded-existing",
+          "translation": "Naibalik at nailapat ang defaults"
+        },
+        "settings.desktop.heading": {
+          "source_hash": "e689bcfc1a296b4b942120b901ce43cbad04dc0337aacc1f61f643f8abe3500b",
+          "status": "seeded-existing",
+          "translation": "DESKTOP"
+        },
+        "settings.documentation_scale": {
+          "source_hash": "7987bf058030b649be51f86652549bbae3411d677ec11613880e243dc3cc3ba0",
+          "status": "seeded-existing",
+          "translation": "Sukat ng dokumentasyon"
+        },
+        "settings.heading": {
+          "source_hash": "c6a8117678d00060231bc199223ad668807eeaf806b057dcc75ac24161ce7934",
+          "status": "seeded-existing",
+          "translation": "MGA KAGUSTUHAN"
+        },
+        "settings.interface_text_size": {
+          "source_hash": "ec54ba683b637a0fda49bd5dc2c8d1ff7dbf8fc6f129a4ec7425295f6260acb7",
+          "status": "seeded-existing",
+          "translation": "Laki ng teksto ng interface"
+        },
+        "settings.intro": {
+          "source_hash": "42c4e974a1ef635c9fa09748a59717eba1e2541bbee23abbbcc3b237bf53ab43",
+          "status": "seeded-existing",
+          "translation": "Network toggles and global limits apply to active sessions immediately. New-torrent defaults only affect torrents added later."
+        },
+        "settings.language.label": {
+          "source_hash": "89baa99845c54662fd4f34ad4d3424343e4647d158f5057781dc0f5c40ed2f04",
+          "status": "seeded-existing",
+          "translation": "Wika ng application"
+        },
+        "settings.language.restart_note": {
+          "source_hash": "71be8b70fd20a3b98679f76e4d2609c080d6762519e1e06398758ea5348a239c",
+          "status": "seeded-existing",
+          "translation": "Mailalapat ang pagbabago ng wika matapos muling buuin ang interface. I-restart ang SalixTorrent upang ligtas na ma-update ang lahat ng bukas na control at dokumento."
+        },
+        "settings.minimize_tray": {
+          "source_hash": "f77e486c08bf1a34cdea8eaa77383ccb46f6f9bafa905285fe0bd9bd5fbcfbfc",
+          "status": "seeded-existing",
+          "translation": "I-minimize sa system tray"
+        },
+        "settings.native_notifications": {
+          "source_hash": "e4191935fc829a1afe0243a0e2cb9f669005eaf8cddd4a121d26f61675beb9f2",
+          "status": "seeded-existing",
+          "translation": "Ipakita ang native desktop completion notifications"
+        },
+        "settings.restore_defaults": {
+          "source_hash": "e2de0c74fe3a1d80ee8ae71f9ced3e252b6c942d5d0665f949dcea46bc9779b0",
+          "status": "seeded-existing",
+          "translation": " Ibalik ang Defaults "
+        },
+        "settings.save": {
+          "source_hash": "becfd9d5fb952ff8045c1f7ece8bd8bd8160ef4d1632e86e67648f1410981a8f",
+          "status": "seeded-existing",
+          "translation": " I-save ang mga Kagustuhan "
+        },
+        "settings.saved": {
+          "source_hash": "4e25395c528d71e3ef94a7da94e8c7f698a8d13e67c92d4c0b5427459a15e936",
+          "status": "seeded-existing",
+          "translation": "Na-save at nailapat ang mga kagustuhan"
+        },
+        "settings.saved_restart": {
+          "source_hash": "0a6515aab32549e784725cf7f5663d15e025297e72d04671454bc0ee909cef3c",
+          "status": "seeded-existing",
+          "translation": "Na-save ang mga kagustuhan. I-restart ang SalixTorrent upang mailapat ang napiling wika sa buong interface."
+        },
+        "settings.system_tray": {
+          "source_hash": "4d8deb72b11389b601eb4192ab7429406941a4388f86769aad5eb571b952cda0",
+          "status": "seeded-existing",
+          "translation": "I-enable ang system tray / menu bar icon at controls"
+        },
+        "settings.transfer_rate_display": {
+          "source_hash": "ee26f177b70034d943d98b48847475c863eca36fc7213ca3dc964779d8c32a9c",
+          "status": "seeded-existing",
+          "translation": "Display ng transfer rate"
+        },
+        "toolbar.active_transfers": {
+          "source_hash": "e311bcfb4782f200741a2d2814b05c9b55f53554ad923f26d6f39e4fbdeee1c2",
+          "status": "seeded-existing",
+          "translation": " Aktibong Transfers "
+        },
+        "toolbar.brand": {
+          "source_hash": "4f4d3f2a42e6f1179223ff59d303e6e8bd94110ca32ba3c90b29f720d7f91ff4",
+          "status": "seeded-existing",
+          "translation": "SALIX_T // BITTORRENT CLIENT"
+        },
+        "toolbar.create_torrent": {
+          "source_hash": "0f2a998596def7d060d1a2895926386080d76f4bf177fc1ff3911556816de4c5",
+          "status": "seeded-existing",
+          "translation": " Gumawa ng Torrent "
+        },
+        "toolbar.preferences": {
+          "source_hash": "a3f5a4b3646d7ac627519a275f712cc49704c65b0dbf00fe37bdc186b5f5e581",
+          "status": "seeded-existing",
+          "translation": " Mga Kagustuhan "
+        },
+        "tray.exit": {
+          "source_hash": "d17d84a604994b722db37b35860b1ac7e8d9e43e725d0eb50702a9f7228a2999",
+          "status": "seeded-existing",
+          "translation": "Lumabas"
+        },
+        "tray.open": {
+          "source_hash": "3365926fd256a9316a219633baaa0bc671ef7b207b76095c81d6af7ff29897d9",
+          "status": "seeded-existing",
+          "translation": "Buksan ang SalixTorrent"
+        },
+        "tray.pause_all": {
+          "source_hash": "4078c10ae4930de11d89afd39b68e3afcdb7623ded6cf92fbb414bb793ad95a6",
+          "status": "seeded-existing",
+          "translation": "I-pause lahat"
+        },
+        "tray.resume_all": {
+          "source_hash": "5322a378a19661bcce62fb2dd9e247bb6f0a42fdd8929bb6777c3244bad926bc",
+          "status": "seeded-existing",
+          "translation": "Ipagpatuloy lahat"
+        },
+        "tray.tooltip": {
+          "source_hash": "91a83117ca8da638fbcbeb71d63546bb318d3786c6a29128a4ddf2af95bab04f",
+          "status": "seeded-existing",
+          "translation": "SalixTorrent (Salix_T)"
+        }
+      }
+    },
+    "pt-BR": {
+      "ui": {
+        "about.summary": {
+          "source_hash": "de1ab0318543077aac0c8698066d456f435b83aa49bafc404447919c11eb2b8e",
+          "status": "seeded-existing",
+          "translation": "A lightweight BitTorrent client and protocol engine written in Python with a Dear PyGui desktop interface."
+        },
+        "about.title": {
+          "source_hash": "f4b4fa7ddff54f6ece0bbaa16aef8a141036bb3cab1415170530e680391c90e1",
+          "status": "seeded-existing",
+          "translation": "Sobre o SalixTorrent"
+        },
+        "common.close": {
+          "source_hash": "b6105258a5b0725e7ed48fdd5dbe7443774d9c1742b69e558886c262ad9af658",
+          "status": "seeded-existing",
+          "translation": " Fechar "
+        },
+        "diagnostics.active_locale": {
+          "source_hash": "88eb544efbdf941752d423fd1bc65dc0ea07a9571430f30b53db03ad483ef73c",
+          "status": "seeded-existing",
+          "translation": "Idioma ativo: {value}"
+        },
+        "diagnostics.canonical_locale": {
+          "source_hash": "3255765fbb7b8ab3b77ee3a93b155f37c49411cf0b394b4a5fea523ebb82b6e4",
+          "status": "seeded-existing",
+          "translation": "Idioma canônico: {value}"
+        },
+        "diagnostics.catalog_entries": {
+          "source_hash": "41190b38705eca5fd6e202fd4ba8a57c7690bf0982be3af6e212932bd16bc44f",
+          "status": "seeded-existing",
+          "translation": "Entradas de catálogo carregadas: {value}"
+        },
+        "diagnostics.catalog_validation": {
+          "source_hash": "d5a059af41277aaac015cab15ee553ab357c985c91a244c0aca6c6e271df247f",
+          "status": "seeded-existing",
+          "translation": "Validação do catálogo: {value}"
+        },
+        "diagnostics.copy": {
+          "source_hash": "1259c9b8afbef05b62338a6d7cb043d52e10005fa4dc6408ccaec6f43bbb62ed",
+          "status": "seeded-existing",
+          "translation": " Copiar diagnóstico "
+        },
+        "diagnostics.fallback_entries": {
+          "source_hash": "488d45059a4c7d71bf78613a41f7ef3be777a93876796a2b6d104e5b7eedcd9d",
+          "status": "seeded-existing",
+          "translation": "Fallbacks para inglês usados: {value}"
+        },
+        "diagnostics.format_errors": {
+          "source_hash": "fc0478b653e378026dbfc2b4780be2387035f9fb5fa829d942419bb7ce8fbee5",
+          "status": "seeded-existing",
+          "translation": "Erros de formatação de localização: {value}"
+        },
+        "diagnostics.heading": {
+          "source_hash": "5433e7093df6b02c4133e0c1c28d0f9a0cd00e1207036b0843f1bcc61df082d6",
+          "status": "seeded-existing",
+          "translation": "DIAGNÓSTICO DO SALIXTORRENT"
+        },
+        "diagnostics.locale_pack": {
+          "source_hash": "4e2aaba14adaeb830ca62b9e3e4305afe638967a9e872148b2749e3c90cba319",
+          "status": "seeded-existing",
+          "translation": "Pacote de idioma: incluído"
+        },
+        "diagnostics.locale_source": {
+          "source_hash": "5338861601fb03888b2c3a7f7bc68427adfcfbf2446afa00f19f6803b5e39d49",
+          "status": "seeded-existing",
+          "translation": "Origem do idioma: {value}"
+        },
+        "diagnostics.locale_source_system": {
+          "source_hash": "d8081c667c73359f755864913dd9e6be70e785e8b864d7715b5c41c2b143245b",
+          "status": "seeded-existing",
+          "translation": "Padrão do sistema"
+        },
+        "diagnostics.locale_source_user": {
+          "source_hash": "66fe732d24717bb8c0c6626938246d34f4d612ad3b3776b56b010da7ce95186b",
+          "status": "seeded-existing",
+          "translation": "Preferência do usuário"
+        },
+        "diagnostics.localization_heading": {
+          "source_hash": "031c2d79d71a06afcb07712e2125db23368a1f14dd96ce0140027b36bdfb5d30",
+          "status": "seeded-existing",
+          "translation": "Localização"
+        },
+        "diagnostics.open_data": {
+          "source_hash": "0fcd40dfb25968c65a8cadee56f83688b466ad378c7e16f8d3013bf66bf2bdb9",
+          "status": "seeded-existing",
+          "translation": " Abrir dados do aplicativo "
+        },
+        "diagnostics.requested_locale": {
+          "source_hash": "099976f67c06c9ae109ad7e2fa606d1998bea93303ccd0f1313b28a44242e253",
+          "status": "seeded-existing",
+          "translation": "Idioma solicitado: {value}"
+        },
+        "diagnostics.title": {
+          "source_hash": "27fdf72ca0dc95051d04c25397b7419d0e24af298793c3235861fa14718929a5",
+          "status": "seeded-existing",
+          "translation": "Diagnóstico do SalixTorrent"
+        },
+        "diagnostics.validation_ok": {
+          "source_hash": "565339bc4d33d72817b583024112eb7f5cdf3e5eef0252d6ec1b9c9a94e12bb3",
+          "status": "seeded-existing",
+          "translation": "OK"
+        },
+        "diagnostics.validation_warning": {
+          "source_hash": "e981ddae45d8f4ca53f1ccbe613ad254a041dacf65a06026099a6302d332113b",
+          "status": "seeded-existing",
+          "translation": "Aviso"
+        },
+        "help.browse_glossary_index": {
+          "source_hash": "d6802ab328580d4a863e2c8b3ccabb2ddb59f98f2356bdf6e12cf48bb7d9f8e2",
+          "status": "seeded-existing",
+          "translation": "Navegar pelo índice alfabético"
+        },
+        "help.clear": {
+          "source_hash": "6ffeafad9231676b511376ef7f62ca2b4abb4a750346a98f6ffd277084d07b68",
+          "status": "seeded-existing",
+          "translation": " Limpar "
+        },
+        "help.contents": {
+          "source_hash": "437aea62a5bd6ad4762e494c81b88532809a231477c82bdecf6fd6636908b7ab",
+          "status": "seeded-existing",
+          "translation": "Conteúdo"
+        },
+        "help.contents_heading": {
+          "source_hash": "eabe6aca2f0dcdbddb32c8f06e6edfa1b78618efaf57d677950d443b91d99175",
+          "status": "seeded-existing",
+          "translation": "CONTEÚDO"
+        },
+        "help.documentation": {
+          "source_hash": "c205924de0fe636ccdde4ed616fef66f75b78e98b03620637965c033fd161141",
+          "status": "seeded-existing",
+          "translation": "Documentação"
+        },
+        "help.glossary": {
+          "source_hash": "afdbc159ddc4ea6f044d6db900685cfaafe8d71cbb52667cbf50938b69b31301",
+          "status": "seeded-existing",
+          "translation": "Glossário A-Z"
+        },
+        "help.glossary_definition": {
+          "source_hash": "a72e3813d551ff85caa7e049a088a7d0973420099a2431c751177581689f0eff",
+          "status": "seeded-existing",
+          "translation": "Definição do glossário"
+        },
+        "help.glossary_heading": {
+          "source_hash": "e3a79fbd7b2b5fbe785cfd2041e06a3db9bb99be9b14b87af006f86dcfa68acd",
+          "status": "seeded-existing",
+          "translation": "GLOSSÁRIO A-Z"
+        },
+        "help.heading": {
+          "source_hash": "b4751753a5c56bdc59cf9938b1c5cd9b6d7584e0e224568abdd747e6c2f1e0ea",
+          "status": "seeded-existing",
+          "translation": "AJUDA E GLOSSÁRIO DO SALIXTORRENT"
+        },
+        "help.intro": {
+          "source_hash": "e1381a4c04ac733ea6250de769e5d8fdef19f6de7e665fe7f08510c21c659f81",
+          "status": "seeded-existing",
+          "translation": "Built-in offline reference for BitTorrent concepts, SalixTorrent controls and the technical detail behind the live interface."
+        },
+        "help.related_terms": {
+          "source_hash": "6ab2a2ac3ae81c2bbb7ce6f18aba9b8b476606995bddcb192bdafe091e2c0459",
+          "status": "seeded-existing",
+          "translation": "Termos relacionados do glossário"
+        },
+        "help.related_topic": {
+          "source_hash": "bb8a3be88ce376eb6ccde5f6c02a019f69da13e730d0b77da11032fbad125421",
+          "status": "seeded-existing",
+          "translation": "Tópico de ajuda relacionado"
+        },
+        "help.search": {
+          "source_hash": "49c266baaaa70981ea188fa714d5c40cf13830d786a861c9943ae0d26a7f3fe9",
+          "status": "seeded-existing",
+          "translation": "Pesquisar"
+        },
+        "help.search_hint": {
+          "source_hash": "98335d8dc79c2eeef30ad72bbb2c3738572b3bb1e2dc59f6aa0051bb8ee0ea20",
+          "status": "seeded-existing",
+          "translation": "Pesquisar tópicos e glossário..."
+        },
+        "help.search_results": {
+          "source_hash": "16f79ca1812d0d520f86da602ba8471a284a53ad1a57f1bd3d5a6c15df41be16",
+          "status": "seeded-existing",
+          "translation": "{topics} tópico(s), {terms} termo(s) do glossário"
+        },
+        "language.english_au": {
+          "source_hash": "46327b92baf9c00e15cf150b567e6e41c726b8fb418ce11f995b375075da030a",
+          "status": "seeded-existing",
+          "translation": "English (Australia)"
+        },
+        "language.english_gb": {
+          "source_hash": "5fab3416cebd0543dee97fac0d60c463caef919918e621ab853e40cf7a4fec10",
+          "status": "seeded-existing",
+          "translation": "English (United Kingdom)"
+        },
+        "language.english_us": {
+          "source_hash": "b03fc903f9856b10fdd5f068c34d5550d0261320f1d5fe7b24c33d36b31b9b82",
+          "status": "seeded-existing",
+          "translation": "English (United States)"
+        },
+        "language.filipino": {
+          "source_hash": "e8a6062c5c37291ed3c80c0f2e0b035e27d014ed476d26cdca9ede7da0eb73af",
+          "status": "seeded-existing",
+          "translation": "Filipino"
+        },
+        "language.portuguese_br": {
+          "source_hash": "25c0623b1a614c445212e0a13bba500c174f794963f593e7f13ee39b8fac5f78",
+          "status": "seeded-existing",
+          "translation": "Português (Brasil)"
+        },
+        "language.system_default": {
+          "source_hash": "d8081c667c73359f755864913dd9e6be70e785e8b864d7715b5c41c2b143245b",
+          "status": "seeded-existing",
+          "translation": "System Default"
+        },
+        "menu.edit": {
+          "source_hash": "464c4ffd019e1e9691dcf0537c797353ef2b1c1d4833d3d463e5b74ae4547344",
+          "status": "seeded-existing",
+          "translation": "Editar"
+        },
+        "menu.edit.clear_filter": {
+          "source_hash": "45a27501e803074041fb843559cebf7a07a7aa5ac98b5ef4d4f7453b15fe8124",
+          "status": "seeded-existing",
+          "translation": "Limpar pesquisa / filtro"
+        },
+        "menu.edit.copy_hash": {
+          "source_hash": "168b2d1de086dc913cd0ffaab8b1aa36aa64e845afd93f79a9b4b02dc1121685",
+          "status": "seeded-existing",
+          "translation": "Copiar hash de informações"
+        },
+        "menu.edit.copy_magnet": {
+          "source_hash": "41835629e01b9620dd5392015a152ad9a28183226b11bd59028db15694ea1d8b",
+          "status": "seeded-existing",
+          "translation": "Copiar link magnet"
+        },
+        "menu.edit.find": {
+          "source_hash": "f12ba7396240cf94d7bfd419f4840213f3e6f8008d182fea14650f86e035880c",
+          "status": "seeded-existing",
+          "translation": "Localizar torrents..."
+        },
+        "menu.edit.restore_order": {
+          "source_hash": "7f7840530aff6cf9de2855a20d8ed3b3d665e02b220f962c5229ad81e4bac370",
+          "status": "seeded-existing",
+          "translation": "Restaurar ordem da fila"
+        },
+        "menu.file": {
+          "source_hash": "50009ce1da4d15e1c4a04024df691eed5f0d598e2c4c67092f205366d0adf99e",
+          "status": "seeded-existing",
+          "translation": "Arquivo"
+        },
+        "menu.file.create_torrent": {
+          "source_hash": "1f9ff445a71419e271950374bc0f99042764759c62ca108d3ed380e35ed71329",
+          "status": "seeded-existing",
+          "translation": "Criar torrent..."
+        },
+        "menu.file.exit": {
+          "source_hash": "d17d84a604994b722db37b35860b1ac7e8d9e43e725d0eb50702a9f7228a2999",
+          "status": "seeded-existing",
+          "translation": "Sair"
+        },
+        "menu.file.open_magnet": {
+          "source_hash": "a21569886273752535e577cd16f7381288212f2d4b3f515adaaf932704c02537",
+          "status": "seeded-existing",
+          "translation": "Abrir link magnet..."
+        },
+        "menu.file.open_torrent": {
+          "source_hash": "d5811093fb1d79758b71c1878bfa363261fca3f19ee7fbc0043419daf0d3ae9e",
+          "status": "seeded-existing",
+          "translation": "Abrir torrent..."
+        },
+        "menu.help": {
+          "source_hash": "b79cac926e0b2e347e72cc91d5174037c9e17ae7733fd7bdb570f71b10cd7bfc",
+          "status": "seeded-existing",
+          "translation": "Ajuda"
+        },
+        "menu.help.about": {
+          "source_hash": "f4b4fa7ddff54f6ece0bbaa16aef8a141036bb3cab1415170530e680391c90e1",
+          "status": "seeded-existing",
+          "translation": "Sobre o SalixTorrent"
+        },
+        "menu.help.diagnostics": {
+          "source_hash": "991d77089ad3ca533f0923b45a514b367cf2a51efac915f4417d906b528dabd2",
+          "status": "seeded-existing",
+          "translation": "Diagnóstico..."
+        },
+        "menu.help.glossary": {
+          "source_hash": "40688b4ae317987c7de408c4f7682be471feaa6ca292fbfc8c0f57e07eeee99e",
+          "status": "seeded-existing",
+          "translation": "Glossário A-Z..."
+        },
+        "menu.help.shortcuts": {
+          "source_hash": "59cdaa26dd9dcd4cbcded97a7b91029b396bcfdbfd927356facbeb163283a3df",
+          "status": "seeded-existing",
+          "translation": "Atalhos de teclado"
+        },
+        "menu.help.topics": {
+          "source_hash": "8dd1d926b79e5f18ff8fa74e9a3b1df29007c9f33c0079022bf62d17447a4d5a",
+          "status": "seeded-existing",
+          "translation": "Tópicos da ajuda..."
+        },
+        "menu.tools": {
+          "source_hash": "ea93d6a262ecb87a9fa4d09edbd7654c046597936a8e235fc3949eb01775ff99",
+          "status": "seeded-existing",
+          "translation": "Ferramentas"
+        },
+        "menu.tools.app_data": {
+          "source_hash": "e830a298efdab65d750244e84dadfcd20d6f9fb2e6e34d975bb36c1db4d04d19",
+          "status": "seeded-existing",
+          "translation": "Abrir pasta de dados do aplicativo"
+        },
+        "menu.tools.preferences": {
+          "source_hash": "60b516276c8b2dbd4248427a24e021ffeb57a4964090c0286749176cf84778bd",
+          "status": "seeded-existing",
+          "translation": "Preferências..."
+        },
+        "menu.tools.remap": {
+          "source_hash": "a5b3b98d07a9c58aa054228ac9b30d1c3b258710256b887bf9afb07a1fa34ac9",
+          "status": "seeded-existing",
+          "translation": "Atualizar / remapear conectividade"
+        },
+        "menu.transfers": {
+          "source_hash": "c417cb88e3fdd02c335b9b4a6b8a34268d5636e897f5436d5394ed79378a2fd1",
+          "status": "seeded-existing",
+          "translation": "Transferências"
+        },
+        "menu.transfers.announce": {
+          "source_hash": "fb3cc8b1792c5e2bf7348128b422a9725a4ee3cce32527ccc36813f9f4c41eb3",
+          "status": "seeded-existing",
+          "translation": "Atualizar / anunciar trackers"
+        },
+        "menu.transfers.high": {
+          "source_hash": "c4ebc6d4a5832cd9415f906ad03661110c705a72381c8b8b145761d02e2dd23a",
+          "status": "seeded-existing",
+          "translation": "Alta"
+        },
+        "menu.transfers.low": {
+          "source_hash": "f793de205ead5ac302c4a1627829dea41f176b1068b993a32373fc869918374b",
+          "status": "seeded-existing",
+          "translation": "Baixa"
+        },
+        "menu.transfers.normal": {
+          "source_hash": "a7248eeb45eb1ce247f81693283e22e8b39e8a50890cecd22d02e75025547d90",
+          "status": "seeded-existing",
+          "translation": "Normal"
+        },
+        "menu.transfers.open_folder": {
+          "source_hash": "ca2e314afc5eb388f58ee6579f736ad708654e2211d4b866a13061913d09e409",
+          "status": "seeded-existing",
+          "translation": "Abrir pasta de downloads"
+        },
+        "menu.transfers.pause": {
+          "source_hash": "858e4ba7a29fd38b630ed73a79e2738333b3fc6778fafa90252f5556c1262fdc",
+          "status": "seeded-existing",
+          "translation": "Pausar"
+        },
+        "menu.transfers.pause_all": {
+          "source_hash": "4078c10ae4930de11d89afd39b68e3afcdb7623ded6cf92fbb414bb793ad95a6",
+          "status": "seeded-existing",
+          "translation": "Pausar tudo"
+        },
+        "menu.transfers.priority": {
+          "source_hash": "d60dbba079223254d4c49c230a515bc107a997e69f811365da2387f8557b9cec",
+          "status": "seeded-existing",
+          "translation": "Prioridade"
+        },
+        "menu.transfers.properties": {
+          "source_hash": "75e23dc6ce5177f1cd918e8ae8f0030b98ea68eec0d572d32329b5a42305eb8b",
+          "status": "seeded-existing",
+          "translation": "Propriedades..."
+        },
+        "menu.transfers.recheck": {
+          "source_hash": "7afae3cd7703ab30d9c9f63481f16d2689fa6355bb410776cff6dae39208a6bd",
+          "status": "seeded-existing",
+          "translation": "Forçar nova verificação..."
+        },
+        "menu.transfers.resume": {
+          "source_hash": "d640c7421da066618a39daf4266da5f61f66a9b1afcd626481b831a17064965d",
+          "status": "seeded-existing",
+          "translation": "Retomar"
+        },
+        "menu.transfers.resume_all": {
+          "source_hash": "5322a378a19661bcce62fb2dd9e247bb6f0a42fdd8929bb6777c3244bad926bc",
+          "status": "seeded-existing",
+          "translation": "Retomar tudo"
+        },
+        "menu.transfers.retry": {
+          "source_hash": "942087cc2d41e01304b7195558d093d10c72af8e838c7556d6a02d471ee71852",
+          "status": "seeded-existing",
+          "translation": "Tentar novamente"
+        },
+        "menu.transfers.start": {
+          "source_hash": "e4bb9f1ece9af9264a3b9e3913bbdb2cf497457167b14ced5f85688bfde74644",
+          "status": "seeded-existing",
+          "translation": "Iniciar"
+        },
+        "menu.transfers.stop": {
+          "source_hash": "cae7d57bc067a514b8e34c9589631a95c7dc051638ddd2a190773269279a99df",
+          "status": "seeded-existing",
+          "translation": "Parar"
+        },
+        "menu.view": {
+          "source_hash": "dcc839a4015c4b7dd9db959a8f757833b8adb92462a751b973386e453c6d58a3",
+          "status": "seeded-existing",
+          "translation": "Exibir"
+        },
+        "menu.view.active_transfers": {
+          "source_hash": "013a15761f0145a906d67cd83da441ca68367de570f1313cd51f32cc657bed5d",
+          "status": "seeded-existing",
+          "translation": "Transferências ativas"
+        },
+        "menu.view.create_torrent": {
+          "source_hash": "59331e00d531b8cba67ac3daa4100ce9d9e44c06c6302a3526000ceb9ef32002",
+          "status": "seeded-existing",
+          "translation": "Criar torrent"
+        },
+        "menu.view.preferences": {
+          "source_hash": "66962f72a08883733c35df6f82a049b929f9579f19c4bc083ac99bead602eab3",
+          "status": "seeded-existing",
+          "translation": "Preferências"
+        },
+        "menu.view.torrent_details": {
+          "source_hash": "89bcf0f2e59b424b50ff940c8c353fadeb4054ff06be9e91ec49a5a9aa1aa2f4",
+          "status": "seeded-existing",
+          "translation": "Detalhes do torrent"
+        },
+        "settings.choose_folder": {
+          "source_hash": "f0cddc508de0816f92477396fd40d52f8a37d6987b8f6d563ce74a22a4978f35",
+          "status": "seeded-existing",
+          "translation": " Escolher pasta "
+        },
+        "settings.close_tray": {
+          "source_hash": "9a4ba5c9f3774ba544c1860618510127fa5c7c6684d7f12b5fbeffb191dfaef7",
+          "status": "seeded-existing",
+          "translation": "Fechar janela para a bandeja do sistema"
+        },
+        "settings.completion_notices": {
+          "source_hash": "2316d186b8b636e8bc5c0204150321693aff9f839afe5615cf4da9169b59e9b9",
+          "status": "seeded-existing",
+          "translation": "Mostrar avisos de conclusão no aplicativo"
+        },
+        "settings.default_download_directory": {
+          "source_hash": "81bfb19a88cb7fe7a3bd749c7e6d718a0f1263d65f473ca4122281ea4f704a91",
+          "status": "seeded-existing",
+          "translation": "Diretório padrão de downloads"
+        },
+        "settings.defaults_restored": {
+          "source_hash": "c24d28b254289a9f9441af74cabc2cbe97a3c0422a4999abeac8e9df96c5b568",
+          "status": "seeded-existing",
+          "translation": "Padrões restaurados e aplicados"
+        },
+        "settings.desktop.heading": {
+          "source_hash": "e689bcfc1a296b4b942120b901ce43cbad04dc0337aacc1f61f643f8abe3500b",
+          "status": "seeded-existing",
+          "translation": "ÁREA DE TRABALHO"
+        },
+        "settings.documentation_scale": {
+          "source_hash": "7987bf058030b649be51f86652549bbae3411d677ec11613880e243dc3cc3ba0",
+          "status": "seeded-existing",
+          "translation": "Escala da documentação"
+        },
+        "settings.heading": {
+          "source_hash": "c6a8117678d00060231bc199223ad668807eeaf806b057dcc75ac24161ce7934",
+          "status": "seeded-existing",
+          "translation": "PREFERÊNCIAS"
+        },
+        "settings.interface_text_size": {
+          "source_hash": "ec54ba683b637a0fda49bd5dc2c8d1ff7dbf8fc6f129a4ec7425295f6260acb7",
+          "status": "seeded-existing",
+          "translation": "Tamanho do texto da interface"
+        },
+        "settings.intro": {
+          "source_hash": "42c4e974a1ef635c9fa09748a59717eba1e2541bbee23abbbcc3b237bf53ab43",
+          "status": "seeded-existing",
+          "translation": "Network toggles and global limits apply to active sessions immediately. New-torrent defaults only affect torrents added later."
+        },
+        "settings.language.label": {
+          "source_hash": "89baa99845c54662fd4f34ad4d3424343e4647d158f5057781dc0f5c40ed2f04",
+          "status": "seeded-existing",
+          "translation": "Idioma do aplicativo"
+        },
+        "settings.language.restart_note": {
+          "source_hash": "71be8b70fd20a3b98679f76e4d2609c080d6762519e1e06398758ea5348a239c",
+          "status": "seeded-existing",
+          "translation": "As alterações de idioma são aplicadas após a interface ser reconstruída. Reinicie o SalixTorrent para atualizar com segurança todos os controles e documentos abertos."
+        },
+        "settings.minimize_tray": {
+          "source_hash": "f77e486c08bf1a34cdea8eaa77383ccb46f6f9bafa905285fe0bd9bd5fbcfbfc",
+          "status": "seeded-existing",
+          "translation": "Minimizar para a bandeja do sistema"
+        },
+        "settings.native_notifications": {
+          "source_hash": "e4191935fc829a1afe0243a0e2cb9f669005eaf8cddd4a121d26f61675beb9f2",
+          "status": "seeded-existing",
+          "translation": "Mostrar notificações nativas de conclusão"
+        },
+        "settings.restore_defaults": {
+          "source_hash": "e2de0c74fe3a1d80ee8ae71f9ced3e252b6c942d5d0665f949dcea46bc9779b0",
+          "status": "seeded-existing",
+          "translation": " Restaurar padrões "
+        },
+        "settings.save": {
+          "source_hash": "becfd9d5fb952ff8045c1f7ece8bd8bd8160ef4d1632e86e67648f1410981a8f",
+          "status": "seeded-existing",
+          "translation": " Salvar preferências "
+        },
+        "settings.saved": {
+          "source_hash": "4e25395c528d71e3ef94a7da94e8c7f698a8d13e67c92d4c0b5427459a15e936",
+          "status": "seeded-existing",
+          "translation": "Preferências salvas e aplicadas"
+        },
+        "settings.saved_restart": {
+          "source_hash": "0a6515aab32549e784725cf7f5663d15e025297e72d04671454bc0ee909cef3c",
+          "status": "seeded-existing",
+          "translation": "Preferências salvas. Reinicie o SalixTorrent para aplicar o idioma selecionado em toda a interface."
+        },
+        "settings.system_tray": {
+          "source_hash": "4d8deb72b11389b601eb4192ab7429406941a4388f86769aad5eb571b952cda0",
+          "status": "seeded-existing",
+          "translation": "Ativar ícone e controles da bandeja / barra de menus"
+        },
+        "settings.transfer_rate_display": {
+          "source_hash": "ee26f177b70034d943d98b48847475c863eca36fc7213ca3dc964779d8c32a9c",
+          "status": "seeded-existing",
+          "translation": "Exibição da taxa de transferência"
+        },
+        "toolbar.active_transfers": {
+          "source_hash": "e311bcfb4782f200741a2d2814b05c9b55f53554ad923f26d6f39e4fbdeee1c2",
+          "status": "seeded-existing",
+          "translation": " Transferências ativas "
+        },
+        "toolbar.brand": {
+          "source_hash": "4f4d3f2a42e6f1179223ff59d303e6e8bd94110ca32ba3c90b29f720d7f91ff4",
+          "status": "seeded-existing",
+          "translation": "SALIX_T // BITTORRENT CLIENT"
+        },
+        "toolbar.create_torrent": {
+          "source_hash": "0f2a998596def7d060d1a2895926386080d76f4bf177fc1ff3911556816de4c5",
+          "status": "seeded-existing",
+          "translation": " Criar torrent "
+        },
+        "toolbar.preferences": {
+          "source_hash": "a3f5a4b3646d7ac627519a275f712cc49704c65b0dbf00fe37bdc186b5f5e581",
+          "status": "seeded-existing",
+          "translation": " Preferências "
+        },
+        "tray.exit": {
+          "source_hash": "d17d84a604994b722db37b35860b1ac7e8d9e43e725d0eb50702a9f7228a2999",
+          "status": "seeded-existing",
+          "translation": "Sair"
+        },
+        "tray.open": {
+          "source_hash": "3365926fd256a9316a219633baaa0bc671ef7b207b76095c81d6af7ff29897d9",
+          "status": "seeded-existing",
+          "translation": "Abrir SalixTorrent"
+        },
+        "tray.pause_all": {
+          "source_hash": "4078c10ae4930de11d89afd39b68e3afcdb7623ded6cf92fbb414bb793ad95a6",
+          "status": "seeded-existing",
+          "translation": "Pausar tudo"
+        },
+        "tray.resume_all": {
+          "source_hash": "5322a378a19661bcce62fb2dd9e247bb6f0a42fdd8929bb6777c3244bad926bc",
+          "status": "seeded-existing",
+          "translation": "Retomar tudo"
+        },
+        "tray.tooltip": {
+          "source_hash": "91a83117ca8da638fbcbeb71d63546bb318d3786c6a29128a4ddf2af95bab04f",
+          "status": "seeded-existing",
+          "translation": "SalixTorrent (Salix_T)"
+        }
+      }
+    }
+  }
+}

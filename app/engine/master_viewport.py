@@ -5,6 +5,7 @@ import queue
 import dearpygui.dearpygui as dpg
 
 from app.engine.gui_engine import GuiEngine
+from app.localization import tr
 from app.views.application_menu import ApplicationMenu
 from app.views.create_torrent_view import CreateTorrentView
 from app.views.download_view import DownloadView
@@ -45,24 +46,24 @@ class MasterViewport:
             # It acts like a small application toolbar while File/Edit/View/...
             # provide the complete desktop-style command surface.
             with dpg.group(horizontal=True, tag="salix_toolbar"):
-                brand_item = dpg.add_text("SALIX_T // BITTORRENT CLIENT", color=(0, 255, 128))
+                brand_item = dpg.add_text(tr("toolbar.brand", "SALIX_T // BITTORRENT CLIENT"), color=(0, 255, 128))
                 add_text_tooltip(
                     brand_item,
                     "SalixTorrent (Salix_T)\n\nA BitTorrent v1 desktop client. Hover technical labels, table cells and controls throughout the application for contextual explanations of what SalixTorrent is doing.",
                 )
                 dpg.add_spacer(width=20)
                 active_button = dpg.add_button(
-                    label=" Active Transfers ",
+                    label=tr("toolbar.active_transfers", " Active Transfers "),
                     callback=lambda: self.gui.switch_scene("DownloadView"),
                 )
                 add_help_tooltip(active_button, "ACTIVE_TRANSFERS_VIEW")
                 create_button = dpg.add_button(
-                    label=" Create Torrent ",
+                    label=tr("toolbar.create_torrent", " Create Torrent "),
                     callback=lambda: self.gui.switch_scene("CreateTorrentView"),
                 )
                 add_help_tooltip(create_button, "CREATE_TORRENT")
                 preferences_button = dpg.add_button(
-                    label=" Preferences ",
+                    label=tr("toolbar.preferences", " Preferences "),
                     callback=lambda: self.gui.switch_scene("SettingsView"),
                 )
                 add_help_tooltip(preferences_button, "PREFERENCES_VIEW")

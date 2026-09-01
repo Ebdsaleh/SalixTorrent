@@ -6,6 +6,8 @@ import math
 
 import dearpygui.dearpygui as dpg
 
+from app.localization import tr
+
 from app.views.help_terms import add_help_tooltip, add_text_tooltip
 
 
@@ -35,27 +37,27 @@ class PieceView:
     def build_view(self, parent_tag):
         with dpg.child_window(parent=parent_tag, height=-1, border=True):
             self.summary_text = dpg.add_text(
-                "Pieces: select a torrent to inspect piece state",
+                tr('view.piece_view.pieces_select_a_torrent_to_inspect_piece', "Pieces: select a torrent to inspect piece state"),
                 color=(100, 180, 255),
             )
             add_help_tooltip(self.summary_text, "PIECE")
             self.scheduler_text = dpg.add_text(
-                "Scheduler: Rarest-first | Pipeline: adaptive | Endgame: Standby",
+                tr('view.piece_view.scheduler_rarest_first_pipeline_adaptive_endgame_standby', "Scheduler: Rarest-first | Pipeline: adaptive | Endgame: Standby"),
                 color=(155, 155, 160),
             )
             add_help_tooltip(self.scheduler_text, "REQUEST_SCHEDULER")
             self.disk_text = dpg.add_text(
-                "Disk I/O: writer idle | buffer 0 B | recent-piece cache 0 B",
+                tr('view.piece_view.disk_i_o_writer_idle_buffer_0', "Disk I/O: writer idle | buffer 0 B | recent-piece cache 0 B"),
                 color=(150, 150, 150),
             )
             add_help_tooltip(self.disk_text, "DISK_IO_PIPELINE")
             map_legend = dpg.add_text(
-                "Map: Verified | Downloading | Requested | Mixed | Missing | No known source",
+                tr('view.piece_view.map_verified_downloading_requested_mixed_missing_no', "Map: Verified | Downloading | Requested | Mixed | Missing | No known source"),
                 color=(150, 150, 150),
             )
             add_help_tooltip(map_legend, "PIECE_STATE")
             self.map_info_text = dpg.add_text(
-                "Piece map waiting for torrent telemetry",
+                tr('view.piece_view.piece_map_waiting_for_torrent_telemetry', "Piece map waiting for torrent telemetry"),
                 color=(150, 150, 150),
             )
             add_help_tooltip(self.map_info_text, "PIECE_MAP")
@@ -69,10 +71,10 @@ class PieceView:
 
             dpg.add_separator()
             details_heading = dpg.add_text(
-                "DETAILS - active pieces and the next incomplete range",
+                tr('view.piece_view.details_active_pieces_and_the_next_incomplete', "DETAILS - active pieces and the next incomplete range"),
                 color=(180, 160, 255),
             )
-            add_text_tooltip(details_heading, "Focused piece details\n\nTo keep the interface responsive on torrents with thousands of pieces, SalixTorrent shows active/requested pieces plus useful nearby incomplete context rather than continuously rendering every piece as a table row.")
+            add_text_tooltip(details_heading, tr('view.piece_view.focused_piece_details_to_keep_the_interface', "Focused piece details\n\nTo keep the interface responsive on torrents with thousands of pieces, SalixTorrent shows active/requested pieces plus useful nearby incomplete context rather than continuously rendering every piece as a table row."))
 
             with dpg.table(
                 header_row=True,
@@ -85,38 +87,38 @@ class PieceView:
                 height=-1,
             ) as self.table_id:
                 piece_col = dpg.add_table_column(
-                    label="Piece",
+                    label=tr('view.piece_view.piece', "Piece"),
                     width_fixed=True,
                     init_width_or_weight=75,
                 )
                 size_col = dpg.add_table_column(
-                    label="Size",
+                    label=tr('view.piece_view.size', "Size"),
                     width_fixed=True,
                     init_width_or_weight=85,
                 )
                 progress_col = dpg.add_table_column(
-                    label="Progress",
+                    label=tr('view.piece_view.progress', "Progress"),
                     width_fixed=True,
                     init_width_or_weight=90,
                 )
                 blocks_col = dpg.add_table_column(
-                    label="Blocks",
+                    label=tr('view.piece_view.blocks', "Blocks"),
                     width_stretch=True,
                     init_width_or_weight=0.28,
                 )
                 availability_col = dpg.add_table_column(
-                    label="Availability",
+                    label=tr('view.piece_view.availability', "Availability"),
                     width_fixed=True,
                     init_width_or_weight=95,
                 )
                 state_col = dpg.add_table_column(
-                    label="State",
+                    label=tr('view.piece_view.state', "State"),
                     width_fixed=True,
                     init_width_or_weight=110,
                 )
                 add_help_tooltip(piece_col, "PIECE")
                 add_help_tooltip(size_col, "PIECE_SIZE")
-                add_text_tooltip(progress_col, "Piece progress\n\nHow much of this piece's block payload has arrived. A piece at 100% is not trusted until its SHA-1 hash passes verification.")
+                add_text_tooltip(progress_col, tr('view.piece_view.piece_progress_how_much_of_this_piece', "Piece progress\n\nHow much of this piece's block payload has arrived. A piece at 100% is not trusted until its SHA-1 hash passes verification."))
                 add_help_tooltip(blocks_col, "BLOCK")
                 add_help_tooltip(availability_col, "PIECE_AVAILABILITY")
                 add_help_tooltip(state_col, "PIECE_STATE")
@@ -161,22 +163,22 @@ class PieceView:
         if self.summary_text and dpg.does_item_exist(self.summary_text):
             dpg.set_value(
                 self.summary_text,
-                "Pieces: select a torrent to inspect piece state",
+                tr('view.piece_view.pieces_select_a_torrent_to_inspect_piece', "Pieces: select a torrent to inspect piece state"),
             )
         if self.scheduler_text and dpg.does_item_exist(self.scheduler_text):
             dpg.set_value(
                 self.scheduler_text,
-                "Scheduler: Rarest-first | Pipeline: adaptive | Endgame: Standby",
+                tr('view.piece_view.scheduler_rarest_first_pipeline_adaptive_endgame_standby', "Scheduler: Rarest-first | Pipeline: adaptive | Endgame: Standby"),
             )
         if self.disk_text and dpg.does_item_exist(self.disk_text):
             dpg.set_value(
                 self.disk_text,
-                "Disk I/O: writer idle | buffer 0 B | recent-piece cache 0 B",
+                tr('view.piece_view.disk_i_o_writer_idle_buffer_0', "Disk I/O: writer idle | buffer 0 B | recent-piece cache 0 B"),
             )
         if self.map_info_text and dpg.does_item_exist(self.map_info_text):
             dpg.set_value(
                 self.map_info_text,
-                "Piece map waiting for torrent telemetry",
+                tr('view.piece_view.piece_map_waiting_for_torrent_telemetry', "Piece map waiting for torrent telemetry"),
             )
 
     def _render_map(self, piece_view: dict):
@@ -241,9 +243,7 @@ class PieceView:
         dpg.set_value(
             self.summary_text,
             (
-                f"Pieces: {verified:,} / {total:,} verified | "
-                f"{downloading:,} downloading | {requested:,} requested | "
-                f"{missing:,} missing | Availability: {availability:.2f}"
+                tr('view.piece_view.pieces_value_value_verified_value_downloading_value_requested', 'Pieces: {verified:,} / {total:,} verified | {downloading:,} downloading | {requested:,} requested | {missing:,} missing | Availability: {availability:.2f}', verified=verified, total=total, downloading=downloading, requested=requested, missing=missing, availability=availability)
             ),
         )
 
@@ -263,10 +263,7 @@ class PieceView:
         dpg.set_value(
             self.scheduler_text,
             (
-                f"Scheduler: Rarest-first | Pipeline: {pipeline_label} | "
-                f"Timeout: {timeout_label} | Endgame: {endgame_label} | "
-                f"Remaining blocks: {remaining_blocks:,} | "
-                f"Outstanding: {outstanding:,} ({duplicates:,} duplicate)"
+                tr('view.piece_view.scheduler_rarest_first_pipeline_value_timeout_value_endgame', 'Scheduler: Rarest-first | Pipeline: {pipeline_label} | Timeout: {timeout_label} | Endgame: {endgame_label} | Remaining blocks: {remaining_blocks:,} | Outstanding: {outstanding:,} ({duplicates:,} duplicate)', pipeline_label=pipeline_label, timeout_label=timeout_label, endgame_label=endgame_label, remaining_blocks=remaining_blocks, outstanding=outstanding, duplicates=duplicates)
             ),
         )
 
@@ -283,12 +280,7 @@ class PieceView:
         pressure_events = int(disk.get("backpressure_events", 0) or 0)
         disk_error = str(disk.get("error") or "")
         disk_label = (
-            f"Disk I/O: writer {writer_label} | "
-            f"buffer {self._format_size(pending_bytes)} / {self._format_size(buffer_limit)} "
-            f"({pending_writes} pending) | avg write {average_ms:.2f} ms | "
-            f"backpressure {pressure_events} | cache "
-            f"{self._format_size(cache_bytes)} / {self._format_size(cache_limit)} "
-            f"({cache_hits} hit / {cache_misses} miss)"
+            tr('view.piece_view.disk_i_o_writer_value_buffer_value_value_value', 'Disk I/O: writer {writer_label} | buffer {value1} / {value2} ({pending_writes} pending) | avg write {average_ms:.2f} ms | backpressure {pressure_events} | cache {value6} / {value7} ({cache_hits} hit / {cache_misses} miss)', writer_label=writer_label, value1=self._format_size(pending_bytes), value2=self._format_size(buffer_limit), pending_writes=pending_writes, average_ms=average_ms, pressure_events=pressure_events, value6=self._format_size(cache_bytes), value7=self._format_size(cache_limit), cache_hits=cache_hits, cache_misses=cache_misses)
         )
         if disk_error:
             disk_label += f" | ERROR: {disk_error}"
@@ -298,11 +290,10 @@ class PieceView:
         cell_count = len(piece_view.get("map_cells") or [])
         pieces_per_cell = int(piece_view.get("pieces_per_map_cell", 1) or 1)
         if pieces_per_cell <= 1:
-            map_info = f"Piece Map: {cell_count:,} cells - one cell per piece"
+            map_info = tr('view.piece_view.piece_map_value_cells_one_cell_per_piece', 'Piece Map: {cell_count:,} cells - one cell per piece', cell_count=cell_count)
         else:
             map_info = (
-                f"Piece Map: {cell_count:,} cells - up to {pieces_per_cell:,} pieces per cell "
-                "(large torrents are compacted for performance)"
+                tr('view.piece_view.piece_map_value_cells_up_to_value_pieces_per', 'Piece Map: {cell_count:,} cells - up to {pieces_per_cell:,} pieces per cell (large torrents are compacted for performance)', cell_count=cell_count, pieces_per_cell=pieces_per_cell)
             )
         dpg.set_value(self.map_info_text, map_info)
 
@@ -316,7 +307,7 @@ class PieceView:
             with dpg.table_row(parent=self.table_id) as row_id:
                 dpg.add_text(str(int(piece.get("index", 0) or 0)))
                 dpg.add_text(self._format_size(piece.get("length", 0)))
-                dpg.add_text(f"{progress * 100:.1f}%")
+                dpg.add_text(tr('view.piece_view.value', '{value0:.1f}%', value0=progress * 100))
                 dpg.add_text(self._format_blocks(piece))
                 dpg.add_text(str(availability_count))
                 dpg.add_text(str(piece.get("state", "Missing")))
