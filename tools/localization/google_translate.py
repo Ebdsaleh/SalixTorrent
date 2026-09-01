@@ -15,18 +15,23 @@ import re
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, Protocol
+from typing import Dict, Iterable
 
 try:
     from .contracts import placeholder_names as placeholders, source_hash
+    from .provider_registry import TranslationProvider, create_provider
+    from .translation_memory import JsonTranslationMemory, memory_entry, resolve_memory_path
 except ImportError:  # direct script execution
     from contracts import placeholder_names as placeholders, source_hash
+    from provider_registry import TranslationProvider, create_provider
+    from translation_memory import JsonTranslationMemory, memory_entry, resolve_memory_path
 
 
 ROOT = Path(__file__).resolve().parents[2]
 LOCALE_ROOT = ROOT / "app" / "localization" / "locales"
 TOOLS_ROOT = Path(__file__).resolve().parent
 CACHE_PATH = TOOLS_ROOT / "translation_cache.json"
+MEMORY_PATH = TOOLS_ROOT / "translation_memory.json"
 MANIFEST_PATH = TOOLS_ROOT / "extraction_manifest.json"
 PROTECTED_PATH = TOOLS_ROOT / "protected_terms.json"
 OVERRIDES_ROOT = TOOLS_ROOT / "manual_overrides"
@@ -49,14 +54,6 @@ TARGET_CODES = {
     "fil-PH": "fil",
 }
 
-
-class TranslationProvider(Protocol):
-    """Small provider contract used by the pipeline and regression tests."""
-
-    provider_name: str
-    model_name: str
-
-    def translate_batch(self, texts: list[str], target_code: str) -> list[str]: ...
 
 
 def _load_json(path: Path, default):
@@ -178,6 +175,9 @@ class GoogleTranslator:
         self.parent = f"projects/{self.project_id}/locations/{self.location}"
         self.model_resource = f"{self.parent}/models/{self.model_name}"
 
+    def target_code(self, locale: str) -> str:
+        return TARGET_CODES.get(str(locale), str(locale))
+
     def translate_batch(self, texts: list[str], target_code: str) -> list[str]:
         if not texts:
             return []
@@ -225,6 +225,7 @@ class GoogleTranslator:
 class TranslationStats:
     locale: str
     cached: int = 0
+    memory: int = 0
     overridden: int = 0
     translated: int = 0
     would_translate: int = 0
@@ -235,6 +236,7 @@ class TranslationStats:
         return {
             "locale": self.locale,
             "cached": self.cached,
+            "memory": self.memory,
             "overridden": self.overridden,
             "translated": self.translated,
             "would_translate": self.would_translate,
@@ -414,12 +416,14 @@ def _chunks(
         yield batch
 
 
-def bootstrap_translation_cache(*, write: bool = True) -> dict[str, int]:
-    """Adopt the pre-Stage-5 bundled translations into the hash cache once.
+def _memory_store(memory_path: str | os.PathLike[str] | None = None) -> JsonTranslationMemory:
+    return JsonTranslationMemory(
+        resolve_memory_path(memory_path, cache_path=CACHE_PATH)
+    )
 
-    This preserves the 113 hand-seeded UI strings per target locale while
-    making them subject to normal source-hash invalidation from now on.
-    """
+
+def bootstrap_translation_cache(*, write: bool = True) -> dict[str, int]:
+    """Adopt pre-Stage-5 bundled translations into the key cache once."""
     cache = _load_cache()
     stats: dict[str, int] = {}
     for locale in sorted(TARGET_CODES):
@@ -449,6 +453,81 @@ def bootstrap_translation_cache(*, write: bool = True) -> dict[str, int]:
     return stats
 
 
+def bootstrap_translation_memory(
+    *,
+    memory_path: str | os.PathLike[str] | None = None,
+    write: bool = True,
+) -> dict[str, int]:
+    """Seed provider-neutral exact-source memory from current hash-valid cache.
+
+    The memory identity is target locale + catalog + canonical source hash,
+    deliberately independent of SalixTorrent localization keys.  This makes
+    exact canonical strings portable to future applications while keeping UI,
+    Help and Glossary semantic domains separate.
+    """
+    cache = _load_cache()
+    memory = _memory_store(memory_path)
+    stats: dict[str, int] = {}
+    for locale in sorted(TARGET_CODES):
+        adopted = 0
+        for catalog in CATALOGS:
+            source = _catalog_strings(SOURCE_LOCALE, catalog)
+            for key, source_text in source.items():
+                entry = _cache_entry(cache, locale, catalog, key)
+                expected_hash = _manifest_hash(catalog, key, source_text)
+                translation = entry.get("translation")
+                if (
+                    entry.get("source_hash") != expected_hash
+                    or not isinstance(translation, str)
+                    or not translation.strip()
+                ):
+                    continue
+                _validate_final(locale, catalog, key, source_text, translation)
+                if memory.lookup(locale, catalog, source_text) is not None:
+                    continue
+                memory.put(
+                    memory_entry(
+                        target_locale=locale,
+                        catalog=catalog,
+                        source=source_text,
+                        translation=translation,
+                        status=str(entry.get("status") or "cached"),
+                        provider=str(entry.get("provider") or ""),
+                        model=str(entry.get("model") or ""),
+                    )
+                )
+                adopted += 1
+        stats[locale] = adopted
+    if write:
+        memory.save()
+    return stats
+
+
+def translation_memory_status(
+    memory_path: str | os.PathLike[str] | None = None,
+):
+    return _memory_store(memory_path).stats()
+
+
+def translation_memory_audit(
+    memory_path: str | os.PathLike[str] | None = None,
+):
+    return _memory_store(memory_path).audit()
+
+
+def merge_translation_memory(
+    source_path: str | os.PathLike[str],
+    *,
+    memory_path: str | os.PathLike[str] | None = None,
+    write: bool = True,
+) -> dict[str, int]:
+    memory = _memory_store(memory_path)
+    result = memory.merge_from(source_path)
+    if write and result["conflicts"] == 0:
+        memory.save()
+    return result
+
+
 def _prune_locale_cache(cache: dict, locale: str) -> None:
     locale_entries = cache.setdefault("entries", {}).setdefault(locale, {})
     for catalog in CATALOGS:
@@ -459,13 +538,19 @@ def _prune_locale_cache(cache: dict, locale: str) -> None:
                 del values[key]
 
 
-def translation_plan(locale: str, *, force: bool = False) -> TranslationStats:
-    """Return a deterministic plan without loading Google libraries or writing."""
+def translation_plan(
+    locale: str,
+    *,
+    force: bool = False,
+    memory_path: str | os.PathLike[str] | None = None,
+) -> TranslationStats:
+    """Return a deterministic plan without loading provider libraries or writing."""
     if locale not in TARGET_CODES:
         raise ValueError(f"Unsupported translation target {locale!r}")
     cache = _load_cache()
+    memory = _memory_store(memory_path)
     override_records = _manual_override_records(locale)
-    cached = overridden = would_translate = 0
+    cached = memory_hits = overridden = would_translate = 0
     for catalog in CATALOGS:
         source = _catalog_strings(SOURCE_LOCALE, catalog)
         for key, source_text in source.items():
@@ -482,14 +567,29 @@ def translation_plan(locale: str, *, force: bool = False) -> TranslationStats:
             ):
                 _validate_final(locale, catalog, key, source_text, entry["translation"])
                 cached += 1
-            else:
-                would_translate += 1
+                continue
+            if not force:
+                candidate = memory.lookup(locale, catalog, source_text)
+                if candidate is not None:
+                    _validate_final(locale, catalog, key, source_text, candidate.translation)
+                    memory_hits += 1
+                    continue
+            would_translate += 1
     return TranslationStats(
         locale=locale,
         cached=cached,
+        memory=memory_hits,
         overridden=overridden,
         would_translate=would_translate,
     )
+
+
+def _provider_target(provider: TranslationProvider, locale: str) -> str:
+    mapper = getattr(provider, "target_code", None)
+    if callable(mapper):
+        return str(mapper(locale))
+    # Backward-compatible custom/test providers receive the existing mapping.
+    return TARGET_CODES.get(locale, locale)
 
 
 def translate_locale(
@@ -502,26 +602,26 @@ def translate_locale(
     location: str | None = None,
     model: str | None = None,
     provider: TranslationProvider | None = None,
+    provider_name: str = "google-cloud",
+    memory_path: str | os.PathLike[str] | None = None,
 ) -> dict[str, int | str]:
-    """Build one locale from overrides/cache and optionally Google Cloud.
+    """Build one locale from overrides/cache/memory and an optional provider.
 
-    No target or cache file is changed until *all* provider calls and contract
-    checks for this locale have succeeded.  A provider/authentication failure
-    therefore leaves the previously packaged locale intact.
+    No target/cache/memory file is changed until all provider calls and
+    translation-contract checks for this locale have succeeded.
     """
     if locale not in TARGET_CODES:
         raise ValueError(f"Unsupported translation target {locale!r}")
 
     if dry_run:
-        return translation_plan(locale, force=force).as_dict()
+        return translation_plan(locale, force=force, memory_path=memory_path).as_dict()
 
     cache = _load_cache()
+    memory = _memory_store(memory_path)
     override_records = _manual_override_records(locale)
     _prune_locale_cache(cache, locale)
     catalog_payloads: dict[str, dict] = {}
-    cached = overridden = translated_count = missing = batches = 0
-
-    # Instantiate Google lazily only if an entry actually needs the network.
+    cached = memory_hits = overridden = translated_count = missing = batches = 0
     active_provider = provider
 
     for catalog in CATALOGS:
@@ -549,17 +649,37 @@ def translate_locale(
                 cached += 1
                 continue
 
+            if not force:
+                candidate = memory.lookup(locale, catalog, source_text)
+                if candidate is not None:
+                    final = candidate.translation
+                    _validate_final(locale, catalog, key, source_text, final)
+                    result[key] = final
+                    _set_cache_entry(
+                        cache,
+                        locale,
+                        catalog,
+                        key,
+                        {
+                            "source_hash": expected_hash,
+                            "translation": final,
+                            "status": "memory-reuse",
+                            "provider": candidate.provider,
+                            "model": candidate.model,
+                        },
+                    )
+                    memory_hits += 1
+                    continue
+
             protected_text, protected = protect_text(source_text)
             pending.append((key, protected_text, protected))
 
         if pending and no_network:
-            # Deliberately *do not* trust old generated locale files: without a
-            # matching source hash they may describe an older canonical string.
-            # Missing entries stay absent and the runtime uses en-AU fallback.
             missing += len(pending)
         elif pending:
             if active_provider is None:
-                active_provider = GoogleTranslator(
+                active_provider = create_provider(
+                    provider_name,
                     project_id=project_id,
                     location=location,
                     model=model,
@@ -567,7 +687,8 @@ def translate_locale(
             for batch in _chunks(pending):
                 batches += 1
                 raw_translations = active_provider.translate_batch(
-                    [item[1] for item in batch], TARGET_CODES[locale]
+                    [item[1] for item in batch],
+                    _provider_target(active_provider, locale),
                 )
                 if len(raw_translations) != len(batch):
                     raise RuntimeError("Translation provider returned an unexpected translation count")
@@ -575,6 +696,8 @@ def translate_locale(
                     final = restore_text(raw_translation, protected)
                     _validate_final(locale, catalog, key, source[key], final)
                     result[key] = final
+                    provider_id = getattr(active_provider, "provider_name", "translation-provider")
+                    model_id = getattr(active_provider, "model_name", "unknown")
                     _set_cache_entry(
                         cache,
                         locale,
@@ -584,9 +707,20 @@ def translate_locale(
                             "source_hash": _manifest_hash(catalog, key, source[key]),
                             "translation": final,
                             "status": "machine",
-                            "provider": getattr(active_provider, "provider_name", "translation-provider"),
-                            "model": getattr(active_provider, "model_name", "unknown"),
+                            "provider": provider_id,
+                            "model": model_id,
                         },
+                    )
+                    memory.put(
+                        memory_entry(
+                            target_locale=locale,
+                            catalog=catalog,
+                            source=source[key],
+                            translation=final,
+                            status="machine",
+                            provider=provider_id,
+                            model=model_id,
+                        )
                     )
                     translated_count += 1
 
@@ -596,20 +730,21 @@ def translate_locale(
                 "source_locale": SOURCE_LOCALE,
                 "catalog": catalog,
                 "generated_by": "tools/localization/google_translate.py",
+                "provider": getattr(active_provider, "provider_name", "") if active_provider else "",
             },
             "strings": dict(sorted(result.items())),
         }
 
-    # Provider work has completed successfully.  Commit deterministic artifacts
-    # atomically one file at a time; cache is written last so an interrupted
-    # locale write can only cause harmless retranslation on the next run.
+    # Commit deterministic artifacts only after all provider work succeeds.
     for catalog in CATALOGS:
         _atomic_write_json(LOCALE_ROOT / locale / f"{catalog}.json", catalog_payloads[catalog])
     _atomic_write_json(CACHE_PATH, cache)
+    memory.save()
 
     return TranslationStats(
         locale=locale,
         cached=cached,
+        memory=memory_hits,
         overridden=overridden,
         translated=translated_count,
         missing=missing,

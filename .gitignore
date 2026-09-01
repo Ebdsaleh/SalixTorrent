@@ -19,6 +19,7 @@
 !tools/localization/stage6_generate_locales.bat
 !tools/localization/stage7_validate_localization.bat
 !tools/localization/stage8_review_localization.bat
+!tools/localization/stage9_validate_translation_memory.bat
 *tree.txt
 
 # Local regression tests are intentionally kept out of this repository.
@@ -46,8 +47,8 @@ test_*.py
 venv/
 
 # Localization credentials are development-machine secrets.
-# Locale JSON, manual overrides, protected terms and translation_cache.json
-# are intentionally NOT ignored: they are reproducible project resources.
+# Locale JSON, manual overrides, protected terms, translation_cache.json,
+# and the project translation_memory.json are intentionally NOT ignored: they are reproducible project resources.
 tools/localization/.credentials/
 tools/localization/credentials*.json
 tools/localization/service-account*.json

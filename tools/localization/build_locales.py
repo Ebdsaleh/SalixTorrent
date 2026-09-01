@@ -16,7 +16,11 @@ try:
         DEFAULT_MODEL,
         TARGET_CODES,
         bootstrap_translation_cache,
+        bootstrap_translation_memory,
+        merge_translation_memory,
         translate_locale,
+        translation_memory_audit,
+        translation_memory_status,
         translation_plan,
     )
     from .stage6_support import all_generation_status, google_doctor
@@ -27,6 +31,7 @@ try:
         write_locale_manifest,
     )
     from .review import export_review, import_review, review_audit, review_summary
+    from .provider_registry import provider_descriptors
     from .validate_locales import validate_all
 except ImportError:  # direct script execution
     from extract_strings import extract_all, extract_records, extraction_drift, extraction_summary
@@ -35,7 +40,11 @@ except ImportError:  # direct script execution
         DEFAULT_MODEL,
         TARGET_CODES,
         bootstrap_translation_cache,
+        bootstrap_translation_memory,
+        merge_translation_memory,
         translate_locale,
+        translation_memory_audit,
+        translation_memory_status,
         translation_plan,
     )
     from stage6_support import all_generation_status, google_doctor
@@ -46,6 +55,7 @@ except ImportError:  # direct script execution
         write_locale_manifest,
     )
     from review import export_review, import_review, review_audit, review_summary
+    from provider_registry import provider_descriptors
     from validate_locales import validate_all
 
 
@@ -71,13 +81,13 @@ def _print_extraction_report() -> None:
                 print(f"    {catalog}:{key} -> {locations}")
 
 
-def _print_translation_plan(locales: list[str], *, force: bool = False) -> None:
+def _print_translation_plan(locales: list[str], *, force: bool = False, memory_path=None) -> None:
     print("Translation plan (no network, no files changed):")
     for locale in locales:
-        stats = translation_plan(locale, force=force)
+        stats = translation_plan(locale, force=force, memory_path=memory_path)
         print(
-            f"  {locale}: cached={stats.cached}, overrides={stats.overridden}, "
-            f"would_translate={stats.would_translate}"
+            f"  {locale}: cached={stats.cached}, memory={stats.memory}, "
+            f"overrides={stats.overridden}, would_translate={stats.would_translate}"
         )
 
 
@@ -103,6 +113,25 @@ def _print_review_report(locales: list[str]) -> None:
             f"review_needed={summary.review_needed}, reviewed={summary.reviewed}, "
             f"locked={summary.locked}, stale={summary.stale}, invalid={summary.invalid} ({marker})"
         )
+
+
+def _print_provider_report() -> None:
+    print("Translation providers:")
+    for item in provider_descriptors():
+        mode = "network" if item.network else "offline"
+        print(f"  {item.name}: {mode}; {item.description}")
+
+
+def _print_memory_status(path=None) -> None:
+    stats = translation_memory_status(path)
+    print("Translation memory:")
+    print(f"  Path: {stats.path}")
+    print(f"  Target locales: {stats.target_locales}")
+    print(f"  Entries: {stats.entries}")
+    print(f"  Reusable: {stats.reusable}")
+    print(f"  Reviewed/locked: {stats.reviewed}")
+    print(f"  Machine: {stats.machine}")
+    print(f"  Seeded existing: {stats.seeded}")
 
 
 def _print_google_doctor(report, *, probed: bool) -> None:
@@ -148,6 +177,13 @@ def main(argv=None) -> int:
     parser.add_argument("--review-export-path", help="Output file for --review-export (requires exactly one --locale)")
     parser.add_argument("--review-import", metavar="FILE", help="Import reviewed/locked entries from an offline review bundle")
     parser.add_argument("--stage8-check", action="store_true", help="Run Stage 8A offline review/provenance infrastructure checks")
+    parser.add_argument("--providers", action="store_true", help="List registered development translation providers")
+    parser.add_argument("--provider", default="google-cloud", help="Translation provider name for network generation")
+    parser.add_argument("--memory-status", action="store_true", help="Show provider-neutral translation-memory statistics")
+    parser.add_argument("--memory-bootstrap", action="store_true", help="Seed translation memory from current hash-valid project cache")
+    parser.add_argument("--memory-path", help="Translation-memory JSON path (otherwise env/default beside cache)")
+    parser.add_argument("--memory-merge", metavar="FILE", help="Merge another compatible translation-memory JSON file")
+    parser.add_argument("--stage9-check", action="store_true", help="Run Stage 9 provider/memory infrastructure checks")
     parser.add_argument("--bootstrap-cache", action="store_true", help="Adopt current pre-Stage-5 locale entries into the source-hash cache")
     parser.add_argument("--project-id", help="Google Cloud project ID/number (otherwise use environment/ADC discovery)")
     parser.add_argument("--location", default=None, help=f"Google Translation location (default: {DEFAULT_LOCATION})")
@@ -158,8 +194,8 @@ def main(argv=None) -> int:
     do_extract = args.extract or args.all
     do_translate = args.translate or args.all
     do_validate = args.validate or args.all
-    if not any((do_extract, do_translate, do_validate, args.check, args.report, args.bootstrap_cache, args.dry_run, args.status, args.doctor, args.generate_initial, args.manifest, args.package_check, args.pseudo_check, args.stage7_check, args.review_report, args.review_export, args.review_import, args.stage8_check)):
-        parser.error("choose --extract, --check, --report, --translate, --validate, --bootstrap-cache, --dry-run, --status, --doctor, --generate-initial, --manifest, --package-check, --pseudo-check, --stage7-check, --review-report, --review-export, --review-import, --stage8-check or --all")
+    if not any((do_extract, do_translate, do_validate, args.check, args.report, args.bootstrap_cache, args.dry_run, args.status, args.doctor, args.generate_initial, args.manifest, args.package_check, args.pseudo_check, args.stage7_check, args.review_report, args.review_export, args.review_import, args.stage8_check, args.providers, args.memory_status, args.memory_bootstrap, args.memory_merge, args.stage9_check)):
+        parser.error("choose --extract, --check, --report, --translate, --validate, --bootstrap-cache, --dry-run, --status, --doctor, --generate-initial, --manifest, --package-check, --pseudo-check, --stage7-check, --review-report, --review-export, --review-import, --stage8-check, --providers, --memory-status, --memory-bootstrap, --memory-merge, --stage9-check or --all")
 
     if args.dry_run and args.bootstrap_cache:
         parser.error("--dry-run and --bootstrap-cache cannot be combined")
@@ -204,6 +240,30 @@ def main(argv=None) -> int:
 
     locales = args.locales or sorted(TARGET_CODES)
 
+    if args.providers:
+        _print_provider_report()
+
+    if args.memory_bootstrap:
+        stats = bootstrap_translation_memory(memory_path=args.memory_path)
+        for locale in sorted(stats):
+            print(f"{locale}: seeded {stats[locale]} translation-memory entrie(s)")
+
+    if args.memory_merge:
+        merged = merge_translation_memory(
+            args.memory_merge,
+            memory_path=args.memory_path,
+        )
+        print(
+            f"Translation memory merge: added={merged['added']}, "
+            f"reused={merged['reused']}, conflicts={merged['conflicts']}"
+        )
+        if merged["conflicts"]:
+            print("Translation memory merge refused to write because conflicts require review.")
+            return 9
+
+    if args.memory_status:
+        _print_memory_status(args.memory_path)
+
     if args.status:
         _print_generation_status(locales)
 
@@ -247,7 +307,7 @@ def main(argv=None) -> int:
                 print(f"  stale/missing: {path}")
             print("Run: python tools\\localization\\build_locales.py --extract")
             return 3
-        _print_translation_plan(locales, force=args.force)
+        _print_translation_plan(locales, force=args.force, memory_path=args.memory_path)
         for locale in locales:
             stats = translate_locale(
                 locale,
@@ -256,10 +316,13 @@ def main(argv=None) -> int:
                 project_id=args.project_id,
                 location=args.location,
                 model=args.model,
+                provider_name=args.provider,
+                memory_path=args.memory_path,
             )
             print(
-                f"{locale}: cached={stats['cached']}, overrides={stats['overridden']}, "
-                f"translated={stats['translated']}, missing={stats['missing']}, "
+                f"{locale}: cached={stats['cached']}, memory={stats.get('memory', 0)}, "
+                f"overrides={stats['overridden']}, translated={stats['translated']}, "
+                f"missing={stats['missing']}, "
                 f"batches={stats['batches']}"
             )
         write_locale_manifest()
@@ -283,7 +346,7 @@ def main(argv=None) -> int:
             print(f"{locale}: adopted {stats[locale]} existing translation(s) into cache")
 
     if args.dry_run:
-        _print_translation_plan(locales, force=args.force)
+        _print_translation_plan(locales, force=args.force, memory_path=args.memory_path)
 
     if do_translate and not args.dry_run:
         for locale in locales:
@@ -294,10 +357,13 @@ def main(argv=None) -> int:
                 project_id=args.project_id,
                 location=args.location,
                 model=args.model,
+                provider_name=args.provider,
+                memory_path=args.memory_path,
             )
             print(
-                f"{locale}: cached={stats['cached']}, overrides={stats['overridden']}, "
-                f"translated={stats['translated']}, missing={stats['missing']}, "
+                f"{locale}: cached={stats['cached']}, memory={stats.get('memory', 0)}, "
+                f"overrides={stats['overridden']}, translated={stats['translated']}, "
+                f"missing={stats['missing']}, "
                 f"batches={stats['batches']}"
             )
 
@@ -383,6 +449,33 @@ def main(argv=None) -> int:
         )
         if not ok:
             return 8
+
+    if args.stage9_check:
+        drift = extraction_drift()
+        manifest_stale = locale_manifest_drift()
+        if drift or manifest_stale:
+            print("Stage 9 drift check: FAILED")
+            return 3
+        descriptors = provider_descriptors()
+        if not descriptors:
+            print("Stage 9 provider registry: FAILED (no providers registered)")
+            return 9
+        print(f"Stage 9 provider registry: OK ({len(descriptors)} provider(s))")
+        seeded = bootstrap_translation_memory(memory_path=args.memory_path, write=False)
+        print(
+            "Stage 9 memory bootstrap audit: OK ("
+            + ", ".join(f"{locale}={count}" for locale, count in sorted(seeded.items()))
+            + ")"
+        )
+        audit = translation_memory_audit(args.memory_path)
+        if not audit.ok:
+            print("Stage 9 translation memory audit: FAILED")
+            for error in audit.errors:
+                print(f"ERROR: {error}")
+            return 9
+        print("Stage 9 translation memory audit: OK")
+        _print_memory_status(args.memory_path)
+        print("Stage 9 provider-neutral translation memory: OK")
 
     if do_validate:
         validate_locales = ["en-AU", *locales]

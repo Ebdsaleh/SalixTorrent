@@ -4,6 +4,17 @@ Notable SalixTorrent changes are recorded here.
 
 ## Unreleased
 
+### Phase 12 Stage 9 - Provider-Neutral Translation Memory Foundation
+
+- Added a provider-neutral translation-memory service with deterministic JSON storage, exact canonical source hashes, placeholder contracts, provenance, model/status metadata and a storage interface intended for a future SQLite/SalixORM backend.
+- Added source-based memory identity independent of SalixTorrent localization keys while retaining semantic catalog separation (`ui`, `help`, `glossary`) to avoid unsafe reuse across unrelated text domains.
+- Seeded the project memory from the existing source-hash-valid translation cache, deduplicating 452 key records into 432 reusable exact-source candidates (108 per target locale).
+- Updated changed-only translation planning/generation to consult manual overrides, the project key cache, then reusable translation memory before invoking a provider; memory hits work in strict no-network mode and are adopted back into the key cache.
+- Added a lazy development provider registry and explicit `--provider` selection; Google Cloud remains one registered network provider rather than the localization architecture itself.
+- Added `--providers`, `--memory-bootstrap`, `--memory-status`, `--memory-path`, `--memory-merge` and `--stage9-check` plus tracked Windows `stage9_validate_translation_memory.bat`.
+- Added fail-closed memory merge/audit behavior for malformed hashes/placeholders and conflicting candidate translations.
+- Added Stage 9 regression coverage for source-based reuse, catalog separation, placeholder safety, merge conflicts, portable memory paths, memory-assisted no-network generation, provider registration and offline Stage-9 validation.
+
 ### Phase 12 Stage 8A - Translation Review Infrastructure
 
 - Added provider-neutral review-state analysis that classifies every target-locale entry as missing, awaiting review, reviewed, locked, stale, or invalid without requiring any translation provider.

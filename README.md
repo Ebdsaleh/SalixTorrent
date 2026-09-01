@@ -773,3 +773,50 @@ the four target locales presently contain 113 seeded UI entries awaiting review 
 failure. Stage 8B will perform the actual warning/security/BitTorrent/Help/Glossary/
 high-visibility language review after locale population resumes.
 
+
+### Phase 12 Stage 9 - provider-neutral translation memory
+
+Stage 9 separates reusable translation memory from SalixTorrent's historical
+Google/key cache. The existing `translation_cache.json` remains a project/key-level
+incremental cache, while `translation_memory.json` is keyed by target locale,
+semantic catalog (`ui`, `help`, `glossary`) and canonical source hash. The memory
+therefore does not depend on a SalixTorrent localization key and can later be
+shared/imported by other applications that use the same canonical source text.
+
+The first storage backend is deterministic JSON by design. It keeps Phase 12
+independent of SalixORM while defining a storage-service boundary that can later
+gain a SQLite/SalixORM implementation without changing the translation pipeline.
+
+Useful offline commands:
+
+```bat
+python tools\localization\build_locales.py --providers
+python tools\localization\build_locales.py --memory-bootstrap
+python tools\localization\build_locales.py --memory-status
+python tools\localization\build_locales.py --stage9-check
+```
+
+Or on Windows:
+
+```bat
+tools\localization\stage9_validate_translation_memory.bat
+```
+
+A different/shared memory file can be selected with either
+`--memory-path <file>` or the `SALIX_LOCALIZATION_MEMORY` environment variable.
+`--memory-merge <file>` performs a fail-closed merge: identical entries are reused,
+new entries are added, and conflicting candidate translations are reported rather
+than silently overwritten.
+
+The current project memory deduplicates the 452 seeded key-cache records into
+432 exact-source candidates (108 per target locale). Because some untranslated
+SalixTorrent keys use source text that already exists elsewhere in the same
+semantic catalog, a normal Stage-9 dry run can reuse additional translations from
+memory before any provider is contacted.
+
+Translation-provider selection is now explicit through the development provider
+registry. Google Cloud remains registered as `google-cloud`, but runtime
+localization has no provider dependency and future adapters (for example an
+offline engine or local model) can be registered without redesigning the runtime
+catalogs, review system, or translation memory.
+

@@ -443,7 +443,7 @@ Source-file information is for development diagnostics and should not be require
 
 ## 10. Translation Provider
 
-The preferred development translation backend is the official Google Cloud Translation API.
+Google Cloud Translation is the first implemented development provider, not the localization architecture.
 
 It must exist only in development tooling.
 
@@ -1336,6 +1336,37 @@ forward. Stage 8A can remain green while Stage 6B translation population is paus
 **Stage 8B is content-dependent and remains on hold with Stage 6B.** The review
 infrastructure is ready; actual language review begins once target locale packs contain
 the strings to be reviewed.
+
+### Stage 9 - Provider-Neutral Translation Memory Foundation
+
+- [x] provider-neutral translation-provider contract/registry
+- [x] lazy Google Cloud provider registration
+- [x] explicit provider selection in development tooling
+- [x] storage-neutral translation-memory service contract
+- [x] deterministic JSON memory backend
+- [x] target-locale + semantic-catalog + source-hash identity
+- [x] placeholder/source-hash integrity checks
+- [x] source-based reuse independent of SalixTorrent localization keys
+- [x] translation-cache to translation-memory bootstrap
+- [x] fail-closed memory merge/conflict reporting
+- [x] configurable project/shared memory path
+- [x] no-network translation-memory reuse
+- [x] provider/memory diagnostics and Windows validation helper
+- [ ] future SQLite/SalixORM translation-memory backend
+- [ ] future offline/local translation provider adapter
+
+**Stage 9 implementation checkpoint (2026-09-01):** The development translation
+pipeline no longer treats the Google/key cache as the long-term reusable architecture.
+`translation_cache.json` remains the SalixTorrent key-level incremental cache, while
+`translation_memory.json` is an exact-source memory keyed by target locale, semantic
+catalog and canonical source hash. The checked-in project memory bootstraps the current
+452 seeded key records into 432 deduplicated candidates (108 per target locale).
+Translation planning/generation now checks reviewed overrides, the key cache, and then
+translation memory before a provider is contacted. Memory files can be relocated via
+`SALIX_LOCALIZATION_MEMORY`/`--memory-path` or merged fail-closed from another compatible
+memory. The initial JSON backend is intentionally transitional: a future SalixORM/SQLite
+store can implement the same service boundary without coupling SalixTorrent runtime
+localization to an ORM or translation provider. Stage 6B and Stage 8B remain paused.
 
 ---
 
