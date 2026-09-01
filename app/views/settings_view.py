@@ -393,25 +393,47 @@ class SettingsView:
                         default_value=bool(self.settings["completion_notifications"]),
                     )
                     add_help_tooltip(self.completion_notifications_checkbox, "COMPLETION_NOTICE")
+                    desktop_caps = self.desktop.capability_snapshot()
                     self.native_notifications_checkbox = dpg.add_checkbox(
-                        label="Show native Windows completion notifications (uses tray API)",
+                        label="Show native desktop completion notifications",
                         default_value=bool(self.settings["native_notifications"]),
+                        enabled=bool(desktop_caps.notifications_supported),
                     )
                     add_help_tooltip(self.native_notifications_checkbox, "NATIVE_NOTIFICATION")
                     self.system_tray_checkbox = dpg.add_checkbox(
-                        label="Enable system tray icon / controls",
+                        label="Enable system tray / menu bar icon and controls",
                         default_value=bool(self.settings["system_tray_enabled"]),
+                        enabled=bool(desktop_caps.tray_supported),
                     )
                     add_help_tooltip(self.system_tray_checkbox, "SYSTEM_TRAY")
                     self.minimize_to_tray_checkbox = dpg.add_checkbox(
                         label="Minimize to system tray",
                         default_value=bool(self.settings["minimize_to_tray"]),
+                        enabled=bool(desktop_caps.minimize_to_tray_supported),
                     )
                     add_help_tooltip(self.minimize_to_tray_checkbox, "MINIMIZE_TRAY")
-                    if not self.desktop.supported:
+                    self.close_to_tray_checkbox = dpg.add_checkbox(
+                        label="Close window to system tray",
+                        default_value=bool(self.settings.get("close_to_tray", True)),
+                        enabled=bool(desktop_caps.close_to_tray_supported),
+                    )
+                    add_help_tooltip(self.close_to_tray_checkbox, "CLOSE_TO_TRAY")
+                    tray_state = (
+                        "running"
+                        if desktop_caps.tray_running
+                        else ("available" if desktop_caps.tray_supported else "unavailable")
+                    )
+                    desktop_status = (
+                        f"Desktop backend: {desktop_caps.tray_backend} | "
+                        f"Tray: {tray_state} | "
+                        f"Notifications: {'available' if desktop_caps.notifications_supported else 'unavailable'}"
+                    )
+                    dpg.add_text(desktop_status, color=(155, 155, 160))
+                    if desktop_caps.detail:
                         dpg.add_text(
-                            "Native tray/notification backend is currently available on Windows.",
+                            desktop_caps.detail,
                             color=(155, 155, 160),
+                            wrap=680,
                         )
 
             dpg.add_spacer(height=10)
@@ -526,6 +548,7 @@ class SettingsView:
             "native_notifications": bool(dpg.get_value(self.native_notifications_checkbox)),
             "system_tray_enabled": bool(dpg.get_value(self.system_tray_checkbox)),
             "minimize_to_tray": bool(dpg.get_value(self.minimize_to_tray_checkbox)),
+            "close_to_tray": bool(dpg.get_value(self.close_to_tray_checkbox)),
             "transfer_rate_display_unit": str(
                 dpg.get_value(self.transfer_rate_display_combo) or "Auto"
             ),
@@ -580,6 +603,7 @@ class SettingsView:
             self.native_notifications_checkbox: settings["native_notifications"],
             self.system_tray_checkbox: settings["system_tray_enabled"],
             self.minimize_to_tray_checkbox: settings["minimize_to_tray"],
+            self.close_to_tray_checkbox: settings.get("close_to_tray", True),
             self.transfer_rate_display_combo: settings.get("transfer_rate_display_unit", "Auto"),
             self.ui_font_size_combo: ui_font_label(settings.get("ui_font_size", 15)),
             self.documentation_scale_combo: documentation_scale_label(

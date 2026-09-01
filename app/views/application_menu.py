@@ -722,6 +722,7 @@ class ApplicationMenu:
             dpg_version = "unknown"
         runtime = runtime_snapshot()
         shell_status = ShellIntegration().status()
+        desktop_caps = self.gui.desktop.capability_snapshot()
 
         selected = self._selected_hash()
         selected_stats = self.download_view.latest_stats.get(selected, {}) if selected else {}
@@ -758,7 +759,15 @@ class ApplicationMenu:
             f"State directory: {runtime.get('state_directory')}\n"
             f"Default download directory: {runtime.get('default_download_directory')}\n"
             f".torrent handler: {'Registered' if shell_status.torrent_handler_registered else ('Not registered' if shell_status.supported else 'Unsupported')}\n"
-            f"magnet handler: {'Registered' if shell_status.magnet_handler_registered else ('Not registered' if shell_status.supported else 'Unsupported')}\n\n"
+            f"magnet handler: {'Registered' if shell_status.magnet_handler_registered else ('Not registered' if shell_status.supported else 'Unsupported')}\n"
+            f"Desktop tray backend: {desktop_caps.tray_backend}\n"
+            f"Tray capability: {'Running' if desktop_caps.tray_running else ('Available' if desktop_caps.tray_supported else 'Unavailable')}\n"
+            f"Tray menu capability: {'Available' if desktop_caps.tray_menu_supported else 'Unavailable'}\n"
+            f"Native notifications: {'Available' if desktop_caps.notifications_supported else 'Unavailable'}\n"
+            f"Window hide/restore: {'Available' if desktop_caps.window_hide_supported and desktop_caps.window_activation_supported else 'Unavailable'}\n"
+            f"Minimize to tray: {'Supported' if desktop_caps.minimize_to_tray_supported else 'Unsupported'}\n"
+            f"Close to tray: {'Supported' if desktop_caps.close_to_tray_supported else 'Unsupported'}\n"
+            f"Desktop integration detail: {desktop_caps.detail or '--'}\n\n"
             f"Current view: {self.gui.scene_mgr.current_scene or '--'}\n"
             f"Loaded torrents: {len(self.download_view.torrent_order)}\n"
             f"Selected torrent: {selected_name}\n"

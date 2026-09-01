@@ -183,6 +183,7 @@ class TorrentManager:
             "native_notifications": True,
             "system_tray_enabled": True,
             "minimize_to_tray": True,
+            "close_to_tray": True,
             "listen_port": 6881,
             "enable_dht": True,
             "enable_pex": True,
@@ -232,6 +233,7 @@ class TorrentManager:
         out["native_notifications"] = bool(data.get("native_notifications", True))
         out["system_tray_enabled"] = bool(data.get("system_tray_enabled", True))
         out["minimize_to_tray"] = bool(data.get("minimize_to_tray", True))
+        out["close_to_tray"] = bool(data.get("close_to_tray", True))
         out["enable_dht"] = bool(data.get("enable_dht", True))
         out["enable_pex"] = bool(data.get("enable_pex", True))
         out["enable_lan_discovery"] = bool(data.get("enable_lan_discovery", True))

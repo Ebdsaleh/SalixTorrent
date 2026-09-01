@@ -2,7 +2,7 @@
 
 SalixTorrent is a desktop BitTorrent client written in Python with a custom asynchronous protocol engine and a Dear PyGui interface. Its transfer engine is generation-aware across BitTorrent v1, BitTorrent v2 and hybrid torrents, while keeping protocol identity, storage verification, discovery provenance and torrent creation explicit. The project aims to expose what a torrent client is doing rather than hiding the protocol behind a single progress bar: transfers, peers, pieces, files, trackers, discovery sources, bandwidth history, connectivity, and protocol terminology are all inspectable from the application.
 
-> **Release status:** v0.3.0 remains the current development version string while the post-v0.3.0 roadmap work is integrated. Phases 1-9 are implemented, including BEP-52 v2 networking, btmh magnets, v2/hybrid metadata exchange, dual-swarm hybrid transfers and v1/v2/hybrid torrent creation. Phase 10 adds frozen executable/portable/installer tooling plus Windows `.torrent` and `magnet:` registration support.
+> **Release status:** v0.3.0 remains the current development version string while the post-v0.3.0 roadmap work is integrated. Phases 1-10 are complete. Phase 11 adds a cross-platform desktop-integration layer with safe tray/menu-bar behavior, Linux/BSD and macOS backends, platform-aware notifications, close/minimize-to-tray policy, and capability diagnostics.
 
 ## Highlights
 
@@ -110,17 +110,26 @@ Create Torrent can emit BitTorrent v1, BitTorrent v2, or recommended hybrid meta
 
 Phase 10 centralizes runtime paths so source runs, PyInstaller one-file executables, Start Menu launches, Explorer `.torrent` opens and `magnet:` URL launches do not depend on the process working directory. Installed builds keep settings/session/cache/error state in the platform per-user state location. A `portable.flag` beside the executable switches state to `.\data` and makes `.\downloads` the default for a new portable profile; `--portable` can request the same mode for one launch.
 
-`packaging/build_windows.ps1` builds two one-file executables through PyInstaller: `SalixTorrent.exe` is the windowed desktop/file-handler target, while `SalixTorrentCLI.exe` preserves the existing console/headless interface without forcing a console window on normal desktop users. The script then creates a portable ZIP and can compile the Inno Setup installer. Build-only dependencies live in `requirements-build.txt`.
+`packaging/build_windows.bat` is the primary Windows release builder. Run it from an already activated project virtual environment; it prints the exact Python interpreter it will use, runs the regression suite, builds the windowed `SalixTorrent.exe` and console `SalixTorrentCLI.exe`, creates the portable ZIP, and can compile the Inno Setup installer. The PowerShell builder remains available as an alternative. Build-only dependencies live in `requirements-build.txt`.
 
 The Windows installer is per-user by default and offers `.torrent` handler registration plus explicit opt-in `magnet:` registration. `.torrent` registration uses SalixTorrent's own ProgID/Open With entry rather than silently replacing another client's default. Because `magnet:` is a single-owner URL scheme, SalixTorrent backs up the previous standard handler values and restores them on unregister only when the current scheme still belongs to that SalixTorrent executable. Portable users can use `--register-torrent-handler`, `--register-magnet-handler`, matching unregister commands, and `--shell-status`.
 
-To build Windows release artifacts from PowerShell:
+To build Windows release artifacts from an activated virtual environment in Command Prompt:
 
-```powershell
-.\packaging\build_windows.ps1
+```bat
+.venv\Scripts\activate
+packaging\build_windows.bat
 ```
 
-PyInstaller builds must be produced on the target operating system; the script therefore refuses to pretend it can cross-build Windows executables from Linux/macOS. Inno Setup 6 is required only for the installer step; `-SkipInstaller` still produces the standalone and portable artifacts.
+PyInstaller builds must be produced on the target operating system; the build script therefore refuses to pretend it can cross-build Windows executables from Linux/macOS. Inno Setup 6 is required only for the installer step; `--skip-installer` still produces the standalone and portable artifacts.
+
+## Cross-platform desktop integration (Phase 11)
+
+Phase 11 moves tray/menu-bar behavior behind `DesktopIntegration`, so torrent logic and Dear PyGui views do not call platform APIs directly. Tray callbacks enqueue semantic actions (`Open SalixTorrent`, `Pause All`, `Resume All`, `Exit`) and the Dear PyGui main thread performs the actual UI/torrent action. This makes the tray lifecycle the same for `python main.py` and frozen builds and avoids manipulating live Dear PyGui widgets from tray worker threads.
+
+Windows keeps a dependency-free native Win32 notification-area backend. After the Dear PyGui viewport is shown, SalixTorrent discovers its real top-level HWND by process rather than depending on a Dear PyGui native-handle helper, then installs a small native close/minimize bridge. `Open SalixTorrent` performs restore/foreground activation while the tray thread is servicing the user's click, with a main-thread restore fallback; the icon is also re-added after Explorer/taskbar recreation. This same binding path is used by `python main.py` and frozen builds. Linux and BSD use pystray when a compatible desktop tray implementation is available; X11 supplies native hide/restore/focus and minimize detection. Wayland-only sessions without an X11 viewport are reported as limited instead of allowing SalixTorrent to disappear into an unreachable tray. macOS uses a pystray menu-bar status item with AppKit window activation. Native notification capability is tracked separately from tray capability because desktops may provide one without the other.
+
+`Minimize to system tray` and `Close window to system tray` are separate preferences. SalixTorrent hides the viewport only when a tray is currently running and native recovery is available. If that capability disappears, close falls back to a normal shutdown rather than hiding the application. Tray `Exit` always requests a real clean shutdown. Preferences and `Help -> Diagnostics` expose the selected backend, live tray state, menu/notification support, native window recovery support and an explanatory capability/detail string.
 
 ## Interface
 
@@ -287,13 +296,14 @@ python test_headless_cli.py
 python test_torrent_v2.py
 python test_phase9.py
 python test_phase10.py
+python test_phase11.py
 ```
 
 The release-critical regression coverage includes strict BEP-52 v2 identity/file-tree/piece-layer/Merkle validation, MSE/RC4 interoperability, rarest-first/endgame scheduling, bounded request pipelines, asynchronous disk backpressure/caching, source binding, encryption fallback rules, multi-torrent port mappings, finite/permanent mapping-lease handling, structured UPnP/NAT-PMP diagnostics, source-severity accounting, Interface Lock, real inbound seeding uploads, IPv6 peer TCP, BEP-7/BEP-15 tracker peers, BEP-11 IPv6 PEX, BEP-32 DHT behavior, BEP-48 HTTP scrape batching, BEP-15 UDP scrape batching, scrape/announce telemetry isolation, Windows Proactor reset handling, responsive content-bounds geometry, framework property-cascade fallback/provenance, per-page documentation layout overrides, and semantic documentation typography/media sizing.
 
 ## Current scope
 
-Phases 1-9 are implemented in the live source tree. Phase 10 provides the source/runtime integration and reproducible Windows packaging definitions for standalone GUI/CLI executables, portable distribution, installer, `.torrent` handler registration and opt-in `magnet:` registration. Final Windows binary/installer release validation must be performed on Windows because PyInstaller does not cross-build Windows binaries. Phase 11 remains the cross-platform native-tray abstraction/implementation pass.
+Phases 1-10 are complete in the live source tree, including native Windows standalone/portable/installer validation. Phase 11 implements the cross-platform desktop/tray abstraction, the native Windows lifecycle/focus fixes, Linux/BSD and macOS backends, safe close/minimize-to-tray policy, and capability diagnostics/help. Linux/BSD/macOS native desktop behavior still requires smoke-testing on those operating systems even though the platform-neutral contracts are regression-tested.
 
 ## Project structure
 
@@ -316,8 +326,10 @@ SalixTorrent/
 ├── test_torrent_v2.py
 ├── test_phase9.py
 ├── test_phase10.py
+├── test_phase11.py
 ├── packaging/
 │   ├── SalixTorrent.spec
+│   ├── build_windows.bat
 │   ├── build_windows.ps1
 │   └── windows/SalixTorrent.iss
 ├── app/

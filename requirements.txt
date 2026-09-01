@@ -4,3 +4,10 @@ dearpygui>=2.0.0
 # Optional / Recommended for Async HTTP Tracker Support & Image handling
 aiohttp>=3.9.0
 pillow>=10.0.0
+
+# Phase 11 cross-platform desktop integration
+# Windows uses SalixTorrent's dependency-free native Win32 tray backend.
+pystray>=0.19.5; sys_platform != "win32"
+python-xlib>=0.33; platform_system == "FreeBSD" or platform_system == "OpenBSD" or platform_system == "NetBSD" or platform_system == "DragonFly"
+pyobjc-framework-Cocoa>=10.0; sys_platform == "darwin"
+pyobjc-framework-Quartz>=7.0; sys_platform == "darwin"

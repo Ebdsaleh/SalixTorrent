@@ -1028,21 +1028,31 @@ HELP_TERMS = {
         "notification services.",
     ),
     "NATIVE_NOTIFICATION": (
-        "Native Windows Completion Notification",
-        "Uses the Windows shell/tray notification backend to announce completed "
-        "downloads outside the main SalixTorrent window. This is desktop integration "
-        "only and has no effect on torrent activity.",
+        "Native Desktop Completion Notification",
+        "Uses the active desktop notification capability to announce completed "
+        "downloads outside the main SalixTorrent window. Windows uses the notification-"
+        "area backend; Linux/BSD and macOS can use their available desktop notification "
+        "service. Notification capability is independent from torrent networking.",
     ),
     "SYSTEM_TRAY": (
-        "System Tray Integration",
-        "Creates a Windows notification-area icon with quick SalixTorrent controls. "
-        "The Python-development build may behave differently from the eventual "
-        "packaged executable, so tray behavior is considered desktop integration.",
+        "System Tray / Menu Bar Integration",
+        "Creates the platform's supported background icon: the Windows notification "
+        "area, a Linux/BSD tray backend, or the macOS menu bar. The backend publishes "
+        "Open, Pause All, Resume All and Exit when its menu implementation supports "
+        "those actions. Diagnostics reports the selected backend and limitations.",
     ),
     "MINIMIZE_TRAY": (
         "Minimize to System Tray",
-        "When supported, minimizing hides the main window while transfers continue "
-        "in the background and the tray icon remains available for reopening it.",
+        "When the active tray and native window-control backend are both healthy, "
+        "minimizing hides the main window while transfers continue. SalixTorrent will "
+        "not hide itself if it cannot prove that a live tray can restore the window.",
+    ),
+    "CLOSE_TO_TRAY": (
+        "Close Window to System Tray",
+        "When enabled and supported, the window close button hides SalixTorrent while "
+        "transfers continue. Tray > Exit always performs a real clean shutdown. If the "
+        "tray backend is unavailable, Close falls back to normal application exit so "
+        "the program cannot become invisible and unreachable.",
     ),
     "SETTINGS_FILE": (
         "Settings File",
@@ -1196,8 +1206,9 @@ HELP_TERMS = {
     "DIAGNOSTICS": (
         "Diagnostics",
         "A support/development snapshot containing version, runtime, selected "
-        "torrent, discovery settings, connectivity state and application-data file "
-        "locations. It is designed to make troubleshooting reproducible.",
+        "torrent, discovery settings, connectivity state, desktop tray/notification "
+        "capabilities and application-data file locations. It is designed to make "
+        "troubleshooting reproducible.",
     ),
     "HEADLESS_MODE": (
         "Headless Mode",

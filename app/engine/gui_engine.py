@@ -1,13 +1,22 @@
 # app/engine/gui_engine.py
 
 from typing import Optional
+import os
 import time
 import traceback
 from pathlib import Path
 
 import dearpygui.dearpygui as dpg
 from app.engine.scene_manager import SceneManager
-from app.engine.desktop_integration import DesktopIntegration
+from app.engine.desktop_integration import (
+    DesktopIntegration,
+    TRAY_ACTION_CLOSE_REQUESTED,
+    TRAY_ACTION_MINIMIZE_REQUESTED,
+    TRAY_ACTION_EXIT,
+    TRAY_ACTION_PAUSE_ALL,
+    TRAY_ACTION_RESTORE,
+    TRAY_ACTION_RESUME_ALL,
+)
 from app.engine.ui_typography import UiTypography
 from app.engine.responsive_layout import ResponsiveLayout
 from app.engine.runtime_paths import state_directory
@@ -66,7 +75,19 @@ class GuiEngine:
                 "coalescing remains enabled; upgrading Dear PyGui is recommended."
             )
 
-        dpg.create_viewport(title="SalixTorrent (Salix_T)", width=1100, height=700)
+        # Windows close/minimize requests are intercepted at the native HWND
+        # after the viewport is shown. Other platforms retain Dear PyGui's
+        # exit-callback fallback.
+        self._native_window_events = os.name == "nt"
+        self._intercept_viewport_close = bool(
+            not self._native_window_events and hasattr(dpg, "set_exit_callback")
+        )
+        dpg.create_viewport(
+            title="SalixTorrent (Salix_T)",
+            width=1100,
+            height=700,
+            disable_close=self._intercept_viewport_close,
+        )
         # Native desktop applications enforce a sensible minimum rather than
         # allowing their controls to collapse into unusable geometry.
         try:
@@ -75,6 +96,16 @@ class GuiEngine:
         except Exception:
             pass
         dpg.setup_dearpygui()
+
+        if self._intercept_viewport_close:
+            try:
+                dpg.set_exit_callback(self._on_viewport_close_requested)
+            except Exception:
+                self._intercept_viewport_close = False
+                try:
+                    dpg.configure_viewport(0, disable_close=False)
+                except Exception:
+                    pass
 
         self.layout = ResponsiveLayout.get_instance()
         self.layout.install_viewport_callback()
@@ -152,40 +183,69 @@ class GuiEngine:
         except OSError:
             pass
 
+    def _on_viewport_close_requested(self, sender=None, app_data=None, user_data=None):
+        """Route the native close button through the main UI thread.
+
+        ``disable_close`` keeps Dear PyGui alive long enough for this callback
+        to decide whether closing should hide to a *live* tray or perform a
+        real application shutdown. Tray -> Exit always bypasses this policy.
+        """
+        del sender, app_data, user_data
+        self.desktop.queue_action(TRAY_ACTION_CLOSE_REQUESTED)
+
     def run(self):
         """Starts the native Dear PyGui render loop."""
         from app.logic.torrent_manager import TorrentManager
 
         manager = TorrentManager.get_instance()
-        self.desktop.configure(manager.get_app_settings())
         dpg.show_viewport()
         try:
             self.layout.refresh_all()
         except Exception:
             pass
 
-        # Dear PyGui 2.x exposes the native platform handle. On older builds the
-        # tray still exists, but automatic minimize-to-tray is simply skipped.
+        # A native-handle accessor is not part of Dear PyGui's documented
+        # cross-platform API. Use it only when a build happens to expose one,
+        # then let DesktopIntegration discover/bind the real native window when
+        # it does not.
         try:
-            platform_handle = dpg.get_viewport_platform_handle()
+            getter = getattr(dpg, "get_viewport_platform_handle", None)
+            platform_handle = getter() if callable(getter) else 0
         except Exception:
             platform_handle = 0
         self.desktop.set_viewport_handle(platform_handle)
+
+        # Start the tray only after the viewport has been bound, so Windows tray
+        # clicks already know which HWND they must restore and focus.
+        self.desktop.configure(manager.get_app_settings())
 
         try:
             while dpg.is_dearpygui_running():
                 # Tray callbacks are produced on a tiny native message thread,
                 # then consumed here so all Dear PyGui/window operations remain
                 # serialized onto the application's main UI thread.
+                self.desktop.maintain()
                 for action in self.desktop.poll_actions():
                     try:
-                        if action == "restore":
+                        if action == TRAY_ACTION_RESTORE:
                             self.desktop.show_viewport()
-                        elif action == "pause_all":
+                        elif action == TRAY_ACTION_PAUSE_ALL:
                             manager.pause_all()
-                        elif action == "resume_all":
+                        elif action == TRAY_ACTION_RESUME_ALL:
                             manager.resume_all()
-                        elif action == "exit":
+                        elif action == TRAY_ACTION_MINIMIZE_REQUESTED:
+                            if self.desktop.should_minimize_to_tray():
+                                if not self.desktop.hide_viewport():
+                                    self.desktop.minimize_viewport()
+                            else:
+                                self.desktop.minimize_viewport()
+                        elif action == TRAY_ACTION_CLOSE_REQUESTED:
+                            if self.desktop.should_close_to_tray():
+                                if not self.desktop.hide_viewport():
+                                    dpg.stop_dearpygui()
+                            else:
+                                dpg.stop_dearpygui()
+                        elif action == TRAY_ACTION_EXIT:
                             dpg.stop_dearpygui()
                     except Exception as exc:
                         self._report_ui_exception(f"desktop action {action}", exc)

@@ -686,7 +686,8 @@ HELP_TOPICS: Tuple[HelpTopic, ...] = (
                 "Preferences and diagnostics",
                 "Preferences controls storage defaults, networking/discovery, bandwidth, queue "
                 "behavior and desktop integration. Help > Diagnostics produces a copyable runtime "
-                "snapshot including connectivity state and application-data paths for troubleshooting.",
+                "snapshot including connectivity, tray/notification capability and application-data "
+                "paths for troubleshooting.",
             ),
             (
                 "Resizing and layout",
@@ -706,6 +707,66 @@ HELP_TOPICS: Tuple[HelpTopic, ...] = (
             "DIAGNOSTICS",
             "RESPONSIVE_LAYOUT",
             "REMOVE_TORRENT",
+        ),
+    ),
+    HelpTopic(
+        key="desktop_integration",
+        title="Desktop Integration & System Tray",
+        summary=(
+            "How SalixTorrent chooses a safe tray/menu-bar backend, restores the window, "
+            "delivers native completion notices and degrades when desktop capabilities are missing."
+        ),
+        sections=(
+            (
+                "Cross-platform tray abstraction",
+                "Torrent and view code do not call a platform tray API directly. DesktopIntegration "
+                "owns a semantic action queue for Open SalixTorrent, Pause All, Resume All and Exit, "
+                "and the Dear PyGui main thread consumes those actions. This keeps tray worker threads "
+                "away from the live widget tree and makes source and packaged builds share one lifecycle.",
+            ),
+            (
+                "Windows",
+                "Windows uses a dependency-free Win32 notification-area backend. Open SalixTorrent "
+                "restores, raises and explicitly focuses the native viewport instead of merely making "
+                "it visible. The tray is re-created after an Explorer taskbar restart and its lifetime "
+                "is monitored so a failed icon cannot leave minimize/close-to-tray enabled unsafely.",
+            ),
+            (
+                "Linux and BSD",
+                "Linux and BSD use pystray when a compatible desktop backend is available. Linux can "
+                "select AppIndicator, GTK or Xorg according to the desktop; BSD uses the Xorg backend "
+                "by default unless PYSTRAY_BACKEND selects another compatible implementation. X11 "
+                "viewport control supplies hide, restore and focus. Wayland-only sessions that expose "
+                "no X11 window are reported as limited rather than pretending hide-to-tray is safe.",
+            ),
+            (
+                "macOS",
+                "macOS uses a pystray status item together with AppKit window control. The menu-bar "
+                "icon can reopen the Dear PyGui window, while AppKit handles deminiaturize, ordering "
+                "and application activation. Native notification availability is reported separately.",
+            ),
+            (
+                "Minimize, Close and Exit",
+                "Minimize to tray and Close window to tray are separate preferences. Both require a "
+                "live tray plus native window recovery support before SalixTorrent will hide itself. "
+                "If either capability fails, Close performs a normal shutdown instead of making the "
+                "application invisible. Tray > Exit always requests a real clean application exit.",
+            ),
+            (
+                "Capability diagnostics",
+                "Preferences and Help > Diagnostics report the selected tray backend, whether it is "
+                "running, menu and notification availability, native window hide/restore support, "
+                "and a backend detail/reason string. Unsupported controls are disabled instead of "
+                "silently accepting settings that cannot work on the current desktop.",
+            ),
+        ),
+        related_terms=(
+            "SYSTEM_TRAY",
+            "MINIMIZE_TRAY",
+            "CLOSE_TO_TRAY",
+            "NATIVE_NOTIFICATION",
+            "DIAGNOSTICS",
+            "PREFERENCES_VIEW",
         ),
     ),
     HelpTopic(

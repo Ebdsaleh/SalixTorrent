@@ -6,6 +6,11 @@ Notable SalixTorrent changes are recorded here.
 
 ### Added
 
+- Phase 11 platform-neutral desktop integration controller with semantic tray actions, independent tray/window capability tracking and fail-safe hide/restore policy.
+- Linux/BSD pystray desktop backend with X11 viewport hide/restore/focus support, backend capability reporting and desktop-notification fallback.
+- macOS menu-bar backend with pystray plus AppKit window restore/activation and notification capability detection.
+- Separate Close window to tray preference plus live tray/menu/notification/window-recovery diagnostics in Preferences, Help and Diagnostics.
+- Phase 11 regression coverage for tray policy, capability snapshots, backend selection contracts, packaging dependencies and source/frozen lifecycle safeguards.
 - Phase 10 centralized runtime-path policy for source, frozen installed and portable execution, removing process-working-directory assumptions from state, default downloads, UI error logs and documentation media resources.
 - PyInstaller release specification plus Windows build script producing a windowed standalone `SalixTorrent.exe`, console `SalixTorrentCLI.exe`, and portable ZIP with `portable.flag`.
 - Inno Setup 6 installer definition with per-user installation, Start Menu/optional desktop shortcuts, optional `.torrent` and `magnet:` integration, and clean unregister behavior.
@@ -19,6 +24,9 @@ Notable SalixTorrent changes are recorded here.
 
 ### Changed
 
+- Windows tray actions now restore, raise and focus the Dear PyGui viewport, and tray lifetime is monitored so source and frozen builds share the same recovery behavior.
+- System-tray and native-notification preference wording is platform-neutral and unsupported desktop controls are capability-gated instead of silently accepting unusable settings.
+- The CMD `packaging/build_windows.bat` workflow is tracked as the primary Windows release builder while the PowerShell builder remains available.
 - New installations no longer derive their default download directory from the process working directory; installed profiles default to the user's Downloads/SalixTorrent folder while portable profiles default beside the executable.
 - UI error logging and application state now share one centralized state-directory policy.
 - Documentation image resources resolve relative to the application/bundle instead of the launch working directory.
@@ -26,6 +34,10 @@ Notable SalixTorrent changes are recorded here.
 
 ### Fixed
 
+- Windows Phase 11 viewport binding no longer depends on a non-portable Dear PyGui native-handle accessor: the Win32 backend discovers the real top-level SalixTorrent HWND by process, subclasses its native window procedure for close/minimize events, and binds that HWND to the tray backend.
+- Windows tray `Open SalixTorrent` now performs native restore/foreground activation while servicing the tray user action, with a main-thread restore fallback, so source and frozen builds share the same focus path.
+- `Open SalixTorrent` from the Windows notification-area menu now performs an explicit restore/raise/focus sequence rather than only making the viewport visible.
+- Minimize/close-to-tray can no longer hide SalixTorrent when no live recoverable tray is available; tray `Exit` always performs a real shutdown.
 - Frozen launches from Start Menu shortcuts, Explorer `.torrent` handlers or `magnet:` protocol handlers cannot accidentally place writable state/download defaults in an unrelated working directory.
 - Hybrid BEP-47 padding remains virtual storage while still being serviceable to v1 peers, and v2 disk recheck uses generation-aware verification rather than a hard-coded SHA-1 assumption.
 

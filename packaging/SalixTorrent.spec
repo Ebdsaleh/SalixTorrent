@@ -1,4 +1,4 @@
-# PyInstaller build description for SalixTorrent Phase 10.
+# PyInstaller build description for SalixTorrent desktop/CLI releases.
 #
 # SALIX_BUILD_TARGET=gui (default) -> windowed SalixTorrent executable
 # SALIX_BUILD_TARGET=cli           -> console SalixTorrentCLI executable
@@ -26,7 +26,7 @@ hiddenimports = []
 
 # Dear PyGui includes a native extension; aiohttp and Pillow can also carry
 # dynamic/data dependencies that a static import walk does not always expose.
-for package in ("dearpygui", "aiohttp", "PIL"):
+for package in ("dearpygui", "aiohttp", "PIL", "pystray", "AppKit", "Quartz"):
     try:
         pkg_datas, pkg_binaries, pkg_hidden = collect_all(package)
     except Exception:
