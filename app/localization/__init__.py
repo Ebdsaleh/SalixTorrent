@@ -7,11 +7,13 @@ from .locale_info import (
     SUPPORTED_LOCALES,
     locale_code_from_label,
     locale_label,
+    locale_info,
     normalise_locale_code,
     resolve_requested_locale,
     system_locale_name,
 )
 from .manager import LocalizationManager, localization_manager, placeholder_names, tr
+from .pseudo import PSEUDO_ENV, PSEUDO_LOCALE, pseudo_catalog, pseudo_localize
 from .documents import (
     HelpTopic,
     canonical_glossary_entries,
@@ -32,8 +34,13 @@ __all__ = [
     "localization_manager",
     "locale_code_from_label",
     "locale_label",
+    "locale_info",
     "normalise_locale_code",
     "placeholder_names",
+    "PSEUDO_ENV",
+    "PSEUDO_LOCALE",
+    "pseudo_catalog",
+    "pseudo_localize",
     "resolve_requested_locale",
     "system_locale_name",
     "tr",

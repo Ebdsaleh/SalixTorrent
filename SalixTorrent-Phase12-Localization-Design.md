@@ -1250,24 +1250,80 @@ locale-pack translations with development credentials.
 
 ### Stage 6 - Generate Initial Locale Packs
 
-- [ ] `en-GB`
-- [ ] `en-US`
-- [ ] `pt-BR`
-- [ ] `fil-PH`
+- [x] local generation-status report
+- [x] Google client/auth/project preflight doctor
+- [x] optional authenticated one-request API probe
+- [x] stale-extraction guard before provider calls
+- [x] one-shot changed-only generation + strict validation
+- [x] tracked Windows Stage-6 generation helper
+- [ ] `en-GB` generated and strict-validated
+- [ ] `en-US` generated and strict-validated
+- [ ] `pt-BR` generated and strict-validated
+- [ ] `fil-PH` generated and strict-validated
+
+**Stage 6 generation checkpoint:** The generation harness is implemented and can
+be exercised before translation through `--status`, `--dry-run` and `--doctor`.
+The actual four locale packs are not marked complete until the credentialed
+`--generate-initial` run succeeds on a developer machine and strict validation
+reports zero missing translations. Google credentials are never committed or
+bundled with SalixTorrent.
+
+**Stage 6B population is currently on hold by design.** The provider-neutral/global
+translation-memory direction is being evaluated before spending on bulk cloud
+translation. This does not block Stage 7 validation/packaging or Stage 8 review
+infrastructure.
 
 ### Stage 7 - Validation and Packaging
 
-- [ ] locale validator
-- [ ] placeholder validation
-- [ ] Help/Glossary structural validation
-- [ ] layout-expansion report
-- [ ] Unicode/font audit
-- [ ] PyInstaller resource inclusion
-- [ ] standalone validation
-- [ ] portable validation
-- [ ] installer validation
+- [x] locale validator hardening
+- [x] placeholder/format validation
+- [x] Help/Glossary structural validation
+- [x] catalog metadata/hash validation
+- [x] stale translation provenance validation
+- [x] protected technical terminology validation
+- [x] deterministic locale metadata manifest
+- [x] locale script/direction/font-profile capability metadata
+- [x] `en-XA` pseudo-locale expansion audit
+- [x] runtime missing/corrupt target-pack fallback diagnostics
+- [x] PyInstaller resource inclusion contract
+- [x] offline Stage-7 Windows validation helper
+- [ ] native standalone smoke validation
+- [ ] native portable smoke validation
+- [ ] native installer smoke validation
 
-### Stage 8 - Manual Review
+**Stage 7 implementation checkpoint (2026-09-01):** Offline hardening is
+implemented. `--extract` now regenerates both canonical catalogs and the runtime
+locale manifest; `--check` verifies both manifests; and `--stage7-check` combines
+pseudo-localization, packaging-resource and hardened catalog validation without
+contacting any translation provider. Runtime target-catalog corruption is fail-closed
+to canonical `en-AU` and surfaced through structured catalog-health/fallback
+diagnostics. The remaining Stage-7 items are native Windows frozen/portable/installer
+smoke tests on the developer machine, not architecture work.
+
+### Stage 8A - Translation Review Infrastructure
+
+- [x] provider-neutral review-state classification
+- [x] missing / review-needed / reviewed / locked / stale / invalid states
+- [x] deterministic offline review-bundle export
+- [x] canonical source hash and extraction-context handoff
+- [x] reviewer notes and provenance metadata
+- [x] reviewed/locked promotion into rich manual overrides
+- [x] stale-source fail-closed import
+- [x] placeholder and protected-term import validation
+- [x] reviewed override freshness validation
+- [x] tracked offline Windows review-audit helper
+
+**Stage 8A implementation checkpoint (2026-09-01):** Review infrastructure is
+complete and fully offline. `--review-report` separates missing content from existing
+translations awaiting human review. `--review-export` produces an ignored working
+bundle containing source text/hash, placeholders, source locations, translation and
+provider provenance. Reviewers explicitly promote entries to `reviewed` or `locked`;
+`--review-import` validates the complete handoff before changing project artifacts and
+records accepted strings as source-hash-bound authoritative manual overrides. Canonical
+source changes therefore invalidate prior review rather than silently carrying approval
+forward. Stage 8A can remain green while Stage 6B translation population is paused.
+
+### Stage 8B - Manual Language Review
 
 - [ ] warnings
 - [ ] confirmations
@@ -1276,6 +1332,10 @@ locale-pack translations with development credentials.
 - [ ] Help
 - [ ] Glossary
 - [ ] high-visibility UI
+
+**Stage 8B is content-dependent and remains on hold with Stage 6B.** The review
+infrastructure is ready; actual language review begins once target locale packs contain
+the strings to be reviewed.
 
 ---
 

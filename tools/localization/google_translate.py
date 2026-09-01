@@ -37,6 +37,8 @@ DEFAULT_MODEL = "general/translation-llm"
 DEFAULT_LOCATION = "global"
 MAX_BATCH_ITEMS = 100
 MAX_BATCH_CHARS = 24000
+_MANIFEST_CACHE_KEY: tuple[str, int, int] | None = None
+_MANIFEST_CACHE_VALUE: dict = {}
 
 # Runtime locale -> Google Translation language code.  SalixTorrent owns its
 # runtime BCP-47 locale names; provider mappings stay confined to this tool.
@@ -248,28 +250,64 @@ def _catalog_strings(locale: str, catalog: str) -> Dict[str, str]:
     return {str(k): str(v) for k, v in values.items() if isinstance(v, str)}
 
 
-def _manual_overrides(locale: str) -> Dict[str, Dict[str, str]]:
-    """Load reviewed/locked translations.
+def _manual_override_records(locale: str) -> Dict[str, Dict[str, dict]]:
+    """Load authoritative manual-review records without discarding metadata.
 
-    A value may remain the original simple string or use
-    ``{"translation": "...", "locked": true}`` for future reviewer metadata.
-    Either form is treated as authoritative and is never overwritten by Google.
+    Legacy string values remain supported. Stage 8A writes rich records carrying
+    source hashes, review state, lock state, reviewer notes and timestamps.
     """
     raw = _load_json(OVERRIDES_ROOT / f"{locale}.json", {})
-    result: Dict[str, Dict[str, str]] = {}
+    result: Dict[str, Dict[str, dict]] = {}
     if not isinstance(raw, dict):
         return result
     for catalog, values in raw.items():
-        if not isinstance(values, dict):
+        if str(catalog).startswith("_") or not isinstance(values, dict):
             continue
-        out: Dict[str, str] = {}
+        out: Dict[str, dict] = {}
         for key, value in values.items():
             if isinstance(value, str):
-                out[str(key)] = value
+                out[str(key)] = {
+                    "translation": value,
+                    "status": "reviewed",
+                    "locked": False,
+                }
             elif isinstance(value, dict) and isinstance(value.get("translation"), str):
-                out[str(key)] = str(value["translation"])
+                record = dict(value)
+                record["translation"] = str(value["translation"])
+                out[str(key)] = record
         result[str(catalog)] = out
     return result
+
+
+def _manual_overrides(locale: str) -> Dict[str, Dict[str, str]]:
+    """Compatibility view returning only authoritative translation text."""
+    records = _manual_override_records(locale)
+    return {
+        catalog: {key: str(record["translation"]) for key, record in values.items()}
+        for catalog, values in records.items()
+    }
+
+
+def _manual_override_for_source(
+    locale: str,
+    catalog: str,
+    key: str,
+    source_text: str,
+    records: Dict[str, Dict[str, dict]],
+) -> str | None:
+    """Return a manual translation, refusing known-stale reviewed records."""
+    record = records.get(catalog, {}).get(key)
+    if not isinstance(record, dict):
+        return None
+    recorded_hash = str(record.get("source_hash") or "")
+    expected_hash = _manifest_hash(catalog, key, source_text)
+    if recorded_hash and recorded_hash != expected_hash:
+        raise ValueError(
+            f"{locale}/{catalog}:{key}: manual override is stale; canonical source changed after review"
+        )
+    final = str(record.get("translation") or "")
+    _validate_final(locale, catalog, key, source_text, final)
+    return final
 
 
 def _new_cache() -> dict:
@@ -319,8 +357,23 @@ def _set_cache_entry(cache: dict, locale: str, catalog: str, key: str, value: di
     cache.setdefault("entries", {}).setdefault(locale, {}).setdefault(catalog, {})[key] = value
 
 
+def _manifest_data() -> dict:
+    """Load extraction metadata once per on-disk manifest revision."""
+    global _MANIFEST_CACHE_KEY, _MANIFEST_CACHE_VALUE
+    try:
+        stat = MANIFEST_PATH.stat()
+        cache_key = (str(MANIFEST_PATH), int(stat.st_mtime_ns), int(stat.st_size))
+    except OSError:
+        cache_key = (str(MANIFEST_PATH), -1, -1)
+    if cache_key != _MANIFEST_CACHE_KEY:
+        raw = _load_json(MANIFEST_PATH, {})
+        _MANIFEST_CACHE_VALUE = raw if isinstance(raw, dict) else {}
+        _MANIFEST_CACHE_KEY = cache_key
+    return _MANIFEST_CACHE_VALUE
+
+
 def _manifest_hash(catalog: str, key: str, text: str) -> str:
-    manifest = _load_json(MANIFEST_PATH, {})
+    manifest = _manifest_data()
     try:
         value = manifest["catalogs"][catalog]["entries"][key]["source_hash"]
     except (KeyError, TypeError):
@@ -411,14 +464,13 @@ def translation_plan(locale: str, *, force: bool = False) -> TranslationStats:
     if locale not in TARGET_CODES:
         raise ValueError(f"Unsupported translation target {locale!r}")
     cache = _load_cache()
-    overrides = _manual_overrides(locale)
+    override_records = _manual_override_records(locale)
     cached = overridden = would_translate = 0
     for catalog in CATALOGS:
         source = _catalog_strings(SOURCE_LOCALE, catalog)
-        catalog_overrides = overrides.get(catalog, {})
         for key, source_text in source.items():
-            if key in catalog_overrides:
-                _validate_final(locale, catalog, key, source_text, catalog_overrides[key])
+            manual = _manual_override_for_source(locale, catalog, key, source_text, override_records)
+            if manual is not None:
                 overridden += 1
                 continue
             entry = _cache_entry(cache, locale, catalog, key)
@@ -464,7 +516,7 @@ def translate_locale(
         return translation_plan(locale, force=force).as_dict()
 
     cache = _load_cache()
-    overrides = _manual_overrides(locale)
+    override_records = _manual_override_records(locale)
     _prune_locale_cache(cache, locale)
     catalog_payloads: dict[str, dict] = {}
     cached = overridden = translated_count = missing = batches = 0
@@ -474,15 +526,13 @@ def translate_locale(
 
     for catalog in CATALOGS:
         source = _catalog_strings(SOURCE_LOCALE, catalog)
-        catalog_overrides = overrides.get(catalog, {})
         pending: list[tuple[str, str, Dict[str, str]]] = []
         result: Dict[str, str] = {}
 
         for key, source_text in source.items():
-            if key in catalog_overrides:
-                final = catalog_overrides[key]
-                _validate_final(locale, catalog, key, source_text, final)
-                result[key] = final
+            manual = _manual_override_for_source(locale, catalog, key, source_text, override_records)
+            if manual is not None:
+                result[key] = manual
                 overridden += 1
                 continue
 

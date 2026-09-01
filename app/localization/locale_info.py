@@ -2,7 +2,7 @@
 
 Runtime locale identifiers are SalixTorrent-owned BCP-47 tags. Translation
 providers are deliberately kept behind a separate mapping so the application
-never depends on Google-specific language codes.
+never depends on provider-specific language codes.
 """
 
 from __future__ import annotations
@@ -10,9 +10,10 @@ from __future__ import annotations
 import ctypes
 import locale as _locale
 import os
-import sys
 from dataclasses import dataclass
 from typing import Dict, Optional
+
+from .pseudo import PSEUDO_LOCALE
 
 
 CANONICAL_LOCALE = "en-AU"
@@ -25,15 +26,33 @@ class LocaleInfo:
     display_name: str
     native_name: str
     google_target: str
+    script: str = "Latn"
+    text_direction: str = "ltr"
+    font_profile: str = "latin"
+    support_status: str = "partial"
 
 
 SUPPORTED_LOCALES: Dict[str, LocaleInfo] = {
-    "en-AU": LocaleInfo("en-AU", "English (Australia)", "English (Australia)", "en-AU"),
+    "en-AU": LocaleInfo(
+        "en-AU", "English (Australia)", "English (Australia)", "en-AU",
+        support_status="canonical",
+    ),
     "en-GB": LocaleInfo("en-GB", "English (United Kingdom)", "English (United Kingdom)", "en-GB"),
     "en-US": LocaleInfo("en-US", "English (United States)", "English (United States)", "en-US"),
     "pt-BR": LocaleInfo("pt-BR", "Portuguese (Brazil)", "Português (Brasil)", "pt-BR"),
     "fil-PH": LocaleInfo("fil-PH", "Filipino", "Filipino", "fil"),
 }
+
+PSEUDO_LOCALE_INFO = LocaleInfo(
+    PSEUDO_LOCALE,
+    "Pseudo English (expanded)",
+    "Pseudo English (expanded)",
+    "",
+    script="Latn",
+    text_direction="ltr",
+    font_profile="latin",
+    support_status="development-only",
+)
 
 
 LANGUAGE_OPTION_LABELS = {
@@ -41,6 +60,13 @@ LANGUAGE_OPTION_LABELS = {
     **{code: info.native_name for code, info in SUPPORTED_LOCALES.items()},
 }
 LANGUAGE_LABEL_TO_CODE = {label: code for code, label in LANGUAGE_OPTION_LABELS.items()}
+
+
+def locale_info(code: object) -> LocaleInfo:
+    cleaned = _clean_locale_code(code)
+    if cleaned == PSEUDO_LOCALE:
+        return PSEUDO_LOCALE_INFO
+    return SUPPORTED_LOCALES.get(cleaned, SUPPORTED_LOCALES[CANONICAL_LOCALE])
 
 
 def _clean_locale_code(value: object) -> str:
@@ -59,12 +85,19 @@ def _clean_locale_code(value: object) -> str:
     return f"{language}-{region}" if region else language
 
 
-def normalise_locale_code(value: object, *, allow_auto: bool = True) -> str:
+def normalise_locale_code(
+    value: object,
+    *,
+    allow_auto: bool = True,
+    allow_pseudo: bool = False,
+) -> str:
     raw = str(value or "").strip()
     if allow_auto and raw.lower() in {"", "auto", "system", "system default"}:
         return AUTO_LOCALE
 
     cleaned = _clean_locale_code(raw)
+    if allow_pseudo and cleaned == PSEUDO_LOCALE:
+        return PSEUDO_LOCALE
     if cleaned in SUPPORTED_LOCALES:
         return cleaned
 
@@ -80,12 +113,17 @@ def normalise_locale_code(value: object, *, allow_auto: bool = True) -> str:
 
 
 def locale_label(code: object) -> str:
+    cleaned = _clean_locale_code(code)
+    if cleaned == PSEUDO_LOCALE:
+        return PSEUDO_LOCALE_INFO.native_name
     normalised = normalise_locale_code(code)
     return LANGUAGE_OPTION_LABELS.get(normalised, LANGUAGE_OPTION_LABELS[CANONICAL_LOCALE])
 
 
 def locale_code_from_label(label: object) -> str:
     raw = str(label or "").strip()
+    if raw == PSEUDO_LOCALE_INFO.native_name:
+        return PSEUDO_LOCALE
     if raw in LANGUAGE_LABEL_TO_CODE:
         return LANGUAGE_LABEL_TO_CODE[raw]
     return normalise_locale_code(raw)
@@ -111,8 +149,6 @@ def system_locale_name() -> str:
     if win:
         return win
 
-    # Python's locale APIs can return None in minimal/container environments,
-    # so preserve ordinary POSIX environment variables as fallbacks.
     try:
         language, _encoding = _locale.getlocale()
         if language:
@@ -127,9 +163,14 @@ def system_locale_name() -> str:
     return ""
 
 
-def resolve_requested_locale(requested: object, *, system_locale: Optional[str] = None) -> str:
-    requested_code = normalise_locale_code(requested)
+def resolve_requested_locale(
+    requested: object,
+    *,
+    system_locale: Optional[str] = None,
+    allow_pseudo: bool = False,
+) -> str:
+    requested_code = normalise_locale_code(requested, allow_pseudo=allow_pseudo)
     if requested_code != AUTO_LOCALE:
         return requested_code
     detected = system_locale if system_locale is not None else system_locale_name()
-    return normalise_locale_code(detected, allow_auto=False)
+    return normalise_locale_code(detected, allow_auto=False, allow_pseudo=False)

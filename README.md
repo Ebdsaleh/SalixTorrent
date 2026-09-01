@@ -601,3 +601,175 @@ unescaped, transient Google failures receive bounded retries, and provider/auth
 failures occur before locale/cache files are committed. The cache is written
 last so an interrupted artifact write can at worst cause harmless retranslation
 on the next development run.
+
+### Phase 12 Stage 6 - initial locale generation
+
+Stage 6 is intentionally split into a safe local preflight and the credentialed
+Google generation run. SalixTorrent itself remains fully offline: Google tooling
+exists only in the developer virtual environment and generated locale JSON is
+bundled into the application.
+
+The Windows helper is tracked as:
+
+```bat
+tools\localization\stage6_generate_locales.bat
+```
+
+With the SalixTorrent `.venv` activated, running it with no arguments performs
+only non-translation preflight checks: canonical extraction, extraction drift, the
+changed-only translation plan, locale completeness status, and the Google setup
+doctor. It does **not** submit application text to the Translation API or make a
+billable translation request.
+
+Stage-6-specific commands are:
+
+```bat
+python tools\localization\build_locales.py --status
+python tools\localization\build_locales.py --doctor
+python tools\localization\build_locales.py --doctor --probe
+python tools\localization\build_locales.py --generate-initial
+```
+
+`--status` is offline and reports packaged/catalog/cache coverage. `--doctor`
+checks that the development client library, Google auth,
+Application Default Credentials and project resolution are available without
+printing credential paths, tokens or secrets. `--doctor --probe` is optional
+and performs one tiny authenticated Translation request to verify API/model
+access before the full generation run.
+
+For a new Windows development machine, the intended setup is:
+
+```bat
+python -m pip install -r requirements-localization.txt
+gcloud init
+gcloud services enable translate.googleapis.com --project YOUR_PROJECT_ID
+gcloud auth application-default login
+set SALIX_T_GOOGLE_PROJECT=YOUR_PROJECT_ID
+python tools\localization\build_locales.py --doctor
+```
+
+Cloud Translation v3 uses Application Default Credentials; credentials are not
+written into this repository. The `SALIX_T_GOOGLE_PROJECT` assignment above is
+for the current Command Prompt only unless the developer deliberately persists
+it separately.
+
+Once the doctor reports ready, either run:
+
+```bat
+tools\localization\stage6_generate_locales.bat --run
+```
+
+or equivalently:
+
+```bat
+python tools\localization\build_locales.py --generate-initial
+```
+
+The one-shot Stage 6 command refuses to translate if canonical extraction is
+stale, translates only source-hash-missing entries, then runs **strict** locale
+validation. It succeeds only when every selected target pack has every canonical
+UI, Help and Glossary key. Until that credentialed command has completed on a
+development machine, Stage 6 remains in progress rather than being marked done.
+
+
+### Phase 12 Stage 7 - validation and packaging hardening
+
+Stage 7 is fully offline and can proceed while initial machine translation is on hold.
+Canonical extraction now also regenerates a deterministic runtime locale manifest:
+
+```text
+app/localization/locales/manifest.json
+```
+
+The manifest records per-locale/catalog counts and hashes plus script, text direction,
+font profile and support state. `--check` verifies both the Stage-4 extraction manifest
+and this runtime locale manifest.
+
+The Stage-7 validator additionally checks catalog metadata/hash integrity, stale
+source-hash provenance for packaged translations, protected technical terminology,
+placeholder contracts, semantic Help/Glossary topology and target completeness. A
+missing or corrupt target runtime catalog does not prevent application startup: the
+`LocalizationManager` records the load failure and falls back to canonical `en-AU`.
+
+Development pseudo-localization is available as the derived `en-XA` locale. It is
+created entirely in memory, accents text, expands it by roughly 30%, and preserves
+Python formatting placeholders. To launch a source-tree smoke test from Windows CMD:
+
+```bat
+set SALIX_T_PSEUDO_LOCALE=1
+python main.py
+set SALIX_T_PSEUDO_LOCALE=
+```
+
+The normal Stage-7 preflight is:
+
+```bat
+tools\localization\stage7_validate_localization.bat
+```
+
+or directly:
+
+```bat
+python tools\localization\build_locales.py --extract
+python tools\localization\build_locales.py --check
+python tools\localization\build_locales.py --stage7-check
+```
+
+`--stage7-check` performs no translation-provider calls. It audits the pseudo locale,
+checks required Help/Glossary/locale resources and the PyInstaller data contract, then
+runs the hardened locale validator. The existing missing-translation warnings remain
+expected until Stage 6B locale population resumes.
+
+### Phase 12 Stage 8A - offline translation review infrastructure
+
+Stage 8A is provider-neutral and can be used while Stage 6B machine-translation
+population is on hold. It distinguishes *translation completeness* from *human
+review completeness*: an entry may be missing, present but awaiting review,
+reviewed, locked, stale, or invalid.
+
+Run the normal offline review audit from an activated Windows `.venv` with:
+
+```bat
+tools\localization\stage8_review_localization.bat
+```
+
+The direct commands are:
+
+```bat
+python tools\localization\build_locales.py --review-report
+python tools\localization\build_locales.py --review-export --locale pt-BR
+python tools\localization\build_locales.py --stage8-check
+```
+
+`--review-export` writes an editable working bundle under
+`tools/localization/review_exports/` by default. That directory is intentionally
+ignored by Git: review bundles are handoff/work files, while canonical source,
+manual overrides, translation cache and locale packs remain the repository source
+of truth. Each exported entry carries its canonical source text/hash, placeholders,
+source locations, current translation, provenance/provider metadata, current status,
+and editable `review_state`, `reviewer`, and `note` fields.
+
+A reviewer should leave ordinary entries as `pending`. After checking a translation
+in context, set `review_state` to `reviewed` or `locked`; `locked` is intended for
+terminology/text that future provider regeneration must never replace. Import the
+finished bundle with:
+
+```bat
+python tools\localization\build_locales.py --review-import tools\localization\review_exports\pt-BR.review.json
+```
+
+Import is fail-closed and validates the *entire* bundle before promotion. It rejects
+a changed canonical source hash, edited source text, missing/changed protected terms,
+broken Python formatting placeholders, unknown keys/catalogs, empty reviewed text,
+and invalid review states. Accepted translations are written into the packaged locale
+and then recorded as rich authoritative entries in
+`manual_overrides/<locale>.json`, including source hash, review/lock state, reviewer,
+note and UTC review timestamp. A later canonical wording change therefore makes the
+reviewed entry stale instead of silently treating old wording as approved.
+
+Current Stage 8A reports are expected to remain incomplete while Stage 6B is paused:
+the four target locales presently contain 113 seeded UI entries awaiting review and
+1,158 missing entries each. That is a content-status warning, not an infrastructure
+failure. Stage 8B will perform the actual warning/security/BitTorrent/Help/Glossary/
+high-visibility language review after locale population resumes.
+

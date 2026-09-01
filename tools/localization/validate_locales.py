@@ -13,6 +13,11 @@ try:
 except ImportError:  # direct script execution
     from contracts import placeholder_names
 
+try:
+    from .stage7_support import catalog_hash, locale_manifest_drift
+except ImportError:  # direct script execution
+    from stage7_support import catalog_hash, locale_manifest_drift
+
 ROOT = Path(__file__).resolve().parents[2]
 LOCALE_ROOT = ROOT / "app" / "localization" / "locales"
 CONTENT_ROOT = ROOT / "app" / "localization" / "content"
@@ -47,6 +52,204 @@ def load_catalog(locale: str, catalog: str) -> Dict[str, str]:
             raise ValueError(f"{path}: catalog entries must map strings to strings")
         out[key] = value
     return out
+
+
+def load_catalog_payload(locale: str, catalog: str) -> dict:
+    path = LOCALE_ROOT / locale / f"{catalog}.json"
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise ValueError(f"{path}: expected JSON object")
+    return raw
+
+
+def validate_catalog_metadata(locale: str, catalog: str, strings: Dict[str, str]) -> ValidationReport:
+    report = ValidationReport()
+    path = LOCALE_ROOT / locale / f"{catalog}.json"
+    try:
+        raw = load_catalog_payload(locale, catalog)
+    except Exception as exc:
+        report.errors.append(f"{locale}/{catalog}: {exc}")
+        return report
+
+    meta = raw.get("_meta")
+    if not isinstance(meta, dict):
+        report.errors.append(f"{locale}/{catalog}: missing/invalid _meta object")
+        return report
+
+    expected = {
+        "locale": locale,
+        "source_locale": CANONICAL,
+        "catalog": catalog,
+    }
+    for field_name, expected_value in expected.items():
+        actual = meta.get(field_name)
+        if actual != expected_value:
+            report.errors.append(
+                f"{locale}/{catalog}: _meta.{field_name}={actual!r}, expected {expected_value!r}"
+            )
+
+    if "entry_count" in meta:
+        try:
+            declared_count = int(meta.get("entry_count"))
+        except (TypeError, ValueError):
+            declared_count = -1
+        if declared_count != len(strings):
+            report.errors.append(
+                f"{locale}/{catalog}: _meta.entry_count={meta.get('entry_count')!r}, actual {len(strings)}"
+            )
+    elif locale == CANONICAL:
+        report.errors.append(f"{locale}/{catalog}: canonical catalog missing _meta.entry_count")
+
+    expected_hash = catalog_hash(strings)
+    declared_hash = str(meta.get("catalog_hash") or "")
+    if declared_hash:
+        if declared_hash != expected_hash:
+            report.errors.append(
+                f"{locale}/{catalog}: _meta.catalog_hash does not match catalog contents"
+            )
+    elif locale == CANONICAL:
+        report.errors.append(f"{locale}/{catalog}: canonical catalog missing _meta.catalog_hash")
+    return report
+
+
+def validate_translation_freshness(locale: str, catalog: str, source: Dict[str, str], target: Dict[str, str]) -> ValidationReport:
+    """Reject target/review strings whose recorded source hash is stale."""
+    report = ValidationReport()
+    if locale == CANONICAL:
+        return report
+    try:
+        try:
+            from .google_translate import (
+                _cache_entry,
+                _load_cache,
+                _manual_override_records,
+                _manifest_hash,
+            )
+        except ImportError:
+            from google_translate import _cache_entry, _load_cache, _manual_override_records, _manifest_hash
+        cache = _load_cache()
+        overrides = _manual_override_records(locale).get(catalog, {})
+    except Exception as exc:
+        report.errors.append(f"{locale}/{catalog}: cannot validate translation freshness: {exc}")
+        return report
+
+    for key in sorted(set(source) & set(target)):
+        expected_hash = _manifest_hash(catalog, key, source[key])
+        override = overrides.get(key)
+        if isinstance(override, dict):
+            recorded_hash = str(override.get("source_hash") or "")
+            if recorded_hash and recorded_hash != expected_hash:
+                report.errors.append(
+                    f"{locale}/{catalog}:{key}: stale manual-review source hash; re-review canonical text"
+                )
+            elif not recorded_hash:
+                report.warnings.append(
+                    f"{locale}/{catalog}:{key}: legacy manual override has no source-hash provenance"
+                )
+            if str(override.get("translation") or "") != target[key]:
+                report.warnings.append(
+                    f"{locale}/{catalog}:{key}: packaged translation differs from authoritative manual override"
+                )
+            continue
+
+        entry = _cache_entry(cache, locale, catalog, key)
+        if not entry:
+            report.warnings.append(
+                f"{locale}/{catalog}:{key}: translation has no source-hash provenance"
+            )
+            continue
+        if entry.get("source_hash") != expected_hash:
+            report.errors.append(
+                f"{locale}/{catalog}:{key}: stale translation source hash; regenerate or review"
+            )
+        elif entry.get("translation") != target[key]:
+            report.warnings.append(
+                f"{locale}/{catalog}:{key}: packaged translation differs from hash-valid cache"
+            )
+    return report
+
+
+def validate_manual_overrides(locale: str, catalog: str, source: Dict[str, str], target: Dict[str, str]) -> ValidationReport:
+    """Validate Stage-8 reviewed/locked override metadata and contracts."""
+    report = ValidationReport()
+    if locale == CANONICAL:
+        return report
+    try:
+        try:
+            from .google_translate import _manual_override_records, _manifest_hash, _protected_terms
+        except ImportError:
+            from google_translate import _manual_override_records, _manifest_hash, _protected_terms
+        records = _manual_override_records(locale).get(catalog, {})
+        protected_terms = _protected_terms()
+    except Exception as exc:
+        report.errors.append(f"{locale}/{catalog}: cannot validate manual overrides: {exc}")
+        return report
+
+    for key, record in sorted(records.items()):
+        if key not in source:
+            report.errors.append(f"{locale}/{catalog}:{key}: manual override key is not canonical")
+            continue
+        translation = str(record.get("translation") or "")
+        expected_hash = _manifest_hash(catalog, key, source[key])
+        recorded_hash = str(record.get("source_hash") or "")
+        if recorded_hash and recorded_hash != expected_hash:
+            report.errors.append(f"{locale}/{catalog}:{key}: manual override source hash is stale")
+        if source[key].strip() and not translation.strip():
+            report.errors.append(f"{locale}/{catalog}:{key}: manual override translation is empty")
+        if placeholders(source[key]) != placeholders(translation):
+            report.errors.append(f"{locale}/{catalog}:{key}: manual override placeholder mismatch")
+        missing_terms = [term for term in protected_terms if term in source[key] and term not in translation]
+        if missing_terms:
+            report.errors.append(
+                f"{locale}/{catalog}:{key}: manual override changed/missing protected term(s): {', '.join(missing_terms)}"
+            )
+        status = str(record.get("status") or "reviewed").lower()
+        if status not in {"reviewed", "locked"}:
+            report.errors.append(f"{locale}/{catalog}:{key}: invalid manual review status {status!r}")
+        if bool(record.get("locked")) != (status == "locked"):
+            report.warnings.append(
+                f"{locale}/{catalog}:{key}: locked flag/status disagree; review importer will normalize them"
+            )
+        if key not in target:
+            report.warnings.append(
+                f"{locale}/{catalog}:{key}: authoritative manual override is not packaged in target locale"
+            )
+    return report
+
+
+def validate_protected_terms(locale: str, catalog: str, source: Dict[str, str], target: Dict[str, str]) -> ValidationReport:
+    report = ValidationReport()
+    if locale == CANONICAL:
+        return report
+    try:
+        try:
+            from .google_translate import _protected_terms
+        except ImportError:
+            from google_translate import _protected_terms
+        terms = _protected_terms()
+    except Exception as exc:
+        report.errors.append(f"{locale}/{catalog}: cannot validate protected terminology: {exc}")
+        return report
+
+    for key in sorted(set(source) & set(target)):
+        src = source[key]
+        dst = target[key]
+        missing_terms = [term for term in terms if term in src and term not in dst]
+        if missing_terms:
+            report.errors.append(
+                f"{locale}/{catalog}:{key}: protected term(s) changed/missing: {', '.join(missing_terms)}"
+            )
+    return report
+
+
+def validate_locale_manifest() -> ValidationReport:
+    report = ValidationReport()
+    try:
+        if locale_manifest_drift():
+            report.errors.append("locale manifest is stale/missing; run --extract or --manifest")
+    except Exception as exc:
+        report.errors.append(f"locale manifest validation failed: {exc}")
+    return report
 
 
 def _read_content(name: str) -> dict:
@@ -222,6 +425,10 @@ def validate_locale(locale: str, *, strict_missing: bool = False) -> ValidationR
             report.errors.append(f"{locale}/{catalog}: {exc}")
             continue
 
+        metadata = validate_catalog_metadata(locale, catalog, target)
+        report.errors.extend(metadata.errors)
+        report.warnings.extend(metadata.warnings)
+
         missing = sorted(set(source) - set(target))
         stale = sorted(set(target) - set(source))
         if missing:
@@ -241,6 +448,16 @@ def validate_locale(locale: str, *, strict_missing: bool = False) -> ValidationR
             if not target[key].strip() and source[key].strip():
                 message = f"{locale}/{catalog}:{key}: empty translation"
                 (report.errors if strict_missing else report.warnings).append(message)
+
+        freshness = validate_translation_freshness(locale, catalog, source, target)
+        report.errors.extend(freshness.errors)
+        report.warnings.extend(freshness.warnings)
+        protected = validate_protected_terms(locale, catalog, source, target)
+        report.errors.extend(protected.errors)
+        report.warnings.extend(protected.warnings)
+        manual = validate_manual_overrides(locale, catalog, source, target)
+        report.errors.extend(manual.errors)
+        report.warnings.extend(manual.warnings)
     return report
 
 
@@ -299,6 +516,9 @@ def validate_all(
     locales: Iterable[str] | None = None,
 ) -> ValidationReport:
     combined = validate_extraction_sources()
+    manifest_report = validate_locale_manifest()
+    combined.errors.extend(manifest_report.errors)
+    combined.warnings.extend(manifest_report.warnings)
     document_report = validate_document_structure()
     combined.errors.extend(document_report.errors)
     combined.warnings.extend(document_report.warnings)

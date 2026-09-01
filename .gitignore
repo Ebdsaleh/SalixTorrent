@@ -16,6 +16,9 @@
 # Local scripts/artifacts. Keep the official Windows release builder tracked.
 *.bat
 !packaging/build_windows.bat
+!tools/localization/stage6_generate_locales.bat
+!tools/localization/stage7_validate_localization.bat
+!tools/localization/stage8_review_localization.bat
 *tree.txt
 
 # Local regression tests are intentionally kept out of this repository.
@@ -48,6 +51,9 @@ venv/
 tools/localization/.credentials/
 tools/localization/credentials*.json
 tools/localization/service-account*.json
+
+# Translator working bundles are generated/export artifacts, not source of truth.
+/tools/localization/review_exports/
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs

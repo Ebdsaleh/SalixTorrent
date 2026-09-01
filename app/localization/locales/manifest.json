@@ -1,0 +1,222 @@
+{
+  "_meta": {
+    "canonical_locale": "en-AU",
+    "catalogs": [
+      "ui",
+      "help",
+      "glossary"
+    ],
+    "generated_by": "tools/localization/stage7_support.py",
+    "schema": 1
+  },
+  "development_locales": {
+    "en-XA": {
+      "derived_from": "en-AU",
+      "display_name": "Pseudo English (expanded)",
+      "font_profile": "latin",
+      "native_name": "Pseudo English (expanded)",
+      "packaged_catalog": false,
+      "purpose": "In-memory text expansion and untranslated-string detection",
+      "script": "Latn",
+      "support_status": "development-only",
+      "text_direction": "ltr"
+    }
+  },
+  "locales": {
+    "en-AU": {
+      "canonical_entries": 1271,
+      "catalogs": {
+        "glossary": {
+          "canonical_entries": 372,
+          "canonical_hash": "6cd8e3aa85653d17d12cd3220efa9f732f441b958142dfeb5b6edc2083ce6cfd",
+          "catalog_hash": "6cd8e3aa85653d17d12cd3220efa9f732f441b958142dfeb5b6edc2083ce6cfd",
+          "entries": 372,
+          "missing": 0,
+          "stale": 0
+        },
+        "help": {
+          "canonical_entries": 246,
+          "canonical_hash": "d5f395b60d2f52804f151efe7a42af7d1ef80ec0f9318e09bc1e6d505ba07877",
+          "catalog_hash": "d5f395b60d2f52804f151efe7a42af7d1ef80ec0f9318e09bc1e6d505ba07877",
+          "entries": 246,
+          "missing": 0,
+          "stale": 0
+        },
+        "ui": {
+          "canonical_entries": 653,
+          "canonical_hash": "001e116db1cf5daf9366ffc5bd992e66db9e7d8f2fe89e6f4cc408a993085eb4",
+          "catalog_hash": "001e116db1cf5daf9366ffc5bd992e66db9e7d8f2fe89e6f4cc408a993085eb4",
+          "entries": 653,
+          "missing": 0,
+          "stale": 0
+        }
+      },
+      "complete": true,
+      "display_name": "English (Australia)",
+      "font_profile": "latin",
+      "missing_entries": 0,
+      "native_name": "English (Australia)",
+      "script": "Latn",
+      "stale_entries": 0,
+      "support_status": "canonical",
+      "text_direction": "ltr",
+      "total_entries": 1271
+    },
+    "en-GB": {
+      "canonical_entries": 1271,
+      "catalogs": {
+        "glossary": {
+          "canonical_entries": 372,
+          "canonical_hash": "6cd8e3aa85653d17d12cd3220efa9f732f441b958142dfeb5b6edc2083ce6cfd",
+          "catalog_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "entries": 0,
+          "missing": 372,
+          "stale": 0
+        },
+        "help": {
+          "canonical_entries": 246,
+          "canonical_hash": "d5f395b60d2f52804f151efe7a42af7d1ef80ec0f9318e09bc1e6d505ba07877",
+          "catalog_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "entries": 0,
+          "missing": 246,
+          "stale": 0
+        },
+        "ui": {
+          "canonical_entries": 653,
+          "canonical_hash": "001e116db1cf5daf9366ffc5bd992e66db9e7d8f2fe89e6f4cc408a993085eb4",
+          "catalog_hash": "1711caec58e729e2a0d97067a8370435aa2b0167dc4ea163da562d2483276071",
+          "entries": 113,
+          "missing": 540,
+          "stale": 0
+        }
+      },
+      "complete": false,
+      "display_name": "English (United Kingdom)",
+      "font_profile": "latin",
+      "missing_entries": 1158,
+      "native_name": "English (United Kingdom)",
+      "script": "Latn",
+      "stale_entries": 0,
+      "support_status": "partial",
+      "text_direction": "ltr",
+      "total_entries": 113
+    },
+    "en-US": {
+      "canonical_entries": 1271,
+      "catalogs": {
+        "glossary": {
+          "canonical_entries": 372,
+          "canonical_hash": "6cd8e3aa85653d17d12cd3220efa9f732f441b958142dfeb5b6edc2083ce6cfd",
+          "catalog_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "entries": 0,
+          "missing": 372,
+          "stale": 0
+        },
+        "help": {
+          "canonical_entries": 246,
+          "canonical_hash": "d5f395b60d2f52804f151efe7a42af7d1ef80ec0f9318e09bc1e6d505ba07877",
+          "catalog_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "entries": 0,
+          "missing": 246,
+          "stale": 0
+        },
+        "ui": {
+          "canonical_entries": 653,
+          "canonical_hash": "001e116db1cf5daf9366ffc5bd992e66db9e7d8f2fe89e6f4cc408a993085eb4",
+          "catalog_hash": "1711caec58e729e2a0d97067a8370435aa2b0167dc4ea163da562d2483276071",
+          "entries": 113,
+          "missing": 540,
+          "stale": 0
+        }
+      },
+      "complete": false,
+      "display_name": "English (United States)",
+      "font_profile": "latin",
+      "missing_entries": 1158,
+      "native_name": "English (United States)",
+      "script": "Latn",
+      "stale_entries": 0,
+      "support_status": "partial",
+      "text_direction": "ltr",
+      "total_entries": 113
+    },
+    "fil-PH": {
+      "canonical_entries": 1271,
+      "catalogs": {
+        "glossary": {
+          "canonical_entries": 372,
+          "canonical_hash": "6cd8e3aa85653d17d12cd3220efa9f732f441b958142dfeb5b6edc2083ce6cfd",
+          "catalog_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "entries": 0,
+          "missing": 372,
+          "stale": 0
+        },
+        "help": {
+          "canonical_entries": 246,
+          "canonical_hash": "d5f395b60d2f52804f151efe7a42af7d1ef80ec0f9318e09bc1e6d505ba07877",
+          "catalog_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "entries": 0,
+          "missing": 246,
+          "stale": 0
+        },
+        "ui": {
+          "canonical_entries": 653,
+          "canonical_hash": "001e116db1cf5daf9366ffc5bd992e66db9e7d8f2fe89e6f4cc408a993085eb4",
+          "catalog_hash": "d623c79c10713d2d1647f6eacda3b2bab9e871993f5b56d87bc26f2cd8954d18",
+          "entries": 113,
+          "missing": 540,
+          "stale": 0
+        }
+      },
+      "complete": false,
+      "display_name": "Filipino",
+      "font_profile": "latin",
+      "missing_entries": 1158,
+      "native_name": "Filipino",
+      "script": "Latn",
+      "stale_entries": 0,
+      "support_status": "partial",
+      "text_direction": "ltr",
+      "total_entries": 113
+    },
+    "pt-BR": {
+      "canonical_entries": 1271,
+      "catalogs": {
+        "glossary": {
+          "canonical_entries": 372,
+          "canonical_hash": "6cd8e3aa85653d17d12cd3220efa9f732f441b958142dfeb5b6edc2083ce6cfd",
+          "catalog_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "entries": 0,
+          "missing": 372,
+          "stale": 0
+        },
+        "help": {
+          "canonical_entries": 246,
+          "canonical_hash": "d5f395b60d2f52804f151efe7a42af7d1ef80ec0f9318e09bc1e6d505ba07877",
+          "catalog_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "entries": 0,
+          "missing": 246,
+          "stale": 0
+        },
+        "ui": {
+          "canonical_entries": 653,
+          "canonical_hash": "001e116db1cf5daf9366ffc5bd992e66db9e7d8f2fe89e6f4cc408a993085eb4",
+          "catalog_hash": "bf0d5e1ef1882578be493e7c71ad7c410c50d13d475da36eb0041e3d202a602f",
+          "entries": 113,
+          "missing": 540,
+          "stale": 0
+        }
+      },
+      "complete": false,
+      "display_name": "Portuguese (Brazil)",
+      "font_profile": "latin",
+      "missing_entries": 1158,
+      "native_name": "Português (Brasil)",
+      "script": "Latn",
+      "stale_entries": 0,
+      "support_status": "partial",
+      "text_direction": "ltr",
+      "total_entries": 113
+    }
+  }
+}

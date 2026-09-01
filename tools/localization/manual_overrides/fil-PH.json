@@ -1,5 +1,11 @@
 {
-  "ui": {},
+  "_meta": {
+    "kind": "salix-manual-overrides",
+    "locale": "fil-PH",
+    "schema": 1,
+    "source_locale": "en-AU"
+  },
+  "glossary": {},
   "help": {},
-  "glossary": {}
+  "ui": {}
 }

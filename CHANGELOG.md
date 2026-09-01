@@ -4,6 +4,36 @@ Notable SalixTorrent changes are recorded here.
 
 ## Unreleased
 
+### Phase 12 Stage 8A - Translation Review Infrastructure
+
+- Added provider-neutral review-state analysis that classifies every target-locale entry as missing, awaiting review, reviewed, locked, stale, or invalid without requiring any translation provider.
+- Added deterministic offline review-bundle export with canonical source text, source hashes, placeholders, extraction/source locations, current translation, provider provenance, reviewer notes and editable review state.
+- Added fail-closed review import: only entries explicitly marked `reviewed` or `locked` are promoted; stale canonical hashes, edited source text, broken placeholders, missing protected terms, unknown keys/catalogs and malformed review states abort the entire import before authoritative review metadata is written.
+- Upgraded manual overrides to a backward-compatible rich schema carrying source hash, review/lock state, reviewer, note and review timestamp; reviewed/locked entries remain authoritative over machine/cache translations, including forced regeneration.
+- Extended locale validation so reviewed overrides participate in source-hash freshness, placeholder, protected-term and packaging-consistency checks instead of being exempt from provenance validation.
+- Added `--review-report`, `--review-export`, `--review-import` and `--stage8-check` commands plus tracked Windows `tools/localization/stage8_review_localization.bat` offline audit helper.
+- Added Stage 8A regression coverage for review summaries, export context/provenance, reviewed and locked promotion, stale-source refusal, placeholder/protected-term refusal, review freshness validation and repository ignore policy.
+- Kept Stage 8B language/content review explicitly dependent on populated locale packs; Stage 6B provider population remains on hold.
+
+### Phase 12 Stage 7 - Validation and Packaging Hardening
+
+- Added deterministic `app/localization/locales/manifest.json` metadata covering canonical/packaged entry counts, catalog hashes, script, text direction, font profile, support status and the development-only pseudo locale.
+- Added strict catalog metadata/hash validation, source-hash freshness checks for packaged translations, and protected-technical-term preservation checks in addition to the existing placeholder and semantic-document validators.
+- Hardened runtime locale loading so missing/corrupt target catalogs fail closed to canonical `en-AU` per key while structured catalog-health, fallback-reason, script/direction and font-profile diagnostics remain available.
+- Added the in-memory `en-XA` pseudo locale for accent/expansion stress testing without network translation or a packaged pseudo catalog; `SALIX_T_PSEUDO_LOCALE=1` can force it for development smoke tests.
+- Added offline pseudo-localization auditing, PyInstaller localization-resource contract checks, locale-manifest drift checking, and the one-shot `--stage7-check` command.
+- Added tracked Windows `tools/localization/stage7_validate_localization.bat` preflight for extraction, deterministic drift checking and all Stage-7 offline hardening checks.
+- Added Stage 7 regression coverage for metadata capabilities, pseudo expansion/placeholder safety, corrupt-pack fallback, deterministic manifest generation, packaging contracts, stale translation detection, protected terminology and Stage-7 CLI behavior.
+
+### Phase 12 Stage 6 - Initial Locale Generation Harness
+
+- Added offline locale-generation status reporting for all four target packs, including packaged, source-hash-valid cache, reviewed override and missing-entry counts.
+- Added a Google development setup doctor that checks client/auth availability, Application Default Credentials, project resolution, selected location/model, and an optional one-request authenticated API probe without exposing credential paths or secrets.
+- Added `--generate-initial`, which refuses stale canonical extraction, runs changed-only generation, and requires strict completeness before declaring selected locale packs generated.
+- Added the tracked Windows `tools/localization/stage6_generate_locales.bat` helper with safe preflight, optional probe, and explicit credentialed `--run` modes.
+- Kept Google credentials ignored while explicitly allowing the official Stage 6 batch helper through the repository's broad `*.bat` ignore rule.
+- Added Stage 6 regression coverage for locale completeness reporting, non-mutating status, setup-doctor failure handling, stale-extraction refusal, strict post-generation validation, and credential-ignore policy.
+
 ### Phase 12 Stage 5 - Translation Pipeline
 
 - Added changed-only Google Cloud Translation v3 generation with `general/translation-llm`, Application Default Credential/project discovery, configurable model/location, bounded batching and transient retry handling.
