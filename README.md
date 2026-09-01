@@ -820,3 +820,40 @@ localization has no provider dependency and future adapters (for example an
 offline engine or local model) can be registered without redesigning the runtime
 catalogs, review system, or translation memory.
 
+### Phase 12 Stage 10 - framework extraction readiness
+
+Stage 10 prepares the localization subsystem for eventual extraction into the wider
+Salix application framework without moving it out of SalixTorrent prematurely. The
+new `app/localization/framework.py` contains provider-neutral locale/profile and
+catalog-repository contracts, while `app/localization/profile.py` is the explicit
+SalixTorrent adapter for catalog names, bundled resource roots and runtime locale
+metadata. Existing `LocalizationManager`/`tr()` call sites remain compatible.
+
+JSON catalog parsing/metadata validation now lives behind `JsonCatalogRepository`;
+SalixTorrent resource-path knowledge stays in the application adapter. The translation
+memory JSON backend is also source-locale aware rather than architecturally fixed to
+`en-AU`, while the current project continues to use `en-AU` as its canonical source.
+Merging memories with different source locales fails closed.
+
+The extraction boundary can be inspected and validated entirely offline:
+
+```bat
+python tools\localization\build_locales.py --framework-report
+python tools\localization\build_locales.py --framework-audit
+python tools\localization\build_locales.py --stage10-check
+```
+
+Or on Windows:
+
+```bat
+tools\localization\stage10_validate_framework_readiness.bat
+```
+
+`tools/localization/framework_audit.py` currently protects four modules as immediately
+extractable candidates: the runtime framework contracts, pseudo-localizer, source/
+placeholder contracts, and translation-memory service. Those candidates are not
+allowed to import SalixTorrent engine/views, Dear PyGui, or Google libraries, and may
+not contain SalixTorrent product branding. Application and provider adapters remain
+explicitly documented rather than being falsely labelled generic. See
+`SalixTorrent-Phase12-Framework-Extraction-Map.md` for the full boundary and future
+extraction sequence.

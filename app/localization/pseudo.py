@@ -29,7 +29,7 @@ _ACCENTS = str.maketrans(
     }
 )
 
-# SalixTorrent uses named ``str.format`` fields.  Match only single-brace
+# The runtime uses named ``str.format`` fields. Match only single-brace
 # fields; escaped literal braces (``{{`` / ``}}``) remain untouched.
 _FORMAT_FIELD = re.compile(r"(?<!\{)\{[^{}]+\}(?!\})")
 
@@ -73,3 +73,5 @@ def pseudo_localize(text: object, *, expansion: float = 0.30) -> str:
 
 def pseudo_catalog(strings: dict[str, str]) -> dict[str, str]:
     return {str(key): pseudo_localize(value) for key, value in strings.items()}
+
+

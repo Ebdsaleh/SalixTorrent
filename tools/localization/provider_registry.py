@@ -1,7 +1,7 @@
-"""Provider registry for SalixTorrent localization development tooling.
+"""Provider-neutral registry for development-time translation services.
 
-Providers are development-only services.  Runtime localization never imports or
-uses this registry.
+Providers are development-only services. Runtime localization must never import
+or depend on this registry.
 """
 
 from __future__ import annotations

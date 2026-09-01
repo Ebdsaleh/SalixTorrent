@@ -20,6 +20,7 @@
 !tools/localization/stage7_validate_localization.bat
 !tools/localization/stage8_review_localization.bat
 !tools/localization/stage9_validate_translation_memory.bat
+!tools/localization/stage10_validate_framework_readiness.bat
 *tree.txt
 
 # Local regression tests are intentionally kept out of this repository.

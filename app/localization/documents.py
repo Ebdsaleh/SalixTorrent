@@ -15,11 +15,8 @@ import json
 from pathlib import Path
 from typing import Iterable, Mapping, Tuple
 
-from app.engine.runtime_paths import resource_path
 from .manager import localization_manager
-
-
-CONTENT_ROOT = Path("app") / "localization" / "content"
+from .profile import salixtorrent_content_path
 
 
 @dataclass(frozen=True)
@@ -42,7 +39,7 @@ class HelpTopic:
 
 
 def _content_path(name: str) -> Path:
-    return resource_path(CONTENT_ROOT / name)
+    return salixtorrent_content_path(name)
 
 
 def _read_json(name: str) -> Mapping[str, object]:
@@ -210,3 +207,5 @@ def document_structure_snapshot() -> dict[str, object]:
             for topic in topics
         },
     }
+
+

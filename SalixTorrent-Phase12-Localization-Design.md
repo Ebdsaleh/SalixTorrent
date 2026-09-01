@@ -1370,6 +1370,36 @@ localization to an ORM or translation provider. Stage 6B and Stage 8B remain pau
 
 ---
 
+### Stage 10 - Framework Extraction Readiness
+
+- [x] provider-neutral `LocaleDescriptor` and `LocalizationProfile` contracts
+- [x] storage-neutral runtime `CatalogRepository` contract
+- [x] deterministic reusable `JsonCatalogRepository`
+- [x] explicit SalixTorrent localization/resource profile adapter
+- [x] runtime manager delegates JSON parsing/metadata validation to repository boundary
+- [x] semantic document resource location routed through the SalixTorrent profile adapter
+- [x] translation-memory source locale made explicit/configurable
+- [x] fail-closed cross-source-locale memory loading/merge behavior
+- [x] offline framework-extraction dependency/product-coupling audit
+- [x] framework extraction map/report
+- [x] tracked Windows Stage-10 validation helper
+- [ ] physically extract localization components into the future umbrella framework
+- [ ] replace JSON translation-memory storage with a future SQLite/SalixORM adapter
+
+**Stage 10 implementation checkpoint (2026-09-01):** SalixTorrent remains the
+reference application, but the first reusable localization contracts are now explicitly
+product/GUI/provider neutral. `LocalizationManager` remains the compatibility facade;
+JSON catalog parsing is delegated to a generic repository and SalixTorrent bundle-path
+policy is isolated in `app.localization.profile`. The current translation memory still
+defaults to `en-AU`, but the storage contract accepts other canonical source locales and
+refuses accidental cross-source-locale merges. `framework_audit.py` protects the modules
+that are intended to be extractable unchanged and records the application/provider
+adapters that still require injection work. Physical repository extraction and the
+SalixORM-backed memory store remain deliberately deferred. Stage 6B and Stage 8B remain
+paused.
+
+---
+
 ## 33. Phase 12 Completion Criteria
 
 Phase 12 is complete when:
@@ -1451,13 +1481,16 @@ LocalizationManager
 Bundled static locale data
 ```
 
-Google Translation exists only here:
+Translation providers exist only here:
 
 ```text
 Developer tooling
         |
         v
-Translation provider
+Provider registry + translation memory
+        |
+        +--> Google adapter (optional)
+        +--> future offline/local adapters
         |
         v
 Validated static locale data
@@ -1484,13 +1517,18 @@ Phase 12
     Help/Glossary localization
     UI/CLI/tray/notification localization
     build-time string extraction
-    Google translation development tool
-    translation cache
-    manual translation overrides
+    provider-neutral translation development tool
+    optional Google translation adapter
+    source-hash translation cache
+    reusable translation memory
+    manual/reviewed translation overrides
+    translation review/provenance infrastructure
     protected technical terminology
     placeholder/catalog validation
     locale diagnostics
     frozen/portable packaging validation
+    framework-neutral localization contracts
+    framework extraction readiness audit
 ```
 
 ---

@@ -1,4 +1,4 @@
-"""Shared source-contract helpers for SalixTorrent localization tooling."""
+"""Framework-neutral source-contract helpers for localization tooling."""
 
 from __future__ import annotations
 
@@ -59,3 +59,5 @@ def placeholder_names(text: object) -> set[str]:
     if contract.malformed:
         return {"<malformed-format-string>"}
     return set(contract.names)
+
+

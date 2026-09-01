@@ -1,9 +1,8 @@
-"""Provider-neutral translation memory for SalixTorrent development tooling.
+"""Provider-neutral, storage-neutral translation memory.
 
-The initial storage backend is deterministic JSON so the translation pipeline can
-remain independent of any ORM/database package.  The public service API is
-deliberately storage-neutral so a future SQLite/SalixORM backend can replace the
-JSON store without changing callers.
+The initial backend is deterministic JSON. The service contract intentionally has
+no application, GUI, ORM, or translation-provider dependency so a future SQLite/
+SalixORM store can replace it without changing translation-pipeline callers.
 """
 
 from __future__ import annotations
@@ -23,7 +22,8 @@ except ImportError:
 
 MEMORY_SCHEMA = 1
 MEMORY_KIND = "salix-translation-memory"
-SOURCE_LOCALE = "en-AU"
+DEFAULT_SOURCE_LOCALE = "en-AU"
+SOURCE_LOCALE = DEFAULT_SOURCE_LOCALE  # backward-compatible public alias
 MEMORY_ENV = "SALIX_LOCALIZATION_MEMORY"
 
 
@@ -56,6 +56,7 @@ class MemoryEntry:
 @dataclass(frozen=True)
 class MemoryStats:
     path: str
+    source_locale: str
     target_locales: int
     entries: int
     reusable: int
@@ -66,6 +67,7 @@ class MemoryStats:
     def as_dict(self) -> dict:
         return {
             "path": self.path,
+            "source_locale": self.source_locale,
             "target_locales": self.target_locales,
             "entries": self.entries,
             "reusable": self.reusable,
@@ -91,12 +93,15 @@ class TranslationMemoryStore(Protocol):
     def save(self) -> None: ...
 
 
-def _empty_memory() -> dict:
+def _empty_memory(source_locale: str = DEFAULT_SOURCE_LOCALE) -> dict:
+    locale = str(source_locale or "").strip()
+    if not locale:
+        raise ValueError("translation-memory source locale cannot be empty")
     return {
         "_meta": {
             "schema": MEMORY_SCHEMA,
             "kind": MEMORY_KIND,
-            "source_locale": SOURCE_LOCALE,
+            "source_locale": locale,
         },
         "entries": {},
     }
@@ -126,24 +131,39 @@ def resolve_memory_path(
 class JsonTranslationMemory:
     """Deterministic JSON implementation of the translation-memory service."""
 
-    def __init__(self, path: str | os.PathLike[str]):
+    def __init__(
+        self,
+        path: str | os.PathLike[str],
+        *,
+        source_locale: str = DEFAULT_SOURCE_LOCALE,
+    ):
         self.path = Path(path)
+        self.source_locale = str(source_locale or "").strip()
+        if not self.source_locale:
+            raise ValueError("translation-memory source locale cannot be empty")
         self._data = self._load()
 
     def _load(self) -> dict:
         try:
             raw = json.loads(self.path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
-            return _empty_memory()
+            return _empty_memory(self.source_locale)
         if not isinstance(raw, dict):
-            return _empty_memory()
+            return _empty_memory(self.source_locale)
         meta = raw.get("_meta", {})
         if not isinstance(meta, dict):
-            return _empty_memory()
+            return _empty_memory(self.source_locale)
         if meta.get("kind") != MEMORY_KIND or meta.get("schema") != MEMORY_SCHEMA:
-            return _empty_memory()
+            return _empty_memory(self.source_locale)
+        declared_source = str(meta.get("source_locale") or "").strip()
+        if not declared_source:
+            return _empty_memory(self.source_locale)
+        if declared_source != self.source_locale:
+            raise ValueError(
+                f"translation-memory source locale {declared_source!r} does not match requested {self.source_locale!r}"
+            )
         if not isinstance(raw.get("entries"), dict):
-            return _empty_memory()
+            return _empty_memory(self.source_locale)
         return raw
 
     @staticmethod
@@ -218,8 +238,13 @@ class JsonTranslationMemory:
                 errors.append("memory kind is invalid")
             if meta.get("schema") != MEMORY_SCHEMA:
                 errors.append("memory schema is unsupported")
-            if meta.get("source_locale") != SOURCE_LOCALE:
-                errors.append("memory source locale is not en-AU")
+            source_locale = str(meta.get("source_locale") or "").strip()
+            if not source_locale:
+                errors.append("memory source locale is missing")
+            elif source_locale != self.source_locale:
+                errors.append(
+                    f"memory source locale {source_locale!r} does not match requested {self.source_locale!r}"
+                )
         entries = self._data.get("entries", {})
         if not isinstance(entries, dict):
             errors.append("memory entries is not an object")
@@ -237,7 +262,7 @@ class JsonTranslationMemory:
 
     def merge_from(self, other_path: str | os.PathLike[str]) -> dict[str, int]:
         """Merge compatible entries from another memory without overwriting conflicts."""
-        other = JsonTranslationMemory(other_path)
+        other = JsonTranslationMemory(other_path, source_locale=self.source_locale)
         added = reused = conflicts = 0
         for locale, values in other._data.get("entries", {}).items():
             if not isinstance(values, dict):
@@ -280,6 +305,7 @@ class JsonTranslationMemory:
                     machine += 1
         return MemoryStats(
             path=str(self.path),
+            source_locale=self.source_locale,
             target_locales=locales,
             entries=entries,
             reusable=reusable,

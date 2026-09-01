@@ -13,6 +13,13 @@ from .locale_info import (
     system_locale_name,
 )
 from .manager import LocalizationManager, localization_manager, placeholder_names, tr
+from .framework import (
+    CatalogRepository,
+    JsonCatalogRepository,
+    LocaleDescriptor,
+    LocalizationProfile,
+)
+from .profile import SALIXTORRENT_LOCALIZATION_PROFILE
 from .pseudo import PSEUDO_ENV, PSEUDO_LOCALE, pseudo_catalog, pseudo_localize
 from .documents import (
     HelpTopic,
@@ -31,6 +38,11 @@ __all__ = [
     "LANGUAGE_OPTION_LABELS",
     "SUPPORTED_LOCALES",
     "LocalizationManager",
+    "CatalogRepository",
+    "JsonCatalogRepository",
+    "LocaleDescriptor",
+    "LocalizationProfile",
+    "SALIXTORRENT_LOCALIZATION_PROFILE",
     "localization_manager",
     "locale_code_from_label",
     "locale_label",
@@ -56,3 +68,5 @@ __all__ = [
     "localized_choices",
     "tr_value",
 ]
+
+

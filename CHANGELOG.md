@@ -4,6 +4,16 @@ Notable SalixTorrent changes are recorded here.
 
 ## Unreleased
 
+### Phase 12 Stage 10 - Framework Extraction Readiness
+
+- Added framework-neutral runtime localization contracts (`LocaleDescriptor`, `LocalizationProfile`, `CatalogRepository`, `JsonCatalogRepository`) without SalixTorrent, Dear PyGui, runtime-path or translation-provider dependencies.
+- Added an explicit SalixTorrent localization profile/resource adapter and routed runtime catalog parsing plus semantic-document content paths through that application boundary while preserving the existing `LocalizationManager`/`tr()` API.
+- Generalized the JSON translation-memory backend so the canonical source locale is explicit rather than structurally fixed to `en-AU`; source-locale mismatches and cross-source-locale memory merges fail closed.
+- Added an offline framework-extraction audit and map that distinguish immediately extractable modules from SalixTorrent application adapters and development/provider adapters.
+- Added `--framework-report`, `--framework-audit`, and `--stage10-check` plus tracked Windows `stage10_validate_framework_readiness.bat`.
+- Added `SalixTorrent-Phase12-Framework-Extraction-Map.md` documenting dependency direction, extraction sequence, deferred SalixORM integration and non-negotiable framework boundaries.
+- Added Stage 10 regression coverage for profile/repository contracts, existing runtime compatibility, non-`en-AU` translation-memory operation, source-locale merge refusal, extraction auditing and offline CLI validation.
+
 ### Phase 12 Stage 9 - Provider-Neutral Translation Memory Foundation
 
 - Added a provider-neutral translation-memory service with deterministic JSON storage, exact canonical source hashes, placeholder contracts, provenance, model/status metadata and a storage interface intended for a future SQLite/SalixORM backend.

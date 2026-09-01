@@ -8,7 +8,6 @@ stress testing.
 
 from __future__ import annotations
 
-import json
 import os
 import string
 import threading
@@ -16,7 +15,6 @@ from collections import Counter
 from pathlib import Path
 from typing import Dict, Mapping, Optional, Set
 
-from app.engine.runtime_paths import resource_path
 from .locale_info import (
     AUTO_LOCALE,
     CANONICAL_LOCALE,
@@ -25,9 +23,8 @@ from .locale_info import (
     resolve_requested_locale,
 )
 from .pseudo import PSEUDO_ENV, PSEUDO_LOCALE, pseudo_catalog
-
-
-CATALOG_NAMES = ("ui", "help", "glossary")
+from .framework import JsonCatalogRepository
+from .profile import CATALOG_NAMES, salixtorrent_catalog_root
 
 
 def _truthy(value: object) -> bool:
@@ -80,37 +77,20 @@ class LocalizationManager:
 
     @staticmethod
     def locale_root(locale_code: str) -> Path:
-        return resource_path(Path("app") / "localization" / "locales" / locale_code)
+        # SalixTorrent-specific resource resolution deliberately stays in this
+        # adapter boundary; JsonCatalogRepository itself is framework-neutral.
+        return salixtorrent_catalog_root(locale_code)
 
     @staticmethod
     def _read_catalog(locale_code: str, catalog_name: str) -> Dict[str, str]:
-        path = LocalizationManager.locale_root(locale_code) / f"{catalog_name}.json"
-        raw = json.loads(path.read_text(encoding="utf-8"))
-        if not isinstance(raw, dict):
-            raise ValueError(f"{path} does not contain a JSON object")
-        meta = raw.get("_meta", {})
-        if meta and not isinstance(meta, dict):
-            raise ValueError(f"{path} has invalid _meta")
-        if isinstance(meta, dict):
-            declared_locale = str(meta.get("locale") or "")
-            declared_catalog = str(meta.get("catalog") or "")
-            if declared_locale and declared_locale != locale_code:
-                raise ValueError(
-                    f"{path} declares locale {declared_locale!r}, expected {locale_code!r}"
-                )
-            if declared_catalog and declared_catalog != catalog_name:
-                raise ValueError(
-                    f"{path} declares catalog {declared_catalog!r}, expected {catalog_name!r}"
-                )
-        strings = raw.get("strings", raw)
-        if not isinstance(strings, dict):
-            raise ValueError(f"{path} does not contain a string mapping")
-        out: Dict[str, str] = {}
-        for key, value in strings.items():
-            if not isinstance(key, str) or not isinstance(value, str):
-                raise ValueError(f"{path} catalog entries must map strings to strings")
-            out[key] = value
-        return out
+        # Resolve through LocalizationManager.locale_root (rather than binding the
+        # application helper directly) so tests/embedders can still inject an
+        # isolated catalog root exactly as before Stage 10.
+        repository = JsonCatalogRepository(
+            lambda locale: LocalizationManager.locale_root(locale),
+            allowed_catalogs=CATALOG_NAMES,
+        )
+        return repository.read(locale_code, catalog_name)
 
     def configure(self, requested_locale: object, *, system_locale: Optional[str] = None) -> str:
         with self._lock:
@@ -256,3 +236,5 @@ def tr(key: str, default: Optional[str] = None, *, catalog: str = "ui", **values
 
 def localization_manager() -> LocalizationManager:
     return _localization
+
+
