@@ -18,6 +18,8 @@ ROOT = Path(__file__).resolve().parents[2]
 # the torrent engine, Google libraries, or runtime path helpers.
 EXTRACTABLE_MODULES = (
     Path("app/localization/framework.py"),
+    Path("app/localization/runtime.py"),
+    Path("app/localization/semantic.py"),
     Path("app/localization/pseudo.py"),
     Path("tools/localization/contracts.py"),
     Path("tools/localization/translation_memory.py"),
@@ -124,6 +126,29 @@ def framework_audit() -> FrameworkAudit:
         errors.append("missing documented adapter(s): " + ", ".join(missing_adapters))
     return FrameworkAudit(modules=modules, errors=tuple(errors))
 
+
+
+def runtime_boundary_audit() -> tuple[str, ...]:
+    """Verify SalixTorrent facades delegate to the generic runtime/services."""
+    errors: list[str] = []
+    manager_path = ROOT / "app/localization/manager.py"
+    documents_path = ROOT / "app/localization/documents.py"
+    manager = manager_path.read_text(encoding="utf-8")
+    documents = documents_path.read_text(encoding="utf-8")
+
+    if "LocalizationRuntime" not in manager:
+        errors.append("manager.py does not delegate to LocalizationRuntime")
+    for forbidden in ("import json", "import string", "import threading", "collections import Counter"):
+        if forbidden in manager:
+            errors.append(f"manager.py still owns generic runtime concern: {forbidden}")
+
+    if "SemanticDocumentationService" not in documents or "SemanticDocumentationSource" not in documents:
+        errors.append("documents.py does not delegate to semantic documentation services")
+    for forbidden in ("import json", "from dataclasses import dataclass", "from functools import lru_cache"):
+        if forbidden in documents:
+            errors.append(f"documents.py still owns generic semantic concern: {forbidden}")
+
+    return tuple(errors)
 
 def extraction_map() -> dict[str, tuple[str, ...]]:
     return {

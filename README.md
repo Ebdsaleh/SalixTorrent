@@ -849,11 +849,45 @@ Or on Windows:
 tools\localization\stage10_validate_framework_readiness.bat
 ```
 
-`tools/localization/framework_audit.py` currently protects four modules as immediately
-extractable candidates: the runtime framework contracts, pseudo-localizer, source/
-placeholder contracts, and translation-memory service. Those candidates are not
+`tools/localization/framework_audit.py` now protects six modules as immediately
+extractable candidates: framework contracts, the generic runtime kernel, semantic
+documentation services, pseudo-localization, source/placeholder contracts, and the
+translation-memory service. Those candidates are not
 allowed to import SalixTorrent engine/views, Dear PyGui, or Google libraries, and may
 not contain SalixTorrent product branding. Application and provider adapters remain
 explicitly documented rather than being falsely labelled generic. See
 `SalixTorrent-Phase12-Framework-Extraction-Map.md` for the full boundary and future
 extraction sequence.
+
+
+### Phase 12 Stage 11 - generic localization runtime kernel
+
+Stage 11 moves the reusable runtime behavior behind the contracts introduced in Stage 10.
+`app/localization/runtime.py` now owns catalog loading, canonical fallback, format/placeholder
+contracts, pseudo-locale generation hooks and structured runtime diagnostics without importing
+SalixTorrent resources, Dear PyGui, BitTorrent code or translation providers.
+`app/localization/manager.py` remains the source-compatible SalixTorrent singleton facade and
+only injects the application profile, resource-backed JSON repository, locale resolver and
+pseudo transform.
+
+Semantic Help/Glossary parsing is similarly separated. `app/localization/semantic.py` provides
+framework-neutral JSON document loading, stable Help/Glossary structures and localization
+overlays; `app/localization/documents.py` is now the thin SalixTorrent adapter supplying content
+paths and the active `tr()` function. Existing view/helper APIs remain unchanged.
+
+Offline validation:
+
+```bat
+python tools\localization\build_locales.py --runtime-boundary-audit
+python tools\localization\build_locales.py --stage11-check
+```
+
+Windows one-shot validation:
+
+```bat
+tools\localization\stage11_validate_runtime_kernel.bat
+```
+
+The framework audit now treats six modules as extractable without product/GUI/provider
+dependencies. Physical repository extraction, the SalixORM translation-memory backend, Stage 6B
+locale population and Stage 8B language review remain deliberately deferred.

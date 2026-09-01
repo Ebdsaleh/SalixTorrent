@@ -32,7 +32,7 @@ try:
     )
     from .review import export_review, import_review, review_audit, review_summary
     from .provider_registry import provider_descriptors
-    from .framework_audit import extraction_map, framework_audit
+    from .framework_audit import extraction_map, framework_audit, runtime_boundary_audit
     from .validate_locales import validate_all
 except ImportError:  # direct script execution
     from extract_strings import extract_all, extract_records, extraction_drift, extraction_summary
@@ -57,7 +57,7 @@ except ImportError:  # direct script execution
     )
     from review import export_review, import_review, review_audit, review_summary
     from provider_registry import provider_descriptors
-    from framework_audit import extraction_map, framework_audit
+    from framework_audit import extraction_map, framework_audit, runtime_boundary_audit
     from validate_locales import validate_all
 
 
@@ -221,6 +221,8 @@ def main(argv=None) -> int:
     parser.add_argument("--framework-report", action="store_true", help="Show Stage 10 framework extraction map")
     parser.add_argument("--framework-audit", action="store_true", help="Audit extractable localization modules for app/GUI/provider coupling")
     parser.add_argument("--stage10-check", action="store_true", help="Run Stage 10 framework-extraction readiness checks")
+    parser.add_argument("--runtime-boundary-audit", action="store_true", help="Audit Stage 11 generic runtime/semantic facade boundaries")
+    parser.add_argument("--stage11-check", action="store_true", help="Run Stage 11 generic runtime-kernel extraction checks")
     parser.add_argument("--bootstrap-cache", action="store_true", help="Adopt current pre-Stage-5 locale entries into the source-hash cache")
     parser.add_argument("--project-id", help="Google Cloud project ID/number (otherwise use environment/ADC discovery)")
     parser.add_argument("--location", default=None, help=f"Google Translation location (default: {DEFAULT_LOCATION})")
@@ -231,8 +233,8 @@ def main(argv=None) -> int:
     do_extract = args.extract or args.all
     do_translate = args.translate or args.all
     do_validate = args.validate or args.all
-    if not any((do_extract, do_translate, do_validate, args.check, args.report, args.bootstrap_cache, args.dry_run, args.status, args.doctor, args.generate_initial, args.manifest, args.package_check, args.pseudo_check, args.stage7_check, args.review_report, args.review_export, args.review_import, args.stage8_check, args.providers, args.memory_status, args.memory_bootstrap, args.memory_merge, args.stage9_check, args.framework_report, args.framework_audit, args.stage10_check)):
-        parser.error("choose --extract, --check, --report, --translate, --validate, --bootstrap-cache, --dry-run, --status, --doctor, --generate-initial, --manifest, --package-check, --pseudo-check, --stage7-check, --review-report, --review-export, --review-import, --stage8-check, --providers, --memory-status, --memory-bootstrap, --memory-merge, --stage9-check, --framework-report, --framework-audit, --stage10-check or --all")
+    if not any((do_extract, do_translate, do_validate, args.check, args.report, args.bootstrap_cache, args.dry_run, args.status, args.doctor, args.generate_initial, args.manifest, args.package_check, args.pseudo_check, args.stage7_check, args.review_report, args.review_export, args.review_import, args.stage8_check, args.providers, args.memory_status, args.memory_bootstrap, args.memory_merge, args.stage9_check, args.framework_report, args.framework_audit, args.stage10_check, args.runtime_boundary_audit, args.stage11_check)):
+        parser.error("choose --extract, --check, --report, --translate, --validate, --bootstrap-cache, --dry-run, --status, --doctor, --generate-initial, --manifest, --package-check, --pseudo-check, --stage7-check, --review-report, --review-export, --review-import, --stage8-check, --providers, --memory-status, --memory-bootstrap, --memory-merge, --stage9-check, --framework-report, --framework-audit, --stage10-check, --runtime-boundary-audit, --stage11-check or --all")
 
     if args.dry_run and args.bootstrap_cache:
         parser.error("--dry-run and --bootstrap-cache cannot be combined")
@@ -517,9 +519,18 @@ def main(argv=None) -> int:
         _print_memory_status(args.memory_path)
         print("Stage 9 provider-neutral translation memory: OK")
 
-    if args.framework_audit and not args.stage10_check:
+    if args.framework_audit and not (args.stage10_check or args.stage11_check):
         if not _run_framework_audit():
             return 10
+
+    if args.runtime_boundary_audit and not args.stage11_check:
+        boundary_errors = runtime_boundary_audit()
+        if boundary_errors:
+            print("Stage 11 runtime/semantic boundary: FAILED")
+            for error in boundary_errors:
+                print(f"ERROR: {error}")
+            return 11
+        print("Stage 11 runtime/semantic boundary: OK")
 
     if args.stage10_check:
         drift = extraction_drift()
@@ -542,6 +553,28 @@ def main(argv=None) -> int:
             return 10
         print("Stage 10 translation-memory boundary: OK")
         print("Stage 10 framework extraction readiness: OK")
+
+    if args.stage11_check:
+        drift = extraction_drift()
+        manifest_stale = locale_manifest_drift()
+        if drift or manifest_stale:
+            print("Stage 11 drift check: FAILED")
+            for path in drift:
+                print(f"ERROR: stale/missing: {path}")
+            if manifest_stale:
+                print("ERROR: stale/missing: app/localization/locales/manifest.json")
+            return 3
+        print("Stage 11 drift check: OK")
+        if not _run_framework_audit():
+            return 11
+        boundary_errors = runtime_boundary_audit()
+        if boundary_errors:
+            print("Stage 11 runtime/semantic boundary: FAILED")
+            for error in boundary_errors:
+                print(f"ERROR: {error}")
+            return 11
+        print("Stage 11 runtime/semantic boundary: OK")
+        print("Stage 11 generic localization runtime kernel: OK")
 
     if do_validate:
         validate_locales = ["en-AU", *locales]

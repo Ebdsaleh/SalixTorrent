@@ -1400,6 +1400,40 @@ paused.
 
 ---
 
+### Stage 11 - Generic Runtime Kernel and Semantic Documentation Services
+
+- [x] framework-neutral `LocalizationRuntime`
+- [x] injected `LocalizationProfile` / `CatalogRepository` / locale resolver
+- [x] pseudo-locale behavior injected instead of runtime importing application pseudo policy
+- [x] generic placeholder/format fallback contract in runtime kernel
+- [x] runtime diagnostics use profile metadata instead of SalixTorrent locale helpers
+- [x] SalixTorrent `LocalizationManager` reduced to compatibility/application adapter
+- [x] framework-neutral semantic document repository contract
+- [x] reusable JSON semantic document repository
+- [x] reusable Help/Glossary semantic source parser
+- [x] reusable semantic documentation localization service
+- [x] SalixTorrent `documents.py` reduced to content-path/runtime adapter
+- [x] framework extraction audit expanded to runtime/semantic modules
+- [x] runtime/semantic facade-boundary audit
+- [x] tracked Windows Stage-11 validation helper
+- [ ] physical extraction into the future umbrella framework repository
+- [ ] project-profile injection for development extraction/review tooling
+- [ ] future SalixORM translation-memory storage adapter
+
+**Stage 11 implementation checkpoint (2026-09-01):** Runtime localization behavior is
+no longer implemented by the SalixTorrent singleton itself. `LocalizationRuntime` owns
+catalog loading, canonical fallback, formatting contracts, pseudo transformation hooks and
+structured diagnostics through injected framework contracts. The historical
+`LocalizationManager` API remains source-compatible as a thin application singleton.
+Semantic Help/Glossary parsing and locale overlays are likewise provided by generic
+repository/source/service objects, while `documents.py` supplies only SalixTorrent content
+paths and the active translator. The extraction audit now protects six immediately reusable
+modules and verifies that application facades do not reclaim generic responsibilities.
+Physical repository extraction, SalixORM storage integration, Stage 6B population and Stage
+8B review remain deliberately deferred.
+
+---
+
 ## 33. Phase 12 Completion Criteria
 
 Phase 12 is complete when:

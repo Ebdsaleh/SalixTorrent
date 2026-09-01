@@ -37,6 +37,15 @@ SALIXTORRENT_LOCALIZATION_PROFILE = LocalizationProfile(
     locales=_runtime_locale_descriptors(),
     pseudo_locale=PSEUDO_LOCALE,
     pseudo_environment=PSEUDO_ENV,
+    pseudo_descriptor=LocaleDescriptor(
+        code=PSEUDO_LOCALE,
+        display_name="Pseudo English (expanded)",
+        native_name="Pseudo English (expanded)",
+        script="Latn",
+        text_direction="ltr",
+        font_profile="latin",
+        support_status="development-only",
+    ),
 )
 
 

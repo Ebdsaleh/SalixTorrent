@@ -4,6 +4,17 @@ Notable SalixTorrent changes are recorded here.
 
 ## Unreleased
 
+### Phase 12 Stage 11 - Generic Runtime Kernel and Semantic Documentation Services
+
+- Extracted catalog loading/fallback/formatting/pseudo-locale behavior into framework-neutral `LocalizationRuntime`, driven only by an injected `LocalizationProfile`, `CatalogRepository`, locale resolver and optional pseudo transform.
+- Reduced `LocalizationManager` to a SalixTorrent singleton compatibility adapter while preserving existing `tr()`, diagnostics, direct catalog-test hooks and runtime behavior.
+- Added generic semantic-document contracts and services (`JsonSemanticDocumentRepository`, `SemanticDocumentationSource`, `SemanticDocumentationService`) for stable Help/Glossary parsing and locale overlays without SalixTorrent resource paths or renderer dependencies.
+- Reduced `app/localization/documents.py` to a SalixTorrent content-path/runtime adapter while preserving the historical Help/Glossary helper API.
+- Extended `LocalizationProfile` with optional pseudo-locale metadata so generic runtime diagnostics no longer need application locale-info helpers.
+- Expanded the framework extraction audit from four to six immediately extractable modules and added an explicit runtime/semantic facade-boundary audit.
+- Added `--runtime-boundary-audit`, `--stage11-check` and tracked Windows `stage11_validate_runtime_kernel.bat`.
+- Added Stage 11 regression coverage for generic runtime injection, fallback/placeholder contracts, semantic-document services, SalixTorrent compatibility and extraction boundaries.
+
 ### Phase 12 Stage 10 - Framework Extraction Readiness
 
 - Added framework-neutral runtime localization contracts (`LocaleDescriptor`, `LocalizationProfile`, `CatalogRepository`, `JsonCatalogRepository`) without SalixTorrent, Dear PyGui, runtime-path or translation-provider dependencies.

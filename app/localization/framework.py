@@ -42,6 +42,7 @@ class LocalizationProfile:
     locales: Mapping[str, LocaleDescriptor]
     pseudo_locale: str = ""
     pseudo_environment: str = ""
+    pseudo_descriptor: LocaleDescriptor | None = None
 
     def __post_init__(self) -> None:
         app_id = str(self.application_id or "").strip()
@@ -63,13 +64,23 @@ class LocalizationProfile:
                 raise ValueError(f"locale mapping key {code!r} does not match descriptor code {info.code!r}")
             if info.text_direction not in {"ltr", "rtl"}:
                 raise ValueError(f"locale {code!r} has unsupported text direction {info.text_direction!r}")
+        if self.pseudo_descriptor is not None:
+            if not self.pseudo_locale:
+                raise ValueError("pseudo_descriptor requires pseudo_locale")
+            if self.pseudo_descriptor.code != self.pseudo_locale:
+                raise ValueError("pseudo_descriptor code must match pseudo_locale")
+            if self.pseudo_descriptor.text_direction not in {"ltr", "rtl"}:
+                raise ValueError("pseudo locale has unsupported text direction")
         object.__setattr__(self, "application_id", app_id)
         object.__setattr__(self, "canonical_locale", canonical)
         object.__setattr__(self, "catalog_names", catalogs)
         object.__setattr__(self, "locales", MappingProxyType(locale_map))
 
     def locale(self, code: object) -> LocaleDescriptor:
-        return self.locales.get(str(code), self.locales[self.canonical_locale])
+        cleaned = str(code)
+        if self.pseudo_descriptor is not None and cleaned == self.pseudo_locale:
+            return self.pseudo_descriptor
+        return self.locales.get(cleaned, self.locales[self.canonical_locale])
 
 
 class CatalogRepository(Protocol):

@@ -1,6 +1,6 @@
 # SalixTorrent Phase 12 — Localization Framework Extraction Map
 
-**Status:** Stage 10 framework-extraction readiness checkpoint  
+**Status:** Stage 11 generic runtime-kernel extraction checkpoint  
 **Purpose:** Define the boundary between reusable localization infrastructure and SalixTorrent-specific adapters before the future umbrella application framework is split into its own repository.
 
 ---
@@ -9,7 +9,7 @@
 
 SalixTorrent remains the reference application and proving ground. The localization subsystem should therefore continue to run inside SalixTorrent until its contracts are stable, but reusable components must stop accumulating torrent-client, Dear PyGui, packaging, and provider assumptions.
 
-Stage 10 does **not** create a second framework repository and does **not** make SalixTorrent depend on unfinished external projects. It introduces explicit generic contracts, isolates application adapters, and adds an offline audit that prevents framework-candidate modules from drifting back toward product-specific coupling.
+Stages 10–11 do **not** create a second framework repository and does **not** make SalixTorrent depend on unfinished external projects. It introduces explicit generic contracts, isolates application adapters, and adds an offline audit that prevents framework-candidate modules from drifting back toward product-specific coupling.
 
 The intended future dependency direction is:
 
@@ -48,6 +48,31 @@ Owns provider-neutral runtime contracts:
 - `JsonCatalogRepository`
 
 It does not import SalixTorrent engine/view modules, Dear PyGui, runtime-path helpers, Google libraries, or provider tooling.
+
+### `app/localization/runtime.py`
+
+Owns provider-neutral offline runtime behavior:
+
+- catalog loading through `CatalogRepository`;
+- canonical per-key fallback;
+- placeholder/format contracts;
+- pseudo-locale transform injection;
+- fallback/load-health diagnostics;
+- runtime generation tracking.
+
+Applications inject locale-resolution policy and storage/resource adapters. The module does not import SalixTorrent, Dear PyGui, runtime-path helpers, BitTorrent code, or translation providers.
+
+### `app/localization/semantic.py`
+
+Owns renderer-neutral semantic documentation contracts and services:
+
+- `HelpTopic`;
+- `SemanticDocumentRepository`;
+- `JsonSemanticDocumentRepository`;
+- `SemanticDocumentationSource`;
+- `SemanticDocumentationService`.
+
+Stable Help/Glossary IDs and localization-key generation are reusable; application content paths and the active translator are injected.
 
 ### `app/localization/pseudo.py`
 
@@ -91,15 +116,11 @@ Provider-specific language codes should eventually move fully into provider adap
 
 ### `app/localization/manager.py`
 
-Remains the compatibility singleton consumed throughout the current application. Stage 10 moves JSON catalog parsing/metadata checking into `JsonCatalogRepository` while preserving the public `LocalizationManager`, `tr()`, and `localization_manager()` API.
-
-A future framework extraction can convert this into a generic runtime object receiving a `LocalizationProfile` and `CatalogRepository`, while SalixTorrent keeps a tiny singleton adapter if desired.
+Now a thin SalixTorrent compatibility singleton subclassing the generic `LocalizationRuntime`. It supplies the SalixTorrent profile, JSON catalog root, locale resolver and pseudo transform while preserving `LocalizationManager`, `tr()`, `localization_manager()` and existing diagnostics behavior.
 
 ### `app/localization/documents.py`
 
-Remains the SalixTorrent semantic Help/Glossary adapter. Its content path now resolves through the application profile boundary rather than directly owning bundle-path policy.
-
-The semantic documentation engine itself already lives separately under `app/engine/documentation` and can be evaluated as its own framework extraction later.
+Now a thin SalixTorrent adapter over `SemanticDocumentationSource` and `SemanticDocumentationService`. It supplies the application's semantic-content path and active runtime translator while preserving the existing Help/Glossary helper API used by views and tests.
 
 ---
 
@@ -151,7 +172,40 @@ This lets catalog format/storage evolve independently from SalixTorrent's resour
 
 ---
 
-## 6. Translation-memory boundary introduced in Stage 10
+## 6. Runtime and semantic-service boundary completed in Stage 11
+
+Stage 11 changes the runtime boundary from a repository-only seam into an actual reusable kernel:
+
+```text
+LocalizationManager                    SalixTorrent compatibility facade
+        |
+        v
+LocalizationRuntime                    reusable
+        |
+        +-- LocalizationProfile         injected contract
+        +-- CatalogRepository           injected storage
+        +-- locale resolver             injected policy
+        +-- pseudo transform            optional injected development behavior
+```
+
+Semantic documentation follows the same direction:
+
+```text
+app/localization/documents.py           SalixTorrent adapter
+        |
+        v
+SemanticDocumentationService            reusable
+        |
+        +-- SemanticDocumentationSource
+        +-- SemanticDocumentRepository
+        +-- translator callback
+```
+
+The Stage-11 boundary audit rejects regressions where the SalixTorrent facades start reclaiming JSON parsing, placeholder/runtime state machinery, or semantic-document parsing.
+
+---
+
+## 7. Translation-memory boundary introduced in Stage 10
 
 Translation memory is now explicitly source-locale aware:
 
@@ -169,7 +223,7 @@ A memory file cannot be silently merged into another memory with a different can
 
 ---
 
-## 7. Extraction audit
+## 8. Extraction audit
 
 The offline audit is implemented in:
 
@@ -207,7 +261,7 @@ tools\localization\stage10_validate_framework_readiness.bat
 
 ---
 
-## 8. What is deliberately deferred
+## 9. What is deliberately deferred
 
 Stage 10 does **not**:
 
@@ -224,15 +278,14 @@ Those tasks should happen only when their dependencies and extraction boundaries
 
 ---
 
-## 9. Future extraction sequence
+## 10. Future extraction sequence
 
 Recommended order after the contracts have remained stable in the reference application:
 
-1. Extract `app/localization/framework.py` and `pseudo.py` into the umbrella framework.
+1. Extract `framework.py`, `runtime.py`, `semantic.py` and `pseudo.py` into the umbrella framework.
 2. Extract source/placeholder contracts and translation-memory interfaces into framework development tooling.
-3. Replace SalixTorrent's profile import with the framework package while keeping current locale/content data in SalixTorrent.
-4. Move the generic localization runtime behind profile/repository injection.
-5. Adapt review/extraction tooling to a project profile instead of repository constants.
+3. Replace SalixTorrent's generic-module imports with the framework package while keeping locale/content data and thin adapters in SalixTorrent.
+4. Adapt review/extraction tooling to a project profile instead of repository constants.
 6. Add the SalixORM-backed translation-memory storage adapter when SalixORM is stable.
 7. Add optional offline/provider plugins independently of the runtime.
 8. Only then remove compatibility copies from SalixTorrent.
@@ -241,7 +294,7 @@ At every step SalixTorrent remains the regression/reference application.
 
 ---
 
-## 10. Extraction invariants
+## 11. Extraction invariants
 
 1. Runtime localization must never require a translation provider.
 2. Generic runtime code must not depend on Dear PyGui.
@@ -256,4 +309,4 @@ At every step SalixTorrent remains the regression/reference application.
 
 ---
 
-**Stage 10 principle:** separate contracts first, repositories later.
+**Stage 11 principle:** prove reusable runtime behavior behind injected application policy before physically splitting repositories.

@@ -473,3 +473,5 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+!tools/localization/stage11_validate_runtime_kernel.bat
