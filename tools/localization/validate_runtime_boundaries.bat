@@ -1,8 +1,10 @@
 @echo off
-setlocal
+setlocal EnableExtensions
+
+cd /d "%~dp0\..\.."
 
 echo ============================================================
-echo  SalixTorrent Phase 12 Stage 9 - Provider/Memory Audit
+echo  SalixTorrent Localization Runtime Boundary Audit
 echo ============================================================
 
 where python >nul 2>&1
@@ -26,15 +28,15 @@ python tools\localization\build_locales.py --check
 if errorlevel 1 exit /b %errorlevel%
 echo.
 
-echo [3/4] Provider-neutral translation memory bootstrap...
-python tools\localization\build_locales.py --memory-bootstrap --memory-status --providers
+echo [3/4] Framework extraction map...
+python tools\localization\build_locales.py --framework-report
 if errorlevel 1 exit /b %errorlevel%
 echo.
 
-echo [4/4] Stage 9 provider/memory validation...
-python tools\localization\build_locales.py --stage9-check
+echo [4/4] Generic runtime and semantic-service boundary validation...
+python tools\localization\build_locales.py --runtime-check
 if errorlevel 1 exit /b %errorlevel%
 echo.
 
-echo Stage 9 provider-neutral translation memory: OK
+echo Generic localization runtime kernel: OK
 exit /b 0

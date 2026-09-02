@@ -1,8 +1,10 @@
 @echo off
-setlocal
+setlocal EnableExtensions
+
+cd /d "%~dp0\..\.."
 
 echo ============================================================
-echo  SalixTorrent Phase 12 Stage 11 - Runtime Kernel Audit
+echo  SalixTorrent Localization Framework Extraction Audit
 echo ============================================================
 
 where python >nul 2>&1
@@ -31,10 +33,10 @@ python tools\localization\build_locales.py --framework-report
 if errorlevel 1 exit /b %errorlevel%
 echo.
 
-echo [4/4] Generic runtime and semantic-service boundary validation...
-python tools\localization\build_locales.py --stage11-check
+echo [4/4] Framework/provider-memory boundary validation...
+python tools\localization\build_locales.py --framework-check
 if errorlevel 1 exit /b %errorlevel%
 echo.
 
-echo Stage 11 generic localization runtime kernel: OK
+echo Framework extraction readiness: OK
 exit /b 0

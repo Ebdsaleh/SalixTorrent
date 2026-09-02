@@ -4,12 +4,12 @@ setlocal
 cd /d "%~dp0\..\.."
 
 if "%VIRTUAL_ENV%"=="" (
-    echo ERROR: Activate the SalixTorrent .venv before running Stage 8A review tooling.
+    echo ERROR: Activate the SalixTorrent .venv before running translation review tooling.
     exit /b 1
 )
 
 echo ============================================================
-echo  SalixTorrent Phase 12 Stage 8A - Translation Review Audit
+echo  SalixTorrent Translation Review Audit
 echo ============================================================
 echo Python: %VIRTUAL_ENV%\Scripts\python.exe
 python --version
@@ -31,10 +31,10 @@ python tools\localization\build_locales.py --review-report
 if errorlevel 1 exit /b %errorlevel%
 
 echo.
-echo [4/4] Stage 8A review/provenance validation...
-python tools\localization\build_locales.py --stage8-check
+echo [4/4] Review/provenance validation...
+python tools\localization\build_locales.py --review-check
 if errorlevel 1 exit /b %errorlevel%
 
 echo.
-echo Stage 8A translation review infrastructure: OK
+echo Translation review infrastructure: OK
 exit /b 0

@@ -6,7 +6,7 @@
       "help",
       "glossary"
     ],
-    "generated_by": "tools/localization/stage7_support.py",
+    "generated_by": "tools/localization/localization_validation.py",
     "schema": 1
   },
   "development_locales": {

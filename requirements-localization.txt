@@ -1,5 +1,10 @@
-# Development-only dependency for Phase 12 locale generation.
-# Normal SalixTorrent users and ordinary source/runtime installs do not need it.
+# Development-only dependencies for localization tooling.
+# Normal SalixTorrent users and ordinary source/runtime installs do not need them.
 # Authentication uses Google Application Default Credentials; no credentials are
-# stored in SalixTorrent or in the generated locale packs.
+# stored in SalixTorrent or in generated locale packs.
 google-cloud-translate>=3.27,<4
+
+# Optional SalixORM translation-memory storage:
+# SalixORM v0.2.0+ is used only when --memory-backend salixorm is selected.
+# Keep it out of normal runtime requirements. From sibling development checkouts:
+#   python -m pip install -e ..\SalixORM

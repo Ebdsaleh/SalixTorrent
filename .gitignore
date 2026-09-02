@@ -16,11 +16,13 @@
 # Local scripts/artifacts. Keep the official Windows release builder tracked.
 *.bat
 !packaging/build_windows.bat
-!tools/localization/stage6_generate_locales.bat
-!tools/localization/stage7_validate_localization.bat
-!tools/localization/stage8_review_localization.bat
-!tools/localization/stage9_validate_translation_memory.bat
-!tools/localization/stage10_validate_framework_readiness.bat
+!tools/localization/generate_initial_locales.bat
+!tools/localization/validate_localization.bat
+!tools/localization/review_localization.bat
+!tools/localization/validate_translation_memory.bat
+!tools/localization/validate_framework_extraction.bat
+!tools/localization/validate_runtime_boundaries.bat
+!tools/localization/validate_salixorm_memory.bat
 *tree.txt
 
 # Local regression tests are intentionally kept out of this repository.
@@ -474,4 +476,8 @@ FodyWeavers.xsd
 *.msm
 *.msp
 
-!tools/localization/stage11_validate_runtime_kernel.bat
+# Optional local SalixORM translation-memory database.
+# The deterministic JSON memory remains the checked-in reference resource.
+tools/localization/translation_memory.db
+tools/localization/translation_memory.db-shm
+tools/localization/translation_memory.db-wal

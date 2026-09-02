@@ -1,11 +1,12 @@
 # SalixTorrent Phase 12 — Localization Framework Extraction Map
 
-**Status:** Stage 11 generic runtime-kernel extraction checkpoint  
+**Status:** SalixORM translation-memory integration checkpoint
+
 **Purpose:** Define the boundary between reusable localization infrastructure and SalixTorrent-specific adapters before the future umbrella application framework is split into its own repository.
 
 ---
 
-## 1. Why this stage exists
+## 1. Why this extraction boundary exists
 
 SalixTorrent remains the reference application and proving ground. The localization subsystem should therefore continue to run inside SalixTorrent until its contracts are stable, but reusable components must stop accumulating torrent-client, Dear PyGui, packaging, and provider assumptions.
 
@@ -84,9 +85,9 @@ Owns canonical source hashing and Python-format placeholder contracts. These ope
 
 ### `tools/localization/translation_memory.py`
 
-Owns the storage-neutral translation-memory service contract plus the current deterministic JSON backend. Stage 10 removes the architectural requirement that its source locale must be `en-AU`; `en-AU` remains only the backward-compatible default for the current SalixTorrent memory.
+Owns the storage-neutral translation-memory service contract plus the deterministic JSON reference/default backend. The framework-boundary refactor removed the architectural requirement that its source locale must be `en-AU`; `en-AU` remains only the backward-compatible default for the current SalixTorrent memory. The SalixORM integration completes the store contract with iteration/statistics/audit/save operations plus shared semantic validation and fail-closed merge behavior.
 
-A future SQLite/SalixORM store should implement the same `TranslationMemoryStore` contract rather than forcing translation-pipeline callers to change.
+The optional SalixORM implementation lives in a development adapter rather than this extractable module, so generic callers continue to depend only on `TranslationMemoryStore`.
 
 ---
 
@@ -136,6 +137,18 @@ Provider-neutral at the public contract level, but currently bootstraps the buil
 
 Google-specific development provider. It must remain optional and development-only.
 
+### `tools/localization/translation_memory_factory.py`
+
+Development-time storage selection seam. It keeps JSON as the default/reference store, resolves optional SalixORM configuration, and lazily imports the SalixORM adapter only when selected. It intentionally stays outside the six generic extraction candidates.
+
+### `tools/localization/translation_memory_salixorm.py`
+
+Optional SalixORM `v0.2.0` / SQLite development-storage adapter implementing the generic translation-memory contract. It owns physical schema/migration policy and transactional persistence; generic runtime localization never imports it.
+
+### `tools/localization/salixorm_memory_audit.py`
+
+Offline integration/parity audit used to prove the complete checked-in JSON memory can be imported, reopened and audited through the SalixORM adapter without semantic drift. It is verification tooling rather than runtime framework code.
+
 ### `tools/localization/review.py`
 
 The review model is broadly reusable, but the current implementation still knows SalixTorrent catalog locations, override locations, and extraction-manifest layout. Extract only after those paths are injected through a project/tooling profile.
@@ -146,9 +159,9 @@ The AST extractor is reusable in principle, but it currently knows SalixTorrent 
 
 ---
 
-## 5. Runtime boundary introduced in Stage 10
+## 5. Runtime boundary introduced by the framework-extraction work
 
-Before Stage 10, `LocalizationManager` directly implemented JSON parsing and directly knew the bundle catalog root.
+Before the framework-boundary refactor, `LocalizationManager` directly implemented JSON parsing and directly knew the bundle catalog root.
 
 The boundary is now:
 
@@ -172,9 +185,9 @@ This lets catalog format/storage evolve independently from SalixTorrent's resour
 
 ---
 
-## 6. Runtime and semantic-service boundary completed in Stage 11
+## 6. Generic runtime and semantic-service boundary
 
-Stage 11 changes the runtime boundary from a repository-only seam into an actual reusable kernel:
+The runtime-kernel refactor changes the runtime boundary from a repository-only seam into an actual reusable kernel:
 
 ```text
 LocalizationManager                    SalixTorrent compatibility facade
@@ -201,25 +214,27 @@ SemanticDocumentationService            reusable
         +-- translator callback
 ```
 
-The Stage-11 boundary audit rejects regressions where the SalixTorrent facades start reclaiming JSON parsing, placeholder/runtime state machinery, or semantic-document parsing.
+The runtime-boundary audit rejects regressions where the SalixTorrent facades start reclaiming JSON parsing, placeholder/runtime state machinery, or semantic-document parsing.
 
 ---
 
-## 7. Translation-memory boundary introduced in Stage 10
+## 7. Translation-memory storage boundary
 
 Translation memory is now explicitly source-locale aware:
 
 ```text
 TranslationMemoryStore
         |
-        +-- JsonTranslationMemory(source_locale="en-AU")   current project
+        +-- JsonTranslationMemory(source_locale="en-AU")       default/reference project store
         |
-        +-- JsonTranslationMemory(source_locale="fr-FR")   supported contract
+        +-- JsonTranslationMemory(source_locale="fr-FR")       supported generic contract
         |
-        +-- SQLiteTranslationMemory(...)                    future SalixORM backend
+        +-- SalixORMTranslationMemory(SQLite file / URL)        optional SalixORM development backend
 ```
 
 A memory file cannot be silently merged into another memory with a different canonical source locale. Cross-source-locale merge attempts fail rather than reinterpreting hashes under the wrong source language.
+
+The SalixORM integration makes the storage seam concrete: provider/pipeline code obtains a `TranslationMemoryStore` through one development factory, while the SalixORM adapter stages writes until `save()` and persists them in one explicit transaction. JSON remains the default/reference implementation; storage choice does not enter runtime localization.
 
 ---
 
@@ -243,36 +258,37 @@ google
 
 or contain SalixTorrent product branding.
 
-The audit is intentionally small and strict. It is not a generic linter; it protects the extraction boundary that Stage 10 declares.
+The audit is intentionally small and strict. It is not a generic linter; it protects the declared extraction boundary.
 
 Commands:
 
 ```bat
 python tools\localization\build_locales.py --framework-report
 python tools\localization\build_locales.py --framework-audit
-python tools\localization\build_locales.py --stage10-check
+python tools\localization\build_locales.py --framework-check
 ```
 
 Windows one-shot validation:
 
 ```bat
-tools\localization\stage10_validate_framework_readiness.bat
+tools\localization\validate_framework_extraction.bat
 ```
 
 ---
 
 ## 9. What is deliberately deferred
 
-Stage 10 does **not**:
+The SalixORM storage integration still does **not**:
 
 - create the umbrella framework repository;
 - rename SalixTorrent packages prematurely;
-- make SalixTorrent depend on SalixORM;
-- replace JSON translation memory with SQLite;
-- add an Argos/local-LLM provider;
+- make ordinary SalixTorrent runtime localization depend on SalixORM;
+- remove the deterministic JSON translation-memory reference/default backend;
+- switch the project default memory backend to SalixORM before application mileage;
+- add another offline translation-provider implementation;
 - change runtime locale behavior;
-- resume Stage 6B machine-translation population;
-- perform Stage 8B human language review.
+- resume machine-translation population;
+- perform manual language review.
 
 Those tasks should happen only when their dependencies and extraction boundaries are mature.
 
@@ -282,12 +298,13 @@ Those tasks should happen only when their dependencies and extraction boundaries
 
 Recommended order after the contracts have remained stable in the reference application:
 
-1. Extract `framework.py`, `runtime.py`, `semantic.py` and `pseudo.py` into the umbrella framework.
-2. Extract source/placeholder contracts and translation-memory interfaces into framework development tooling.
-3. Replace SalixTorrent's generic-module imports with the framework package while keeping locale/content data and thin adapters in SalixTorrent.
-4. Adapt review/extraction tooling to a project profile instead of repository constants.
-6. Add the SalixORM-backed translation-memory storage adapter when SalixORM is stable.
-7. Add optional offline/provider plugins independently of the runtime.
+1. Keep exercising both JSON and SalixORM translation-memory implementations in SalixTorrent development tooling; convert any real defect into a storage-contract regression.
+2. Extract `framework.py`, `runtime.py`, `semantic.py` and `pseudo.py` into the umbrella framework when the repository boundary is intentionally created.
+3. Extract source/placeholder contracts and the generic translation-memory interface/JSON reference implementation into framework development tooling.
+4. Keep the SalixORM adapter as an optional storage plugin/adapter rather than making the generic runtime depend on an ORM.
+5. Replace SalixTorrent's generic-module imports with the framework package while keeping locale/content data and thin application adapters in SalixTorrent.
+6. Adapt review/extraction tooling to a project profile instead of repository constants.
+7. Add optional translation-provider plugins independently of the runtime.
 8. Only then remove compatibility copies from SalixTorrent.
 
 At every step SalixTorrent remains the regression/reference application.
@@ -309,4 +326,4 @@ At every step SalixTorrent remains the regression/reference application.
 
 ---
 
-**Stage 11 principle:** prove reusable runtime behavior behind injected application policy before physically splitting repositories.
+**Storage-integration principle:** prove storage interchangeability and transactional durability behind the generic memory contract before changing defaults or physically splitting repositories.

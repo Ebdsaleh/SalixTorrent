@@ -1,4 +1,4 @@
-"""Phase-12 Stage-6 locale-generation preflight and reporting helpers.
+"""Locale-generation preflight and reporting helpers.
 
 These helpers are development-only.  They never run from SalixTorrent itself
 and never persist credentials, access tokens, or credential file paths.
@@ -83,7 +83,7 @@ def google_doctor(
 
     ``probe=False`` is entirely local.  ``probe=True`` performs one tiny
     authenticated Translation request so API enablement/model access can be
-    verified before the full Stage-6 generation run.
+    verified before a full locale-generation run.
     """
     client_library = False
     auth_library = False

@@ -20,11 +20,13 @@ from typing import Dict, Iterable
 try:
     from .contracts import placeholder_names as placeholders, source_hash
     from .provider_registry import TranslationProvider, create_provider
-    from .translation_memory import JsonTranslationMemory, memory_entry, resolve_memory_path
+    from .translation_memory import JsonTranslationMemory, merge_memory_stores, memory_entry
+    from .translation_memory_factory import create_translation_memory_store
 except ImportError:  # direct script execution
     from contracts import placeholder_names as placeholders, source_hash
     from provider_registry import TranslationProvider, create_provider
-    from translation_memory import JsonTranslationMemory, memory_entry, resolve_memory_path
+    from translation_memory import JsonTranslationMemory, merge_memory_stores, memory_entry
+    from translation_memory_factory import create_translation_memory_store
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -255,7 +257,7 @@ def _catalog_strings(locale: str, catalog: str) -> Dict[str, str]:
 def _manual_override_records(locale: str) -> Dict[str, Dict[str, dict]]:
     """Load authoritative manual-review records without discarding metadata.
 
-    Legacy string values remain supported. Stage 8A writes rich records carrying
+    Legacy string values remain supported. Review tooling writes rich records carrying
     source hashes, review state, lock state, reviewer notes and timestamps.
     """
     raw = _load_json(OVERRIDES_ROOT / f"{locale}.json", {})
@@ -330,8 +332,8 @@ def _load_cache() -> dict:
     if raw.get("_meta", {}).get("schema") == CACHE_SCHEMA and isinstance(raw.get("entries"), dict):
         return raw
 
-    # Stage-1/4 used a flat ``locale:catalog:key`` cache.  Migrate it in memory
-    # so old working copies remain compatible with Stage 5.
+    # Earlier localization tooling used a flat ``locale:catalog:key`` cache.  Migrate it in memory
+    # so old working copies remain compatible with the current translation pipeline.
     migrated = _new_cache()
     entries = migrated["entries"]
     for flat_key, value in raw.items():
@@ -405,7 +407,7 @@ def _chunks(
         if item_size > max_chars:
             raise ValueError(
                 f"Localization entry {item[0]!r} is {item_size} characters; "
-                f"the Stage-5 synchronous translation batch limit is {max_chars}."
+                f"the synchronous translation batch limit is {max_chars}."
             )
         if batch and (size + item_size > max_chars or len(batch) >= max_items):
             yield batch
@@ -416,14 +418,23 @@ def _chunks(
         yield batch
 
 
-def _memory_store(memory_path: str | os.PathLike[str] | None = None) -> JsonTranslationMemory:
-    return JsonTranslationMemory(
-        resolve_memory_path(memory_path, cache_path=CACHE_PATH)
+def _memory_store(
+    memory_path: str | os.PathLike[str] | None = None,
+    *,
+    memory_backend: str | None = None,
+    memory_url: str | None = None,
+):
+    return create_translation_memory_store(
+        backend=memory_backend,
+        memory_path=memory_path,
+        memory_url=memory_url,
+        cache_path=CACHE_PATH,
+        source_locale=SOURCE_LOCALE,
     )
 
 
 def bootstrap_translation_cache(*, write: bool = True) -> dict[str, int]:
-    """Adopt pre-Stage-5 bundled translations into the key cache once."""
+    """Adopt pre-cache bundled translations into the key cache once."""
     cache = _load_cache()
     stats: dict[str, int] = {}
     for locale in sorted(TARGET_CODES):
@@ -456,6 +467,8 @@ def bootstrap_translation_cache(*, write: bool = True) -> dict[str, int]:
 def bootstrap_translation_memory(
     *,
     memory_path: str | os.PathLike[str] | None = None,
+    memory_backend: str | None = None,
+    memory_url: str | None = None,
     write: bool = True,
 ) -> dict[str, int]:
     """Seed provider-neutral exact-source memory from current hash-valid cache.
@@ -466,7 +479,9 @@ def bootstrap_translation_memory(
     Help and Glossary semantic domains separate.
     """
     cache = _load_cache()
-    memory = _memory_store(memory_path)
+    memory = _memory_store(
+        memory_path, memory_backend=memory_backend, memory_url=memory_url
+    )
     stats: dict[str, int] = {}
     for locale in sorted(TARGET_CODES):
         adopted = 0
@@ -505,24 +520,39 @@ def bootstrap_translation_memory(
 
 def translation_memory_status(
     memory_path: str | os.PathLike[str] | None = None,
+    *,
+    memory_backend: str | None = None,
+    memory_url: str | None = None,
 ):
-    return _memory_store(memory_path).stats()
+    return _memory_store(
+        memory_path, memory_backend=memory_backend, memory_url=memory_url
+    ).stats()
 
 
 def translation_memory_audit(
     memory_path: str | os.PathLike[str] | None = None,
+    *,
+    memory_backend: str | None = None,
+    memory_url: str | None = None,
 ):
-    return _memory_store(memory_path).audit()
+    return _memory_store(
+        memory_path, memory_backend=memory_backend, memory_url=memory_url
+    ).audit()
 
 
 def merge_translation_memory(
     source_path: str | os.PathLike[str],
     *,
     memory_path: str | os.PathLike[str] | None = None,
+    memory_backend: str | None = None,
+    memory_url: str | None = None,
     write: bool = True,
 ) -> dict[str, int]:
-    memory = _memory_store(memory_path)
-    result = memory.merge_from(source_path)
+    memory = _memory_store(
+        memory_path, memory_backend=memory_backend, memory_url=memory_url
+    )
+    source = JsonTranslationMemory(source_path, source_locale=SOURCE_LOCALE)
+    result = merge_memory_stores(memory, source)
     if write and result["conflicts"] == 0:
         memory.save()
     return result
@@ -543,12 +573,16 @@ def translation_plan(
     *,
     force: bool = False,
     memory_path: str | os.PathLike[str] | None = None,
+    memory_backend: str | None = None,
+    memory_url: str | None = None,
 ) -> TranslationStats:
     """Return a deterministic plan without loading provider libraries or writing."""
     if locale not in TARGET_CODES:
         raise ValueError(f"Unsupported translation target {locale!r}")
     cache = _load_cache()
-    memory = _memory_store(memory_path)
+    memory = _memory_store(
+        memory_path, memory_backend=memory_backend, memory_url=memory_url
+    )
     override_records = _manual_override_records(locale)
     cached = memory_hits = overridden = would_translate = 0
     for catalog in CATALOGS:
@@ -604,6 +638,8 @@ def translate_locale(
     provider: TranslationProvider | None = None,
     provider_name: str = "google-cloud",
     memory_path: str | os.PathLike[str] | None = None,
+    memory_backend: str | None = None,
+    memory_url: str | None = None,
 ) -> dict[str, int | str]:
     """Build one locale from overrides/cache/memory and an optional provider.
 
@@ -614,10 +650,18 @@ def translate_locale(
         raise ValueError(f"Unsupported translation target {locale!r}")
 
     if dry_run:
-        return translation_plan(locale, force=force, memory_path=memory_path).as_dict()
+        return translation_plan(
+            locale,
+            force=force,
+            memory_path=memory_path,
+            memory_backend=memory_backend,
+            memory_url=memory_url,
+        ).as_dict()
 
     cache = _load_cache()
-    memory = _memory_store(memory_path)
+    memory = _memory_store(
+        memory_path, memory_backend=memory_backend, memory_url=memory_url
+    )
     override_records = _manual_override_records(locale)
     _prune_locale_cache(cache, locale)
     catalog_payloads: dict[str, dict] = {}

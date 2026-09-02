@@ -24,7 +24,7 @@ if not exist "%PYTHON%" (
 )
 
 echo ============================================================
-echo  SalixTorrent Phase 12 Stage 7 - Localization Hardening
+echo  SalixTorrent Offline Localization Validation
 echo ============================================================
 echo Python: %PYTHON%
 "%PYTHON%" --version
@@ -38,9 +38,9 @@ echo [2/3] Verifying deterministic extraction state...
 "%PYTHON%" tools\localization\build_locales.py --check || exit /b 1
 
 echo.
-echo [3/3] Running offline Stage 7 hardening checks...
-"%PYTHON%" tools\localization\build_locales.py --stage7-check || exit /b 1
+echo [3/3] Running offline localization checks...
+"%PYTHON%" tools\localization\build_locales.py --offline-validation-check || exit /b 1
 
 echo.
-echo Stage 7 localization hardening: OK
+echo Offline localization validation: OK
 exit /b 0

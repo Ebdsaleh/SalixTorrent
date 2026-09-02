@@ -14,9 +14,9 @@ except ImportError:  # direct script execution
     from contracts import placeholder_names
 
 try:
-    from .stage7_support import catalog_hash, locale_manifest_drift
+    from .localization_validation import catalog_hash, locale_manifest_drift
 except ImportError:  # direct script execution
-    from stage7_support import catalog_hash, locale_manifest_drift
+    from localization_validation import catalog_hash, locale_manifest_drift
 
 ROOT = Path(__file__).resolve().parents[2]
 LOCALE_ROOT = ROOT / "app" / "localization" / "locales"
@@ -26,7 +26,7 @@ CATALOGS = ("ui", "help", "glossary")
 
 
 def placeholders(text: str) -> set[str]:
-    """Compatibility alias for the shared Stage-4 placeholder contract."""
+    """Compatibility alias for the shared localization placeholder contract."""
     return placeholder_names(text)
 
 
@@ -170,7 +170,7 @@ def validate_translation_freshness(locale: str, catalog: str, source: Dict[str, 
 
 
 def validate_manual_overrides(locale: str, catalog: str, source: Dict[str, str], target: Dict[str, str]) -> ValidationReport:
-    """Validate Stage-8 reviewed/locked override metadata and contracts."""
+    """Validate reviewed/locked override metadata and contracts."""
     report = ValidationReport()
     if locale == CANONICAL:
         return report

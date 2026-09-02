@@ -1,6 +1,6 @@
 """Extract SalixTorrent's canonical en-AU localization catalogs.
 
-Stage 4 makes extraction reproducible and auditable. Only explicit literal
+Localization extraction is reproducible and auditable. Only explicit literal
 ``tr(key, source_text, ...)`` calls, renderer-neutral semantic Help/Glossary
 sources, stable presentation-value sources, and the explicit ``ui_static``
 source are included. Arbitrary Python string literals are never translated.
@@ -186,7 +186,7 @@ def extract_python_ui_records(paths: Iterable[Path]) -> tuple[dict[str, Extracte
 
 
 def extract_python_ui_strings(paths: Iterable[Path]) -> Tuple[Dict[str, str], Dict[str, list[str]]]:
-    """Compatibility wrapper returning the Stage-1/2 public tuple shape."""
+    """Compatibility wrapper returning the original public tuple shape."""
     records, _dynamic = extract_python_ui_records(paths)
     strings = {key: entry.text for key, entry in records.items()}
     sources = {

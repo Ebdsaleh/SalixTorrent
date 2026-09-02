@@ -1,6 +1,6 @@
 """Offline translation review/provenance tooling for SalixTorrent.
 
-Stage 8A deliberately separates *review state* from the translation provider.
+Translation review deliberately separates *review state* from the translation provider.
 Machine/provider output, seeded translations, and human-reviewed overrides all
 flow through one deterministic report/export/import contract.  Runtime locale
 files remain ordinary JSON and SalixTorrent never needs this module at runtime.

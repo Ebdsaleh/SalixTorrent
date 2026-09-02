@@ -1162,7 +1162,7 @@ On runtime locale failure:
 
 ## 32. Phase 12 Implementation Order
 
-### Stage 1 - Localization Foundation
+### Localization Foundation
 
 - [x] Add `LocalizationManager`
 - [x] Define supported locale metadata
@@ -1172,7 +1172,7 @@ On runtime locale failure:
 - [x] Add system-locale detection
 - [x] Add diagnostics fields
 
-### Stage 2 - UI String Migration
+### UI String Migration
 
 - [x] Main menus
 - [x] torrent list/view
@@ -1186,13 +1186,13 @@ On runtime locale failure:
 - [x] Create Torrent
 - [x] CLI human-facing text
 
-**Stage 2 status (2026-09-01): implementation complete.** Primary direct Dear
+**Status (2026-09-01): implementation complete.** Primary direct Dear
 PyGui strings are localization-aware and stable internal values are translated
 only for presentation. The canonical UI catalog contains 649 entries. Target
 locale population is intentionally deferred until the canonical catalog is
 stable; missing target entries continue to fall back to bundled `en-AU`.
 
-### Stage 3 - Semantic Documentation Migration
+### Semantic Documentation Migration
 
 - [x] Help content extracted from renderer assumptions
 - [x] Glossary content extracted
@@ -1200,17 +1200,17 @@ stable; missing target entries continue to fall back to bundled `en-AU`.
 - [x] locale-specific Help resources
 - [x] locale-specific Glossary resources
 
-**Stage 3 status (2026-09-01): implementation complete.** Canonical Help and
+**Status (2026-09-01): implementation complete.** Canonical Help and
 Glossary authoring data now lives under `app/localization/content/` rather than
 in Dear PyGui view modules. Help topics, sections and Glossary terms use stable
 locale-neutral IDs; related-term links are validated against the Glossary; and
 locale catalogs carry only translated wording. Canonical `en-AU` Help/Glossary
 catalogs are generated from the semantic sources and frozen builds package both
 the source topology and locale overlays. Target-language document wording remains
-intentionally deferred to the translation-generation stage and therefore uses
+intentionally deferred to translation-generation work and therefore uses
 offline `en-AU` fallback for now.
 
-### Stage 4 - Development Extraction Tool
+### Development Extraction Tool
 
 - [x] Python AST extraction
 - [x] documentation extraction
@@ -1219,14 +1219,14 @@ offline `en-AU` fallback for now.
 - [x] duplicate-key detection
 - [x] placeholder discovery
 
-**Stage 4 checkpoint:** Canonical extraction is reproducible from authoritative
+**Extraction checkpoint:** Canonical extraction is reproducible from authoritative
 source rather than carrying old generated entries forward. `--check` performs a
 non-mutating drift check, while `--report` exposes source locations, safe key
 reuse, placeholder contracts, and dynamic `tr()` audit results. The committed
 `extraction_manifest.json` records deterministic source hashes and formatting
 contracts for all UI, Help, and Glossary keys.
 
-### Stage 5 - Translation Pipeline
+### Changed-Only Translation Pipeline
 
 - [x] Google Cloud Translation adapter
 - [x] `requirements-localization.txt`
@@ -1236,44 +1236,44 @@ contracts for all UI, Help, and Glossary keys.
 - [x] manual override support
 - [x] reviewed/locked translations
 
-**Stage 5 checkpoint:** Translation generation is development-only and defaults
+**Translation-pipeline checkpoint:** Translation generation is development-only and defaults
 to Google Cloud Translation v3 using `general/translation-llm`, with project
 discovery through explicit CLI/environment configuration or Application Default
 Credentials. `--dry-run` produces a non-mutating changed-only plan, while
 `--no-network` rebuilds only from source-hash-valid cache entries and manual
-overrides. Pre-Stage-5 bundled translations are adopted once into the deterministic
+overrides. Pre-cache bundled translations are adopted once into the deterministic
 cache; new/changed strings are batched for the provider, technical tokens and
 format placeholders are protected and validated, manual overrides are treated as
 reviewed/locked authority, and provider failures leave the previous packaged
-locale/cache intact. Stage 6 is responsible for actually generating the remaining
+locale/cache intact. Locale generation is responsible for actually generating the remaining
 locale-pack translations with development credentials.
 
-### Stage 6 - Generate Initial Locale Packs
+### Generate Initial Locale Packs
 
 - [x] local generation-status report
 - [x] Google client/auth/project preflight doctor
 - [x] optional authenticated one-request API probe
 - [x] stale-extraction guard before provider calls
 - [x] one-shot changed-only generation + strict validation
-- [x] tracked Windows Stage-6 generation helper
+- [x] tracked Windows locale-generation helper
 - [ ] `en-GB` generated and strict-validated
 - [ ] `en-US` generated and strict-validated
 - [ ] `pt-BR` generated and strict-validated
 - [ ] `fil-PH` generated and strict-validated
 
-**Stage 6 generation checkpoint:** The generation harness is implemented and can
+**Locale-generation checkpoint:** The generation harness is implemented and can
 be exercised before translation through `--status`, `--dry-run` and `--doctor`.
 The actual four locale packs are not marked complete until the credentialed
 `--generate-initial` run succeeds on a developer machine and strict validation
 reports zero missing translations. Google credentials are never committed or
 bundled with SalixTorrent.
 
-**Stage 6B population is currently on hold by design.** The provider-neutral/global
+**Machine-translation population is currently on hold by design.** The provider-neutral/global
 translation-memory direction is being evaluated before spending on bulk cloud
-translation. This does not block Stage 7 validation/packaging or Stage 8 review
+translation. This does not block validation/packaging or translation review
 infrastructure.
 
-### Stage 7 - Validation and Packaging
+### Validation and Packaging
 
 - [x] locale validator hardening
 - [x] placeholder/format validation
@@ -1286,26 +1286,26 @@ infrastructure.
 - [x] `en-XA` pseudo-locale expansion audit
 - [x] runtime missing/corrupt target-pack fallback diagnostics
 - [x] PyInstaller resource inclusion contract
-- [x] offline Stage-7 Windows validation helper
+- [x] offline Windows localization-validation helper
 - [ ] native standalone smoke validation
 - [ ] native portable smoke validation
 - [ ] native installer smoke validation
 
-**Stage 7 implementation checkpoint (2026-09-01):** Offline hardening is
+**Validation/packaging checkpoint (2026-09-01):** Offline hardening is
 implemented. `--extract` now regenerates both canonical catalogs and the runtime
-locale manifest; `--check` verifies both manifests; and `--stage7-check` combines
+locale manifest; `--check` verifies both manifests; and `--offline-validation-check` combines
 pseudo-localization, packaging-resource and hardened catalog validation without
 contacting any translation provider. Runtime target-catalog corruption is fail-closed
 to canonical `en-AU` and surfaced through structured catalog-health/fallback
-diagnostics. The remaining Stage-7 items are native Windows frozen/portable/installer
+diagnostics. The remaining validation/packaging items are native Windows frozen/portable/installer
 smoke tests on the developer machine, not architecture work.
 
-### Stage 8A - Translation Review Infrastructure
+### Translation Review Infrastructure
 
 - [x] provider-neutral review-state classification
 - [x] missing / review-needed / reviewed / locked / stale / invalid states
 - [x] deterministic offline review-bundle export
-- [x] canonical source hash and extraction-context handoff
+- [x] canonical source hash and extraction context
 - [x] reviewer notes and provenance metadata
 - [x] reviewed/locked promotion into rich manual overrides
 - [x] stale-source fail-closed import
@@ -1313,17 +1313,17 @@ smoke tests on the developer machine, not architecture work.
 - [x] reviewed override freshness validation
 - [x] tracked offline Windows review-audit helper
 
-**Stage 8A implementation checkpoint (2026-09-01):** Review infrastructure is
+**Review-infrastructure checkpoint (2026-09-01):** Review infrastructure is
 complete and fully offline. `--review-report` separates missing content from existing
 translations awaiting human review. `--review-export` produces an ignored working
 bundle containing source text/hash, placeholders, source locations, translation and
 provider provenance. Reviewers explicitly promote entries to `reviewed` or `locked`;
-`--review-import` validates the complete handoff before changing project artifacts and
+`--review-import` validates the complete review bundle before changing project artifacts and
 records accepted strings as source-hash-bound authoritative manual overrides. Canonical
 source changes therefore invalidate prior review rather than silently carrying approval
-forward. Stage 8A can remain green while Stage 6B translation population is paused.
+forward. Review infrastructure can remain green while machine-translation population is paused.
 
-### Stage 8B - Manual Language Review
+### Manual Language Review
 
 - [ ] warnings
 - [ ] confirmations
@@ -1333,11 +1333,11 @@ forward. Stage 8A can remain green while Stage 6B translation population is paus
 - [ ] Glossary
 - [ ] high-visibility UI
 
-**Stage 8B is content-dependent and remains on hold with Stage 6B.** The review
+**Manual language review is content-dependent and remains on hold with machine-translation population.** The review
 infrastructure is ready; actual language review begins once target locale packs contain
 the strings to be reviewed.
 
-### Stage 9 - Provider-Neutral Translation Memory Foundation
+### Provider-Neutral Translation Memory Foundation
 
 - [x] provider-neutral translation-provider contract/registry
 - [x] lazy Google Cloud provider registration
@@ -1352,10 +1352,10 @@ the strings to be reviewed.
 - [x] configurable project/shared memory path
 - [x] no-network translation-memory reuse
 - [x] provider/memory diagnostics and Windows validation helper
-- [ ] future SQLite/SalixORM translation-memory backend
+- [x] optional SQLite/SalixORM translation-memory backend (implemented by the SalixORM storage integration)
 - [ ] future offline/local translation provider adapter
 
-**Stage 9 implementation checkpoint (2026-09-01):** The development translation
+**Translation-memory checkpoint (2026-09-01):** The development translation
 pipeline no longer treats the Google/key cache as the long-term reusable architecture.
 `translation_cache.json` remains the SalixTorrent key-level incremental cache, while
 `translation_memory.json` is an exact-source memory keyed by target locale, semantic
@@ -1364,13 +1364,13 @@ catalog and canonical source hash. The checked-in project memory bootstraps the 
 Translation planning/generation now checks reviewed overrides, the key cache, and then
 translation memory before a provider is contacted. Memory files can be relocated via
 `SALIX_LOCALIZATION_MEMORY`/`--memory-path` or merged fail-closed from another compatible
-memory. The initial JSON backend is intentionally transitional: a future SalixORM/SQLite
-store can implement the same service boundary without coupling SalixTorrent runtime
-localization to an ORM or translation provider. Stage 6B and Stage 8B remain paused.
+memory. JSON remains the default/reference backend; the SalixORM integration now provides an optional
+SalixORM/SQLite store behind the same service boundary without coupling SalixTorrent runtime
+localization to an ORM or translation provider. Machine-translation population and manual language review remain paused.
 
 ---
 
-### Stage 10 - Framework Extraction Readiness
+### Framework Extraction Readiness
 
 - [x] provider-neutral `LocaleDescriptor` and `LocalizationProfile` contracts
 - [x] storage-neutral runtime `CatalogRepository` contract
@@ -1382,11 +1382,11 @@ localization to an ORM or translation provider. Stage 6B and Stage 8B remain pau
 - [x] fail-closed cross-source-locale memory loading/merge behavior
 - [x] offline framework-extraction dependency/product-coupling audit
 - [x] framework extraction map/report
-- [x] tracked Windows Stage-10 validation helper
+- [x] tracked Windows framework-validation helper
 - [ ] physically extract localization components into the future umbrella framework
-- [ ] replace JSON translation-memory storage with a future SQLite/SalixORM adapter
+- [x] add optional SQLite/SalixORM translation-memory storage behind the generic store contract (SalixORM adapter)
 
-**Stage 10 implementation checkpoint (2026-09-01):** SalixTorrent remains the
+**Framework-extraction checkpoint (2026-09-01):** SalixTorrent remains the
 reference application, but the first reusable localization contracts are now explicitly
 product/GUI/provider neutral. `LocalizationManager` remains the compatibility facade;
 JSON catalog parsing is delegated to a generic repository and SalixTorrent bundle-path
@@ -1394,13 +1394,13 @@ policy is isolated in `app.localization.profile`. The current translation memory
 defaults to `en-AU`, but the storage contract accepts other canonical source locales and
 refuses accidental cross-source-locale merges. `framework_audit.py` protects the modules
 that are intended to be extractable unchanged and records the application/provider
-adapters that still require injection work. Physical repository extraction and the
-SalixORM-backed memory store remain deliberately deferred. Stage 6B and Stage 8B remain
-paused.
+adapters that still require injection work. The SalixORM storage integration adds the SalixORM-backed memory store
+without changing the six-module extraction boundary. Physical repository extraction remains
+deliberately deferred. Machine-translation population and manual language review remain paused.
 
 ---
 
-### Stage 11 - Generic Runtime Kernel and Semantic Documentation Services
+### Generic Runtime Kernel and Semantic Documentation Services
 
 - [x] framework-neutral `LocalizationRuntime`
 - [x] injected `LocalizationProfile` / `CatalogRepository` / locale resolver
@@ -1415,12 +1415,12 @@ paused.
 - [x] SalixTorrent `documents.py` reduced to content-path/runtime adapter
 - [x] framework extraction audit expanded to runtime/semantic modules
 - [x] runtime/semantic facade-boundary audit
-- [x] tracked Windows Stage-11 validation helper
+- [x] tracked Windows runtime-boundary validation helper
 - [ ] physical extraction into the future umbrella framework repository
 - [ ] project-profile injection for development extraction/review tooling
-- [ ] future SalixORM translation-memory storage adapter
+- [x] optional SalixORM translation-memory storage adapter (implemented by the SalixORM storage integration)
 
-**Stage 11 implementation checkpoint (2026-09-01):** Runtime localization behavior is
+**Runtime-kernel checkpoint (2026-09-01):** Runtime localization behavior is
 no longer implemented by the SalixTorrent singleton itself. `LocalizationRuntime` owns
 catalog loading, canonical fallback, formatting contracts, pseudo transformation hooks and
 structured diagnostics through injected framework contracts. The historical
@@ -1429,8 +1429,48 @@ Semantic Help/Glossary parsing and locale overlays are likewise provided by gene
 repository/source/service objects, while `documents.py` supplies only SalixTorrent content
 paths and the active translator. The extraction audit now protects six immediately reusable
 modules and verifies that application facades do not reclaim generic responsibilities.
-Physical repository extraction, SalixORM storage integration, Stage 6B population and Stage
-8B review remain deliberately deferred.
+The SalixORM integration implements storage as a development adapter outside those generic modules.
+Physical repository extraction, machine-translation population and manual language review remain deliberately
+deferred.
+
+---
+
+### SalixORM Translation-Memory Storage Adapter
+
+- [x] complete `TranslationMemoryStore` contract covers lookup/write/iteration/stats/audit/save
+- [x] shared backend-neutral entry validation and fail-closed store merge semantics
+- [x] centralized JSON/SalixORM development-memory factory
+- [x] JSON remains the default/reference backend and historical memory-path behavior remains compatible
+- [x] separate SalixORM backend and database-URL configuration
+- [x] file-backed SQLite store implemented through released SalixORM `v0.2.0`
+- [x] explicit SalixORM migration revision for translation-memory physical schema
+- [x] recoverable empty-ledger/schema-only first-initialization states with fail-closed metadata/data inconsistency
+- [x] semantic memory kind/schema/source-locale metadata persisted and validated
+- [x] unique target-locale + catalog + source-hash storage identity
+- [x] persisted source/hash/placeholder contract revalidation
+- [x] staged `put()` plus explicit transactional `save()` preserves locale-generation atomicity
+- [x] JSON-to-SalixORM import/merge with non-destructive conflict handling
+- [x] all 432 current JSON memory entries round-trip exactly through SalixORM
+- [x] no-network translation pipeline reuse works with SalixORM storage
+- [x] provider failure cannot partially persist staged SalixORM memory
+- [x] offline SalixORM parity/audit command and tracked Windows validation helper
+- [x] SalixORM remains optional development tooling rather than a runtime localization dependency
+- [ ] collect application mileage before considering any default-backend change
+
+**SalixORM integration checkpoint (2026-09-02):** The storage-neutral translation-memory
+boundary is now exercised by two implementations. Deterministic JSON remains the checked-in
+reference/default store. `SalixORMTranslationMemory` provides file-backed SQLite persistence
+through SalixORM `v0.2.0`, owns an explicit migration revision, validates semantic metadata and
+reopens persisted candidates through the same source/hash/placeholder contract. The provider
+pipeline selects storage at one factory seam rather than constructing a JSON store directly.
+
+The adapter deliberately stages `put()` operations and commits pending entries only from
+`save()` inside one explicit SalixORM Session transaction. This preserves the existing
+translation pipeline's all-or-nothing locale update boundary: failed provider work or failed
+translation-contract validation does not leave partial new memory rows behind. The offline
+SalixORM parity validator imports and reopens all 432 current project-memory entries with exact parity.
+Runtime localization remains entirely offline/provider-independent and does not import SalixORM.
+Physical framework extraction, machine-translation population and manual language review remain deferred.
 
 ---
 

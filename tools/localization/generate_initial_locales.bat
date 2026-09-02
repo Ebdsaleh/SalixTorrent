@@ -28,7 +28,7 @@ if /I "%~1"=="--probe" goto :probe
 if not "%~1"=="" goto :usage
 
 echo ============================================================
-echo  SalixTorrent Phase 12 Stage 6 - Locale Generation Preflight
+echo  SalixTorrent Locale Generation Preflight
 echo ============================================================
 echo Python: %PYTHON%
 "%PYTHON%" --version
@@ -67,31 +67,31 @@ if not "%DOCTOR_RC%"=="0" (
     echo      set SALIX_T_GOOGLE_PROJECT=YOUR_PROJECT_ID
     echo.
     echo 3. Re-run this preflight, then optionally test one tiny API call with:
-    echo      tools\localization\stage6_generate_locales.bat --probe
+    echo      tools\localization\generate_initial_locales.bat --probe
     echo.
     echo 4. Generate all initial locale packs with:
-    echo      tools\localization\stage6_generate_locales.bat --run
+    echo      tools\localization\generate_initial_locales.bat --run
     exit /b %DOCTOR_RC%
 )
 
 echo Google setup looks ready.
 echo Optional authenticated probe:
-echo     tools\localization\stage6_generate_locales.bat --probe
+echo     tools\localization\generate_initial_locales.bat --probe
 echo.
 echo Generate all four initial locale packs:
-echo     tools\localization\stage6_generate_locales.bat --run
+echo     tools\localization\generate_initial_locales.bat --run
 exit /b 0
 
 :probe
 echo ============================================================
-echo  Stage 6 authenticated Translation API probe
+echo  Authenticated Translation API probe
 echo ============================================================
 "%PYTHON%" tools\localization\build_locales.py --doctor --probe
 exit /b %ERRORLEVEL%
 
 :run
 echo ============================================================
-echo  SalixTorrent Phase 12 Stage 6 - Generate Initial Locales
+echo  SalixTorrent Initial Locale Generation
 echo ============================================================
 echo.
 echo This command performs billable Google Cloud Translation requests for
@@ -112,7 +112,7 @@ if errorlevel 1 (
 if errorlevel 1 exit /b %ERRORLEVEL%
 
 echo.
-echo Stage 6 generation completed. Final checks:
+echo Locale generation completed. Final checks:
 "%PYTHON%" tools\localization\build_locales.py --check || exit /b 1
 "%PYTHON%" tools\localization\build_locales.py --validate --strict || exit /b 1
 "%PYTHON%" tools\localization\build_locales.py --status || exit /b 1
@@ -120,12 +120,12 @@ exit /b 0
 
 :usage
 echo Usage:
-echo     tools\localization\stage6_generate_locales.bat
+echo     tools\localization\generate_initial_locales.bat
 echo         Safe local preflight; no Translation API calls.
 echo.
-echo     tools\localization\stage6_generate_locales.bat --probe
+echo     tools\localization\generate_initial_locales.bat --probe
 echo         One tiny authenticated API request to verify access.
 echo.
-echo     tools\localization\stage6_generate_locales.bat --run
+echo     tools\localization\generate_initial_locales.bat --run
 echo         Generate all initial locale packs and strict-validate them.
 exit /b 2

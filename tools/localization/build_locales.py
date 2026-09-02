@@ -1,4 +1,4 @@
-"""SalixTorrent Phase-12 localization build orchestrator."""
+"""SalixTorrent localization development/build orchestrator."""
 
 from __future__ import annotations
 
@@ -23,8 +23,8 @@ try:
         translation_memory_status,
         translation_plan,
     )
-    from .stage6_support import all_generation_status, google_doctor
-    from .stage7_support import (
+    from .locale_generation import all_generation_status, google_doctor
+    from .localization_validation import (
         locale_manifest_drift,
         packaging_report,
         pseudo_audit,
@@ -48,8 +48,8 @@ except ImportError:  # direct script execution
         translation_memory_status,
         translation_plan,
     )
-    from stage6_support import all_generation_status, google_doctor
-    from stage7_support import (
+    from locale_generation import all_generation_status, google_doctor
+    from localization_validation import (
         locale_manifest_drift,
         packaging_report,
         pseudo_audit,
@@ -83,10 +83,23 @@ def _print_extraction_report() -> None:
                 print(f"    {catalog}:{key} -> {locations}")
 
 
-def _print_translation_plan(locales: list[str], *, force: bool = False, memory_path=None) -> None:
+def _print_translation_plan(
+    locales: list[str],
+    *,
+    force: bool = False,
+    memory_path=None,
+    memory_backend=None,
+    memory_url=None,
+) -> None:
     print("Translation plan (no network, no files changed):")
     for locale in locales:
-        stats = translation_plan(locale, force=force, memory_path=memory_path)
+        stats = translation_plan(
+            locale,
+            force=force,
+            memory_path=memory_path,
+            memory_backend=memory_backend,
+            memory_url=memory_url,
+        )
         print(
             f"  {locale}: cached={stats.cached}, memory={stats.memory}, "
             f"overrides={stats.overridden}, would_translate={stats.would_translate}"
@@ -124,8 +137,10 @@ def _print_provider_report() -> None:
         print(f"  {item.name}: {mode}; {item.description}")
 
 
-def _print_memory_status(path=None) -> None:
-    stats = translation_memory_status(path)
+def _print_memory_status(path=None, *, backend=None, url=None) -> None:
+    stats = translation_memory_status(
+        path, memory_backend=backend, memory_url=url
+    )
     print("Translation memory:")
     print(f"  Path: {stats.path}")
     print(f"  Source locale: {stats.source_locale}")
@@ -182,8 +197,31 @@ def _print_google_doctor(report, *, probed: bool) -> None:
         print(f"  Authenticated API probe: {'OK' if report.probe_ok else 'FAILED'}")
     else:
         print("  Authenticated API probe: Not requested (local-only doctor run)")
-    print(f"  Ready for Stage 6: {'Yes' if report.ready else 'No'}")
+    print(f"  Ready for locale generation: {'Yes' if report.ready else 'No'}")
     print(f"  Detail: {report.detail}")
+
+
+def _run_salixorm_memory_audit() -> bool:
+    try:
+        if __package__:
+            from .salixorm_memory_audit import salixorm_memory_parity_audit
+        else:
+            from salixorm_memory_audit import salixorm_memory_parity_audit
+        audit = salixorm_memory_parity_audit()
+    except Exception as exc:
+        print(f"SalixORM translation-memory parity: FAILED ({exc})")
+        return False
+    if not audit.ok:
+        print("SalixORM translation-memory parity: FAILED")
+        for error in audit.errors:
+            print(f"ERROR: {error}")
+        return False
+    print(
+        "SalixORM translation-memory parity: OK "
+        f"(json={audit.json_entries}, salixorm={audit.salixorm_entries}, "
+        f"added={audit.added}, reused={audit.reused}, conflicts={audit.conflicts})"
+    )
+    return True
 
 
 def main(argv=None) -> int:
@@ -201,29 +239,32 @@ def main(argv=None) -> int:
     parser.add_argument("--status", action="store_true", help="Show packaged/cache completeness for the target locale packs")
     parser.add_argument("--doctor", action="store_true", help="Check local Google client/auth/project setup without translating")
     parser.add_argument("--probe", action="store_true", help="With --doctor, perform one tiny authenticated Translation API probe")
-    parser.add_argument("--generate-initial", action="store_true", help="Stage 6: translate selected initial locales and require strict completeness")
+    parser.add_argument("--generate-initial", action="store_true", help="Translate selected initial locales and require strict completeness")
     parser.add_argument("--manifest", action="store_true", help="Regenerate deterministic runtime locale metadata manifest")
     parser.add_argument("--package-check", action="store_true", help="Validate localization resources and PyInstaller packaging contract")
     parser.add_argument("--pseudo-check", action="store_true", help="Validate the in-memory en-XA pseudo-localization contract")
-    parser.add_argument("--stage7-check", action="store_true", help="Run Stage 7 offline hardening checks (drift, validation, packaging, pseudo locale)")
+    parser.add_argument("--offline-validation-check", action="store_true", help="Run the complete offline localization validation gate")
     parser.add_argument("--review-report", action="store_true", help="Show human-review/missing/stale status for target locale entries")
     parser.add_argument("--review-export", action="store_true", help="Export editable offline review bundle(s) for selected locale(s)")
     parser.add_argument("--review-export-path", help="Output file for --review-export (requires exactly one --locale)")
     parser.add_argument("--review-import", metavar="FILE", help="Import reviewed/locked entries from an offline review bundle")
-    parser.add_argument("--stage8-check", action="store_true", help="Run Stage 8A offline review/provenance infrastructure checks")
+    parser.add_argument("--review-check", action="store_true", help="Run offline translation review/provenance checks")
     parser.add_argument("--providers", action="store_true", help="List registered development translation providers")
     parser.add_argument("--provider", default="google-cloud", help="Translation provider name for network generation")
     parser.add_argument("--memory-status", action="store_true", help="Show provider-neutral translation-memory statistics")
     parser.add_argument("--memory-bootstrap", action="store_true", help="Seed translation memory from current hash-valid project cache")
-    parser.add_argument("--memory-path", help="Translation-memory JSON path (otherwise env/default beside cache)")
-    parser.add_argument("--memory-merge", metavar="FILE", help="Merge another compatible translation-memory JSON file")
-    parser.add_argument("--stage9-check", action="store_true", help="Run Stage 9 provider/memory infrastructure checks")
-    parser.add_argument("--framework-report", action="store_true", help="Show Stage 10 framework extraction map")
+    parser.add_argument("--memory-path", help="Translation-memory path for the selected backend")
+    parser.add_argument("--memory-backend", choices=("json", "salixorm"), help="Translation-memory storage backend (default: json or environment)")
+    parser.add_argument("--memory-url", help="SalixORM SQLite database URL; implies --memory-backend salixorm when backend is omitted")
+    parser.add_argument("--memory-merge", metavar="FILE", help="Merge a compatible translation-memory JSON file into the selected backend")
+    parser.add_argument("--memory-check", action="store_true", help="Run provider-neutral translation-memory checks")
+    parser.add_argument("--framework-report", action="store_true", help="Show the localization framework extraction map")
     parser.add_argument("--framework-audit", action="store_true", help="Audit extractable localization modules for app/GUI/provider coupling")
-    parser.add_argument("--stage10-check", action="store_true", help="Run Stage 10 framework-extraction readiness checks")
-    parser.add_argument("--runtime-boundary-audit", action="store_true", help="Audit Stage 11 generic runtime/semantic facade boundaries")
-    parser.add_argument("--stage11-check", action="store_true", help="Run Stage 11 generic runtime-kernel extraction checks")
-    parser.add_argument("--bootstrap-cache", action="store_true", help="Adopt current pre-Stage-5 locale entries into the source-hash cache")
+    parser.add_argument("--framework-check", action="store_true", help="Run localization framework-extraction readiness checks")
+    parser.add_argument("--runtime-boundary-audit", action="store_true", help="Audit generic runtime/semantic facade boundaries")
+    parser.add_argument("--runtime-check", action="store_true", help="Run generic runtime-kernel and semantic-service boundary checks")
+    parser.add_argument("--salixorm-memory-check", action="store_true", help="Run SalixORM translation-memory parity and storage checks")
+    parser.add_argument("--bootstrap-cache", action="store_true", help="Adopt existing packaged locale entries into the source-hash cache")
     parser.add_argument("--project-id", help="Google Cloud project ID/number (otherwise use environment/ADC discovery)")
     parser.add_argument("--location", default=None, help=f"Google Translation location (default: {DEFAULT_LOCATION})")
     parser.add_argument("--model", default=None, help=f"Google Translation model ID (default: {DEFAULT_MODEL})")
@@ -233,8 +274,8 @@ def main(argv=None) -> int:
     do_extract = args.extract or args.all
     do_translate = args.translate or args.all
     do_validate = args.validate or args.all
-    if not any((do_extract, do_translate, do_validate, args.check, args.report, args.bootstrap_cache, args.dry_run, args.status, args.doctor, args.generate_initial, args.manifest, args.package_check, args.pseudo_check, args.stage7_check, args.review_report, args.review_export, args.review_import, args.stage8_check, args.providers, args.memory_status, args.memory_bootstrap, args.memory_merge, args.stage9_check, args.framework_report, args.framework_audit, args.stage10_check, args.runtime_boundary_audit, args.stage11_check)):
-        parser.error("choose --extract, --check, --report, --translate, --validate, --bootstrap-cache, --dry-run, --status, --doctor, --generate-initial, --manifest, --package-check, --pseudo-check, --stage7-check, --review-report, --review-export, --review-import, --stage8-check, --providers, --memory-status, --memory-bootstrap, --memory-merge, --stage9-check, --framework-report, --framework-audit, --stage10-check, --runtime-boundary-audit, --stage11-check or --all")
+    if not any((do_extract, do_translate, do_validate, args.check, args.report, args.bootstrap_cache, args.dry_run, args.status, args.doctor, args.generate_initial, args.manifest, args.package_check, args.pseudo_check, args.offline_validation_check, args.review_report, args.review_export, args.review_import, args.review_check, args.providers, args.memory_status, args.memory_bootstrap, args.memory_merge, args.memory_check, args.framework_report, args.framework_audit, args.framework_check, args.runtime_boundary_audit, args.runtime_check, args.salixorm_memory_check)):
+        parser.error("choose --extract, --check, --report, --translate, --validate, --bootstrap-cache, --dry-run, --status, --doctor, --generate-initial, --manifest, --package-check, --pseudo-check, --offline-validation-check, --review-report, --review-export, --review-import, --review-check, --providers, --memory-status, --memory-bootstrap, --memory-merge, --memory-check, --framework-report, --framework-audit, --framework-check, --runtime-boundary-audit, --runtime-check, --salixorm-memory-check or --all")
 
     if args.dry_run and args.bootstrap_cache:
         parser.error("--dry-run and --bootstrap-cache cannot be combined")
@@ -252,6 +293,10 @@ def main(argv=None) -> int:
         parser.error("--review-export-path requires exactly one --locale")
     if args.review_import and (args.review_export or args.review_export_path):
         parser.error("--review-import cannot be combined with --review-export")
+
+    memory_backend = args.memory_backend
+    if args.memory_url and memory_backend is None:
+        memory_backend = "salixorm"
 
     if do_extract:
         for name, path in extract_all().items():
@@ -286,7 +331,11 @@ def main(argv=None) -> int:
         _print_framework_report()
 
     if args.memory_bootstrap:
-        stats = bootstrap_translation_memory(memory_path=args.memory_path)
+        stats = bootstrap_translation_memory(
+            memory_path=args.memory_path,
+            memory_backend=memory_backend,
+            memory_url=args.memory_url,
+        )
         for locale in sorted(stats):
             print(f"{locale}: seeded {stats[locale]} translation-memory entrie(s)")
 
@@ -294,6 +343,8 @@ def main(argv=None) -> int:
         merged = merge_translation_memory(
             args.memory_merge,
             memory_path=args.memory_path,
+            memory_backend=memory_backend,
+            memory_url=args.memory_url,
         )
         print(
             f"Translation memory merge: added={merged['added']}, "
@@ -304,7 +355,9 @@ def main(argv=None) -> int:
             return 9
 
     if args.memory_status:
-        _print_memory_status(args.memory_path)
+        _print_memory_status(
+            args.memory_path, backend=memory_backend, url=args.memory_url
+        )
 
     if args.status:
         _print_generation_status(locales)
@@ -344,12 +397,18 @@ def main(argv=None) -> int:
     if args.generate_initial:
         drift = extraction_drift()
         if drift:
-            print("Stage 6 generation refused: canonical extraction is stale.")
+            print("Locale generation refused: canonical extraction is stale.")
             for path in drift:
                 print(f"  stale/missing: {path}")
             print("Run: python tools\\localization\\build_locales.py --extract")
             return 3
-        _print_translation_plan(locales, force=args.force, memory_path=args.memory_path)
+        _print_translation_plan(
+            locales,
+            force=args.force,
+            memory_path=args.memory_path,
+            memory_backend=memory_backend,
+            memory_url=args.memory_url,
+        )
         for locale in locales:
             stats = translate_locale(
                 locale,
@@ -360,6 +419,8 @@ def main(argv=None) -> int:
                 model=args.model,
                 provider_name=args.provider,
                 memory_path=args.memory_path,
+                memory_backend=memory_backend,
+                memory_url=args.memory_url,
             )
             print(
                 f"{locale}: cached={stats['cached']}, memory={stats.get('memory', 0)}, "
@@ -375,11 +436,11 @@ def main(argv=None) -> int:
             print(f"ERROR: {error}")
         if not report.ok:
             print(
-                f"Stage 6 strict validation: FAILED "
+                f"Initial locale strict validation: FAILED "
                 f"({len(report.errors)} error(s), {len(report.warnings)} warning(s))"
             )
             return 2
-        print("Stage 6 strict validation: OK (all selected locale packs complete)")
+        print("Initial locale strict validation: OK (all selected locale packs complete)")
         _print_generation_status(locales)
 
     if args.bootstrap_cache:
@@ -388,7 +449,13 @@ def main(argv=None) -> int:
             print(f"{locale}: adopted {stats[locale]} existing translation(s) into cache")
 
     if args.dry_run:
-        _print_translation_plan(locales, force=args.force, memory_path=args.memory_path)
+        _print_translation_plan(
+            locales,
+            force=args.force,
+            memory_path=args.memory_path,
+            memory_backend=memory_backend,
+            memory_url=args.memory_url,
+        )
 
     if do_translate and not args.dry_run:
         for locale in locales:
@@ -401,6 +468,8 @@ def main(argv=None) -> int:
                 model=args.model,
                 provider_name=args.provider,
                 memory_path=args.memory_path,
+                memory_backend=memory_backend,
+                memory_url=args.memory_url,
             )
             print(
                 f"{locale}: cached={stats['cached']}, memory={stats.get('memory', 0)}, "
@@ -412,7 +481,7 @@ def main(argv=None) -> int:
     if do_translate and not args.dry_run:
         write_locale_manifest()
 
-    if args.pseudo_check or args.stage7_check:
+    if args.pseudo_check or args.offline_validation_check:
         pseudo = pseudo_audit()
         print(
             f"Pseudo-locale check: {'OK' if pseudo.ok else 'FAILED'} "
@@ -426,7 +495,7 @@ def main(argv=None) -> int:
                 print(f"ERROR: pseudo expansion contract failed: {key}")
             return 5
 
-    if args.package_check or args.stage7_check:
+    if args.package_check or args.offline_validation_check:
         package = packaging_report(["en-AU", *locales])
         for warning in package.warnings:
             print(f"WARNING: {warning}")
@@ -439,34 +508,34 @@ def main(argv=None) -> int:
         if not package.ok:
             return 6
 
-    if args.stage7_check:
+    if args.offline_validation_check:
         drift = extraction_drift()
         manifest_stale = locale_manifest_drift()
         if drift or manifest_stale:
-            print("Stage 7 drift check: FAILED")
+            print("Offline localization drift check: FAILED")
             for path in drift:
                 print(f"ERROR: stale/missing: {path}")
             if manifest_stale:
                 print("ERROR: stale/missing: app/localization/locales/manifest.json")
             return 3
-        print("Stage 7 drift check: OK")
+        print("Offline localization drift check: OK")
         report = validate_all(strict_missing=False, locales=["en-AU", *locales])
         for warning in report.warnings:
             print(f"WARNING: {warning}")
         for error in report.errors:
             print(f"ERROR: {error}")
         print(
-            f"Stage 7 validation: {'OK' if report.ok else 'FAILED'} "
+            f"Offline localization validation: {'OK' if report.ok else 'FAILED'} "
             f"({len(report.errors)} error(s), {len(report.warnings)} warning(s))"
         )
         if not report.ok:
             return 2
 
-    if args.stage8_check:
+    if args.review_check:
         drift = extraction_drift()
         manifest_stale = locale_manifest_drift()
         if drift or manifest_stale:
-            print("Stage 8A drift check: FAILED")
+            print("Translation review drift check: FAILED")
             for path in drift:
                 print(f"ERROR: stale/missing: {path}")
             if manifest_stale:
@@ -485,96 +554,135 @@ def main(argv=None) -> int:
             print(f"ERROR: {error}")
         ok = audit.ok and report.ok
         print(
-            f"Stage 8A review infrastructure: {'OK' if ok else 'FAILED'} "
+            f"Translation review infrastructure: {'OK' if ok else 'FAILED'} "
             f"({len(audit.errors) + len(report.errors)} error(s), "
             f"{len(audit.warnings) + len(report.warnings)} warning(s))"
         )
         if not ok:
             return 8
 
-    if args.stage9_check:
+    if args.memory_check:
         drift = extraction_drift()
         manifest_stale = locale_manifest_drift()
         if drift or manifest_stale:
-            print("Stage 9 drift check: FAILED")
+            print("Translation-memory drift check: FAILED")
             return 3
         descriptors = provider_descriptors()
         if not descriptors:
-            print("Stage 9 provider registry: FAILED (no providers registered)")
+            print("Translation provider registry: FAILED (no providers registered)")
             return 9
-        print(f"Stage 9 provider registry: OK ({len(descriptors)} provider(s))")
-        seeded = bootstrap_translation_memory(memory_path=args.memory_path, write=False)
+        print(f"Translation provider registry: OK ({len(descriptors)} provider(s))")
+        seeded = bootstrap_translation_memory(
+            memory_path=args.memory_path,
+            memory_backend=memory_backend,
+            memory_url=args.memory_url,
+            write=False,
+        )
         print(
-            "Stage 9 memory bootstrap audit: OK ("
+            "Translation memory bootstrap audit: OK ("
             + ", ".join(f"{locale}={count}" for locale, count in sorted(seeded.items()))
             + ")"
         )
-        audit = translation_memory_audit(args.memory_path)
+        audit = translation_memory_audit(
+            args.memory_path,
+            memory_backend=memory_backend,
+            memory_url=args.memory_url,
+        )
         if not audit.ok:
-            print("Stage 9 translation memory audit: FAILED")
+            print("Translation memory audit: FAILED")
             for error in audit.errors:
                 print(f"ERROR: {error}")
             return 9
-        print("Stage 9 translation memory audit: OK")
-        _print_memory_status(args.memory_path)
-        print("Stage 9 provider-neutral translation memory: OK")
+        print("Translation memory audit: OK")
+        _print_memory_status(
+            args.memory_path, backend=memory_backend, url=args.memory_url
+        )
+        print("Provider-neutral translation memory: OK")
 
-    if args.framework_audit and not (args.stage10_check or args.stage11_check):
+    if args.framework_audit and not (args.framework_check or args.runtime_check or args.salixorm_memory_check):
         if not _run_framework_audit():
             return 10
 
-    if args.runtime_boundary_audit and not args.stage11_check:
+    if args.runtime_boundary_audit and not (args.runtime_check or args.salixorm_memory_check):
         boundary_errors = runtime_boundary_audit()
         if boundary_errors:
-            print("Stage 11 runtime/semantic boundary: FAILED")
+            print("Localization runtime/semantic boundary: FAILED")
             for error in boundary_errors:
                 print(f"ERROR: {error}")
             return 11
-        print("Stage 11 runtime/semantic boundary: OK")
+        print("Localization runtime/semantic boundary: OK")
 
-    if args.stage10_check:
+    if args.framework_check:
         drift = extraction_drift()
         manifest_stale = locale_manifest_drift()
         if drift or manifest_stale:
-            print("Stage 10 drift check: FAILED")
+            print("Framework extraction drift check: FAILED")
             for path in drift:
                 print(f"ERROR: stale/missing: {path}")
             if manifest_stale:
                 print("ERROR: stale/missing: app/localization/locales/manifest.json")
             return 3
-        print("Stage 10 drift check: OK")
+        print("Framework extraction drift check: OK")
         if not _run_framework_audit():
             return 10
-        memory_audit = translation_memory_audit(args.memory_path)
+        memory_audit = translation_memory_audit(
+            args.memory_path,
+            memory_backend=memory_backend,
+            memory_url=args.memory_url,
+        )
         if not memory_audit.ok:
-            print("Stage 10 translation-memory boundary: FAILED")
+            print("Framework translation-memory boundary: FAILED")
             for error in memory_audit.errors:
                 print(f"ERROR: {error}")
             return 10
-        print("Stage 10 translation-memory boundary: OK")
-        print("Stage 10 framework extraction readiness: OK")
+        print("Framework translation-memory boundary: OK")
+        print("Framework extraction readiness: OK")
 
-    if args.stage11_check:
+    if args.runtime_check:
         drift = extraction_drift()
         manifest_stale = locale_manifest_drift()
         if drift or manifest_stale:
-            print("Stage 11 drift check: FAILED")
+            print("Runtime-kernel drift check: FAILED")
             for path in drift:
                 print(f"ERROR: stale/missing: {path}")
             if manifest_stale:
                 print("ERROR: stale/missing: app/localization/locales/manifest.json")
             return 3
-        print("Stage 11 drift check: OK")
+        print("Runtime-kernel drift check: OK")
         if not _run_framework_audit():
             return 11
         boundary_errors = runtime_boundary_audit()
         if boundary_errors:
-            print("Stage 11 runtime/semantic boundary: FAILED")
+            print("Localization runtime/semantic boundary: FAILED")
             for error in boundary_errors:
                 print(f"ERROR: {error}")
             return 11
-        print("Stage 11 runtime/semantic boundary: OK")
-        print("Stage 11 generic localization runtime kernel: OK")
+        print("Localization runtime/semantic boundary: OK")
+        print("Generic localization runtime kernel: OK")
+
+    if args.salixorm_memory_check:
+        drift = extraction_drift()
+        manifest_stale = locale_manifest_drift()
+        if drift or manifest_stale:
+            print("SalixORM memory integration drift check: FAILED")
+            for path in drift:
+                print(f"ERROR: stale/missing: {path}")
+            if manifest_stale:
+                print("ERROR: stale/missing: app/localization/locales/manifest.json")
+            return 3
+        print("SalixORM memory integration drift check: OK")
+        if not _run_framework_audit():
+            return 12
+        boundary_errors = runtime_boundary_audit()
+        if boundary_errors:
+            print("SalixORM memory integration runtime/semantic boundary: FAILED")
+            for error in boundary_errors:
+                print(f"ERROR: {error}")
+            return 12
+        print("SalixORM memory integration runtime/semantic boundary: OK")
+        if not _run_salixorm_memory_audit():
+            return 12
+        print("SalixORM translation-memory storage adapter: OK")
 
     if do_validate:
         validate_locales = ["en-AU", *locales]

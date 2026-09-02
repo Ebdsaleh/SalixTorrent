@@ -1,8 +1,8 @@
 """Provider-neutral, storage-neutral translation memory.
 
-The initial backend is deterministic JSON. The service contract intentionally has
-no application, GUI, ORM, or translation-provider dependency so a future SQLite/
-SalixORM store can replace it without changing translation-pipeline callers.
+The default/reference backend is deterministic JSON. The service contract intentionally has
+no application, GUI, ORM, or translation-provider dependency so alternate storage
+backends can replace it without changing translation-pipeline callers.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Mapping, Protocol
+from typing import Iterable, Iterator, Mapping, Protocol
 
 try:
     from .contracts import placeholder_names, source_hash
@@ -87,10 +87,78 @@ class MemoryAudit:
 
 
 class TranslationMemoryStore(Protocol):
+    """Complete storage contract consumed by localization development tooling."""
+
+    source_locale: str
+
     def lookup(self, target_locale: str, catalog: str, source: str) -> MemoryEntry | None: ...
     def put(self, entry: MemoryEntry) -> None: ...
+    def iter_entries(self) -> Iterable[MemoryEntry]: ...
     def stats(self) -> MemoryStats: ...
+    def audit(self) -> MemoryAudit: ...
     def save(self) -> None: ...
+
+
+def validate_memory_entry(entry: MemoryEntry) -> MemoryEntry:
+    """Validate one backend-neutral translation-memory entry.
+
+    Storage adapters call this before accepting a write and again when decoding
+    persisted state. Database constraints remain authoritative for physical
+    integrity; these checks protect the semantic source/placeholder contract.
+    """
+    if not isinstance(entry.target_locale, str) or not entry.target_locale.strip():
+        raise ValueError("translation-memory target locale cannot be empty")
+    if not isinstance(entry.catalog, str) or not entry.catalog.strip():
+        raise ValueError("translation-memory catalog cannot be empty")
+    if not isinstance(entry.source, str) or not entry.source:
+        raise ValueError("translation-memory source is missing/invalid")
+    if not isinstance(entry.translation, str) or not entry.translation.strip():
+        raise ValueError("translation-memory translation is missing/empty")
+
+    expected_hash = source_hash(entry.source)
+    if entry.source_hash != expected_hash:
+        raise ValueError("translation-memory source hash does not match source text")
+
+    expected_placeholders = tuple(sorted(placeholder_names(entry.source)))
+    if tuple(sorted(str(x) for x in entry.placeholders)) != expected_placeholders:
+        raise ValueError("translation-memory placeholder metadata does not match source")
+    if tuple(sorted(placeholder_names(entry.translation))) != expected_placeholders:
+        raise ValueError("translation-memory translation placeholder contract is invalid")
+    return entry
+
+
+def memory_identity(entry: MemoryEntry) -> tuple[str, str, str]:
+    """Return the portable storage identity for one memory entry."""
+    validate_memory_entry(entry)
+    return (entry.target_locale, entry.catalog, entry.source_hash)
+
+
+def merge_memory_stores(
+    target: TranslationMemoryStore,
+    source: TranslationMemoryStore,
+) -> dict[str, int]:
+    """Merge one compatible store into another without overwriting conflicts."""
+    if str(target.source_locale) != str(source.source_locale):
+        raise ValueError(
+            f"translation-memory source locale {source.source_locale!r} does not match "
+            f"target {target.source_locale!r}"
+        )
+
+    current = {memory_identity(entry): entry for entry in target.iter_entries()}
+    added = reused = conflicts = 0
+    for candidate in source.iter_entries():
+        identity = memory_identity(candidate)
+        existing = current.get(identity)
+        if existing is None:
+            target.put(candidate)
+            current[identity] = candidate
+            added += 1
+        elif existing == candidate:
+            reused += 1
+        else:
+            # Never silently replace one candidate translation with another.
+            conflicts += 1
+    return {"added": added, "reused": reused, "conflicts": conflicts}
 
 
 def _empty_memory(source_locale: str = DEFAULT_SOURCE_LOCALE) -> dict:
@@ -112,10 +180,10 @@ def resolve_memory_path(
     *,
     cache_path: Path | None = None,
 ) -> Path:
-    """Resolve memory path without hard-coding a repository location.
+    """Resolve JSON memory path without hard-coding a repository location.
 
-    Explicit argument wins, then SALIX_LOCALIZATION_MEMORY.  Otherwise the
-    memory lives beside the translation cache.  The latter also keeps isolated
+    Explicit argument wins, then SALIX_LOCALIZATION_MEMORY. Otherwise the
+    memory lives beside the translation cache. The latter also keeps isolated
     tests isolated when they patch CACHE_PATH to a temporary directory.
     """
     if explicit:
@@ -187,13 +255,7 @@ class JsonTranslationMemory:
         expected_hash = source_hash(source)
         if recorded_hash != expected_hash or str(raw.get("source_hash") or "") != expected_hash:
             raise ValueError("source hash does not match canonical source text")
-        expected_placeholders = tuple(sorted(placeholder_names(source)))
-        stored_placeholders = tuple(sorted(str(x) for x in raw.get("placeholders", [])))
-        if stored_placeholders != expected_placeholders:
-            raise ValueError("placeholder metadata does not match source")
-        if tuple(sorted(placeholder_names(translation))) != expected_placeholders:
-            raise ValueError("translation placeholder contract does not match source")
-        return MemoryEntry(
+        entry = MemoryEntry(
             target_locale=str(target_locale),
             catalog=catalog,
             source=source,
@@ -202,9 +264,11 @@ class JsonTranslationMemory:
             status=str(raw.get("status") or "machine"),
             provider=str(raw.get("provider") or ""),
             model=str(raw.get("model") or ""),
-            placeholders=expected_placeholders,
+            placeholders=tuple(sorted(str(x) for x in raw.get("placeholders", []))),
             reusable=bool(raw.get("reusable", True)),
         )
+        validate_memory_entry(entry)
+        return entry
 
     def lookup(self, target_locale: str, catalog: str, source: str) -> MemoryEntry | None:
         key = self._entry_key(catalog, source)
@@ -215,18 +279,26 @@ class JsonTranslationMemory:
             entry = self._decode_entry(target_locale, key, raw)
         except ValueError:
             return None
+        # The exact source text is checked in addition to the hash so a hash
+        # collision/corrupt record can never be reused as another string.
+        if entry.source != source:
+            return None
         return entry if entry.reusable else None
 
     def put(self, entry: MemoryEntry) -> None:
-        if entry.source_hash != source_hash(entry.source):
-            raise ValueError("translation-memory source hash does not match source text")
-        expected = tuple(sorted(placeholder_names(entry.source)))
-        if tuple(sorted(entry.placeholders)) != expected:
-            raise ValueError("translation-memory placeholder metadata does not match source")
-        if tuple(sorted(placeholder_names(entry.translation))) != expected:
-            raise ValueError("translation-memory translation placeholder contract is invalid")
+        validate_memory_entry(entry)
         key = self._entry_key(entry.catalog, entry.source)
         self._data.setdefault("entries", {}).setdefault(entry.target_locale, {})[key] = entry.as_dict()
+
+    def iter_entries(self) -> Iterator[MemoryEntry]:
+        entries = self._data.get("entries", {})
+        if not isinstance(entries, dict):
+            raise ValueError("memory entries is not an object")
+        for locale, values in sorted(entries.items()):
+            if not isinstance(values, dict):
+                raise ValueError(f"{locale}: locale memory is not an object")
+            for key, raw in sorted(values.items()):
+                yield self._decode_entry(str(locale), str(key), raw)
 
     def audit(self) -> MemoryAudit:
         errors: list[str] = []
@@ -261,52 +333,28 @@ class JsonTranslationMemory:
         return MemoryAudit(tuple(errors))
 
     def merge_from(self, other_path: str | os.PathLike[str]) -> dict[str, int]:
-        """Merge compatible entries from another memory without overwriting conflicts."""
+        """Merge compatible JSON memory without overwriting conflicts."""
         other = JsonTranslationMemory(other_path, source_locale=self.source_locale)
-        added = reused = conflicts = 0
-        for locale, values in other._data.get("entries", {}).items():
-            if not isinstance(values, dict):
-                continue
-            for key, raw in values.items():
-                try:
-                    other._decode_entry(str(locale), str(key), raw)
-                except ValueError as exc:
-                    raise ValueError(f"Cannot merge invalid translation-memory entry {locale}/{key}: {exc}") from exc
-                current = self._data.setdefault("entries", {}).setdefault(locale, {}).get(key)
-                if current is None:
-                    self._data["entries"][locale][key] = copy.deepcopy(raw)
-                    added += 1
-                elif current == raw:
-                    reused += 1
-                else:
-                    # Never silently replace one candidate translation with another.
-                    conflicts += 1
-        return {"added": added, "reused": reused, "conflicts": conflicts}
+        return merge_memory_stores(self, other)
 
     def stats(self) -> MemoryStats:
         entries = reusable = reviewed = machine = seeded = 0
-        locales = 0
-        for _locale, values in self._data.get("entries", {}).items():
-            if not isinstance(values, dict):
-                continue
-            locales += 1
-            for raw in values.values():
-                if not isinstance(raw, dict):
-                    continue
-                entries += 1
-                if bool(raw.get("reusable", True)):
-                    reusable += 1
-                status = str(raw.get("status") or "")
-                if status in {"reviewed", "locked"}:
-                    reviewed += 1
-                elif status == "seeded-existing":
-                    seeded += 1
-                elif status:
-                    machine += 1
+        locales: set[str] = set()
+        for entry in self.iter_entries():
+            locales.add(entry.target_locale)
+            entries += 1
+            if entry.reusable:
+                reusable += 1
+            if entry.status in {"reviewed", "locked"}:
+                reviewed += 1
+            elif entry.status == "seeded-existing":
+                seeded += 1
+            elif entry.status:
+                machine += 1
         return MemoryStats(
             path=str(self.path),
             source_locale=self.source_locale,
-            target_locales=locales,
+            target_locales=len(locales),
             entries=entries,
             reusable=reusable,
             reviewed=reviewed,

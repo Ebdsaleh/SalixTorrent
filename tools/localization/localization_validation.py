@@ -1,4 +1,4 @@
-"""Phase-12 Stage-7 localization hardening helpers.
+"""Offline localization validation and packaging helpers.
 
 All functions here are development/build-time only and perform no network I/O.
 They make locale packaging deterministic, expose script/direction metadata,
@@ -107,7 +107,7 @@ def build_locale_manifest() -> dict:
         "_meta": {
             "schema": MANIFEST_SCHEMA,
             "canonical_locale": CANONICAL_LOCALE,
-            "generated_by": "tools/localization/stage7_support.py",
+            "generated_by": "tools/localization/localization_validation.py",
             "catalogs": list(CATALOGS),
         },
         "locales": locales,

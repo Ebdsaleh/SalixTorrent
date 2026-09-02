@@ -4,7 +4,21 @@ Notable SalixTorrent changes are recorded here.
 
 ## Unreleased
 
-### Phase 12 Stage 11 - Generic Runtime Kernel and Semantic Documentation Services
+### SalixORM Translation-Memory Storage
+
+- Expanded the provider-neutral `TranslationMemoryStore` contract to cover iteration, statistics, audit and persistence operations actually consumed by localization tooling, with shared semantic entry validation and backend-neutral fail-closed merge behavior.
+- Added one development-time translation-memory backend factory with deterministic JSON remaining the default/reference backend and optional `salixorm` selection through CLI/environment configuration.
+- Added a file-backed SQLite translation-memory adapter built on released SalixORM `v0.2.0`, with explicit migration revisioning, source-locale metadata, unique semantic identities, placeholder/source-hash validation and post-save SQLite integrity checks.
+- Made interrupted first-initialization states recoverable when only an empty SalixORM migration ledger or schema-without-semantic-data exists, while refusing missing metadata once entry rows exist.
+- Preserved locale-generation failure atomicity by staging SalixORM memory mutations until `save()` and committing the complete pending set inside one explicit SalixORM `Session` transaction rather than durably writing each `put()`.
+- Kept `SALIX_LOCALIZATION_MEMORY` backward-compatible as the JSON-memory path and added separate `SALIX_LOCALIZATION_MEMORY_BACKEND` / `SALIX_LOCALIZATION_MEMORY_URL` configuration for backend selection and SQLite URLs.
+- Generalized memory bootstrap/status/audit/merge/plan/translation commands so the provider pipeline depends on the storage contract instead of constructing `JsonTranslationMemory` directly.
+- Added offline JSON-to-SalixORM parity validation proving all 432 checked-in exact-source memory entries round-trip without semantic loss, while conflicting imports remain non-destructive.
+- Added `--salixorm-memory-check`, tracked Windows `validate_salixorm_memory.bat`, and SalixORM-memory regression coverage for lazy optional dependency loading, migration history, persistence/reopen, source-locale/hash corruption refusal, no-network reuse and provider-failure no-partial-persistence behavior.
+- Renamed temporary numbered localization tests, support modules, validation helpers and one-shot CLI checks to function-descriptive names so development checkpoint numbering does not persist in the maintained codebase.
+- Kept SalixORM out of runtime localization and normal SalixTorrent runtime requirements; the new backend is optional development translation-memory storage and physical framework extraction remains deferred.
+
+### Generic Runtime Kernel and Semantic Documentation Services
 
 - Extracted catalog loading/fallback/formatting/pseudo-locale behavior into framework-neutral `LocalizationRuntime`, driven only by an injected `LocalizationProfile`, `CatalogRepository`, locale resolver and optional pseudo transform.
 - Reduced `LocalizationManager` to a SalixTorrent singleton compatibility adapter while preserving existing `tr()`, diagnostics, direct catalog-test hooks and runtime behavior.
@@ -12,76 +26,76 @@ Notable SalixTorrent changes are recorded here.
 - Reduced `app/localization/documents.py` to a SalixTorrent content-path/runtime adapter while preserving the historical Help/Glossary helper API.
 - Extended `LocalizationProfile` with optional pseudo-locale metadata so generic runtime diagnostics no longer need application locale-info helpers.
 - Expanded the framework extraction audit from four to six immediately extractable modules and added an explicit runtime/semantic facade-boundary audit.
-- Added `--runtime-boundary-audit`, `--stage11-check` and tracked Windows `stage11_validate_runtime_kernel.bat`.
-- Added Stage 11 regression coverage for generic runtime injection, fallback/placeholder contracts, semantic-document services, SalixTorrent compatibility and extraction boundaries.
+- Added `--runtime-boundary-audit`, `--runtime-check` and tracked Windows `validate_runtime_boundaries.bat`.
+- Added runtime/semantic-service regression coverage for generic runtime injection, fallback/placeholder contracts, semantic-document services, SalixTorrent compatibility and extraction boundaries.
 
-### Phase 12 Stage 10 - Framework Extraction Readiness
+### Framework Extraction Readiness
 
 - Added framework-neutral runtime localization contracts (`LocaleDescriptor`, `LocalizationProfile`, `CatalogRepository`, `JsonCatalogRepository`) without SalixTorrent, Dear PyGui, runtime-path or translation-provider dependencies.
 - Added an explicit SalixTorrent localization profile/resource adapter and routed runtime catalog parsing plus semantic-document content paths through that application boundary while preserving the existing `LocalizationManager`/`tr()` API.
 - Generalized the JSON translation-memory backend so the canonical source locale is explicit rather than structurally fixed to `en-AU`; source-locale mismatches and cross-source-locale memory merges fail closed.
 - Added an offline framework-extraction audit and map that distinguish immediately extractable modules from SalixTorrent application adapters and development/provider adapters.
-- Added `--framework-report`, `--framework-audit`, and `--stage10-check` plus tracked Windows `stage10_validate_framework_readiness.bat`.
-- Added `SalixTorrent-Phase12-Framework-Extraction-Map.md` documenting dependency direction, extraction sequence, deferred SalixORM integration and non-negotiable framework boundaries.
-- Added Stage 10 regression coverage for profile/repository contracts, existing runtime compatibility, non-`en-AU` translation-memory operation, source-locale merge refusal, extraction auditing and offline CLI validation.
+- Added `--framework-report`, `--framework-audit`, and `--framework-check` plus tracked Windows `validate_framework_extraction.bat`.
+- Added `SalixTorrent-Phase12-Framework-Extraction-Map.md` documenting dependency direction, extraction sequence, the optional SalixORM storage boundary and non-negotiable framework boundaries.
+- Added framework-boundary regression coverage for profile/repository contracts, existing runtime compatibility, non-`en-AU` translation-memory operation, source-locale merge refusal, extraction auditing and offline CLI validation.
 
-### Phase 12 Stage 9 - Provider-Neutral Translation Memory Foundation
+### Provider-Neutral Translation Memory Foundation
 
-- Added a provider-neutral translation-memory service with deterministic JSON storage, exact canonical source hashes, placeholder contracts, provenance, model/status metadata and a storage interface intended for a future SQLite/SalixORM backend.
+- Added a provider-neutral translation-memory service with deterministic JSON storage, exact canonical source hashes, placeholder contracts, provenance, model/status metadata and a storage interface designed for interchangeable backends.
 - Added source-based memory identity independent of SalixTorrent localization keys while retaining semantic catalog separation (`ui`, `help`, `glossary`) to avoid unsafe reuse across unrelated text domains.
 - Seeded the project memory from the existing source-hash-valid translation cache, deduplicating 452 key records into 432 reusable exact-source candidates (108 per target locale).
 - Updated changed-only translation planning/generation to consult manual overrides, the project key cache, then reusable translation memory before invoking a provider; memory hits work in strict no-network mode and are adopted back into the key cache.
 - Added a lazy development provider registry and explicit `--provider` selection; Google Cloud remains one registered network provider rather than the localization architecture itself.
-- Added `--providers`, `--memory-bootstrap`, `--memory-status`, `--memory-path`, `--memory-merge` and `--stage9-check` plus tracked Windows `stage9_validate_translation_memory.bat`.
+- Added `--providers`, `--memory-bootstrap`, `--memory-status`, `--memory-path`, `--memory-merge` and `--memory-check` plus tracked Windows `validate_translation_memory.bat`.
 - Added fail-closed memory merge/audit behavior for malformed hashes/placeholders and conflicting candidate translations.
-- Added Stage 9 regression coverage for source-based reuse, catalog separation, placeholder safety, merge conflicts, portable memory paths, memory-assisted no-network generation, provider registration and offline Stage-9 validation.
+- Added translation-memory regression coverage for source-based reuse, catalog separation, placeholder safety, merge conflicts, portable memory paths, memory-assisted no-network generation, provider registration and offline translation-memory validation.
 
-### Phase 12 Stage 8A - Translation Review Infrastructure
+### Translation Review Infrastructure
 
 - Added provider-neutral review-state analysis that classifies every target-locale entry as missing, awaiting review, reviewed, locked, stale, or invalid without requiring any translation provider.
 - Added deterministic offline review-bundle export with canonical source text, source hashes, placeholders, extraction/source locations, current translation, provider provenance, reviewer notes and editable review state.
 - Added fail-closed review import: only entries explicitly marked `reviewed` or `locked` are promoted; stale canonical hashes, edited source text, broken placeholders, missing protected terms, unknown keys/catalogs and malformed review states abort the entire import before authoritative review metadata is written.
 - Upgraded manual overrides to a backward-compatible rich schema carrying source hash, review/lock state, reviewer, note and review timestamp; reviewed/locked entries remain authoritative over machine/cache translations, including forced regeneration.
 - Extended locale validation so reviewed overrides participate in source-hash freshness, placeholder, protected-term and packaging-consistency checks instead of being exempt from provenance validation.
-- Added `--review-report`, `--review-export`, `--review-import` and `--stage8-check` commands plus tracked Windows `tools/localization/stage8_review_localization.bat` offline audit helper.
-- Added Stage 8A regression coverage for review summaries, export context/provenance, reviewed and locked promotion, stale-source refusal, placeholder/protected-term refusal, review freshness validation and repository ignore policy.
-- Kept Stage 8B language/content review explicitly dependent on populated locale packs; Stage 6B provider population remains on hold.
+- Added `--review-report`, `--review-export`, `--review-import` and `--review-check` commands plus tracked Windows `tools/localization/review_localization.bat` offline audit helper.
+- Added translation-review regression coverage for review summaries, export context/provenance, reviewed and locked promotion, stale-source refusal, placeholder/protected-term refusal, review freshness validation and repository ignore policy.
+- Kept manual language/content review explicitly dependent on populated locale packs; machine-translation population remains on hold.
 
-### Phase 12 Stage 7 - Validation and Packaging Hardening
+### Validation and Packaging Hardening
 
 - Added deterministic `app/localization/locales/manifest.json` metadata covering canonical/packaged entry counts, catalog hashes, script, text direction, font profile, support status and the development-only pseudo locale.
 - Added strict catalog metadata/hash validation, source-hash freshness checks for packaged translations, and protected-technical-term preservation checks in addition to the existing placeholder and semantic-document validators.
 - Hardened runtime locale loading so missing/corrupt target catalogs fail closed to canonical `en-AU` per key while structured catalog-health, fallback-reason, script/direction and font-profile diagnostics remain available.
 - Added the in-memory `en-XA` pseudo locale for accent/expansion stress testing without network translation or a packaged pseudo catalog; `SALIX_T_PSEUDO_LOCALE=1` can force it for development smoke tests.
-- Added offline pseudo-localization auditing, PyInstaller localization-resource contract checks, locale-manifest drift checking, and the one-shot `--stage7-check` command.
-- Added tracked Windows `tools/localization/stage7_validate_localization.bat` preflight for extraction, deterministic drift checking and all Stage-7 offline hardening checks.
-- Added Stage 7 regression coverage for metadata capabilities, pseudo expansion/placeholder safety, corrupt-pack fallback, deterministic manifest generation, packaging contracts, stale translation detection, protected terminology and Stage-7 CLI behavior.
+- Added offline pseudo-localization auditing, PyInstaller localization-resource contract checks, locale-manifest drift checking, and the one-shot `--offline-validation-check` command.
+- Added tracked Windows `tools/localization/validate_localization.bat` preflight for extraction, deterministic drift checking and all offline localization hardening checks.
+- Added localization-validation regression coverage for metadata capabilities, pseudo expansion/placeholder safety, corrupt-pack fallback, deterministic manifest generation, packaging contracts, stale translation detection, protected terminology and offline-validation CLI behavior.
 
-### Phase 12 Stage 6 - Initial Locale Generation Harness
+### Initial Locale Generation Harness
 
 - Added offline locale-generation status reporting for all four target packs, including packaged, source-hash-valid cache, reviewed override and missing-entry counts.
 - Added a Google development setup doctor that checks client/auth availability, Application Default Credentials, project resolution, selected location/model, and an optional one-request authenticated API probe without exposing credential paths or secrets.
 - Added `--generate-initial`, which refuses stale canonical extraction, runs changed-only generation, and requires strict completeness before declaring selected locale packs generated.
-- Added the tracked Windows `tools/localization/stage6_generate_locales.bat` helper with safe preflight, optional probe, and explicit credentialed `--run` modes.
-- Kept Google credentials ignored while explicitly allowing the official Stage 6 batch helper through the repository's broad `*.bat` ignore rule.
-- Added Stage 6 regression coverage for locale completeness reporting, non-mutating status, setup-doctor failure handling, stale-extraction refusal, strict post-generation validation, and credential-ignore policy.
+- Added the tracked Windows `tools/localization/generate_initial_locales.bat` helper with safe preflight, optional probe, and explicit credentialed `--run` modes.
+- Kept Google credentials ignored while explicitly allowing the official locale-generation batch helper through the repository's broad `*.bat` ignore rule.
+- Added locale-generation regression coverage for locale completeness reporting, non-mutating status, setup-doctor failure handling, stale-extraction refusal, strict post-generation validation, and credential-ignore policy.
 
-### Phase 12 Stage 5 - Translation Pipeline
+### Changed-Only Translation Pipeline
 
 - Added changed-only Google Cloud Translation v3 generation with `general/translation-llm`, Application Default Credential/project discovery, configurable model/location, bounded batching and transient retry handling.
 - Added non-mutating `--dry-run` translation planning and strict `--no-network` rebuilding from source-hash-valid cache/manual overrides only.
-- Upgraded `translation_cache.json` to a deterministic locale/catalog/key schema tied to the Stage-4 extraction hashes and bootstrapped the existing 113 UI translations per target locale.
+- Upgraded `translation_cache.json` to a deterministic locale/catalog/key schema tied to the canonical extraction hashes and bootstrapped the existing 113 UI translations per target locale.
 - Made reviewed manual overrides authoritative even under forced regeneration, with placeholder/protected-token validation before generated translations are accepted.
 - Made translation generation fail safely: provider/auth failures occur before target locale artifacts are written, generated JSON uses atomic replacement, and the cache is committed last.
-- Added Stage 5 regression coverage for project discovery, protected-token round trips, cache bootstrap, changed-only translation, manual-override precedence, offline rebuilds, provider-failure rollback and credential-free dry-run planning.
+- Added translation-pipeline regression coverage for project discovery, protected-token round trips, cache bootstrap, changed-only translation, manual-override precedence, offline rebuilds, provider-failure rollback and credential-free dry-run planning.
 
-### Phase 12 Stage 4 - Development Extraction Tool
+### Development Extraction Tool
 
 - Made canonical `en-AU` extraction fully reproducible from explicit source declarations rather than retaining stale generated catalog entries.
 - Added deterministic `extraction_manifest.json` source hashes, source locations, placeholder/format contracts, duplicate-key reuse records, and dynamic `tr()` auditing.
 - Added `build_locales.py --check` for non-mutating extraction drift checks and `--report` for extraction diagnostics.
 - Added explicit `ui_static.json` for intentionally indirect canonical UI strings and centralized source-hash/placeholder contracts for extraction, validation, and translation tooling.
-- Added Stage 4 regression coverage for AST extraction, source hashes, duplicate conflicts, dynamic-call auditing, deterministic generation, and extraction validation.
+- Added extraction regression coverage for AST extraction, source hashes, duplicate conflicts, dynamic-call auditing, deterministic generation, and extraction validation.
 
 ### Added
 
@@ -90,10 +104,10 @@ Notable SalixTorrent changes are recorded here.
 - Separate `requirements-localization.txt` so Google translation tooling is never required or bundled for normal SalixTorrent runtime/build use.
 - Phase 12 localization diagnostics reporting requested/active/canonical locale, bundled catalog size, English fallbacks, format errors, and catalog health.
 - Phase 12 regression coverage for locale normalization, offline fallback, translated UI loading, placeholder safety, developer extraction/protection tools, settings persistence, and PyInstaller locale packaging.
-- Phase 12 Stage 2 presentation-only translation helpers for stable torrent states, priorities, protocol policies and combo values, keeping engine/persistence tokens locale-independent.
-- Phase 12 Stage 2 regression coverage auditing direct Dear PyGui user-facing literals, canonical-value round trips, CLI extraction and localization-aware `.gitignore` policy.
-- Phase 12 Stage 3 renderer-neutral semantic documentation sources under `app/localization/content/`, with stable Help topic/section IDs, stable Glossary term IDs, and locale-neutral cross-links.
-- Phase 12 Stage 3 documentation validation for duplicate/missing semantic IDs, broken related-term links, canonical catalog drift, and frozen-resource packaging.
+- Phase 12 presentation-only translation helpers for stable torrent states, priorities, protocol policies and combo values, keeping engine/persistence tokens locale-independent.
+- Phase 12 UI-localization regression coverage auditing direct Dear PyGui user-facing literals, canonical-value round trips, CLI extraction and localization-aware `.gitignore` policy.
+- Phase 12 renderer-neutral semantic documentation sources under `app/localization/content/`, with stable Help topic/section IDs, stable Glossary term IDs, and locale-neutral cross-links.
+- Phase 12 semantic-documentation validation for duplicate/missing semantic IDs, broken related-term links, canonical catalog drift, and frozen-resource packaging.
 - Phase 11 platform-neutral desktop integration controller with semantic tray actions, independent tray/window capability tracking and fail-safe hide/restore policy.
 - Linux/BSD pystray desktop backend with X11 viewport hide/restore/focus support, backend capability reporting and desktop-notification fallback.
 - macOS menu-bar backend with pystray plus AppKit window restore/activation and notification capability detection.
@@ -112,7 +126,7 @@ Notable SalixTorrent changes are recorded here.
 
 ### Changed
 
-- Phase 12 Stage 2 migrates the primary transfer/detail views, Preferences, dialogs, status/progress text, Create Torrent, completion notifications and human-facing CLI output to semantic `tr()` calls; structured/machine-readable data remains locale-independent.
+- Phase 12 UI localization migrates the primary transfer/detail views, Preferences, dialogs, status/progress text, Create Torrent, completion notifications and human-facing CLI output to semantic `tr()` calls; structured/machine-readable data remains locale-independent.
 - Canonical `en-AU` UI extraction now includes presentation values and currently produces 653 UI strings, while incomplete target locales continue to fall back offline to `en-AU` until translation generation is run.
 - `.gitignore` now tracks the Phase 12 design document, locale catalogs, manual overrides, protected terminology and deterministic translation cache while excluding localization credentials and retaining existing build/payload/local-test exclusions.
 - Windows tray/menu commands, the main application menu/toolbar, core Desktop preferences, Help/Glossary shell navigation and diagnostics now consume semantic localization keys while preserving stable internal protocol/state values.

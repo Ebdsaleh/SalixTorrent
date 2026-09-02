@@ -1,8 +1,10 @@
 @echo off
-setlocal
+setlocal EnableExtensions
+
+cd /d "%~dp0\..\.."
 
 echo ============================================================
-echo  SalixTorrent Phase 12 Stage 10 - Framework Readiness Audit
+echo  SalixTorrent Translation Provider/Memory Audit
 echo ============================================================
 
 where python >nul 2>&1
@@ -26,15 +28,15 @@ python tools\localization\build_locales.py --check
 if errorlevel 1 exit /b %errorlevel%
 echo.
 
-echo [3/4] Framework extraction map...
-python tools\localization\build_locales.py --framework-report
+echo [3/4] Provider-neutral translation memory bootstrap...
+python tools\localization\build_locales.py --memory-bootstrap --memory-status --providers
 if errorlevel 1 exit /b %errorlevel%
 echo.
 
-echo [4/4] Framework/provider-memory boundary validation...
-python tools\localization\build_locales.py --stage10-check
+echo [4/4] Provider/memory validation...
+python tools\localization\build_locales.py --memory-check
 if errorlevel 1 exit /b %errorlevel%
 echo.
 
-echo Stage 10 framework extraction readiness: OK
+echo Provider-neutral translation memory: OK
 exit /b 0

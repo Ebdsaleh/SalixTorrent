@@ -25,8 +25,8 @@ EXTRACTABLE_MODULES = (
     Path("tools/localization/translation_memory.py"),
 )
 
-# These remain intentional adapters/consumers. Stage 10 documents the seam rather
-# than pretending the whole subsystem is generic already.
+# These remain intentional adapters/consumers. The extraction map documents the seam
+# rather than pretending the whole subsystem is generic already.
 APPLICATION_ADAPTERS = (
     Path("app/localization/profile.py"),
     Path("app/localization/locale_info.py"),
@@ -37,6 +37,9 @@ APPLICATION_ADAPTERS = (
 DEVELOPMENT_ADAPTERS = (
     Path("tools/localization/provider_registry.py"),
     Path("tools/localization/google_translate.py"),
+    Path("tools/localization/translation_memory_factory.py"),
+    Path("tools/localization/translation_memory_salixorm.py"),
+    Path("tools/localization/salixorm_memory_audit.py"),
     Path("tools/localization/review.py"),
     Path("tools/localization/extract_strings.py"),
 )
