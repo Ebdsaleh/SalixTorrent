@@ -4,6 +4,17 @@ Notable SalixTorrent changes are recorded here.
 
 ## Unreleased
 
+### Application Settings Persistence Boundary
+
+- Audited SalixTorrent's file-backed durable state and selected application preferences as the next low-risk SalixORM integration boundary; session metadata remains JSON while fast-resume, cached metainfo, payloads, shell-handler backup and diagnostic-log formats remain purpose-built files.
+- Added a generic `AppSettingsStore` boundary plus deterministic JSON reference/default implementation so `TorrentManager` no longer owns JSON file I/O directly.
+- Added lazy application-settings backend selection with `SALIX_T_SETTINGS_BACKEND=json|salixorm` and optional `SALIX_T_SETTINGS_URL`, while normal runtime startup continues to avoid importing or requiring SalixORM.
+- Added an optional file-backed SQLite settings adapter using released SalixORM `v0.2.0`, an explicit `application-settings-0001` migration, semantic metadata, unique setting keys, one-transaction full-snapshot saves and post-commit SQLite integrity/foreign-key checks.
+- Preserved backward compatibility by allowing an existing `settings.json` snapshot to bootstrap an empty opt-in SalixORM store; the next normalized settings save makes the selected database authoritative without deleting or dual-writing the legacy JSON file.
+- Made corrupt/incompatible SalixORM settings state fail closed and mark the active store unhealthy so later settings updates cannot silently overwrite the database with defaults.
+- Added application-settings persistence regression coverage for JSON compatibility, lazy dependency loading, SalixORM save/reopen, metadata corruption, key replacement, legacy bootstrap, custom database targets and `TorrentManager` runtime integration.
+- Added `SalixTorrent-Application-Persistence-Design.md` documenting the persistence inventory, selection criteria, settings pilot and the reasons session/resume/protocol-hot-path state remain separate.
+
 ### SalixORM Translation-Memory Storage
 
 - Expanded the provider-neutral `TranslationMemoryStore` contract to cover iteration, statistics, audit and persistence operations actually consumed by localization tooling, with shared semantic entry validation and backend-neutral fail-closed merge behavior.

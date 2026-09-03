@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from app.engine.runtime_paths import default_download_directory, state_directory
+from app.persistence import AppSettingsStoreError, build_app_settings_store
 from app.localization import AUTO_LOCALE, normalise_locale_code
 from app.logic.connectivity import ConnectivityManager
 from app.logic.network_binding import normalise_bind_address
@@ -139,7 +140,13 @@ class TorrentManager:
             cls._instance._state_dir = cls._instance._get_state_directory()
             cls._instance._state_file = cls._instance._state_dir / "session.json"
             cls._instance._torrent_cache_dir = cls._instance._state_dir / "torrents"
-            cls._instance._settings_file = cls._instance._state_dir / "settings.json"
+            # ``settings.json`` remains the default/reference settings artifact.
+            # Alternative stores are selected behind one persistence boundary so
+            # normal runtime startup does not import optional storage backends.
+            cls._instance._settings_store = build_app_settings_store(
+                cls._instance._state_dir
+            )
+            cls._instance._settings_store_healthy = True
             cls._instance._settings = cls._instance._load_app_settings()
             cls._instance._max_active_downloads = int(
                 cls._instance._settings.get(
@@ -326,23 +333,32 @@ class TorrentManager:
     def _load_app_settings(self) -> dict:
         defaults = self._default_app_settings()
         try:
-            if not self._settings_file.exists():
+            raw = self._settings_store.load()
+            if raw is None:
                 return defaults
-            raw = json.loads(self._settings_file.read_text(encoding="utf-8"))
             return self._normalise_app_settings(raw)
-        except (OSError, json.JSONDecodeError, TypeError, ValueError):
+        except AppSettingsStoreError as exc:
+            # An explicitly selected non-default backend fails visibly instead
+            # of silently accepting corrupted/incompatible state. Keep the app
+            # usable with normalized defaults, but refuse later writes through
+            # the unhealthy store so corrupted durable state is not overwritten.
+            self._settings_store_healthy = False
+            print(f"[Salix_T Notice] Could not load settings: {exc}")
+            return defaults
+        except (TypeError, ValueError):
             return defaults
 
     def save_app_settings(self):
-        try:
-            self._ensure_state_directories()
-            temp_path = self._settings_file.with_suffix(".json.tmp")
-            temp_path.write_text(
-                json.dumps(self._settings, indent=2, sort_keys=True),
-                encoding="utf-8",
+        if not self._settings_store_healthy:
+            print(
+                "[Salix_T Notice] Settings storage is unhealthy; refusing to overwrite "
+                f"{self._settings_store.location}."
             )
-            os.replace(temp_path, self._settings_file)
-        except OSError as exc:
+            return
+        try:
+            self._settings_store.save(self._settings)
+        except AppSettingsStoreError as exc:
+            self._settings_store_healthy = False
             print(f"[Salix_T Notice] Could not save settings: {exc}")
 
     def get_app_settings(self) -> dict:
@@ -455,7 +471,15 @@ class TorrentManager:
 
     @property
     def settings_path(self) -> str:
-        return str(self._settings_file)
+        return self._settings_store.location
+
+    @property
+    def settings_backend(self) -> str:
+        return self._settings_store.backend
+
+    @property
+    def settings_storage_healthy(self) -> bool:
+        return bool(self._settings_store_healthy)
 
     def _ensure_state_directories(self):
         self._state_dir.mkdir(parents=True, exist_ok=True)

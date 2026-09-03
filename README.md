@@ -2,7 +2,7 @@
 
 SalixTorrent is a desktop BitTorrent client written in Python with a custom asynchronous protocol engine and a Dear PyGui interface. Its transfer engine is generation-aware across BitTorrent v1, BitTorrent v2 and hybrid torrents, while keeping protocol identity, storage verification, discovery provenance and torrent creation explicit. The project aims to expose what a torrent client is doing rather than hiding the protocol behind a single progress bar: transfers, peers, pieces, files, trackers, discovery sources, bandwidth history, connectivity, and protocol terminology are all inspectable from the application.
 
-> **Release status:** v0.3.0 remains the current development version string while post-v0.3.0 roadmap work is integrated. Phases 1-11 are complete. Phase 12 adds the offline-first localization framework, semantic Help/Glossary services, provider-neutral translation tooling, and the optional SalixORM-backed development translation-memory store while keeping normal runtime localization offline and storage-independent.
+> **Release status:** v0.3.0 remains the current development version string while post-v0.3.0 roadmap work is integrated. Phases 1-11 are complete. Phase 12 adds the offline-first localization framework, semantic Help/Glossary services, provider-neutral translation tooling, and the optional SalixORM-backed development translation-memory store while keeping normal runtime localization offline and storage-independent. The current application-persistence pilot also places user preferences behind a backend-neutral settings store with historical JSON as the default and optional SalixORM/SQLite storage for explicit integration testing.
 
 ## Highlights
 
@@ -972,3 +972,38 @@ SalixORM `Session` transaction. That preserves the existing locale-generation gu
 provider/validation failure cannot leave half of a locale's new translation-memory candidates
 persisted. JSON remains available as the reference backend while the SalixORM adapter gains
 application mileage.
+
+### Application-settings persistence pilot
+
+After the translation-memory integration, SalixTorrent audited its remaining durable state rather
+than treating every persistent file as a database candidate. Application preferences are the first
+runtime-facing SalixORM pilot because they are structured, low-frequency user state with one clear
+normalization/ownership boundary. Transfer/session state remains JSON for now, while fast-resume
+sidecars, cached `.torrent` metainfo, payload data, shell-registration backups and diagnostic logs
+remain purpose-built files. The complete classification and migration policy are documented in
+`SalixTorrent-Application-Persistence-Design.md`.
+
+The historical `settings.json` backend remains the default and normal runtime startup still does
+not import or require SalixORM. The optional adapter is dynamically loaded only after explicit
+backend selection, so installing SalixORM for source development does not silently turn it into a
+frozen-build dependency. An explicitly configured development/source run can select the optional
+SalixORM/SQLite settings store with:
+
+```text
+SALIX_T_SETTINGS_BACKEND=salixorm
+SALIX_T_SETTINGS_URL=...
+```
+
+When no URL is supplied, the database defaults to `settings.db` inside SalixTorrent's normal state
+directory. The adapter accepts file-backed SQLite only. With sibling source checkouts, the same
+released SalixORM installation used by the translation-memory integration is sufficient:
+
+```bat
+python -m pip install -e ..\SalixORM
+```
+
+On first use, an existing `settings.json` can be read as a compatibility/bootstrap snapshot. The
+next settings save persists the complete normalized preferences to the selected SalixORM store in
+one explicit transaction. The legacy JSON file is not deleted or dual-written. Corrupt or
+incompatible SalixORM settings state fails visibly and is marked unhealthy so a later settings
+save cannot silently overwrite it.

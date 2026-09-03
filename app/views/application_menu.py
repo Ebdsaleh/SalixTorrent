@@ -875,6 +875,8 @@ class ApplicationMenu:
             f"Selected mapping lease: {'permanent' if connectivity.get('mapping_permanent') else (str(connectivity.get('mapping_lease_seconds')) + 's' if connectivity.get('mapping_lease_seconds') is not None else '--')}\n"
             f"Active listener ports: {aggregate_connectivity.get('active_listener_ports') or '--'}\n"
             f"Mapped listener ports: {aggregate_connectivity.get('mapped_ports') or '--'}\n\n"
+            f"Settings backend: {self.manager.settings_backend}\n"
+            f"Settings storage healthy: {'Yes' if self.manager.settings_storage_healthy else 'No'}\n"
             f"Settings: {self.manager.settings_path}\n"
             f"Session state: {self.manager.session_state_path}\n"
             f"UI error log: {self.gui._ui_error_log_path()}\n"
