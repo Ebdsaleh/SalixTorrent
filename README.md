@@ -280,30 +280,35 @@ Users can choose generation, piece size, trackers, privacy, comment, output path
 
 ## Tests
 
-The project currently includes a foundation suite and focused regression coverage, including dedicated BEP-52/v2 metainfo and Merkle tests. Local/network integration scripts may require a `test.torrent` and active peers.
+The maintained regression suite lives under the version-controlled `tests/` package and uses Python's built-in `unittest`. Test modules and classes are named for the behavior they protect; historical milestone lineage is kept in module comments/docstrings rather than in filenames.
 
-```bash
-python foundation_test.py
-python test_piece_selection.py
-python test_request_scheduling.py
-python test_disk_io.py
-python test_transport_security.py
-python test_ipv6.py
-python test_tracker_scrape.py
-python test_responsive_layout.py
-python test_documentation.py
-python test_headless_cli.py
-python test_torrent_v2.py
-python test_phase9.py
-python test_phase10.py
-python test_phase11.py
+Run the complete suite from the repository root with:
+
+```bat
+python -m unittest discover -s tests -t .
 ```
 
-The release-critical regression coverage includes strict BEP-52 v2 identity/file-tree/piece-layer/Merkle validation, MSE/RC4 interoperability, rarest-first/endgame scheduling, bounded request pipelines, asynchronous disk backpressure/caching, source binding, encryption fallback rules, multi-torrent port mappings, finite/permanent mapping-lease handling, structured UPnP/NAT-PMP diagnostics, source-severity accounting, Interface Lock, real inbound seeding uploads, IPv6 peer TCP, BEP-7/BEP-15 tracker peers, BEP-11 IPv6 PEX, BEP-32 DHT behavior, BEP-48 HTTP scrape batching, BEP-15 UDP scrape batching, scrape/announce telemetry isolation, Windows Proactor reset handling, responsive content-bounds geometry, framework property-cascade fallback/provenance, per-page documentation layout overrides, and semantic documentation typography/media sizing.
+Plain repository-root discovery remains supported:
+
+```bat
+python -m unittest discover
+```
+
+Focused examples:
+
+```bat
+python -m unittest tests.persistence.test_session_state_persistence -v
+python -m unittest tests.persistence.test_app_settings_persistence -v
+python -m unittest tests.network.test_transport_security -v
+python -m unittest tests.protocol.test_v2_peer_wire -v
+python -m unittest discover -s tests\localization -t . -v
+```
+
+The release-critical regression coverage includes strict BEP-52 v2 identity/file-tree/piece-layer/Merkle validation, MSE/RC4 interoperability, rarest-first/endgame scheduling, bounded request pipelines, asynchronous disk backpressure/caching, source binding, encryption fallback rules, multi-torrent port mappings, finite/permanent mapping-lease handling, structured UPnP/NAT-PMP diagnostics, source-severity accounting, Interface Lock, real inbound seeding uploads, IPv6 peer TCP, BEP-7/BEP-15 tracker peers, BEP-11 IPv6 PEX, BEP-32 DHT behavior, BEP-48 HTTP scrape batching, BEP-15 UDP scrape batching, scrape/announce telemetry isolation, Windows Proactor reset handling, application/session persistence, offline localization, responsive content-bounds geometry, framework property-cascade fallback/provenance, per-page documentation layout overrides, and semantic documentation typography/media sizing.
 
 ## Current scope
 
-Phases 1-10 are complete in the live source tree, including native Windows standalone/portable/installer validation. Phase 11 implements the cross-platform desktop/tray abstraction, the native Windows lifecycle/focus fixes, Linux/BSD and macOS backends, safe close/minimize-to-tray policy, and capability diagnostics/help. Linux/BSD/macOS native desktop behavior still requires smoke-testing on those operating systems even though the platform-neutral contracts are regression-tested.
+Phases 1-11 are complete in the live source tree, including native Windows standalone/portable/installer validation and the cross-platform desktop/tray abstraction. Phase 12 provides the offline-first localization framework, semantic Help/Glossary services, provider-neutral translation tooling, and optional SalixORM-backed development translation memory. Linux/BSD/macOS native desktop behavior and full target-locale population/review remain active release-hardening work.
 
 ## Project structure
 
@@ -313,20 +318,53 @@ SalixTorrent/
 ├── cli_main.py
 ├── requirements.txt
 ├── requirements-build.txt
-├── foundation_test.py
-├── test_piece_selection.py
-├── test_request_scheduling.py
-├── test_disk_io.py
-├── test_transport_security.py
-├── test_ipv6.py
-├── test_tracker_scrape.py
-├── test_responsive_layout.py
-├── test_documentation.py
-├── test_headless_cli.py
-├── test_torrent_v2.py
-├── test_phase9.py
-├── test_phase10.py
-├── test_phase11.py
+├── tests/
+│   ├── helpers.py
+│   ├── core/
+│   │   └── test_foundation.py
+│   ├── protocol/
+│   │   ├── test_piece_selection.py
+│   │   ├── test_request_scheduling.py
+│   │   ├── test_torrent_generation.py
+│   │   ├── test_torrent_v2.py
+│   │   ├── test_v2_peer_wire.py
+│   │   └── test_magnet_metadata.py
+│   ├── network/
+│   │   ├── test_transport_security.py
+│   │   ├── test_ipv6.py
+│   │   └── test_tracker_scrape.py
+│   ├── persistence/
+│   │   ├── test_disk_io.py
+│   │   ├── test_app_settings_persistence.py
+│   │   └── test_session_state_persistence.py
+│   ├── platform/
+│   │   ├── test_runtime_paths.py
+│   │   ├── test_shell_integration.py
+│   │   └── test_desktop_integration.py
+│   ├── packaging/
+│   │   ├── test_release_packaging.py
+│   │   └── test_localization_packaging.py
+│   ├── presentation/
+│   │   ├── test_responsive_layout.py
+│   │   └── test_documentation.py
+│   ├── cli/
+│   │   └── test_headless_cli.py
+│   └── localization/
+│       ├── test_locale_resolution.py
+│       ├── test_runtime_catalogs.py
+│       ├── test_localization_settings.py
+│       ├── test_localization_tooling.py
+│       ├── test_localization_ui.py
+│       ├── test_localization_semantic_documents.py
+│       ├── test_localization_extraction.py
+│       ├── test_localization_translation_pipeline.py
+│       ├── test_localization_locale_generation.py
+│       ├── test_localization_validation.py
+│       ├── test_localization_review.py
+│       ├── test_localization_translation_memory.py
+│       ├── test_localization_framework_boundaries.py
+│       ├── test_localization_runtime_services.py
+│       └── test_localization_salixorm_memory.py
 ├── packaging/
 │   ├── SalixTorrent.spec
 │   ├── build_windows.bat

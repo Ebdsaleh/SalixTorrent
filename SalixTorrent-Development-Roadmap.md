@@ -2,8 +2,8 @@
 
 **Current application version string:** `0.3.0`
 **Roadmap status:** active development planning
-**Current implementation checkpoint:** session-state persistence complete and validated
-**Current real Windows regression baseline:** 299 / 299 tests passing, with one expected non-Windows skip
+**Current implementation checkpoint:** tracked repository-owned unittest suite complete and validated
+**Current real Windows regression baseline:** 305 / 305 tests passing, with one expected non-Windows skip
 
 This roadmap records intended engineering direction rather than promising dates or release numbers. Changes should remain incremental, testable, reviewable, and compatible with SalixTorrent's existing protocol, persistence, packaging, localization, and cross-platform boundaries.
 
@@ -118,37 +118,11 @@ Fast-resume sidecars, cached `.torrent` artifacts, payload files, logs and proto
 
 ---
 
-# 3. Immediate engineering priority — repository-owned unittest suite
+# 3. Repository-owned unittest suite — complete and validated
 
-The next change should be repository/test hygiene, not another product feature.
+The maintained regression suite has been migrated from repository-root local files into a structured, version-controlled `tests/` package.
 
-The current source contains:
-
-```text
-27 root test_*.py modules
-+ foundation_test.py
-```
-
-The existing `.gitignore` intentionally excludes those regression tests from the public repository. That policy made sense during early rapid development, but the suite is now too important to live only in local snapshots.
-
-The maintained regression suite should become:
-
-- structured;
-- version controlled;
-- available in a fresh clone;
-- reviewable alongside source changes;
-- runnable with Python's standard library;
-- removed from the repository root.
-
-## Directory convention
-
-Use the conventional plural directory:
-
-```text
-tests/
-```
-
-Keep Python's built-in:
+The migration preserves Python's built-in:
 
 ```text
 unittest
@@ -156,11 +130,12 @@ unittest
 
 No pytest dependency is required.
 
-## Proposed structure
+## Final structure
 
 ```text
 tests/
 ├── __init__.py
+├── helpers.py
 ├── core/
 │   ├── __init__.py
 │   └── test_foundation.py
@@ -217,26 +192,11 @@ tests/
     └── test_localization_salixorm_memory.py
 ```
 
-## Naming rule
+## Naming and lineage rule
 
-The final tracked suite should use **behavior-oriented names, not milestone numbers**.
+Maintained test filenames and classes describe the behavior or contract they protect rather than historical milestone numbers.
 
-Temporary source files such as `test_phase9.py` through `test_phase12.py` may be used while performing the migration, but they should not remain in the finished tree just to preserve history.
-
-Preserve historical provenance inside the test module instead:
-
-```python
-"""Desktop integration regressions.
-
-Regression lineage:
-- originally introduced during the Phase 11 desktop-integration milestone
-- source milestone commit: <resolved commit hash>
-"""
-```
-
-Use the real commit hash from Git history when available; do not invent one.
-
-Current mixed milestone files should be split by responsibility where useful:
+The former mixed milestone containers were split by responsibility:
 
 ```text
 test_phase9.py
@@ -261,54 +221,56 @@ test_phase12.py
     -> packaging assertions -> test_localization_packaging.py
 ```
 
-Class names should also describe behavior (`TestLocaleResolution`, `TestDesktopIntegration`, `TestReleasePackaging`, etc.) rather than carrying `PhaseN` names.
+Historical milestone lineage is preserved in module documentation where useful. Exact source-test commit hashes are not recorded where the original regression files were never version controlled; no hash is inferred or invented.
 
-## Migration checklist
+## Completed migration checklist
 
-- [ ] commit the completed session-state persistence checkpoint first;
-- [ ] create the `tests/` package tree;
-- [ ] move all maintained root regression modules;
-- [ ] rename `foundation_test.py` -> `tests/core/test_foundation.py`;
-- [ ] replace `test_phaseN.py` filenames and `PhaseN...Tests` classes with semantic behavior-oriented names;
-- [ ] split mixed milestone files across logical modules where that improves ownership;
-- [ ] preserve milestone/commit provenance in module docstrings or comments, not filenames;
-- [ ] add `__init__.py` files for deterministic discovery;
-- [ ] introduce shared test path/root helpers;
-- [ ] replace assumptions that `Path(__file__).parent` is the repository root;
-- [ ] add dedicated restore regressions for unavailable source/cache metainfo and saved-info-hash mismatch refusal;
-- [ ] preserve subprocess working-directory expectations explicitly;
-- [ ] update README test commands and project tree;
-- [ ] remove maintained-test exclusions from `.gitignore`;
-- [ ] keep only generated fixtures/output ignored;
-- [ ] verify focused suites;
-- [ ] verify full Windows discovery;
-- [ ] account explicitly for every test-count change;
-- [ ] commit the test-tree refactor separately from product features.
+- [x] committed the session-state persistence checkpoint separately first;
+- [x] created the `tests/` package tree;
+- [x] moved all maintained root regression modules;
+- [x] renamed `foundation_test.py` -> `tests/core/test_foundation.py`;
+- [x] replaced milestone-only filenames/classes with semantic behavior-oriented names;
+- [x] split mixed milestone files across logical modules;
+- [x] preserved milestone lineage in module documentation where useful;
+- [x] added `__init__.py` files for deterministic discovery;
+- [x] introduced shared repository-root helpers;
+- [x] removed moved-test assumptions that `Path(__file__).parent` is the repository root;
+- [x] added dedicated restore regressions for unavailable source/cache metainfo and saved-info-hash mismatch refusal;
+- [x] preserved subprocess working-directory expectations explicitly;
+- [x] updated README test commands and project tree;
+- [x] removed maintained-test exclusions from `.gitignore`;
+- [x] kept generated Python cache/output artifacts ignored;
+- [x] verified the focused session suite on the real Windows checkout;
+- [x] verified both canonical and plain full discovery on the real Windows checkout;
+- [x] accounted explicitly for the discoverable test-count change.
 
-`foundation_test.py` currently contains four `unittest` tests but is not matched by normal `test*.py` discovery. Once renamed and included, the initial discoverable suite should therefore be **at least 303 tests** before any new migration-guard tests are added.
+Test-count lineage:
 
-Canonical full command after migration:
-
-```bat
-python -m unittest discover -s tests -t .
+```text
+previous normal discovery:    299
+foundation tests joining:      +4
+new restore regressions:        +2
+                              ----
+current normal discovery:      305
 ```
 
-Focused examples:
+Current Windows validation:
 
-```bat
+```text
 python -m unittest tests.persistence.test_session_state_persistence -v
-python -m unittest tests.persistence.test_app_settings_persistence -v
-python -m unittest tests.network.test_transport_security -v
-python -m unittest discover -s tests\localization -t . -v
-```
+Ran 24 tests
+OK
 
-A plain repository-root:
+python -m unittest discover -s tests -t .
+Ran 305 tests
+OK (skipped=1)
 
-```bat
 python -m unittest discover
+Ran 305 tests
+OK (skipped=1)
 ```
 
-should remain useful if practical.
+The one skip remains the intentional non-Windows shell-behavior test.
 
 ---
 
@@ -567,33 +529,29 @@ A relational database is not automatically the right format for every durable ar
 
 ## Priority A — immediate
 
-**Commit the completed session-state persistence checkpoint.**
+**Commit the validated tracked `tests/` migration as its own repository-engineering checkpoint.**
 
-## Priority B — repository engineering
-
-**Move the maintained regression suite into a tracked structured `tests/` unittest package.**
-
-## Priority C — user-facing durability
+## Priority B — user-facing durability
 
 1. seeding goals;
 2. safe data relocation;
 3. labels/categories;
 4. watch folder.
 
-## Priority D — privacy/network transport
+## Priority C — privacy/network transport
 
 1. SOCKS5 proxy policy;
 2. uTP/BEP 29;
 3. WebSeed support.
 
-## Priority E — release/content
+## Priority D — release/content
 
 1. complete target locale population/review;
 2. Windows frozen/portable/installer localization smoke;
 3. Linux/BSD/macOS native desktop smoke;
 4. choose next release scope.
 
-## Priority F — later automation
+## Priority E — later automation
 
 1. local supervisory API/service mode;
 2. scheduling/rules;
@@ -605,13 +563,13 @@ A relational database is not automatically the right format for every durable ar
 
 Version numbers below are planning examples, not commitments.
 
-## Next engineering checkpoint
+## Current engineering checkpoint
 
 ```text
-Tracked structured unittest suite
+Tracked structured unittest suite — validated, pending commit
 ```
 
-No version bump is required.
+No version bump is required. After this checkpoint is committed, the next recommended product track is seeding goals and automatic stop policy.
 
 ## Possible v0.4.0 theme
 
@@ -664,10 +622,14 @@ Possible contents:
 
 ```text
 Session persistence suite:
-22 / 22 OK
+24 / 24 OK
 
 Full real Windows suite:
-299 / 299 OK
+305 / 305 OK
+1 expected non-Windows skip
+
+Plain repository-root discovery:
+305 / 305 OK
 1 expected non-Windows skip
 
 Live SalixORM session smoke:
@@ -681,5 +643,7 @@ alpha selected
 process restart restored 2 torrents
 first GUI frame displayed persisted queue order
 ```
+
+The 305-test baseline consists of the previous 299 discoverable tests, four foundation tests now included in normal discovery, and two dedicated session-restore regressions added during the test-tree migration.
 
 Future changes must preserve this baseline or account explicitly for every intentional test-count change.

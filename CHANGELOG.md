@@ -4,6 +4,15 @@ Notable SalixTorrent changes are recorded here.
 
 ## Unreleased
 
+### Maintained Regression Suite
+
+- Moved the maintained `unittest` regression suite from repository-root local files into a version-controlled `tests/` package with logical core, protocol, network, persistence, platform, packaging, presentation, CLI and localization subpackages.
+- Replaced milestone-only test filenames/classes with behavior-oriented names while preserving milestone lineage in module documentation.
+- Added shared repository-root helpers so moved tests no longer depend on `Path(__file__).parent` being the project root, and preserved subprocess working-directory contracts explicitly.
+- Added dedicated session-restore regressions for unavailable source/cache metainfo and saved-info-hash mismatch refusal.
+- Removed the historical `.gitignore` exclusions that kept maintained regression tests out of the public repository and documented canonical full/focused `unittest` commands.
+- Validated both canonical `tests/` discovery and plain repository-root discovery at 305 tests on the real Windows checkout, with one expected non-Windows skip.
+
 ### Session-State Persistence Boundary
 
 - Added a backend-neutral `SessionStateStore` boundary so `TorrentManager` no longer owns `session.json` file I/O directly; deterministic JSON remains the default/reference backend.
