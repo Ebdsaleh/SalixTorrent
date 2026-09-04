@@ -4,6 +4,20 @@ Notable SalixTorrent changes are recorded here.
 
 ## Unreleased
 
+### Session-State Persistence Boundary
+
+- Added a backend-neutral `SessionStateStore` boundary so `TorrentManager` no longer owns `session.json` file I/O directly; deterministic JSON remains the default/reference backend.
+- Advanced the normalized session snapshot to version 7 while retaining JSON import compatibility for historical versions 1-6.
+- Removed `max_active_downloads` from new session snapshots so application settings are the single durable authority for the active-download slot preference; legacy session values no longer overwrite current settings during restore.
+- Added lazy session backend selection with `SALIX_T_SESSION_BACKEND=json|salixorm` and optional `SALIX_T_SESSION_URL`; headless/nonpersistent managers force the JSON boundary without importing an optional SalixORM backend.
+- Added an optional file-backed SQLite session adapter using SalixORM `v0.2.0`, explicit `session-state-0001` migration metadata, ordered per-torrent rows, and one-transaction whole-snapshot replacement.
+- Preserved queue order explicitly with validated contiguous queue positions and persisted selected transfer, lifecycle intent, transfer limits, uploaded totals, seed-source path, protocol policy, file priorities and queue priority.
+- Made manual Move Up / Move Down immediately return a column-sorted queue view to real queue order so the GUI visibly reflects the persisted scheduler change without requiring a second Queue Order click.
+- Made the transfer table start in unsorted queue-order mode so a restored persisted queue is presented in scheduler order on the first rendered frame instead of defaulting to Name ASC.
+- Added read-only `session.json` bootstrap for an empty opt-in SalixORM store without deleting or dual-writing the legacy artifact.
+- Made corrupt/incompatible SalixORM session state fail closed and mark the active store unhealthy so later queue changes or shutdown cannot silently overwrite the damaged database.
+- Added diagnostics for active session backend/storage health and regression coverage for JSON v1-v6 compatibility, JSON v7 authority, lazy dependency behavior, SalixORM migration/reopen/order parity, atomic failed save, corrupt metadata/queue refusal, legacy bootstrap, custom database targets and real stopped-torrent restore.
+
 ### Application Settings Persistence Boundary
 
 - Audited SalixTorrent's file-backed durable state and selected application preferences as the next low-risk SalixORM integration boundary; session metadata remains JSON while fast-resume, cached metainfo, payloads, shell-handler backup and diagnostic-log formats remain purpose-built files.

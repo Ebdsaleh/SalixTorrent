@@ -1,7 +1,6 @@
 # app/logic/torrent_manager.py
 
 import asyncio
-import json
 import os
 import queue
 import secrets
@@ -13,7 +12,13 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from app.engine.runtime_paths import default_download_directory, state_directory
-from app.persistence import AppSettingsStoreError, build_app_settings_store
+from app.persistence import (
+    AppSettingsStoreError,
+    CURRENT_SESSION_STATE_VERSION,
+    SessionStateStoreError,
+    build_app_settings_store,
+    build_session_state_store,
+)
 from app.localization import AUTO_LOCALE, normalise_locale_code
 from app.logic.connectivity import ConnectivityManager
 from app.logic.network_binding import normalise_bind_address
@@ -76,7 +81,7 @@ class SessionIntent:
 
 class TorrentManager:
     _instance: Optional["TorrentManager"] = None
-    SESSION_STATE_VERSION = 6
+    SESSION_STATE_VERSION = CURRENT_SESSION_STATE_VERSION
     DEFAULT_MAX_ACTIVE_DOWNLOADS = 2
     PRIORITY_RANK = {
         TORRENT_PRIORITY_HIGH: 0,
@@ -108,7 +113,7 @@ class TorrentManager:
             cls._instance._running = False
             cls._instance._engine_ready = threading.Event()
             cls._instance._sessions_lock = threading.Lock()
-            cls._instance._state_file_lock = threading.Lock()
+            cls._instance._session_store_lock = threading.Lock()
             cls._instance._session_persistence_enabled = bool(session_persistence_enabled)
             cls._instance._persistent_sessions = set()
             cls._instance._ephemeral_torrent_paths = set()
@@ -138,8 +143,14 @@ class TorrentManager:
             cls._instance._connectivity = ConnectivityManager()
 
             cls._instance._state_dir = cls._instance._get_state_directory()
-            cls._instance._state_file = cls._instance._state_dir / "session.json"
             cls._instance._torrent_cache_dir = cls._instance._state_dir / "torrents"
+            # Headless/explicitly nonpersistent managers must not import an optional
+            # session backend merely because a desktop environment variable is set.
+            cls._instance._session_store = build_session_state_store(
+                cls._instance._state_dir,
+                backend=None if cls._instance._session_persistence_enabled else "json",
+            )
+            cls._instance._session_store_healthy = True
             # ``settings.json`` remains the default/reference settings artifact.
             # Alternative stores are selected behind one persistence boundary so
             # normal runtime startup does not import optional storage backends.
@@ -467,7 +478,15 @@ class TorrentManager:
 
     @property
     def session_state_path(self) -> str:
-        return str(self._state_file)
+        return self._session_store.location
+
+    @property
+    def session_backend(self) -> str:
+        return self._session_store.backend
+
+    @property
+    def session_storage_healthy(self) -> bool:
+        return bool(self._session_store_healthy)
 
     @property
     def settings_path(self) -> str:
@@ -585,46 +604,48 @@ class TorrentManager:
         return {
             "version": self.SESSION_STATE_VERSION,
             "selected_info_hash": selected_info_hash,
-            "max_active_downloads": int(self._max_active_downloads),
             "torrents": entries,
         }
 
     def save_session_state(self, force: bool = False):
-        """Atomically persist the current queue and the user's lifecycle intent."""
+        """Persist one coherent queue/lifecycle snapshot through the active store."""
         if not self._session_persistence_enabled:
             return
         if self._restoring_state and not force:
+            return
+        if not self._session_store_healthy:
+            print(
+                "[Salix_T Notice] Session storage is unhealthy; refusing to overwrite "
+                f"{self._session_store.location}."
+            )
             return
 
         try:
             data = self._build_persistent_state()
             self._ensure_state_directories()
-
-            with self._state_file_lock:
-                temp_path = self._state_file.with_suffix(".json.tmp")
-                temp_path.write_text(
-                    json.dumps(data, indent=2, sort_keys=True),
-                    encoding="utf-8",
-                )
-                os.replace(temp_path, self._state_file)
-        except OSError as exc:
+            with self._session_store_lock:
+                self._session_store.save(data)
+        except (SessionStateStoreError, OSError) as exc:
+            if self._session_store.backend != "json":
+                self._session_store_healthy = False
             print(f"[Salix_T Notice] Could not save previous session: {exc}")
 
     def _load_session_state(self) -> Optional[dict]:
         if not self._session_persistence_enabled:
             return None
-        if not self._state_file.exists():
-            return None
 
         try:
-            data = json.loads(self._state_file.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
+            with self._session_store_lock:
+                data = self._session_store.load()
+        except SessionStateStoreError as exc:
+            if self._session_store.backend != "json":
+                self._session_store_healthy = False
             print(f"[Salix_T Notice] Could not read previous session: {exc}")
             return None
 
         if not isinstance(data, dict):
             return None
-        if data.get("version") not in (1, 2, 3, 4, 5, self.SESSION_STATE_VERSION):
+        if data.get("version") not in tuple(range(1, self.SESSION_STATE_VERSION + 1)):
             print("[Salix_T Notice] Previous session uses an unsupported format.")
             return None
         if not isinstance(data.get("torrents", []), list):
@@ -664,16 +685,6 @@ class TorrentManager:
         entries = data.get("torrents", [])
         if not entries:
             return 0
-
-        try:
-            self._max_active_downloads = max(
-                0,
-                int(data.get("max_active_downloads", self.DEFAULT_MAX_ACTIVE_DOWNLOADS)),
-            )
-        except (TypeError, ValueError):
-            self._max_active_downloads = self.DEFAULT_MAX_ACTIVE_DOWNLOADS
-        self._settings["max_active_downloads"] = int(self._max_active_downloads)
-        self.save_app_settings()
 
         restored_order: List[str] = []
         active_hashes: List[str] = []
@@ -844,7 +855,6 @@ class TorrentManager:
         self._max_active_downloads = value
         self._settings["max_active_downloads"] = value
         self.save_app_settings()
-        self.save_session_state()
         self._send_cmd(
             TorrentCommand.SET_QUEUE_LIMIT,
             "",
@@ -1468,7 +1478,6 @@ class TorrentManager:
                         )
                     except (TypeError, ValueError):
                         self._max_active_downloads = self.DEFAULT_MAX_ACTIVE_DOWNLOADS
-                    self.save_session_state()
                     self._rebalance_queue()
                     continue
 

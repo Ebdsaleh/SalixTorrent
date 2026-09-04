@@ -192,6 +192,10 @@ class DownloadView:
                     header_row=True,
                     resizable=True,
                     sortable=True,
+                    # Start in the scheduler's persisted queue order instead of
+                    # Dear PyGui's implicit first-column sort. Users can still
+                    # click any column header to enter a temporary visual sort.
+                    sort_tristate=True,
                     callback=self._on_queue_sort,
                     policy=dpg.mvTable_SizingStretchProp,
                     borders_outerH=True,
@@ -1590,7 +1594,11 @@ class DownloadView:
         )
         self.manager.set_queue_order(self.torrent_order)
         if self._sort_specs:
-            self._apply_queue_sort()
+            # Move Up/Down changes the real scheduler order. If the table is
+            # currently under a visual column sort, immediately return it to
+            # queue order so the action is visible instead of appearing to do
+            # nothing until the separate Queue Order button is clicked.
+            self._clear_queue_sort()
         self._refresh_context_menu_states()
 
     def _move_torrent_down(self, info_hash: str):
@@ -1615,7 +1623,11 @@ class DownloadView:
         )
         self.manager.set_queue_order(self.torrent_order)
         if self._sort_specs:
-            self._apply_queue_sort()
+            # Move Up/Down changes the real scheduler order. If the table is
+            # currently under a visual column sort, immediately return it to
+            # queue order so the action is visible instead of appearing to do
+            # nothing until the separate Queue Order button is clicked.
+            self._clear_queue_sort()
         self._refresh_context_menu_states()
 
     def _refresh_context_menu_state(self, info_hash: str):
