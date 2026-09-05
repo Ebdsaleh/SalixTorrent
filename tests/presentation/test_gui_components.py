@@ -8,6 +8,7 @@ from tests.helpers import PROJECT_ROOT
 from app.engine.components import (
     AUTO,
     FILL,
+    Button,
     ComboBox,
     ControlGrid,
     ControlLayout,
@@ -15,9 +16,13 @@ from app.engine.components import (
     ControlRow,
     DurationEditor,
     Label,
+    LabeledComboField,
+    LabeledField,
     LabeledNumericField,
     NumericKind,
     NumericStepper,
+    NumericUnitField,
+    TextInput,
     resolve_control_layout,
 )
 from app.engine.components.layout import backend_dimension
@@ -209,6 +214,91 @@ class GuiComponentFoundationTests(unittest.TestCase):
             ControlGrid(((Label("A"), Label("B")), (Label("C"),)))
         with self.assertRaises(ValueError):
             ControlGrid(((Label("A"), Label("B")),), column_widths=(100,))
+
+    def test_labeled_field_supports_multiple_trailing_accessories(self):
+        renderer = RecordingRenderer()
+        field = LabeledField(
+            "Network interface / VPN",
+            ComboBox(("Any interface", "Ethernet"), default_value="Any interface"),
+            accessories=(
+                Button("Refresh Interfaces"),
+                Label("Ready"),
+            ),
+        )
+
+        field.build(renderer=renderer)
+
+        self.assertEqual(len(field.row.children), 4)
+        self.assertIs(field.row.children[0], field.label)
+        self.assertIs(field.row.children[1], field.control)
+        self.assertEqual(len(field.accessory_items()), 2)
+        self.assertEqual(renderer.created[0][0], "label")
+        self.assertEqual(renderer.created[1][0], "combo_box")
+        self.assertEqual(renderer.created[2][0], "button")
+        self.assertEqual(renderer.created[3][0], "label")
+
+    def test_numeric_unit_field_keeps_value_and_unit_controls_independent(self):
+        renderer = RecordingRenderer()
+        field = NumericUnitField(
+            "Download",
+            ("KB/s", "MB/s"),
+            default_value=2.5,
+            default_unit="MB/s",
+            min_value=0.0,
+            min_clamped=True,
+            format="%.2f",
+            value_width=110,
+            unit_width=90,
+        )
+
+        field.build(renderer=renderer)
+        value_item, unit_item = field.value_items()
+
+        self.assertEqual(field.value_control.get_value(), 2.5)
+        self.assertEqual(field.unit_control.get_value(), "MB/s")
+        self.assertEqual(value_item, field.control.require_item())
+        self.assertEqual(unit_item, field.accessories[0].require_item())
+        field.unit_control.set_value("KB/s")
+        self.assertEqual(field.unit_control.get_value(), "KB/s")
+
+    def test_text_input_dispatches_through_renderer_and_keeps_layout_semantic(self):
+        renderer = RecordingRenderer()
+        control = TextInput(
+            default_value="C:/Downloads",
+            hint="Folder",
+            layout=ControlLayout(width=700),
+        )
+
+        control.build(renderer=renderer)
+
+        kind, _, kwargs = renderer.created[0]
+        self.assertEqual(kind, "text_input")
+        self.assertEqual(kwargs["default_value"], "C:/Downloads")
+        self.assertEqual(kwargs["hint"], "Folder")
+        self.assertEqual(kwargs["width"], 700)
+        self.assertEqual(control.get_value(), "C:/Downloads")
+
+    def test_specialized_labeled_fields_share_generic_composition_contract(self):
+        combo = LabeledComboField("Mode", ("A", "B"), default_value="A")
+        numeric = LabeledNumericField("Ratio", default_value=1)
+
+        self.assertIsInstance(combo, LabeledField)
+        self.assertIsInstance(numeric, LabeledField)
+        self.assertEqual(combo.accessories, [])
+        self.assertEqual(numeric.accessories, [])
+
+    def test_preferences_value_controls_are_component_owned(self):
+        source = (PROJECT_ROOT / "app" / "views" / "settings_view.py").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("LabeledField(", source)
+        self.assertIn("NumericUnitField(", source)
+        self.assertIn("TextInput(", source)
+        self.assertIn("ControlRow(", source)
+        self.assertNotIn("dpg.add_input_", source)
+        self.assertNotIn("dpg.add_combo(", source)
+        self.assertNotIn("dpg.add_checkbox(", source)
 
     def test_duration_editor_is_three_validated_numeric_controls_in_one_grid(self):
         renderer = RecordingRenderer()

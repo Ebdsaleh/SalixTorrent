@@ -66,6 +66,8 @@ class DearPyGuiRenderer:
             return dpg.add_button(**kwargs)
         if kind == "combo_box":
             return dpg.add_combo(**kwargs)
+        if kind == "text_input":
+            return dpg.add_input_text(**kwargs)
         if kind == "numeric_int":
             return dpg.add_input_int(**kwargs)
         if kind == "numeric_float":

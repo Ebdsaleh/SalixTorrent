@@ -18,9 +18,16 @@ from app.engine.components.controls import (
     NumericKind,
     NumericStepper,
     Spacer,
+    TextInput,
 )
 from app.engine.components.containers import ControlColumn, ControlGrid, ControlRow
-from app.engine.components.fields import DurationEditor, LabeledComboField, LabeledNumericField
+from app.engine.components.fields import (
+    DurationEditor,
+    LabeledComboField,
+    LabeledField,
+    LabeledNumericField,
+    NumericUnitField,
+)
 from app.engine.components.renderer import (
     ComponentRenderer,
     DearPyGuiRenderer,
@@ -45,11 +52,14 @@ __all__ = [
     "DurationEditor",
     "Label",
     "LabeledComboField",
+    "LabeledField",
     "LabeledNumericField",
     "NumericKind",
     "NumericStepper",
+    "NumericUnitField",
     "ResolvedControlLayout",
     "Spacer",
+    "TextInput",
     "get_default_renderer",
     "resolve_control_layout",
 ]

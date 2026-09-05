@@ -2,8 +2,8 @@
 
 **Current application version string:** `0.4.0`
 **Roadmap status:** active development planning
-**Current implementation checkpoint:** post-v0.4.0 reusable GUI component foundation — first source tranche implemented; real-Windows validation pending
-**Current real Windows regression baseline:** 334 / 334 tests passing, with one expected non-Windows skip
+**Current implementation checkpoint:** post-v0.4.0 reusable GUI component foundation — first tranche committed/Windows-validated; Preferences composition tranche prepared
+**Current real Windows regression baseline:** 343 / 343 tests passing, with one expected non-Windows skip; next prepared tranche expects 348
 
 This roadmap records intended engineering direction rather than promising dates or release numbers. Changes should remain incremental, testable, reviewable, and compatible with SalixTorrent's existing protocol, persistence, packaging, localization, and cross-platform boundaries.
 
@@ -549,9 +549,9 @@ A relational database is not automatically the right format for every durable ar
 
 ## Priority A — immediate
 
-**Validate and continue the reusable GUI component layer introduced in the first post-v0.4.0 source tranche.**
+**Continue the reusable GUI component layer after the committed and Windows-validated first tranche.**
 
-Current first-tranche scope:
+First tranche — complete/pushed (`66b46fa7070128f13bc87fbe4f9556a86049e895`):
 
 - [x] create a framework-owned `app/engine/components/` package;
 - [x] add backend-neutral primitive Label, Button, ComboBox, NumericStepper, CheckBox and Spacer controls;
@@ -562,9 +562,22 @@ Current first-tranche scope:
 - [x] migrate Torrent Properties, `Configure targets...`, and Preferences seeding-goal controls without changing seeding-policy semantics;
 - [x] add nine headless component/layout regressions;
 - [x] regenerate deterministic localization extraction metadata without adding or changing canonical strings;
-- [ ] run the focused component/localization tests on the real Windows checkout;
-- [ ] run both full Windows discovery commands and account for the expected 334 -> 343 test-count increase;
-- [ ] smoke the migrated seeding-goal surfaces visually before broadening the conversion.
+- [x] real Windows focused component/localization validation;
+- [x] both full Windows discovery commands at 343/343 with one expected skip;
+- [x] visual parity smoke for Torrent Properties, `Configure targets...`, and Preferences.
+
+Second tranche — Preferences composition expansion:
+
+- [x] add backend-neutral `TextInput`;
+- [x] add generic `LabeledField` with one primary control plus zero-or-more trailing/accessory components;
+- [x] make `LabeledComboField` and `LabeledNumericField` reuse the generic field contract;
+- [x] add `NumericUnitField` for numeric-value + unit-selector rows;
+- [x] migrate Preferences value controls and action rows while retaining existing item-id compatibility aliases;
+- [x] add five additional headless component regressions (14 component tests total);
+- [x] regenerate deterministic localization extraction metadata with no canonical string changes;
+- [ ] run focused Windows component/localization validation;
+- [ ] run both full Windows discovery commands and account for the expected 343 -> 348 test-count increase;
+- [ ] visually smoke Downloads, Networking, Privacy/Transport, Queue, Global Bandwidth, New Torrent Defaults and Desktop Preferences before the next architectural tranche.
 
 ## Priority B — user-facing durability
 
@@ -630,6 +643,7 @@ Primitive controls
     Label
     Button
     ComboBox
+    TextInput
     NumericStepper
     CheckBox
     Spacer
@@ -641,21 +655,24 @@ Layout components
     ControlGrid
         |
         v
-Semantic composites
+Field composition
+    LabeledField
+        primary control + 0..n accessories
     LabeledComboField
     LabeledNumericField
+    NumericUnitField
     DurationEditor
 ```
 
 `ControlRow` is the generic single-row-capacity composition primitive: it accepts an arbitrary number of child components and resolves width, height and horizontal spacing independently through the existing framework property cascade. `AUTO` and `FILL` are semantic framework sizes; Dear PyGui-specific values are translated only inside the renderer bridge.
 
-The first live migration deliberately targets the already-polished seeding-goal controls:
+The first live migration deliberately targeted the already-polished seeding-goal controls and is now Windows-validated:
 
 - Torrent Properties uses one dense `ControlRow` containing the existing goal-mode, ratio and D/H/M primitives;
 - `Configure targets...` uses labeled combo/numeric composites plus `DurationEditor`;
 - Preferences new-torrent defaults use the same semantic composites and duration editor.
 
-The surrounding views retain temporary raw item-id aliases so this first extraction does not force an unrelated whole-application rewrite. Broader migration should proceed incrementally after the real Windows visual/test gate proves layout parity.
+The second tranche broadens the same contract across Preferences. `LabeledField` provides the generic row shape for a label, one primary control and arbitrary trailing accessories; `NumericUnitField` is a convenience built on that contract rather than a parallel layout system. Preferences no longer constructs input/combo/checkbox value controls directly through Dear PyGui, while its surrounding panel/child-window structure remains intentionally application-specific. Existing raw item-id aliases are retained temporarily so persistence, refresh, tooltips and save/restore logic continue through their proven boundaries.
 
 ### Possible v0.5.0 theme
 
@@ -663,14 +680,13 @@ The surrounding views retain temporary raw item-id aliases so this first extract
 Reusable GUI component foundation
 ```
 
-Candidate follow-up work after the first tranche validates:
+Candidate follow-up work after the Preferences composition tranche validates:
 
-- migrate repeated bandwidth/rate-limit rows;
-- migrate queue/network/default-setting controls where the component contract already fits;
-- introduce a deliberate application-level component theme object instead of scattered width constants;
-- add component-level tooltip/accessibility hooks without moving SalixTorrent-specific Help semantics into the framework;
+- introduce a deliberate application-level component theme/profile object instead of repeating common width constants in views;
+- add generic component metadata/hooks for tooltip and accessibility attachment without moving SalixTorrent-specific Help semantics into the framework;
+- consider framework-owned panel/form-section composition only where it removes repeated layout contracts rather than wrapping every Dear PyGui container cosmetically;
 - continue separating component model/state from the Dear PyGui renderer where that improves future RAD extraction;
-- avoid converting complex tables/graphs merely for cosmetic uniformity.
+- migrate additional ordinary forms incrementally, but avoid converting complex tables/graphs merely for cosmetic uniformity.
 
 ## Later network release
 
@@ -750,6 +766,6 @@ process restart restored 2 torrents
 first GUI frame displayed persisted queue order
 ```
 
-The v0.4.0 release baseline remains 334/334 tests with one expected non-Windows skip. The first GUI-component source tranche adds nine new headless presentation regressions, so the expected full discoverable count after applying this drop-in is 343 tests; that new count is not authoritative until confirmed on the real Windows checkout. Source-side component tests pass 8/8 and deterministic localization extraction is current. Live GUI smoke for the migrated component surfaces is still required.
+The v0.4.0 release baseline remains 334/334 tests with one expected non-Windows skip. The first GUI-component tranche is committed/pushed at `66b46fa7070128f13bc87fbe4f9556a86049e895` and is now the authoritative real-Windows development baseline at 343/343 tests with one expected skip; its visual parity smoke also passed. The second Preferences-composition tranche adds five headless component regressions, bringing source-side component coverage to 14/14 and the expected real-Windows discoverable total to 348 after application. Focused documentation/localization tests pass 34/34 source-side and deterministic localization extraction is current; the 348 Windows/full visual gate remains pending.
 
 The v0.4.0 live GUI smoke covers per-torrent editing, additive Days/Hours/Minutes quick controls, explicit bulk Preferences application, persistence, in-app/native notifications, instanced time-based automatic stop, Days/Hours/Minutes exact editors, stacked compact duration controls, and the widened Preferences ratio field. Ratio-threshold behavior remains covered by deterministic regressions without requiring a second live peer. Future changes must preserve the applicable baseline or account explicitly for every intentional test-count change.

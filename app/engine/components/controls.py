@@ -121,6 +121,49 @@ class ComboBox(ValueComponent):
         self.configure(items=list(self.items))
 
 
+class TextInput(ValueComponent):
+    def __init__(
+        self,
+        *,
+        default_value: str = "",
+        hint: str | None = None,
+        multiline: bool = False,
+        readonly: bool = False,
+        callback=None,
+        user_data=None,
+        enabled: bool = True,
+        show: bool = True,
+        theme: ControlLayoutTheme | None = None,
+        layout: ControlLayout | None = None,
+    ):
+        super().__init__(theme=theme, layout=layout)
+        self.default_value = str(default_value)
+        self.hint = hint
+        self.multiline = bool(multiline)
+        self.readonly = bool(readonly)
+        self.callback = callback
+        self.user_data = user_data
+        self.enabled = bool(enabled)
+        self.show = bool(show)
+
+    def build(self, *, renderer=None, parent=None) -> object:
+        renderer = renderer or get_default_renderer()
+        resolved = self._resolve_layout()
+        kwargs = self._layout_kwargs(resolved)
+        kwargs.update(
+            default_value=self.default_value,
+            hint=self.hint,
+            multiline=self.multiline,
+            readonly=self.readonly,
+            callback=self.callback,
+            user_data=self.user_data,
+            enabled=self.enabled,
+            show=self.show,
+        )
+        self._with_parent(kwargs, parent)
+        return self._bind(renderer, renderer.create("text_input", **kwargs))
+
+
 class NumericStepper(ValueComponent):
     """Validated integer/float input with backend-native step buttons."""
 

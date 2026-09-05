@@ -14,6 +14,17 @@ Notable SalixTorrent changes are recorded here.
 - Migrated the seeding-goal controls in Torrent Properties, `Configure targets...`, and Preferences new-torrent defaults onto the new component layer while preserving the existing GUI behavior, localized strings, durable policy semantics, and legacy item-id aliases used by the surrounding views.
 - Added headless component regressions covering layout provenance/fallback, semantic sizing, arbitrary `ControlRow` composition, integer/float numeric dispatch, value/configuration access, grid validation, and the three-part duration editor.
 - Regenerated deterministic localization extraction metadata after the view-level component migration; no canonical UI/Help/Glossary strings changed.
+- Validated the first component tranche on the real Windows checkout at 343/343 tests in both canonical and plain discovery, with one expected non-Windows skip; live GUI smoke confirmed parity in Torrent Properties, `Configure targets...`, and Preferences.
+
+### Preferences Component Composition Expansion
+
+- Added generic `LabeledField` composition so one label, one primary control, and zero or more trailing/accessory components can share a single reusable row without proliferating narrowly named widget combinations.
+- Added backend-neutral `TextInput` and reusable `NumericUnitField` components; the latter composes a validated numeric stepper with a unit selector through the same generic field/accessory boundary.
+- Refactored `LabeledComboField` and `LabeledNumericField` to share the generic `LabeledField` contract instead of maintaining parallel row implementations.
+- Migrated Preferences value controls onto the component layer, including the default download-directory chooser, listen-port fallback row, torrent protocol/max peers, DHT/PEX/LPD and port-mapping toggles, peer encryption, network-interface selection/refresh, Interface Lock/IP masking, queue controls, global/default bandwidth rows, desktop choices/toggles, and Save/Restore actions.
+- Preserved the existing Dear PyGui item identifiers as compatibility aliases so persistence, refresh, tooltips, validation, and save/restore behavior continue through the established view logic while construction becomes framework-owned.
+- Added five component regressions covering generic trailing accessories, numeric+unit composition, text-input rendering/value access, specialized-field inheritance, and the rule that Preferences no longer constructs input/combo/checkbox value controls directly through Dear PyGui.
+- Regenerated deterministic localization extraction metadata after the Preferences migration; canonical UI/Help/Glossary strings remain unchanged.
 
 
 ## v0.4.0 - 2026-09-05

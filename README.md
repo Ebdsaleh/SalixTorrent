@@ -2,7 +2,7 @@
 
 SalixTorrent is a desktop BitTorrent client written in Python with a custom asynchronous protocol engine and a Dear PyGui interface. Its transfer engine is generation-aware across BitTorrent v1, BitTorrent v2 and hybrid torrents, while keeping protocol identity, storage verification, discovery provenance and torrent creation explicit. The project aims to expose what a torrent client is doing rather than hiding the protocol behind a single progress bar: transfers, peers, pieces, files, trackers, discovery sources, bandwidth history, connectivity, and protocol terminology are all inspectable from the application.
 
-> **Release status:** v0.4.0 is the current release. It consolidates the Phase 12 offline-first localization foundation, semantic Help/Glossary services, provider-neutral translation tooling, backend-neutral application/session persistence, optional SalixORM/SQLite integrations, the tracked regression suite, and durable per-torrent seeding goals with ratio/time automatic-stop policies. Deterministic JSON remains the default/reference persistence format, while SalixORM-backed storage remains an explicit opt-in integration path. The current real-Windows source regression baseline is 334 / 334 tests passing, with one expected non-Windows shell-behavior skip.
+> **Release status:** v0.4.0 is the current release. It consolidates the Phase 12 offline-first localization foundation, semantic Help/Glossary services, provider-neutral translation tooling, backend-neutral application/session persistence, optional SalixORM/SQLite integrations, the tracked regression suite, and durable per-torrent seeding goals with ratio/time automatic-stop policies. Deterministic JSON remains the default/reference persistence format, while SalixORM-backed storage remains an explicit opt-in integration path. The immutable v0.4.0 Windows release baseline is 334 / 334 tests passing with one expected non-Windows shell-behavior skip; the current pushed post-release development baseline is 343 / 343.
 
 ## Highlights
 
@@ -315,7 +315,7 @@ python -m unittest tests.protocol.test_v2_peer_wire -v
 python -m unittest discover -s tests\localization -t . -v
 ```
 
-The current real Windows development baseline is **334 / 334 tests passing**, with one expected non-Windows shell-behavior skip. Both canonical `tests/` discovery and plain repository-root discovery produce the same result.
+The current pushed real Windows development baseline is **343 / 343 tests passing**, with one expected non-Windows shell-behavior skip. Both canonical `tests/` discovery and plain repository-root discovery produce the same result. The in-progress Preferences composition tranche adds five headless component regressions, so its expected Windows total is 348 after application.
 
 The release-critical regression coverage includes strict BEP-52 v2 identity/file-tree/piece-layer/Merkle validation, MSE/RC4 interoperability, rarest-first/endgame scheduling, bounded request pipelines, asynchronous disk backpressure/caching, source binding, encryption fallback rules, multi-torrent port mappings, finite/permanent mapping-lease handling, structured UPnP/NAT-PMP diagnostics, source-severity accounting, Interface Lock, real inbound seeding uploads, IPv6 peer TCP, BEP-7/BEP-15 tracker peers, BEP-11 IPv6 PEX, BEP-32 DHT behavior, BEP-48 HTTP scrape batching, BEP-15 UDP scrape batching, scrape/announce telemetry isolation, Windows Proactor reset handling, application/session persistence, offline localization, responsive content-bounds geometry, framework property-cascade fallback/provenance, per-page documentation layout overrides, and semantic documentation typography/media sizing.
 
@@ -323,7 +323,7 @@ The release-critical regression coverage includes strict BEP-52 v2 identity/file
 
 v0.4.0 is the current release checkpoint. Phases 1-11 remain complete, including the native Windows standalone/portable/installer architecture and the cross-platform desktop/tray abstraction. Phase 12 provides the offline-first localization framework, semantic Help/Glossary services, provider-neutral translation tooling, optional SalixORM-backed development translation memory, backend-neutral application/session persistence, and the tracked regression suite. The v0.4.0 transfer-lifecycle milestone adds durable per-torrent seeding goals and automatic-stop policy. Linux/BSD/macOS native desktop behavior and full target-locale population/review remain active hardening work.
 
-Post-v0.4.0 development has begun the reusable GUI component layer intended for later RAD/framework extraction. The first tranche introduces backend-neutral primitive controls, semantic `AUTO`/`FILL` sizing, the generic one-row `ControlRow` container, aligned `ControlGrid`/`ControlColumn` composition, and reusable labeled-field/duration composites. The seeding-goal controls are the first application surface migrated onto this layer so framework behavior is proven against an already validated real GUI before broader conversion.
+Post-v0.4.0 development has begun the reusable GUI component layer intended for later RAD/framework extraction. The first tranche introduced backend-neutral primitive controls, semantic `AUTO`/`FILL` sizing, the generic one-row `ControlRow` container, aligned `ControlGrid`/`ControlColumn` composition, and reusable labeled-field/duration composites; that tranche is committed/pushed and Windows-validated at 343/343 with visual parity. The next composition tranche adds `TextInput`, a generic `LabeledField` with zero-or-more trailing/accessory components, and `NumericUnitField`, then migrates Preferences value controls onto those same framework-owned primitives while preserving existing item-id compatibility.
 
 The component layer deliberately reuses the existing property-cascade rule:
 
@@ -331,7 +331,7 @@ The component layer deliberately reuses the existing property-cascade rule:
 framework default -> active theme -> explicit instance override
 ```
 
-Width, height and row spacing resolve independently, preserving safe framework defaults while allowing sparse themes and per-instance overrides. Dear PyGui remains the current renderer, but its bridge is kept behind the component contract so the component model can be extracted without making application views own backend-specific construction details.
+Width, height and row spacing resolve independently, preserving safe framework defaults while allowing sparse themes and per-instance overrides. Generic field composition now follows `label -> primary control -> 0..n accessories`, which covers patterns such as `Network interface / VPN + ComboBox + Refresh`, `Active download slots + NumericStepper + 0 = Unlimited`, and `Download + NumericStepper + unit ComboBox` without creating one-off framework classes for every row shape. Dear PyGui remains the current renderer, but its bridge is kept behind the component contract so the component model can be extracted without making application views own backend-specific construction details.
 
 ## Project structure
 

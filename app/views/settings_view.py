@@ -9,10 +9,20 @@ import dearpygui.dearpygui as dpg
 
 from app.engine.desktop_integration import DesktopIntegration
 from app.engine.components import (
+    Button,
+    CheckBox,
+    ComboBox,
+    ControlLayout,
+    ControlRow,
     DurationEditor,
+    Label,
     LabeledComboField,
+    LabeledField,
     LabeledNumericField,
     NumericKind,
+    NumericStepper,
+    NumericUnitField,
+    TextInput,
 )
 from app.engine.documentation import (
     DOCUMENTATION_SCALE_LABELS,
@@ -96,87 +106,119 @@ class SettingsView:
             with dpg.child_window(height=112, width=-1, border=True) as self.downloads_panel:
                 dpg.add_text(tr('view.settings_view.downloads', "DOWNLOADS"), color=(100, 180, 255))
                 dpg.add_separator()
-                with dpg.group(horizontal=True):
-                    download_dir_label = dpg.add_text(tr("settings.default_download_directory", "Default download directory"))
-                    add_help_tooltip(download_dir_label, "DEFAULT_DOWNLOAD_DIR")
-                    self.download_dir_input = dpg.add_input_text(
-                        default_value=self.settings["download_dir"], width=700
-                    )
-                    add_help_tooltip(self.download_dir_input, "DEFAULT_DOWNLOAD_DIR")
-                    choose_download_dir_button = dpg.add_button(label=tr("settings.choose_folder", " Choose Folder "), callback=self._choose_download_dir)
-                    add_help_tooltip(choose_download_dir_button, "DEFAULT_DOWNLOAD_DIR")
+                self.download_directory_field = LabeledField(
+                    tr("settings.default_download_directory", "Default download directory"),
+                    TextInput(
+                        default_value=self.settings["download_dir"],
+                        layout=ControlLayout(width=700),
+                    ),
+                    accessories=(
+                        Button(
+                            tr("settings.choose_folder", " Choose Folder "),
+                            callback=self._choose_download_dir,
+                        ),
+                    ),
+                )
+                self.download_directory_field.build()
+                self.download_dir_input = self.download_directory_field.control.require_item()
+                choose_download_dir_button = self.download_directory_field.accessories[0].require_item()
+                add_help_tooltip(self.download_directory_field.label.require_item(), "DEFAULT_DOWNLOAD_DIR")
+                add_help_tooltip(self.download_dir_input, "DEFAULT_DOWNLOAD_DIR")
+                add_help_tooltip(choose_download_dir_button, "DEFAULT_DOWNLOAD_DIR")
 
             dpg.add_spacer(height=7)
             with dpg.group(horizontal=True):
                 with dpg.child_window(width=530, height=290, border=True) as self.networking_panel:
                     dpg.add_text(tr('view.settings_view.networking', "NETWORKING"), color=(255, 200, 100))
                     dpg.add_separator()
-                    with dpg.group(horizontal=True):
-                        listen_port_label = dpg.add_text(tr('view.settings_view.bittorrent_listen_port', "BitTorrent listen port"))
-                        add_help_tooltip(listen_port_label, "LISTEN_PORT")
-                        self.listen_port_input = dpg.add_input_int(
+                    self.listen_port_field = LabeledField(
+                        tr('view.settings_view.bittorrent_listen_port', "BitTorrent listen port"),
+                        NumericStepper(
+                            kind=NumericKind.INTEGER,
                             default_value=int(self.settings["listen_port"]),
                             min_value=1,
                             max_value=65535,
                             min_clamped=True,
                             max_clamped=True,
-                            width=100,
-                        )
-                        add_help_tooltip(self.listen_port_input, "LISTEN_PORT")
-                        fallback_ports = dpg.add_text(tr('view.settings_view.fallback_next_10_ports', "Fallback: next 10 ports"), color=(140, 140, 145))
-                        add_text_tooltip(fallback_ports, tr('view.settings_view.listen_port_fallback_if_the_preferred_tcp', "Listen-port fallback\n\nIf the preferred TCP port is already occupied, SalixTorrent tries the next ten port numbers rather than failing the entire torrent subsystem."))
+                            layout=ControlLayout(width=100),
+                        ),
+                        accessories=(
+                            Label(
+                                tr('view.settings_view.fallback_next_10_ports', "Fallback: next 10 ports"),
+                                color=(140, 140, 145),
+                            ),
+                        ),
+                    )
+                    self.listen_port_field.build()
+                    self.listen_port_input = self.listen_port_field.control.require_item()
+                    fallback_ports = self.listen_port_field.accessories[0].require_item()
+                    add_help_tooltip(self.listen_port_field.label.require_item(), "LISTEN_PORT")
+                    add_help_tooltip(self.listen_port_input, "LISTEN_PORT")
+                    add_text_tooltip(fallback_ports, tr('view.settings_view.listen_port_fallback_if_the_preferred_tcp', "Listen-port fallback\n\nIf the preferred TCP port is already occupied, SalixTorrent tries the next ten port numbers rather than failing the entire torrent subsystem."))
 
-                    with dpg.group(horizontal=True):
-                        protocol_label = dpg.add_text(tr('view.settings_view.torrent_protocol', "Torrent protocol"))
-                        add_help_tooltip(protocol_label, "TORRENT_PROTOCOL_POLICY")
-                        self.torrent_protocol_combo = dpg.add_combo(
-                            items=localized_choices(TORRENT_PROTOCOL_POLICIES),
-                            default_value=tr_value(self.settings.get(
-                                "torrent_protocol_policy", TORRENT_PROTOCOL_AUTO
-                            )),
-                            width=220,
-                        )
-                        add_help_tooltip(self.torrent_protocol_combo, "TORRENT_PROTOCOL_POLICY")
+                    self.torrent_protocol_field = LabeledComboField(
+                        tr('view.settings_view.torrent_protocol', "Torrent protocol"),
+                        localized_choices(TORRENT_PROTOCOL_POLICIES),
+                        default_value=tr_value(self.settings.get(
+                            "torrent_protocol_policy", TORRENT_PROTOCOL_AUTO
+                        )),
+                        control_width=220,
+                    )
+                    self.torrent_protocol_field.build()
+                    self.torrent_protocol_combo = self.torrent_protocol_field.control.require_item()
+                    add_help_tooltip(self.torrent_protocol_field.label.require_item(), "TORRENT_PROTOCOL_POLICY")
+                    add_help_tooltip(self.torrent_protocol_combo, "TORRENT_PROTOCOL_POLICY")
 
-                    with dpg.group(horizontal=True):
-                        max_peers_label = dpg.add_text(tr('view.settings_view.default_max_peers', "Default max peers"))
-                        add_help_tooltip(max_peers_label, "MAX_PEERS")
-                        self.max_peers_input = dpg.add_input_int(
-                            default_value=int(self.settings["default_max_peers"]),
-                            min_value=1,
-                            max_value=500,
-                            min_clamped=True,
-                            max_clamped=True,
-                            width=90,
-                        )
-                        add_help_tooltip(self.max_peers_input, "MAX_PEERS")
+                    self.max_peers_field = LabeledNumericField(
+                        tr('view.settings_view.default_max_peers', "Default max peers"),
+                        kind=NumericKind.INTEGER,
+                        default_value=int(self.settings["default_max_peers"]),
+                        min_value=1,
+                        max_value=500,
+                        min_clamped=True,
+                        max_clamped=True,
+                        control_width=90,
+                    )
+                    self.max_peers_field.build()
+                    self.max_peers_input = self.max_peers_field.control.require_item()
+                    add_help_tooltip(self.max_peers_field.label.require_item(), "MAX_PEERS")
+                    add_help_tooltip(self.max_peers_input, "MAX_PEERS")
 
-                    self.enable_dht_checkbox = dpg.add_checkbox(
-                        label=tr('view.settings_view.enable_dht_bep_5_bep_32', "Enable DHT (BEP-5 / BEP-32)"),
+                    self.enable_dht_control = CheckBox(
+                        tr('view.settings_view.enable_dht_bep_5_bep_32', "Enable DHT (BEP-5 / BEP-32)"),
                         default_value=bool(self.settings["enable_dht"]),
                     )
+                    self.enable_dht_checkbox = self.enable_dht_control.build()
                     add_help_tooltip(self.enable_dht_checkbox, "DHT")
-                    self.enable_pex_checkbox = dpg.add_checkbox(
-                        label=tr('view.settings_view.enable_peer_exchange_pex_bep_10_11', "Enable Peer Exchange / PEX (BEP-10/11)"),
+                    self.enable_pex_control = CheckBox(
+                        tr('view.settings_view.enable_peer_exchange_pex_bep_10_11', "Enable Peer Exchange / PEX (BEP-10/11)"),
                         default_value=bool(self.settings["enable_pex"]),
                     )
+                    self.enable_pex_checkbox = self.enable_pex_control.build()
                     add_help_tooltip(self.enable_pex_checkbox, "PEX")
-                    self.enable_lan_checkbox = dpg.add_checkbox(
-                        label=tr('view.settings_view.enable_local_peer_discovery_lan_bep_14', "Enable Local Peer Discovery / LAN (BEP-14)"),
+                    self.enable_lan_control = CheckBox(
+                        tr('view.settings_view.enable_local_peer_discovery_lan_bep_14', "Enable Local Peer Discovery / LAN (BEP-14)"),
                         default_value=bool(self.settings["enable_lan_discovery"]),
                     )
+                    self.enable_lan_checkbox = self.enable_lan_control.build()
                     add_help_tooltip(self.enable_lan_checkbox, "LPD")
-                    with dpg.group(horizontal=True):
-                        self.enable_upnp_checkbox = dpg.add_checkbox(
-                            label=tr('view.settings_view.upnp_port_mapping', "UPnP port mapping"),
-                            default_value=bool(self.settings["enable_upnp"]),
+                    self.port_mapping_row = ControlRow(
+                        (
+                            CheckBox(
+                                tr('view.settings_view.upnp_port_mapping', "UPnP port mapping"),
+                                default_value=bool(self.settings["enable_upnp"]),
+                            ),
+                            CheckBox(
+                                tr('view.settings_view.nat_pmp_fallback', "NAT-PMP fallback"),
+                                default_value=bool(self.settings["enable_natpmp"]),
+                            ),
                         )
-                        add_help_tooltip(self.enable_upnp_checkbox, "UPNP")
-                        self.enable_natpmp_checkbox = dpg.add_checkbox(
-                            label=tr('view.settings_view.nat_pmp_fallback', "NAT-PMP fallback"),
-                            default_value=bool(self.settings["enable_natpmp"]),
-                        )
-                        add_help_tooltip(self.enable_natpmp_checkbox, "NATPMP")
+                    )
+                    self.port_mapping_row.build()
+                    self.enable_upnp_checkbox = self.port_mapping_row.children[0].require_item()
+                    self.enable_natpmp_checkbox = self.port_mapping_row.children[1].require_item()
+                    add_help_tooltip(self.enable_upnp_checkbox, "UPNP")
+                    add_help_tooltip(self.enable_natpmp_checkbox, "NATPMP")
 
                 with dpg.child_window(width=-1, height=360, border=True) as self.connectivity_panel:
                     dpg.add_text(tr('view.settings_view.incoming_connectivity', "INCOMING CONNECTIVITY"), color=(0, 255, 128))
@@ -204,10 +246,11 @@ class SettingsView:
                     )
                     add_help_tooltip(self.connectivity_error, "PORT_MAPPING")
                     dpg.add_spacer(height=6)
-                    refresh_connectivity_button = dpg.add_button(
-                        label=tr('view.settings_view.refresh_remap_now', " Refresh / Remap Now "),
+                    self.refresh_connectivity_control = Button(
+                        tr('view.settings_view.refresh_remap_now', " Refresh / Remap Now "),
                         callback=self._refresh_connectivity,
                     )
+                    refresh_connectivity_button = self.refresh_connectivity_control.build()
                     add_help_tooltip(refresh_connectivity_button, "PORT_MAPPING")
                     self.connectivity_note = dpg.add_text(
                         tr('view.settings_view.mapped_means_the_router_accepted_a_mapping', "'Mapped' means the router accepted a mapping. 'Incoming Confirmed' "
@@ -221,43 +264,52 @@ class SettingsView:
             with dpg.child_window(height=238, width=-1, border=True) as self.privacy_panel:
                 dpg.add_text(tr('view.settings_view.privacy_transport', "PRIVACY / TRANSPORT"), color=(100, 220, 200))
                 dpg.add_separator()
-                with dpg.group(horizontal=True):
-                    encryption_label = dpg.add_text(tr('view.settings_view.peer_transport_encryption', "Peer transport encryption"))
-                    add_help_tooltip(encryption_label, "MSE")
-                    self.peer_encryption_combo = dpg.add_combo(
-                        items=localized_choices(PEER_ENCRYPTION_POLICIES),
-                        default_value=tr_value(self.settings.get("peer_encryption", "Prefer Encryption")),
-                        width=190,
-                    )
-                    add_help_tooltip(self.peer_encryption_combo, "PEER_ENCRYPTION_POLICY")
+                self.peer_encryption_field = LabeledComboField(
+                    tr('view.settings_view.peer_transport_encryption', "Peer transport encryption"),
+                    localized_choices(PEER_ENCRYPTION_POLICIES),
+                    default_value=tr_value(self.settings.get("peer_encryption", "Prefer Encryption")),
+                    control_width=190,
+                )
+                self.peer_encryption_field.build()
+                self.peer_encryption_combo = self.peer_encryption_field.control.require_item()
+                add_help_tooltip(self.peer_encryption_field.label.require_item(), "MSE")
+                add_help_tooltip(self.peer_encryption_combo, "PEER_ENCRYPTION_POLICY")
 
                 bind_options, selected_bind_option = self._build_network_interface_options(
                     self.settings.get("network_bind_address", "")
                 )
-                with dpg.group(horizontal=True):
-                    bind_label = dpg.add_text(tr('view.settings_view.network_interface_vpn', "Network interface / VPN"))
-                    add_help_tooltip(bind_label, "NETWORK_BINDING")
-                    self.network_bind_combo = dpg.add_combo(
-                        items=bind_options,
+                self.network_bind_field = LabeledField(
+                    tr('view.settings_view.network_interface_vpn', "Network interface / VPN"),
+                    ComboBox(
+                        bind_options,
                         default_value=selected_bind_option,
-                        width=430,
-                    )
-                    add_help_tooltip(self.network_bind_combo, "NETWORK_BINDING")
-                    refresh_interfaces_button = dpg.add_button(
-                        label=tr('view.settings_view.refresh_interfaces', " Refresh Interfaces "),
-                        callback=self._refresh_network_interfaces,
-                    )
-                    add_help_tooltip(refresh_interfaces_button, "NETWORK_BINDING")
+                        layout=ControlLayout(width=430),
+                    ),
+                    accessories=(
+                        Button(
+                            tr('view.settings_view.refresh_interfaces', " Refresh Interfaces "),
+                            callback=self._refresh_network_interfaces,
+                        ),
+                    ),
+                )
+                self.network_bind_field.build()
+                self.network_bind_combo = self.network_bind_field.control.require_item()
+                refresh_interfaces_button = self.network_bind_field.accessories[0].require_item()
+                add_help_tooltip(self.network_bind_field.label.require_item(), "NETWORK_BINDING")
+                add_help_tooltip(self.network_bind_combo, "NETWORK_BINDING")
+                add_help_tooltip(refresh_interfaces_button, "NETWORK_BINDING")
 
-                self.interface_lock_checkbox = dpg.add_checkbox(
-                    label=tr('view.settings_view.interface_lock_kill_switch_fail_closed_if', "Interface Lock / kill switch (fail closed if the selected address disappears)"),
+                self.interface_lock_control = CheckBox(
+                    tr('view.settings_view.interface_lock_kill_switch_fail_closed_if', "Interface Lock / kill switch (fail closed if the selected address disappears)"),
                     default_value=bool(self.settings.get("interface_lock", False)),
                 )
+                self.interface_lock_checkbox = self.interface_lock_control.build()
                 add_help_tooltip(self.interface_lock_checkbox, "INTERFACE_LOCK")
-                self.mask_peer_ips_checkbox = dpg.add_checkbox(
-                    label=tr('view.settings_view.mask_peer_ip_addresses_in_the_interface', "Mask peer IP addresses in the interface"),
+                self.mask_peer_ips_control = CheckBox(
+                    tr('view.settings_view.mask_peer_ip_addresses_in_the_interface', "Mask peer IP addresses in the interface"),
                     default_value=bool(self.settings.get("mask_peer_ips", False)),
                 )
+                self.mask_peer_ips_checkbox = self.mask_peer_ips_control.build()
                 add_help_tooltip(self.mask_peer_ips_checkbox, "IP_MASKING")
                 self.transport_note = dpg.add_text(
                     tr('view.settings_view.binding_chooses_one_local_ipv4_or_ipv6', "Binding chooses one local IPv4 or IPv6 source address for torrent traffic. "
@@ -273,31 +325,45 @@ class SettingsView:
                 with dpg.child_window(width=530, height=225, border=True) as self.queue_preferences_panel:
                     dpg.add_text(tr('view.settings_view.queue', "QUEUE"), color=(180, 160, 255))
                     dpg.add_separator()
-                    with dpg.group(horizontal=True):
-                        active_slots_label = dpg.add_text(tr('view.settings_view.active_download_slots', "Active download slots"))
-                        add_help_tooltip(active_slots_label, "ACTIVE_DL_SLOTS")
-                        self.active_slots_input = dpg.add_input_int(
+                    self.active_slots_field = LabeledField(
+                        tr('view.settings_view.active_download_slots', "Active download slots"),
+                        NumericStepper(
+                            kind=NumericKind.INTEGER,
                             default_value=int(self.settings["max_active_downloads"]),
                             min_value=0,
                             min_clamped=True,
-                            width=90,
-                        )
-                        add_help_tooltip(self.active_slots_input, "ACTIVE_DL_SLOTS")
-                        active_slots_unlimited = dpg.add_text(tr('view.settings_view.0_unlimited', "0 = Unlimited"), color=(150, 150, 150))
-                        add_help_tooltip(active_slots_unlimited, "ACTIVE_DL_SLOTS")
-                    with dpg.group(horizontal=True):
-                        default_priority_label = dpg.add_text(tr('view.settings_view.default_queue_priority', "Default queue priority"))
-                        add_help_tooltip(default_priority_label, "QUEUE_PRIORITY")
-                        self.default_priority_combo = dpg.add_combo(
-                            items=localized_choices(("High", "Normal", "Low")),
-                            default_value=tr_value(self.settings["default_queue_priority"]),
-                            width=130,
-                        )
-                        add_help_tooltip(self.default_priority_combo, "QUEUE_PRIORITY")
-                    self.auto_resume_checkbox = dpg.add_checkbox(
-                        label=tr('view.settings_view.resume_torrents_that_were_active_when_salixtorrent', "Resume torrents that were active when SalixTorrent closed"),
+                            layout=ControlLayout(width=90),
+                        ),
+                        accessories=(
+                            Label(
+                                tr('view.settings_view.0_unlimited', "0 = Unlimited"),
+                                color=(150, 150, 150),
+                            ),
+                        ),
+                    )
+                    self.active_slots_field.build()
+                    self.active_slots_input = self.active_slots_field.control.require_item()
+                    active_slots_unlimited = self.active_slots_field.accessories[0].require_item()
+                    add_help_tooltip(self.active_slots_field.label.require_item(), "ACTIVE_DL_SLOTS")
+                    add_help_tooltip(self.active_slots_input, "ACTIVE_DL_SLOTS")
+                    add_help_tooltip(active_slots_unlimited, "ACTIVE_DL_SLOTS")
+
+                    self.default_priority_field = LabeledComboField(
+                        tr('view.settings_view.default_queue_priority', "Default queue priority"),
+                        localized_choices(("High", "Normal", "Low")),
+                        default_value=tr_value(self.settings["default_queue_priority"]),
+                        control_width=130,
+                    )
+                    self.default_priority_field.build()
+                    self.default_priority_combo = self.default_priority_field.control.require_item()
+                    add_help_tooltip(self.default_priority_field.label.require_item(), "QUEUE_PRIORITY")
+                    add_help_tooltip(self.default_priority_combo, "QUEUE_PRIORITY")
+
+                    self.auto_resume_control = CheckBox(
+                        tr('view.settings_view.resume_torrents_that_were_active_when_salixtorrent', "Resume torrents that were active when SalixTorrent closed"),
                         default_value=bool(self.settings["auto_resume_active"]),
                     )
+                    self.auto_resume_checkbox = self.auto_resume_control.build()
                     add_help_tooltip(self.auto_resume_checkbox, "AUTO_RESUME")
 
                 with dpg.child_window(width=-1, height=225, border=True) as self.global_bandwidth_panel:
@@ -308,38 +374,43 @@ class SettingsView:
                         color=(150, 150, 150),
                     )
                     add_help_tooltip(global_bandwidth_note, "GLOBAL_BANDWIDTH")
-                    with dpg.group(horizontal=True):
-                        dpg.add_text(tr('view.settings_view.download', "Download"))
-                        self.global_download_limit_input = dpg.add_input_float(
-                            default_value=float(self.settings["global_download_limit_value"]),
-                            min_value=0.0,
-                            min_clamped=True,
-                            format="%.2f",
-                            width=110,
-                        )
-                        self.global_download_limit_unit = dpg.add_combo(
-                            items=RATE_UNITS,
-                            default_value=self.settings["global_download_limit_unit"],
-                            width=90,
-                        )
-                        add_help_tooltip(self.global_download_limit_input, "GLOBAL_BANDWIDTH")
-                        add_help_tooltip(self.global_download_limit_unit, "GLOBAL_BANDWIDTH")
-                    with dpg.group(horizontal=True):
-                        dpg.add_text(tr('view.settings_view.upload', "Upload   "))
-                        self.global_upload_limit_input = dpg.add_input_float(
-                            default_value=float(self.settings["global_upload_limit_value"]),
-                            min_value=0.0,
-                            min_clamped=True,
-                            format="%.2f",
-                            width=110,
-                        )
-                        self.global_upload_limit_unit = dpg.add_combo(
-                            items=RATE_UNITS,
-                            default_value=self.settings["global_upload_limit_unit"],
-                            width=90,
-                        )
-                        add_help_tooltip(self.global_upload_limit_input, "GLOBAL_BANDWIDTH")
-                        add_help_tooltip(self.global_upload_limit_unit, "GLOBAL_BANDWIDTH")
+                    self.global_download_limit_field = NumericUnitField(
+                        tr('view.settings_view.download', "Download"),
+                        RATE_UNITS,
+                        default_value=float(self.settings["global_download_limit_value"]),
+                        default_unit=self.settings["global_download_limit_unit"],
+                        min_value=0.0,
+                        min_clamped=True,
+                        format="%.2f",
+                        value_width=110,
+                        unit_width=90,
+                    )
+                    self.global_download_limit_field.build()
+                    (
+                        self.global_download_limit_input,
+                        self.global_download_limit_unit,
+                    ) = self.global_download_limit_field.value_items()
+                    add_help_tooltip(self.global_download_limit_input, "GLOBAL_BANDWIDTH")
+                    add_help_tooltip(self.global_download_limit_unit, "GLOBAL_BANDWIDTH")
+
+                    self.global_upload_limit_field = NumericUnitField(
+                        tr('view.settings_view.upload', "Upload   "),
+                        RATE_UNITS,
+                        default_value=float(self.settings["global_upload_limit_value"]),
+                        default_unit=self.settings["global_upload_limit_unit"],
+                        min_value=0.0,
+                        min_clamped=True,
+                        format="%.2f",
+                        value_width=110,
+                        unit_width=90,
+                    )
+                    self.global_upload_limit_field.build()
+                    (
+                        self.global_upload_limit_input,
+                        self.global_upload_limit_unit,
+                    ) = self.global_upload_limit_field.value_items()
+                    add_help_tooltip(self.global_upload_limit_input, "GLOBAL_BANDWIDTH")
+                    add_help_tooltip(self.global_upload_limit_unit, "GLOBAL_BANDWIDTH")
 
             dpg.add_spacer(height=7)
             with dpg.group(horizontal=True):
@@ -348,38 +419,41 @@ class SettingsView:
                     dpg.add_separator()
                     new_torrent_defaults_note = dpg.add_text(tr('view.settings_view.per_torrent_limits_assigned_when_a_torrent', "Per-torrent limits assigned when a torrent is added."))
                     add_help_tooltip(new_torrent_defaults_note, "NEW_TORRENT_LIMITS")
-                    with dpg.group(horizontal=True):
-                        dpg.add_text(tr('view.settings_view.download', "Download"))
-                        self.download_limit_input = dpg.add_input_float(
-                            default_value=float(self.settings["default_download_limit_value"]),
-                            min_value=0.0,
-                            min_clamped=True,
-                            format="%.2f",
-                            width=110,
-                        )
-                        self.download_limit_unit = dpg.add_combo(
-                            items=RATE_UNITS,
-                            default_value=self.settings["default_download_limit_unit"],
-                            width=90,
-                        )
-                        add_help_tooltip(self.download_limit_input, "NEW_TORRENT_LIMITS")
-                        add_help_tooltip(self.download_limit_unit, "NEW_TORRENT_LIMITS")
-                    with dpg.group(horizontal=True):
-                        dpg.add_text(tr('view.settings_view.upload', "Upload   "))
-                        self.upload_limit_input = dpg.add_input_float(
-                            default_value=float(self.settings["default_upload_limit_value"]),
-                            min_value=0.0,
-                            min_clamped=True,
-                            format="%.2f",
-                            width=110,
-                        )
-                        self.upload_limit_unit = dpg.add_combo(
-                            items=RATE_UNITS,
-                            default_value=self.settings["default_upload_limit_unit"],
-                            width=90,
-                        )
-                        add_help_tooltip(self.upload_limit_input, "NEW_TORRENT_LIMITS")
-                        add_help_tooltip(self.upload_limit_unit, "NEW_TORRENT_LIMITS")
+                    self.default_download_limit_field = NumericUnitField(
+                        tr('view.settings_view.download', "Download"),
+                        RATE_UNITS,
+                        default_value=float(self.settings["default_download_limit_value"]),
+                        default_unit=self.settings["default_download_limit_unit"],
+                        min_value=0.0,
+                        min_clamped=True,
+                        format="%.2f",
+                        value_width=110,
+                        unit_width=90,
+                    )
+                    self.default_download_limit_field.build()
+                    self.download_limit_input, self.download_limit_unit = (
+                        self.default_download_limit_field.value_items()
+                    )
+                    add_help_tooltip(self.download_limit_input, "NEW_TORRENT_LIMITS")
+                    add_help_tooltip(self.download_limit_unit, "NEW_TORRENT_LIMITS")
+
+                    self.default_upload_limit_field = NumericUnitField(
+                        tr('view.settings_view.upload', "Upload   "),
+                        RATE_UNITS,
+                        default_value=float(self.settings["default_upload_limit_value"]),
+                        default_unit=self.settings["default_upload_limit_unit"],
+                        min_value=0.0,
+                        min_clamped=True,
+                        format="%.2f",
+                        value_width=110,
+                        unit_width=90,
+                    )
+                    self.default_upload_limit_field.build()
+                    self.upload_limit_input, self.upload_limit_unit = (
+                        self.default_upload_limit_field.value_items()
+                    )
+                    add_help_tooltip(self.upload_limit_input, "NEW_TORRENT_LIMITS")
+                    add_help_tooltip(self.upload_limit_unit, "NEW_TORRENT_LIMITS")
 
                     dpg.add_spacer(height=5)
                     self.default_seeding_goal_field = LabeledComboField(
@@ -459,12 +533,15 @@ class SettingsView:
                         wrap=480,
                     )
                     add_help_tooltip(seed_defaults_note, "SEEDING_GOAL")
-                    self.apply_seeding_goal_existing_checkbox = dpg.add_checkbox(
-                        label=tr(
+                    self.apply_seeding_goal_existing_control = CheckBox(
+                        tr(
                             "settings.apply_seeding_goal_existing",
                             "Apply this seeding goal to all existing torrents when saving",
                         ),
                         default_value=False,
+                    )
+                    self.apply_seeding_goal_existing_checkbox = (
+                        self.apply_seeding_goal_existing_control.build()
                     )
                     add_help_tooltip(
                         self.apply_seeding_goal_existing_checkbox, "SEEDING_GOAL"
@@ -473,91 +550,105 @@ class SettingsView:
                 with dpg.child_window(width=-1, height=350, border=True) as self.desktop_panel:
                     dpg.add_text(tr("settings.desktop.heading", "DESKTOP"), color=(0, 255, 128))
                     dpg.add_separator()
-                    with dpg.group(horizontal=True):
-                        language_label_item = dpg.add_text(
-                            tr("settings.language.label", "Application language")
-                        )
-                        self.language_combo = dpg.add_combo(
-                            items=list(LANGUAGE_OPTION_LABELS.values()),
-                            default_value=locale_label(self.settings.get("language", "auto")),
-                            width=205,
-                        )
-                        add_text_tooltip(
-                            language_label_item,
-                            tr(
-                                "settings.language.restart_note",
-                                "Language changes are applied after the interface is rebuilt. "
-                                "Restart SalixTorrent to update every open control and document safely.",
-                            ),
-                        )
-                        add_text_tooltip(
-                            self.language_combo,
-                            tr(
-                                "settings.language.restart_note",
-                                "Language changes are applied after the interface is rebuilt. "
-                                "Restart SalixTorrent to update every open control and document safely.",
-                            ),
-                        )
-                    with dpg.group(horizontal=True):
-                        text_size_label = dpg.add_text(
-                            tr("settings.interface_text_size", "Interface text size")
-                        )
-                        self.ui_font_size_combo = dpg.add_combo(
-                            items=[UI_FONT_LABELS[size] for size in UI_FONT_SIZES],
-                            default_value=ui_font_label(self.settings.get("ui_font_size", 15)),
-                            width=180,
-                        )
-                        add_help_tooltip(text_size_label, "UI_TEXT_SIZE")
-                        add_help_tooltip(self.ui_font_size_combo, "UI_TEXT_SIZE")
-                    with dpg.group(horizontal=True):
-                        documentation_scale_label_item = dpg.add_text(tr("settings.documentation_scale", "Documentation scale"))
-                        self.documentation_scale_combo = dpg.add_combo(
-                            items=[DOCUMENTATION_SCALE_LABELS[scale] for scale in DOCUMENTATION_SCALES],
-                            default_value=documentation_scale_label(
-                                self.settings.get("documentation_scale", 100)
-                            ),
-                            width=190,
-                        )
-                        add_help_tooltip(documentation_scale_label_item, "DOCUMENTATION_SCALE")
-                        add_help_tooltip(self.documentation_scale_combo, "DOCUMENTATION_SCALE")
-                    with dpg.group(horizontal=True):
-                        rate_display_label = dpg.add_text(tr("settings.transfer_rate_display", "Transfer rate display"))
-                        self.transfer_rate_display_combo = dpg.add_combo(
-                            items=localized_choices(TRANSFER_RATE_UNITS),
-                            default_value=tr_value(self.settings.get("transfer_rate_display_unit", "Auto")),
-                            width=105,
-                        )
-                        add_help_tooltip(rate_display_label, "TRANSFER_RATE")
-                        add_help_tooltip(self.transfer_rate_display_combo, "TRANSFER_RATE")
-                    self.completion_notifications_checkbox = dpg.add_checkbox(
-                        label=tr("settings.completion_notices", "Show in-app completion notices"),
+                    language_restart_note = tr(
+                        "settings.language.restart_note",
+                        "Language changes are applied after the interface is rebuilt. "
+                        "Restart SalixTorrent to update every open control and document safely.",
+                    )
+                    self.language_field = LabeledComboField(
+                        tr("settings.language.label", "Application language"),
+                        list(LANGUAGE_OPTION_LABELS.values()),
+                        default_value=locale_label(self.settings.get("language", "auto")),
+                        control_width=205,
+                    )
+                    self.language_field.build()
+                    self.language_combo = self.language_field.control.require_item()
+                    add_text_tooltip(self.language_field.label.require_item(), language_restart_note)
+                    add_text_tooltip(self.language_combo, language_restart_note)
+
+                    self.ui_font_size_field = LabeledComboField(
+                        tr("settings.interface_text_size", "Interface text size"),
+                        [UI_FONT_LABELS[size] for size in UI_FONT_SIZES],
+                        default_value=ui_font_label(self.settings.get("ui_font_size", 15)),
+                        control_width=180,
+                    )
+                    self.ui_font_size_field.build()
+                    self.ui_font_size_combo = self.ui_font_size_field.control.require_item()
+                    add_help_tooltip(self.ui_font_size_field.label.require_item(), "UI_TEXT_SIZE")
+                    add_help_tooltip(self.ui_font_size_combo, "UI_TEXT_SIZE")
+
+                    self.documentation_scale_field = LabeledComboField(
+                        tr("settings.documentation_scale", "Documentation scale"),
+                        [DOCUMENTATION_SCALE_LABELS[scale] for scale in DOCUMENTATION_SCALES],
+                        default_value=documentation_scale_label(
+                            self.settings.get("documentation_scale", 100)
+                        ),
+                        control_width=190,
+                    )
+                    self.documentation_scale_field.build()
+                    self.documentation_scale_combo = (
+                        self.documentation_scale_field.control.require_item()
+                    )
+                    add_help_tooltip(
+                        self.documentation_scale_field.label.require_item(),
+                        "DOCUMENTATION_SCALE",
+                    )
+                    add_help_tooltip(self.documentation_scale_combo, "DOCUMENTATION_SCALE")
+
+                    self.transfer_rate_display_field = LabeledComboField(
+                        tr("settings.transfer_rate_display", "Transfer rate display"),
+                        localized_choices(TRANSFER_RATE_UNITS),
+                        default_value=tr_value(
+                            self.settings.get("transfer_rate_display_unit", "Auto")
+                        ),
+                        control_width=105,
+                    )
+                    self.transfer_rate_display_field.build()
+                    self.transfer_rate_display_combo = (
+                        self.transfer_rate_display_field.control.require_item()
+                    )
+                    add_help_tooltip(
+                        self.transfer_rate_display_field.label.require_item(),
+                        "TRANSFER_RATE",
+                    )
+                    add_help_tooltip(self.transfer_rate_display_combo, "TRANSFER_RATE")
+
+                    self.completion_notifications_control = CheckBox(
+                        tr("settings.completion_notices", "Show in-app completion notices"),
                         default_value=bool(self.settings["completion_notifications"]),
+                    )
+                    self.completion_notifications_checkbox = (
+                        self.completion_notifications_control.build()
                     )
                     add_help_tooltip(self.completion_notifications_checkbox, "COMPLETION_NOTICE")
                     desktop_caps = self.desktop.capability_snapshot()
-                    self.native_notifications_checkbox = dpg.add_checkbox(
-                        label=tr("settings.native_notifications", "Show native desktop completion notifications"),
+                    self.native_notifications_control = CheckBox(
+                        tr("settings.native_notifications", "Show native desktop completion notifications"),
                         default_value=bool(self.settings["native_notifications"]),
                         enabled=bool(desktop_caps.notifications_supported),
                     )
+                    self.native_notifications_checkbox = self.native_notifications_control.build()
                     add_help_tooltip(self.native_notifications_checkbox, "NATIVE_NOTIFICATION")
-                    self.system_tray_checkbox = dpg.add_checkbox(
-                        label=tr("settings.system_tray", "Enable system tray / menu bar icon and controls"),
+                    self.system_tray_control = CheckBox(
+                        tr("settings.system_tray", "Enable system tray / menu bar icon and controls"),
                         default_value=bool(self.settings["system_tray_enabled"]),
                         enabled=bool(desktop_caps.tray_supported),
                     )
+                    self.system_tray_checkbox = self.system_tray_control.build()
                     add_help_tooltip(self.system_tray_checkbox, "SYSTEM_TRAY")
-                    self.minimize_to_tray_checkbox = dpg.add_checkbox(
-                        label=tr("settings.minimize_tray", "Minimize to system tray"),
+                    self.minimize_to_tray_control = CheckBox(
+                        tr("settings.minimize_tray", "Minimize to system tray"),
                         default_value=bool(self.settings["minimize_to_tray"]),
                         enabled=bool(desktop_caps.minimize_to_tray_supported),
                     )
+                    self.minimize_to_tray_checkbox = self.minimize_to_tray_control.build()
                     add_help_tooltip(self.minimize_to_tray_checkbox, "MINIMIZE_TRAY")
-                    self.close_to_tray_checkbox = dpg.add_checkbox(
-                        label=tr("settings.close_tray", "Close window to system tray"),
+                    self.close_to_tray_control = CheckBox(
+                        tr("settings.close_tray", "Close window to system tray"),
                         default_value=bool(self.settings.get("close_to_tray", True)),
                         enabled=bool(desktop_caps.close_to_tray_supported),
                     )
+                    self.close_to_tray_checkbox = self.close_to_tray_control.build()
                     add_help_tooltip(self.close_to_tray_checkbox, "CLOSE_TO_TRAY")
                     tray_state = (
                         "running"
@@ -576,12 +667,22 @@ class SettingsView:
                         )
 
             dpg.add_spacer(height=10)
-            with dpg.group(horizontal=True):
-                save_preferences_button = dpg.add_button(label=tr("settings.save", " Save Preferences "), callback=self._save)
-                add_text_tooltip(save_preferences_button, tr('view.settings_view.save_preferences_validates_persists_and_applies_the', "Save Preferences\n\nValidates, persists and applies the values shown on this page. Networking toggles and global limits can affect active sessions immediately."))
-                restore_defaults_button = dpg.add_button(label=tr("settings.restore_defaults", " Restore Defaults "), callback=self._restore_defaults)
-                add_text_tooltip(restore_defaults_button, tr('view.settings_view.restore_defaults_replaces_the_current_application_preferences', "Restore Defaults\n\nReplaces the current application preferences with SalixTorrent's built-in defaults and applies them. This does not delete torrents or payload data."))
-                self.status_text = dpg.add_text("", color=(0, 255, 128))
+            self.preference_actions_row = ControlRow(
+                (
+                    Button(tr("settings.save", " Save Preferences "), callback=self._save),
+                    Button(
+                        tr("settings.restore_defaults", " Restore Defaults "),
+                        callback=self._restore_defaults,
+                    ),
+                    Label("", color=(0, 255, 128)),
+                )
+            )
+            self.preference_actions_row.build()
+            save_preferences_button = self.preference_actions_row.children[0].require_item()
+            restore_defaults_button = self.preference_actions_row.children[1].require_item()
+            self.status_text = self.preference_actions_row.children[2].require_item()
+            add_text_tooltip(save_preferences_button, tr('view.settings_view.save_preferences_validates_persists_and_applies_the', "Save Preferences\n\nValidates, persists and applies the values shown on this page. Networking toggles and global limits can affect active sessions immediately."))
+            add_text_tooltip(restore_defaults_button, tr('view.settings_view.restore_defaults_replaces_the_current_application_preferences', "Restore Defaults\n\nReplaces the current application preferences with SalixTorrent's built-in defaults and applies them. This does not delete torrents or payload data."))
 
             dpg.add_spacer(height=7)
             settings_path_text = dpg.add_text(

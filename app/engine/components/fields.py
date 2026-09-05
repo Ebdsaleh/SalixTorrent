@@ -2,14 +2,53 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+
 from app.engine.components.base import Component
 from app.engine.components.containers import ControlColumn, ControlGrid, ControlRow
 from app.engine.components.controls import ComboBox, Label, NumericKind, NumericStepper
 from app.engine.components.layout import ControlLayout, ControlLayoutTheme
-from app.engine.components.renderer import ComponentRenderer, get_default_renderer
+from app.engine.components.renderer import get_default_renderer
 
 
-class LabeledComboField(Component):
+class LabeledField(Component):
+    """One-row field composition with an arbitrary trailing accessory set.
+
+    The framework owns only composition.  The primary control and any accessories
+    remain normal components, so applications can attach semantics such as Help
+    tooltips without teaching this generic layer about application concepts.
+    """
+
+    def __init__(
+        self,
+        label: str | Label,
+        control: Component,
+        *,
+        accessories: Iterable[Component] = (),
+        theme: ControlLayoutTheme | None = None,
+        layout: ControlLayout | None = None,
+    ):
+        super().__init__(theme=theme, layout=layout)
+        self.label = label if isinstance(label, Label) else Label(label)
+        self.control = control
+        self.accessories = list(accessories)
+        self.row = ControlRow(
+            (self.label, self.control, *self.accessories),
+            theme=self.theme,
+            layout=self.layout,
+        )
+
+    def build(self, *, renderer=None, parent=None) -> object:
+        renderer = renderer or get_default_renderer()
+        item = self.row.build(renderer=renderer, parent=parent)
+        self.resolved_layout = self.row.resolved_layout
+        return self._bind(renderer, item)
+
+    def accessory_items(self) -> tuple[object, ...]:
+        return tuple(component.require_item() for component in self.accessories)
+
+
+class LabeledComboField(LabeledField):
     def __init__(
         self,
         label: str,
@@ -21,29 +60,22 @@ class LabeledComboField(Component):
         theme: ControlLayoutTheme | None = None,
         layout: ControlLayout | None = None,
     ):
-        super().__init__(theme=theme, layout=layout)
-        self.label = Label(label)
         control_layout = ControlLayout(width=control_width) if control_width else ControlLayout()
-        self.control = ComboBox(
+        control = ComboBox(
             items,
             default_value=default_value,
             callback=callback,
             layout=control_layout,
         )
-        self.row = ControlRow(
-            (self.label, self.control),
-            theme=self.theme,
-            layout=self.layout,
+        super().__init__(
+            label,
+            control,
+            theme=theme,
+            layout=layout,
         )
 
-    def build(self, *, renderer=None, parent=None) -> object:
-        renderer = renderer or get_default_renderer()
-        item = self.row.build(renderer=renderer, parent=parent)
-        self.resolved_layout = self.row.resolved_layout
-        return self._bind(renderer, item)
 
-
-class LabeledNumericField(Component):
+class LabeledNumericField(LabeledField):
     def __init__(
         self,
         label: str,
@@ -62,8 +94,6 @@ class LabeledNumericField(Component):
         theme: ControlLayoutTheme | None = None,
         layout: ControlLayout | None = None,
     ):
-        super().__init__(theme=theme, layout=layout)
-        self.label = Label(label)
         control_layout = ControlLayout(width=control_width) if control_width else ControlLayout()
 
         numeric_kwargs = dict(
@@ -82,18 +112,75 @@ class LabeledNumericField(Component):
         if step_fast is not None:
             numeric_kwargs["step_fast"] = step_fast
 
-        self.control = NumericStepper(**numeric_kwargs)
-        self.row = ControlRow(
-            (self.label, self.control),
-            theme=self.theme,
-            layout=self.layout,
+        super().__init__(
+            label,
+            NumericStepper(**numeric_kwargs),
+            theme=theme,
+            layout=layout,
         )
 
-    def build(self, *, renderer=None, parent=None) -> object:
-        renderer = renderer or get_default_renderer()
-        item = self.row.build(renderer=renderer, parent=parent)
-        self.resolved_layout = self.row.resolved_layout
-        return self._bind(renderer, item)
+
+class NumericUnitField(LabeledField):
+    """Numeric value plus a unit selector, composed as one reusable field row."""
+
+    def __init__(
+        self,
+        label: str,
+        units,
+        *,
+        default_value=0.0,
+        default_unit=None,
+        kind: NumericKind | str = NumericKind.FLOAT,
+        min_value=None,
+        max_value=None,
+        min_clamped: bool = False,
+        max_clamped: bool = False,
+        format: str | None = None,
+        step=None,
+        step_fast=None,
+        value_width: int | None = None,
+        unit_width: int | None = None,
+        callback=None,
+        unit_callback=None,
+        theme: ControlLayoutTheme | None = None,
+        layout: ControlLayout | None = None,
+    ):
+        value_layout = ControlLayout(width=value_width) if value_width else ControlLayout()
+        unit_layout = ControlLayout(width=unit_width) if unit_width else ControlLayout()
+
+        numeric_kwargs = dict(
+            kind=kind,
+            default_value=default_value,
+            min_value=min_value,
+            max_value=max_value,
+            min_clamped=min_clamped,
+            max_clamped=max_clamped,
+            format=format,
+            callback=callback,
+            layout=value_layout,
+        )
+        if step is not None:
+            numeric_kwargs["step"] = step
+        if step_fast is not None:
+            numeric_kwargs["step_fast"] = step_fast
+
+        self.value_control = NumericStepper(**numeric_kwargs)
+        self.unit_control = ComboBox(
+            units,
+            default_value=default_unit,
+            callback=unit_callback,
+            layout=unit_layout,
+        )
+        super().__init__(
+            label,
+            self.value_control,
+            accessories=(self.unit_control,),
+            theme=theme,
+            layout=layout,
+        )
+
+    def value_items(self) -> tuple[object, object]:
+        return self.value_control.require_item(), self.unit_control.require_item()
 
 
 class DurationEditor(Component):
