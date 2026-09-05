@@ -1,12 +1,12 @@
-# SalixTorrent (Salix_T) v0.3.0
+# SalixTorrent (Salix_T) v0.4.0
 
 SalixTorrent is a desktop BitTorrent client written in Python with a custom asynchronous protocol engine and a Dear PyGui interface. Its transfer engine is generation-aware across BitTorrent v1, BitTorrent v2 and hybrid torrents, while keeping protocol identity, storage verification, discovery provenance and torrent creation explicit. The project aims to expose what a torrent client is doing rather than hiding the protocol behind a single progress bar: transfers, peers, pieces, files, trackers, discovery sources, bandwidth history, connectivity, and protocol terminology are all inspectable from the application.
 
-> **Release status:** v0.3.0 remains the current development version string while v0.4.0-targeted roadmap work is integrated. Phases 1-11 are complete. Phase 12 adds the offline-first localization framework, semantic Help/Glossary services, provider-neutral translation tooling, and optional SalixORM-backed development translation memory while keeping normal runtime localization offline and storage-independent. Application persistence has backend-neutral settings and desktop-session storage boundaries, and the current transfer-lifecycle work adds durable per-torrent seeding goals with ratio/time automatic-stop policies. Deterministic JSON remains the default/reference persistence format and optional SalixORM/SQLite adapters can be selected explicitly for integration testing.
+> **Release status:** v0.4.0 is the current release. It consolidates the Phase 12 offline-first localization foundation, semantic Help/Glossary services, provider-neutral translation tooling, backend-neutral application/session persistence, optional SalixORM/SQLite integrations, the tracked regression suite, and durable per-torrent seeding goals with ratio/time automatic-stop policies. Deterministic JSON remains the default/reference persistence format, while SalixORM-backed storage remains an explicit opt-in integration path. The current real-Windows source regression baseline is 334 / 334 tests passing, with one expected non-Windows shell-behavior skip.
 
 ## Highlights
 
-**v0.3.0 milestone:** SalixTorrent now combines a substantially more capable BitTorrent v1 engine with a reusable responsive Dear PyGui presentation foundation. The release adds rarest-first/endgame scheduling, bounded adaptive request pipelines, asynchronous disk backpressure/caching, MSE/PE transport, network-interface binding and Interface Lock, dual-stack IPv6 peer/tracker/DHT support, batched tracker scrape statistics, event-driven seeding/connectivity telemetry, and the semantic responsive Documentation subsystem.
+**v0.4.0 milestone — durability and transfer lifecycle:** SalixTorrent now builds on the v0.3.0 protocol/network foundation with an offline-first localization system, semantic Help/Glossary content, provider-neutral translation tooling, backend-neutral application settings and session-state persistence, optional SalixORM/SQLite adapters, a fully tracked `unittest` regression suite, and durable per-torrent seeding goals. Timed goals use an instanced baseline so a newly requested duration starts from the moment it is applied, while cumulative Seed Time remains available as historical telemetry.
 
 - Load v1, v2 or hybrid `.torrent` files and `btih`/`btmh` magnet links.
 - Generation-aware magnet metadata retrieval with info-hash and BEP-52 piece-layer verification.
@@ -35,7 +35,7 @@ SalixTorrent is a desktop BitTorrent client written in Python with a custom asyn
 
 ## Requirements
 
-- Python 3.13 is the primary development/runtime version for v0.3.0.
+- Python 3.13 is the primary development/runtime version for v0.4.0.
 - Dear PyGui 2.3.1 or newer in the 2.x series.
 - aiohttp 3.11 or newer in the 3.x series.
 - Tk support in the Python installation for native file/folder dialogs.
@@ -321,7 +321,7 @@ The release-critical regression coverage includes strict BEP-52 v2 identity/file
 
 ## Current scope
 
-Phases 1-11 are complete in the live source tree, including native Windows standalone/portable/installer validation and the cross-platform desktop/tray abstraction. Phase 12 provides the offline-first localization framework, semantic Help/Glossary services, provider-neutral translation tooling, and optional SalixORM-backed development translation memory. Linux/BSD/macOS native desktop behavior and full target-locale population/review remain active release-hardening work.
+v0.4.0 is the current release checkpoint. Phases 1-11 remain complete, including the native Windows standalone/portable/installer architecture and the cross-platform desktop/tray abstraction. Phase 12 provides the offline-first localization framework, semantic Help/Glossary services, provider-neutral translation tooling, optional SalixORM-backed development translation memory, backend-neutral application/session persistence, and the tracked regression suite. The v0.4.0 transfer-lifecycle milestone adds durable per-torrent seeding goals and automatic-stop policy. Linux/BSD/macOS native desktop behavior and full target-locale population/review remain active hardening work.
 
 ## Project structure
 
@@ -334,7 +334,8 @@ SalixTorrent/
 ├── tests/
 │   ├── helpers.py
 │   ├── core/
-│   │   └── test_foundation.py
+│   │   ├── test_foundation.py
+│   │   └── test_seeding_policy.py
 │   ├── protocol/
 │   │   ├── test_piece_selection.py
 │   │   ├── test_request_scheduling.py
@@ -414,6 +415,7 @@ SalixTorrent/
 │   │   ├── network_binding.py
 │   │   ├── peer.py
 │   │   ├── piece_manager.py
+│   │   ├── seeding_policy.py
 │   │   ├── session.py
 │   │   ├── torrent_creator.py
 │   │   ├── torrent_file.py

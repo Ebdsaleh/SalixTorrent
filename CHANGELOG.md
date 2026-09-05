@@ -4,6 +4,17 @@ Notable SalixTorrent changes are recorded here.
 
 ## Unreleased
 
+No unreleased changes have been recorded after v0.4.0.
+
+## v0.4.0 - 2026-09-05
+
+### Release
+
+- Promoted SalixTorrent to version 0.4.0 after the completed durability and transfer-lifecycle milestone.
+- Consolidated the Phase 12 offline-first localization foundation, backend-neutral application/session persistence, optional SalixORM/SQLite integrations, tracked regression-suite migration, and durable per-torrent seeding goals into one release checkpoint.
+- Preserved deterministic JSON as the default/reference persistence path while keeping SalixORM integrations explicit and optional.
+- Established the release source baseline at 334 / 334 real-Windows regression tests passing, with one expected non-Windows shell-behavior skip.
+
 ### Seeding Goals & Automatic Stop
 
 - Added durable per-torrent seeding policies with four modes: Seed Indefinitely, Stop at Ratio, Stop after Time, and Stop at Ratio or Time.

@@ -1,8 +1,8 @@
 # SalixTorrent Development Roadmap
 
-**Current application version string:** `0.3.0`
+**Current application version string:** `0.4.0`
 **Roadmap status:** active development planning
-**Current implementation checkpoint:** v0.4.0-targeted seeding goals and automatic-stop policy complete and validated on the real Windows checkout
+**Current implementation checkpoint:** v0.4.0 durability and transfer-lifecycle release
 **Current real Windows regression baseline:** 334 / 334 tests passing, with one expected non-Windows skip
 
 This roadmap records intended engineering direction rather than promising dates or release numbers. Changes should remain incremental, testable, reviewable, and compatible with SalixTorrent's existing protocol, persistence, packaging, localization, and cross-platform boundaries.
@@ -548,7 +548,7 @@ A relational database is not automatically the right format for every durable ar
 
 ## Priority A — immediate
 
-**Commit the completed and Windows-validated v0.4.0-targeted seeding-goal / automatic-stop tranche.**
+**Begin the reusable GUI component layer for post-v0.4.0 development, starting with framework-owned primitive controls and a single-row `ControlRow` composition boundary.**
 
 ## Priority B — user-facing durability
 
@@ -585,24 +585,27 @@ Version numbers below are planning examples, not commitments.
 ## Current engineering checkpoint
 
 ```text
-v0.4.0-targeted seeding goals / automatic stop — complete and Windows-validated
+v0.4.0 — durability and transfer lifecycle
 ```
 
-The application version string remains `0.3.0` until the broader v0.4.0 release scope passes its deliberate release gate.
+The v0.4.0 release consolidates the completed persistence, tracked-test, localization-foundation, and seeding-goal milestones behind the current `0.4.0` application version.
 
-## Possible v0.4.0 theme
+## v0.4.0 release theme
 
 ```text
 Durability and transfer lifecycle
 ```
 
-Possible contents:
+Included release pillars:
 
-- stable application/session persistence;
-- seeding goals;
-- safe data relocation;
-- queue organization/watch-folder automation;
-- localization/release hardening.
+- stable backend-neutral application/session persistence;
+- tracked regression-suite ownership;
+- offline-first localization/framework foundations;
+- durable per-torrent seeding goals and automatic-stop policy.
+
+## Post-v0.4.0 GUI-framework direction
+
+The next architecture track should extract reusable GUI primitives and layout composites from the Dear PyGui views without rewriting the application wholesale. Initial candidates include framework-owned Label, Button, ComboBox and NumericStepper controls plus a generic single-row `ControlRow` composition primitive. Theme/default/instance property resolution should reuse the existing framework property cascade rather than introducing a second styling system.
 
 ## Later network release
 
