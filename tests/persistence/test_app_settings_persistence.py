@@ -107,6 +107,29 @@ class JsonAppSettingsPersistenceTests(_ManagerEnvironmentMixin, unittest.TestCas
         )
         self.assertEqual(result.stdout.splitlines(), ["json", "False", "False"])
 
+    def test_seeding_goal_defaults_are_normalized_as_application_settings(self):
+        normalized = TorrentManager._normalise_app_settings(
+            {
+                "default_seeding_goal_mode": "Stop at Ratio or Time",
+                "default_seeding_ratio": "2.5",
+                "default_seeding_time_minutes": "90",
+            }
+        )
+        self.assertEqual(normalized["default_seeding_goal_mode"], "Stop at Ratio or Time")
+        self.assertEqual(normalized["default_seeding_ratio"], 2.5)
+        self.assertEqual(normalized["default_seeding_time_minutes"], 90)
+
+        fallback = TorrentManager._normalise_app_settings(
+            {
+                "default_seeding_goal_mode": "invalid",
+                "default_seeding_ratio": "bad",
+                "default_seeding_time_minutes": 0,
+            }
+        )
+        self.assertEqual(fallback["default_seeding_goal_mode"], "Seed Indefinitely")
+        self.assertEqual(fallback["default_seeding_ratio"], 1.0)
+        self.assertEqual(fallback["default_seeding_time_minutes"], 1)
+
     def test_torrent_manager_default_json_behavior_is_unchanged(self):
         with tempfile.TemporaryDirectory() as td:
             os.environ["SALIX_T_STATE_DIR"] = td

@@ -35,15 +35,26 @@ class SemanticDocumentationTests(unittest.TestCase):
 
     def test_semantic_source_has_stable_unique_ids_and_expected_shape(self):
         snapshot = document_structure_snapshot()
-        self.assertEqual(snapshot["topic_count"], 19)
-        self.assertEqual(snapshot["section_count"], 104)
-        self.assertEqual(snapshot["term_count"], 186)
+        self.assertEqual(snapshot["topic_count"], 20)
+        self.assertEqual(snapshot["section_count"], 110)
+        self.assertEqual(snapshot["term_count"], 191)
         self.assertEqual(len(snapshot["topic_ids"]), len(set(snapshot["topic_ids"])))
         self.assertEqual(len(snapshot["term_ids"]), len(set(snapshot["term_ids"])))
         for topic_id, section_ids in snapshot["section_ids"].items():
             self.assertTrue(topic_id)
             self.assertEqual(len(section_ids), len(set(section_ids)))
             self.assertTrue(all(section_id and not section_id.isdigit() for section_id in section_ids))
+
+    def test_seeding_goal_help_and_glossary_are_part_of_the_semantic_source(self):
+        snapshot = document_structure_snapshot()
+        self.assertIn("seeding_goals", snapshot["topic_ids"])
+        for term_id in (
+            "SEEDING_GOAL",
+            "SEEDING_RATIO",
+            "SEEDING_TIME",
+            "AUTOMATIC_STOP",
+        ):
+            self.assertIn(term_id, snapshot["term_ids"])
 
     def test_related_help_terms_reference_real_glossary_ids(self):
         snapshot = document_structure_snapshot()

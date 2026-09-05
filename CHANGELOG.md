@@ -4,6 +4,24 @@ Notable SalixTorrent changes are recorded here.
 
 ## Unreleased
 
+### Seeding Goals & Automatic Stop
+
+- Added durable per-torrent seeding policies with four modes: Seed Indefinitely, Stop at Ratio, Stop after Time, and Stop at Ratio or Time.
+- Added application defaults for new torrents without silently rewriting existing per-torrent policies.
+- Added an explicit one-shot **Apply this seeding goal to all existing torrents when saving** Preferences action for deliberate bulk updates.
+- Added right-click **Seeding Goal** controls with quick mode changes and a focused target editor, while retaining the same durable per-torrent controls in Torrent Properties.
+- Expanded **Stop after Time** into lazy right-click Days (1-31), Hours (1-12), and Minutes (1-60) component submenus that combine additively (for example 1 day + 5 hours + 10 minutes), with independent passive branch markers, interactive numeric check marks, per-component toggle-off behavior, and **Clear Time (Days/Hrs/Mins)**; exact targets remain available through **Configure targets...**.
+- Polished long-duration presentation and editing: General now shows timed-goal elapsed/target values as Days/Hours/Minutes, while **Configure targets...**, Torrent Properties, and the Preferences default expose separate Days, Hours, and Minutes fields instead of requiring large minute totals.
+- Stacked the Days, Hours, and Minutes controls vertically in **Configure targets...** and the compact Preferences default panel so unit labels and Dear PyGui +/- controls stay readable at normal DPI and scaled desktop layouts; widened the Preferences ratio input to match the polished numeric-control presentation.
+- Added immediate seeding-goal update events so General, Properties and context-menu state reflect per-torrent changes without requiring stop/start or application restart.
+- Kept a dedicated cumulative Seed Time counter for lifetime-style telemetry, while time-based goals now persist an independent instance baseline so every explicit timed-goal apply/change starts counting from that moment instead of immediately consuming historical Seed Time.
+- Added automatic stop handling through the shared `TorrentManager` lifecycle boundary so a reached goal becomes durable Stopped intent, rebalances the queue, and emits desktop/in-app notification events.
+- Added live seeding-goal progress to General/Properties, including payload-based ratio progress that remains meaningful for external/source-backed seeds.
+- Advanced normalized session state to version 9 and added SalixORM migration `session-state-0003` for timed-goal baselines and additive quick-time components; historical JSON versions 1-8 and existing SalixORM v7/v8 databases remain upgrade-compatible while `session-state-0001` and `session-state-0002` stay checksum-frozen.
+- Added internal Help/Glossary coverage for seeding goals, ratio targets, cumulative seed time and automatic-stop restart behavior, with corresponding localization extraction updates.
+- Added policy, application-settings, JSON-session, SalixORM migration and restore regression coverage for the new lifecycle behavior.
+- Validated the completed seeding-goal tranche on the real Windows checkout at 334/334 tests in both canonical and plain discovery, with one expected non-Windows skip; localization extraction/manifests, pseudo locale, offline validation, and 432/432 translation-memory parity also remained clean.
+
 ### Maintained Regression Suite
 
 - Moved the maintained `unittest` regression suite from repository-root local files into a version-controlled `tests/` package with logical core, protocol, network, persistence, platform, packaging, presentation, CLI and localization subpackages.
@@ -161,7 +179,7 @@ Notable SalixTorrent changes are recorded here.
 ### Changed
 
 - Phase 12 UI localization migrates the primary transfer/detail views, Preferences, dialogs, status/progress text, Create Torrent, completion notifications and human-facing CLI output to semantic `tr()` calls; structured/machine-readable data remains locale-independent.
-- Canonical `en-AU` UI extraction now includes presentation values and currently produces 653 UI strings, while incomplete target locales continue to fall back offline to `en-AU` until translation generation is run.
+- Canonical `en-AU` UI extraction now includes presentation values and currently produces 688 UI strings, while incomplete target locales continue to fall back offline to `en-AU` until translation generation is run.
 - `.gitignore` now tracks the Phase 12 design document, locale catalogs, manual overrides, protected terminology and deterministic translation cache while excluding localization credentials and retaining existing build/payload/local-test exclusions.
 - Windows tray/menu commands, the main application menu/toolbar, core Desktop preferences, Help/Glossary shell navigation and diagnostics now consume semantic localization keys while preserving stable internal protocol/state values.
 - Semantic Help topics and the shared hover-help glossary can now be overlaid from bundled locale catalogs without changing topic/term IDs, renderer structure, links or layout policy.

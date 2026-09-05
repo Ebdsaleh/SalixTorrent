@@ -81,13 +81,13 @@ class LocalizationExtractionTests(unittest.TestCase):
         entry = result.catalogs["ui"]["language.english_au"]
         self.assertEqual(entry.text, "English (Australia)")
         self.assertTrue(any(item.kind == "static-ui" for item in entry.occurrences))
-        self.assertEqual(len(result.catalogs["ui"]), 653)
+        self.assertEqual(len(result.catalogs["ui"]), 695)
 
     def test_manifest_tracks_all_catalogs_hashes_placeholders_and_duplicates(self):
         manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
         self.assertEqual(manifest["_meta"]["schema"], 1)
         self.assertEqual(set(manifest["catalogs"]), {"ui", "help", "glossary"})
-        self.assertEqual(manifest["catalogs"]["ui"]["entry_count"], 653)
+        self.assertEqual(manifest["catalogs"]["ui"]["entry_count"], 695)
         entry = manifest["catalogs"]["ui"]["entries"]["cli.transfer.status"]
         self.assertEqual(len(entry["source_hash"]), 64)
         self.assertIn("name", entry["placeholders"])

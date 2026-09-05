@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Mapping, Protocol, runtime_checkable
 
 
-CURRENT_SESSION_STATE_VERSION = 7
+CURRENT_SESSION_STATE_VERSION = 9
 SUPPORTED_SESSION_STATE_VERSIONS = tuple(range(1, CURRENT_SESSION_STATE_VERSION + 1))
 
 

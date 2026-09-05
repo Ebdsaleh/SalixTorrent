@@ -1,6 +1,6 @@
 # SalixTorrent Application Persistence Design
 
-**Status:** settings boundary stable; session-state backend pilot implemented
+**Status:** settings boundary stable; session-state v9 seeding-goal boundary complete and validated on the real Windows checkout
 **Current application version string:** `0.3.0`
 **Storage policy:** preserve purpose-built file formats where they are the right abstraction; introduce SalixORM only behind bounded application-state contracts that benefit from transactional/schema-managed persistence.
 
@@ -134,10 +134,10 @@ When session persistence is explicitly disabled (for example the headless CLI), 
 Current normalized session state version:
 
 ```text
-7
+9
 ```
 
-Historical JSON versions 1-6 remain accepted as import/restore inputs.
+Historical JSON versions 1-8 remain accepted as import/restore inputs.
 
 The current snapshot owns:
 
@@ -165,9 +165,21 @@ seed_source_path
 protocol_policy
 file_priorities
 queue_priority
+seeding_goal_mode
+seeding_ratio_limit
+seeding_time_limit_minutes
+seeding_elapsed_seconds
+seeding_time_goal_baseline_seconds
+seeding_time_days
+seeding_time_hours
+seeding_time_minutes_component
 ```
 
 List order is queue order in the JSON reference backend. The SalixORM adapter stores the same order explicitly through `queue_position`.
+
+Version 8 introduced the durable per-torrent seeding policy. Version 9 separates the cumulative `seeding_elapsed_seconds` telemetry clock from the current timed-goal window by persisting `seeding_time_goal_baseline_seconds`. A newly applied timed goal therefore means “seed for this duration starting now”; for example, a torrent with 70 historical seeding minutes given a 60-minute target stops after about 60 additional seeding minutes, not immediately. The Days/Hours/Minutes quick-menu components are persisted independently so a composed target such as 1 day + 5 hours + 10 minutes survives restart exactly as selected. The ratio target remains evaluated against cumulative uploaded payload divided by the torrent's full payload size. Policy evaluation stays in the torrent/session lifecycle layer rather than in either persistence adapter. Configure targets, Torrent Properties, and Preferences expose canonical Days/Hours/Minutes editors (with the compact Configure/Preferences surfaces stacked vertically for readability), but these are presentation controls only: application defaults continue to persist one normalized `default_seeding_time_minutes` value, while per-torrent v9 state keeps the normalized minute target plus the independent quick-menu component representation already owned by the session schema.
+
+Historical v1-v7 snapshots have no seeding-goal fields and therefore restore as **Seed Indefinitely**, preserving the behavior they had when written. Historical v8 timed goals keep their policy/target but receive a baseline equal to their persisted cumulative Seed Time so they begin a fresh timed-goal window under v9 semantics. New application defaults are copied only when a torrent is newly added; changing Preferences does not retroactively reinterpret historical or existing session state. Preferences may perform an explicit one-shot bulk apply to all currently loaded torrents, after which each torrent again owns and persists its independent policy.
 
 ---
 
@@ -194,14 +206,18 @@ Semantic metadata:
 ```text
 kind:           salix-session-state
 schema_version: 1
-snapshot:       7
+snapshot:       9
 ```
 
-Physical migration revision:
+Physical migration lineage:
 
 ```text
-session-state-0001
+session-state-0001   initial v7 session schema
+session-state-0002   v8 seeding-goal fields
+session-state-0003   v9 instanced timed-goal baseline and additive time components
 ```
+
+`session-state-0001` and `session-state-0002` are frozen immutable historical migrations. `session-state-0003` adds the timed-goal baseline plus persisted Days/Hours/Minutes quick-menu components. When an existing v8 database is upgraded, any active time-based goal receives a baseline equal to its persisted cumulative Seed Time so the legacy total cannot trigger an immediate automatic stop under the new semantics. Historical JSON versions 1-8 and SalixORM v7/v8 databases are normalized to snapshot version 9; the next successful save records the complete v9 state.
 
 Tables:
 
@@ -254,7 +270,7 @@ When the SalixORM session backend is selected and `session.db` has no session sn
 1. the primary database is checked first;
 2. historical `session.json` is consulted as a read-only fallback;
 3. `TorrentManager` restores the queue with existing compatibility behavior;
-4. the next normal save writes a current version-7 snapshot to SalixORM;
+4. the next normal save writes a current version-8 snapshot to SalixORM;
 5. the database becomes authoritative for that selected backend.
 
 The legacy JSON file is not deleted or dual-written.
@@ -298,6 +314,7 @@ The storage adapter does not instantiate `TorrentSession` objects or validate ex
 - file priorities;
 - queue priority;
 - protocol policy;
+- seeding-goal policy, cumulative Seed Time, timed-goal baseline and additive quick-time components;
 - auto-resume policy;
 - skipping unavailable torrents;
 - post-restore state rewrite to remove dead entries.
@@ -328,7 +345,7 @@ Cached `.torrent` files stay external artifacts and are not stored as SQL blobs.
 Session persistence regression coverage includes:
 
 - current JSON round-trip/atomic replacement;
-- JSON historical versions 1-6 import;
+- JSON historical versions 1-8 import;
 - malformed/unsupported JSON tolerance;
 - current-version-only JSON saves;
 - default runtime lazy dependency behavior;
@@ -337,6 +354,9 @@ Session persistence regression coverage includes:
 - legacy session queue-limit refusal to override settings;
 - SalixORM save/reopen/order parity;
 - semantic metadata and migration revision;
+- in-place SalixORM v7 -> v8 -> v9 migration through checksum-frozen `session-state-0001`, `session-state-0002`, and current `session-state-0003`;
+- per-torrent seeding-goal, cumulative Seed Time, timed-goal baseline and additive quick-time round-trip;
+- historical v7 restore preserving indefinite-seeding behavior;
 - empty queue snapshots;
 - file-backed SQLite-only policy;
 - corrupt metadata refusal;
@@ -347,5 +367,19 @@ Session persistence regression coverage includes:
 - corrupt-store write refusal;
 - custom database target;
 - restore of real stopped-torrent metainfo/session metadata.
+
+
+Current real Windows validation for the completed seeding-goal tranche:
+
+```text
+seeding policy:                  14 / 14 OK
+application settings:            12 / 12 OK
+session persistence:             34 / 34 OK
+full canonical discovery:       334 / 334 OK
+plain repository discovery:     334 / 334 OK
+expected non-Windows skip:        1
+```
+
+Canonical localization extraction/manifests are current at 1337 entries (695 UI / 260 Help / 382 Glossary), pseudo-locale validation is clean, and provider-neutral translation-memory parity remains 432/432.
 
 The source-export snapshot can still omit `packaging/SalixTorrent.spec`; packaging-only failures caused solely by that omission are not persistence regressions and must be validated on the real checkout.

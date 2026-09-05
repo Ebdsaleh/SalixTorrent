@@ -484,7 +484,32 @@
     {
       "id": "SHARE_RATIO",
       "title": "Share Ratio",
-      "body": "Uploaded payload divided by downloaded payload. A ratio of 1.0 means roughly as much data has been uploaded as downloaded. A source-backed seed can upload even though SalixTorrent itself downloaded zero bytes."
+      "body": "Uploaded payload divided by downloaded payload for the transfer's displayed share ratio. A ratio of 1.0 means roughly as much data has been uploaded as downloaded. Automatic seeding-ratio goals use Uploaded Total divided by the full torrent payload size so a torrent seeded from existing local data has a meaningful target even when SalixTorrent downloaded zero bytes itself."
+    },
+    {
+      "id": "SEEDING_GOAL",
+      "title": "Seeding Goal",
+      "body": "A per-torrent policy that decides when a complete torrent should stop seeding automatically. SalixTorrent supports Seed Indefinitely, Stop at Ratio, Stop after Time, and Stop at Ratio or Time. Preferences supplies the default copied into newly added torrents and can explicitly apply that default to all existing torrents as a one-shot bulk action. Right-click Seeding Goal or Torrent Properties changes one torrent independently, and that torrent keeps its last saved policy across restart."
+    },
+    {
+      "id": "SEEDING_RATIO",
+      "title": "Seeding Ratio Target",
+      "body": "The cumulative upload target used by ratio-based seeding goals. SalixTorrent divides persisted Uploaded Total by the torrent's full payload size; a target of 1.0 means one payload-equivalent uploaded. This goal calculation remains meaningful for source-backed seeds that did not download their payload through SalixTorrent."
+    },
+    {
+      "id": "SEEDING_TIME",
+      "title": "Seeding Time",
+      "body": "The cumulative time a torrent has actually spent in Seeding state. It is historical telemetry and is not reset when a new timed goal is applied. Timed automatic-stop progress uses a separate goal window that starts from the apply action; time targets are presented and edited as Days, Hours, and Minutes for readability."
+    },
+    {
+      "id": "TIMED_GOAL_WINDOW",
+      "title": "Timed Seeding Goal Window",
+      "body": "The amount of new seeding time counted toward the currently configured time-based goal. The window starts at zero whenever a timed goal is applied or changed, while cumulative Seed Time continues to retain the torrent's full seeding history. General shows the current window and its target in Days/Hours/Minutes, and Configure targets and the compact Preferences panel stack Days, Hours, and Minutes vertically for readability, while Torrent Properties exposes the same three-part duration editor. A 60-minute goal applied after 70 minutes of prior seeding therefore ends after 60 additional minutes, not immediately."
+    },
+    {
+      "id": "AUTOMATIC_STOP",
+      "title": "Automatic Stop",
+      "body": "The lifecycle action taken when a configured seeding goal is reached. SalixTorrent changes the torrent's durable intent to Stopped and saves that state, so it remains stopped after restart. Applying a new timed goal starts a fresh timed-goal window without erasing cumulative Seed Time."
     },
     {
       "id": "TRANSFER_LIMITS",

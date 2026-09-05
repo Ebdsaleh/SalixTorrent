@@ -37,6 +37,19 @@ from app.logic.magnet import (
     MagnetMetadataFetcher,
     build_torrent_bytes,
 )
+from app.logic.seeding_policy import (
+    DEFAULT_SEEDING_RATIO,
+    DEFAULT_SEEDING_TIME_MINUTES,
+    SEEDING_GOAL_EITHER,
+    SEEDING_GOAL_FOREVER,
+    SEEDING_GOAL_RATIO,
+    SEEDING_GOAL_TIME,
+    normalise_seeding_goal_mode,
+    normalise_seeding_ratio,
+    normalise_seeding_time_component,
+    normalise_seeding_time_minutes,
+    seeding_goal_uses_time,
+)
 from app.logic.session import (
     TorrentSession,
     SessionState,
@@ -58,6 +71,9 @@ class TorrentCommand:
     SET_LIMITS = "SET_LIMITS"
     SET_FILE_PRIORITY = "SET_FILE_PRIORITY"
     SET_TORRENT_PRIORITY = "SET_TORRENT_PRIORITY"
+    SET_SEEDING_GOAL = "SET_SEEDING_GOAL"
+    APPLY_SEEDING_GOAL_ALL = "APPLY_SEEDING_GOAL_ALL"
+    SEEDING_GOAL_REACHED = "SEEDING_GOAL_REACHED"
     SET_QUEUE_LIMIT = "SET_QUEUE_LIMIT"
     REBALANCE_QUEUE = "REBALANCE_QUEUE"
     FORCE_RECHECK = "FORCE_RECHECK"
@@ -223,6 +239,9 @@ class TorrentManager:
             "default_upload_limit_value": 0.0,
             "default_upload_limit_unit": "KB/s",
             "default_queue_priority": TORRENT_PRIORITY_NORMAL,
+            "default_seeding_goal_mode": SEEDING_GOAL_FOREVER,
+            "default_seeding_ratio": DEFAULT_SEEDING_RATIO,
+            "default_seeding_time_minutes": DEFAULT_SEEDING_TIME_MINUTES,
             "transfer_rate_display_unit": "Auto",
             "ui_font_size": 15,
             "documentation_scale": 100,
@@ -306,6 +325,15 @@ class TorrentManager:
         priority = str(data.get("default_queue_priority") or TORRENT_PRIORITY_NORMAL).strip().title()
         out["default_queue_priority"] = (
             priority if priority in TORRENT_PRIORITIES else TORRENT_PRIORITY_NORMAL
+        )
+        out["default_seeding_goal_mode"] = normalise_seeding_goal_mode(
+            data.get("default_seeding_goal_mode", SEEDING_GOAL_FOREVER)
+        )
+        out["default_seeding_ratio"] = normalise_seeding_ratio(
+            data.get("default_seeding_ratio", DEFAULT_SEEDING_RATIO)
+        )
+        out["default_seeding_time_minutes"] = normalise_seeding_time_minutes(
+            data.get("default_seeding_time_minutes", DEFAULT_SEEDING_TIME_MINUTES)
         )
 
         valid_display_units = {"Auto", "KB/s", "MB/s", "kbps", "Mbps"}
@@ -417,6 +445,16 @@ class TorrentManager:
 
     def _on_incoming_peer(self, port: int, remote_ip: str):
         self._connectivity.mark_incoming(port, remote_ip)
+
+    def _on_seeding_goal_reached(self, info_hash: str, reason: str):
+        """Route a session goal event back through the manager command boundary."""
+        if not info_hash:
+            return
+        self._send_cmd(
+            TorrentCommand.SEEDING_GOAL_REACHED,
+            info_hash,
+            {"reason": str(reason or "")},
+        )
 
     def update_app_settings(self, values: dict) -> dict:
         merged = dict(self._settings)
@@ -595,6 +633,18 @@ class TorrentManager:
                     "protocol_policy": session.protocol_policy,
                     "file_priorities": session.piece_mgr.get_file_priorities(),
                     "queue_priority": session.queue_priority,
+                    "seeding_goal_mode": session.seeding_goal_mode,
+                    "seeding_ratio_limit": float(session.seeding_ratio_limit),
+                    "seeding_time_limit_minutes": int(session.seeding_time_limit_minutes),
+                    "seeding_elapsed_seconds": float(session.seeding_elapsed_seconds),
+                    "seeding_time_goal_baseline_seconds": float(
+                        session.seeding_time_goal_baseline_seconds
+                    ),
+                    "seeding_time_days": int(session.seeding_time_days),
+                    "seeding_time_hours": int(session.seeding_time_hours),
+                    "seeding_time_minutes_component": int(
+                        session.seeding_time_minutes_component
+                    ),
                 }
             )
 
@@ -688,6 +738,10 @@ class TorrentManager:
 
         restored_order: List[str] = []
         active_hashes: List[str] = []
+        try:
+            source_session_version = int(data.get("version", 1) or 1)
+        except (TypeError, ValueError):
+            source_session_version = 1
 
         self._restoring_state = True
         try:
@@ -735,6 +789,30 @@ class TorrentManager:
                         global_upload_limiter=self._global_upload_limiter,
                         listen_port_callback=self._on_session_listen_port,
                         incoming_peer_callback=self._on_incoming_peer,
+                        # Historical v1-v7 sessions seeded indefinitely. v8 introduced
+                        # per-torrent seeding policy but compared timed goals against
+                        # lifetime seed time. v9 snapshots persist an instance baseline
+                        # so a timed goal means "from the moment it was configured".
+                        seeding_goal_mode=entry.get("seeding_goal_mode", SEEDING_GOAL_FOREVER),
+                        seeding_ratio_limit=entry.get("seeding_ratio_limit", DEFAULT_SEEDING_RATIO),
+                        seeding_time_limit_minutes=entry.get(
+                            "seeding_time_limit_minutes", DEFAULT_SEEDING_TIME_MINUTES
+                        ),
+                        seeding_elapsed_seconds=entry.get("seeding_elapsed_seconds", 0.0),
+                        seeding_time_goal_baseline_seconds=(
+                            entry.get("seeding_elapsed_seconds", 0.0)
+                            if source_session_version == 8
+                            and seeding_goal_uses_time(
+                                entry.get("seeding_goal_mode", SEEDING_GOAL_FOREVER)
+                            )
+                            else entry.get("seeding_time_goal_baseline_seconds", 0.0)
+                        ),
+                        seeding_time_days=entry.get("seeding_time_days"),
+                        seeding_time_hours=entry.get("seeding_time_hours"),
+                        seeding_time_minutes_component=entry.get(
+                            "seeding_time_minutes_component"
+                        ),
+                        seeding_goal_callback=self._on_seeding_goal_reached,
                     )
                 except Exception as exc:
                     print(f"[Salix_T Notice] Could not restore '{restore_path}': {exc}")
@@ -1561,6 +1639,35 @@ class TorrentManager:
                             print(f"[Salix_T Notice] Could not apply live network preferences: {exc}")
                     continue
 
+                if action == TorrentCommand.APPLY_SEEDING_GOAL_ALL:
+                    payload = payload or {}
+                    mode = normalise_seeding_goal_mode(
+                        payload.get("mode", SEEDING_GOAL_FOREVER)
+                    )
+                    ratio_limit = normalise_seeding_ratio(
+                        payload.get("ratio_limit", DEFAULT_SEEDING_RATIO)
+                    )
+                    time_limit_minutes = normalise_seeding_time_minutes(
+                        payload.get("time_limit_minutes", DEFAULT_SEEDING_TIME_MINUTES)
+                    )
+                    with self._sessions_lock:
+                        sessions = list(self.sessions.values())
+
+                    changed_any = False
+                    for live_session in sessions:
+                        changed_any = live_session.set_seeding_goal(
+                            mode,
+                            ratio_limit,
+                            time_limit_minutes,
+                            restart_time_window=seeding_goal_uses_time(mode),
+                        ) or changed_any
+                        self.ui_queue.put(
+                            self._seeding_goal_updated_event(live_session)
+                        )
+                    if changed_any:
+                        self.save_session_state()
+                    continue
+
                 with self._sessions_lock:
                     session = self.sessions.get(info_hash)
 
@@ -1664,6 +1771,49 @@ class TorrentManager:
                     )
                     if changed:
                         self.save_session_state()
+                    self._rebalance_queue()
+
+                elif action == TorrentCommand.SET_SEEDING_GOAL:
+                    payload = payload or {}
+                    raw_components = payload.get("time_components")
+                    time_components = None
+                    if isinstance(raw_components, (list, tuple)) and len(raw_components) == 3:
+                        time_components = tuple(raw_components)
+                    changed = session.set_seeding_goal(
+                        payload.get("mode", SEEDING_GOAL_FOREVER),
+                        payload.get("ratio_limit", DEFAULT_SEEDING_RATIO),
+                        payload.get("time_limit_minutes", DEFAULT_SEEDING_TIME_MINUTES),
+                        time_components=time_components,
+                        restart_time_window=bool(payload.get("restart_time_window", False)),
+                    )
+                    if changed:
+                        self.save_session_state()
+                    self.ui_queue.put(self._seeding_goal_updated_event(session))
+
+                elif action == TorrentCommand.SEEDING_GOAL_REACHED:
+                    payload = payload or {}
+                    reason = str(payload.get("reason") or "")
+                    with self._sessions_lock:
+                        self._desired_states[info_hash] = SessionIntent.STOPPED
+                    self._explicit_start_requests.discard(info_hash)
+                    session.stop()
+                    self.save_session_state()
+                    self.ui_queue.put(
+                        {
+                            "type": "SEEDING_GOAL_REACHED",
+                            "info_hash": info_hash,
+                            "torrent_name": session.torrent.name,
+                            "reason": reason,
+                            "seeding_goal_mode": session.seeding_goal_mode,
+                            "seeding_ratio_limit": session.seeding_ratio_limit,
+                            "seeding_time_limit_minutes": session.seeding_time_limit_minutes,
+                            "seeding_elapsed_seconds": session.seeding_elapsed_seconds,
+                            "seeding_goal_elapsed_seconds": session.seeding_goal_elapsed_seconds,
+                            "seeding_time_goal_baseline_seconds": (
+                                session.seeding_time_goal_baseline_seconds
+                            ),
+                        }
+                    )
                     self._rebalance_queue()
 
             finally:
@@ -1827,6 +1977,16 @@ class TorrentManager:
             global_upload_limiter=self._global_upload_limiter,
             listen_port_callback=self._on_session_listen_port,
             incoming_peer_callback=self._on_incoming_peer,
+            seeding_goal_mode=self._settings.get(
+                "default_seeding_goal_mode", SEEDING_GOAL_FOREVER
+            ),
+            seeding_ratio_limit=self._settings.get(
+                "default_seeding_ratio", DEFAULT_SEEDING_RATIO
+            ),
+            seeding_time_limit_minutes=self._settings.get(
+                "default_seeding_time_minutes", DEFAULT_SEEDING_TIME_MINUTES
+            ),
+            seeding_goal_callback=self._on_seeding_goal_reached,
         )
         info_hash = new_session.torrent.hex_info_hash
 
@@ -1840,6 +2000,7 @@ class TorrentManager:
         replacement_uploaded = 0
         replacement_priorities = None
         replacement_queue_priority = TORRENT_PRIORITY_NORMAL
+        replacement_seeding_goal = None
         replaced_existing = False
 
         with self._sessions_lock:
@@ -1873,6 +2034,14 @@ class TorrentManager:
                     replacement_uploaded = existing_session.uploaded_bytes
                     replacement_priorities = existing_session.piece_mgr.get_file_priorities()
                     replacement_queue_priority = existing_session.queue_priority
+                    replacement_seeding_goal = (
+                        existing_session.seeding_goal_mode,
+                        existing_session.seeding_ratio_limit,
+                        existing_session.seeding_time_limit_minutes,
+                        existing_session.seeding_elapsed_seconds,
+                        existing_session.seeding_time_goal_baseline_seconds,
+                        existing_session.seeding_time_components,
+                    )
                     self.sessions[info_hash] = new_session
                     self._desired_states[info_hash] = SessionIntent.IDLE
                     self._source_paths[info_hash] = torrent_path
@@ -1913,6 +2082,28 @@ class TorrentManager:
             new_session.set_file_priorities(replacement_priorities, emit=False)
         if replaced_existing:
             new_session.set_queue_priority(replacement_queue_priority, emit=False)
+            if replacement_seeding_goal is not None:
+                (
+                    mode,
+                    ratio_limit,
+                    time_limit_minutes,
+                    elapsed_seconds,
+                    time_baseline_seconds,
+                    time_components,
+                ) = replacement_seeding_goal
+                new_session._seeding_elapsed_seconds = max(0.0, float(elapsed_seconds))
+                new_session._seeding_time_goal_baseline_seconds = min(
+                    max(0.0, float(time_baseline_seconds)),
+                    new_session._seeding_elapsed_seconds,
+                )
+                new_session.set_seeding_goal(
+                    mode,
+                    ratio_limit,
+                    time_limit_minutes,
+                    time_components=time_components,
+                    restart_time_window=False,
+                    emit=False,
+                )
         else:
             new_session.set_queue_priority(
                 self._settings.get("default_queue_priority", TORRENT_PRIORITY_NORMAL),
@@ -2054,6 +2245,118 @@ class TorrentManager:
             {"priority": value},
         )
 
+    @staticmethod
+    def _seeding_goal_updated_event(session: TorrentSession) -> dict:
+        status = session.seeding_goal_status()
+        return {
+            "type": "SEEDING_GOAL_UPDATED",
+            "info_hash": session.torrent.hex_info_hash,
+            "torrent_name": session.torrent.name,
+            "seeding_goal_mode": session.seeding_goal_mode,
+            "seeding_ratio_limit": session.seeding_ratio_limit,
+            "seeding_time_limit_minutes": session.seeding_time_limit_minutes,
+            "seeding_elapsed_seconds": session.seeding_elapsed_seconds,
+            "seeding_goal_elapsed_seconds": status.elapsed_seconds,
+            "seeding_time_goal_baseline_seconds": (
+                session.seeding_time_goal_baseline_seconds
+            ),
+            "seeding_time_days": int(session.seeding_time_days),
+            "seeding_time_hours": int(session.seeding_time_hours),
+            "seeding_time_minutes_component": int(
+                session.seeding_time_minutes_component
+            ),
+            "seeding_goal_ratio": status.current_ratio,
+            "seeding_goal_remaining_ratio": status.remaining_ratio,
+            "seeding_goal_remaining_seconds": status.remaining_seconds,
+            "seeding_goal_reached": status.reached,
+        }
+
+    def set_seeding_goal(
+        self,
+        info_hash: str,
+        mode: object,
+        ratio_limit: object,
+        time_limit_minutes: object,
+        *,
+        time_components: object | None = None,
+        restart_time_window: bool | None = None,
+    ):
+        """Set one torrent's durable automatic seeding-stop policy.
+
+        Explicit user changes to a policy containing a time condition restart
+        that torrent's timed goal window from the current cumulative seed-time
+        counter. Lifetime Seed Time remains intact as telemetry.
+        """
+        with self._sessions_lock:
+            if info_hash not in self.sessions:
+                return False
+
+        normalized_mode = normalise_seeding_goal_mode(mode)
+        payload = {
+            "mode": normalized_mode,
+            "ratio_limit": normalise_seeding_ratio(ratio_limit),
+            "time_limit_minutes": normalise_seeding_time_minutes(time_limit_minutes),
+            "restart_time_window": (
+                seeding_goal_uses_time(normalized_mode)
+                if restart_time_window is None
+                else bool(restart_time_window)
+            ),
+        }
+        if isinstance(time_components, (list, tuple)) and len(time_components) == 3:
+            payload["time_components"] = [
+                normalise_seeding_time_component("days", time_components[0]),
+                normalise_seeding_time_component("hours", time_components[1]),
+                normalise_seeding_time_component("minutes", time_components[2]),
+            ]
+        self._send_cmd(TorrentCommand.SET_SEEDING_GOAL, info_hash, payload)
+        return True
+
+    def apply_seeding_goal_to_all_existing(
+        self,
+        mode: object,
+        ratio_limit: object,
+        time_limit_minutes: object,
+    ) -> int:
+        """Apply one seeding policy to every currently loaded torrent.
+
+        This is an explicit bulk action used by Preferences. Application
+        defaults remain defaults for future torrents unless the caller asks
+        for this operation deliberately.
+        """
+        normalized_mode = normalise_seeding_goal_mode(mode)
+        normalized_ratio = normalise_seeding_ratio(ratio_limit)
+        normalized_time = normalise_seeding_time_minutes(time_limit_minutes)
+        with self._sessions_lock:
+            sessions = list(self.sessions.values())
+
+        if not sessions:
+            return 0
+
+        if self._running:
+            self._send_cmd(
+                TorrentCommand.APPLY_SEEDING_GOAL_ALL,
+                "",
+                {
+                    "mode": normalized_mode,
+                    "ratio_limit": normalized_ratio,
+                    "time_limit_minutes": normalized_time,
+                },
+            )
+            return len(sessions)
+
+        changed_any = False
+        for session in sessions:
+            changed_any = session.set_seeding_goal(
+                normalized_mode,
+                normalized_ratio,
+                normalized_time,
+                restart_time_window=seeding_goal_uses_time(normalized_mode),
+            ) or changed_any
+            self.ui_queue.put(self._seeding_goal_updated_event(session))
+        if changed_any:
+            self.save_session_state()
+        return len(sessions)
+
     def force_recheck(self, info_hash: str):
         """Discard fast-resume trust and hash the existing payload again."""
         with self._sessions_lock:
@@ -2133,8 +2436,3 @@ class TorrentManager:
 
         self._connectivity.close()
         self._cleanup_ephemeral_torrents()
-
-
-
-
-

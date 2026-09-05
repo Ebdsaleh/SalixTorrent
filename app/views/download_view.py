@@ -14,6 +14,19 @@ import dearpygui.dearpygui as dpg
 from app.localization import canonical_choice, localized_choices, tr, tr_value
 
 from app.logic.network_binding import format_endpoint
+from app.logic.seeding_policy import (
+    SEEDING_GOAL_EITHER,
+    SEEDING_GOAL_MODES,
+    SEEDING_GOAL_FOREVER,
+    SEEDING_GOAL_RATIO,
+    SEEDING_GOAL_TIME,
+    SEEDING_TIME_COMPONENT_SPECS,
+    seeding_goal_uses_time,
+    seeding_time_components_from_minutes,
+    seeding_time_components_to_minutes,
+    seeding_time_parts_from_minutes,
+    seeding_time_parts_to_minutes,
+)
 from app.logic.torrent_manager import TorrentManager
 from app.logic.transfer_add import TransferAddRequest
 from app.engine.desktop_integration import DesktopIntegration
@@ -85,6 +98,13 @@ class DownloadView:
         self._state_filter: str = "All"
         self._completion_notified = set()
         self._completion_notice_info_hash: str = ""
+        self._seeding_goal_notice_info_hash: str = ""
+        self._seeding_goal_edit_info_hash: str = ""
+        # The Stop-after-Time quick menu contains 103 presets. Build those
+        # children lazily for only the most recently opened torrent context
+        # menu so large queues do not carry thousands of hidden Dear PyGui
+        # menu items.
+        self._seeding_time_preset_info_hash: str = ""
         self._magnet_info_hash: str = ""
         self._magnet_close_at: float = 0.0
         self.peer_view = PeerView()
@@ -298,6 +318,14 @@ class DownloadView:
                                 add_help_tooltip(self.elapsed_text, "ELAPSED")
                                 self.ratio_text = dpg.add_text(tr('view.download_view.share_ratio', "Share Ratio: --"))
                                 add_help_tooltip(self.ratio_text, "SHARE_RATIO")
+                                self.seeding_goal_text = dpg.add_text(
+                                    tr('view.download_view.seeding_goal_indefinite', "Seeding Goal: Seed Indefinitely")
+                                )
+                                add_help_tooltip(self.seeding_goal_text, "SEEDING_GOAL")
+                                self.seeding_time_text = dpg.add_text(
+                                    tr('view.download_view.seed_time_00_00', "Seed Time: 00:00")
+                                )
+                                add_help_tooltip(self.seeding_time_text, "SEEDING_TIME")
                                 self.peers_text = dpg.add_text(tr('view.download_view.connected_peers_0', "Connected Peers: 0"))
                                 add_help_tooltip(self.peers_text, "CONNECTED_PEERS")
                                 self.error_text = dpg.add_text("", color=(255, 105, 105), wrap=390)
@@ -602,14 +630,73 @@ class DownloadView:
             label=tr('view.download_view.torrent_properties', "Torrent Properties"),
             modal=True,
             show=False,
-            width=720,
-            height=520,
-            min_size=[620, 360],
+            width=760,
+            height=650,
+            min_size=[660, 500],
         ) as self.properties_modal:
             self.properties_title = dpg.add_text(tr('view.download_view.torrent_properties', "Torrent Properties"), color=(0, 255, 128))
             dpg.add_separator()
-            with dpg.child_window(height=400, width=-1, border=False) as self.properties_body:
-                self.properties_text = dpg.add_text("", wrap=660)
+            with dpg.child_window(height=330, width=-1, border=False) as self.properties_body:
+                self.properties_text = dpg.add_text("", wrap=700)
+            dpg.add_separator()
+            seeding_goal_heading = dpg.add_text(
+                tr('view.download_view.seeding_goal', "SEEDING GOAL"),
+                color=(255, 190, 100),
+            )
+            add_help_tooltip(seeding_goal_heading, "SEEDING_GOAL")
+            with dpg.group(horizontal=True):
+                self.properties_seeding_goal_combo = dpg.add_combo(
+                    items=localized_choices(SEEDING_GOAL_MODES),
+                    default_value=tr_value(SEEDING_GOAL_FOREVER),
+                    width=230,
+                )
+                ratio_target_label = dpg.add_text(
+                    tr('view.download_view.ratio_target', "Ratio target")
+                )
+                self.properties_seeding_ratio_input = dpg.add_input_float(
+                    default_value=1.0,
+                    min_value=0.1,
+                    max_value=1000.0,
+                    min_clamped=True,
+                    max_clamped=True,
+                    format="%.2f",
+                    width=110,
+                )
+                time_target_label = dpg.add_text(
+                    tr('view.download_view.time_target', "Time target")
+                )
+                dpg.add_text(tr('view.download_view.days', "Days"))
+                self.properties_seeding_time_days = dpg.add_input_int(
+                    default_value=0, min_value=0, max_value=365,
+                    min_clamped=True, max_clamped=True, width=58,
+                )
+                dpg.add_text(tr('view.download_view.hours', "Hours"))
+                self.properties_seeding_time_hours = dpg.add_input_int(
+                    default_value=1, min_value=0, max_value=23,
+                    min_clamped=True, max_clamped=True, width=58,
+                )
+                dpg.add_text(tr('view.download_view.minutes', "Minutes"))
+                self.properties_seeding_time_minutes = dpg.add_input_int(
+                    default_value=0, min_value=0, max_value=59,
+                    min_clamped=True, max_clamped=True, width=58,
+                )
+            add_help_tooltip(self.properties_seeding_goal_combo, "SEEDING_GOAL")
+            add_help_tooltip(ratio_target_label, "SEEDING_RATIO")
+            add_help_tooltip(self.properties_seeding_ratio_input, "SEEDING_RATIO")
+            add_help_tooltip(time_target_label, "SEEDING_TIME")
+            for item in (
+                self.properties_seeding_time_days,
+                self.properties_seeding_time_hours,
+                self.properties_seeding_time_minutes,
+            ):
+                add_help_tooltip(item, "SEEDING_TIME")
+            with dpg.group(horizontal=True):
+                apply_seeding_goal_button = dpg.add_button(
+                    label=tr('view.download_view.apply_seeding_goal', " Apply Seeding Goal "),
+                    callback=self._properties_apply_seeding_goal,
+                )
+                add_help_tooltip(apply_seeding_goal_button, "SEEDING_GOAL")
+                self.properties_seeding_goal_status = dpg.add_text("", color=(150, 200, 160))
             dpg.add_spacer(height=8)
             with dpg.group(horizontal=True):
                 properties_hash_button = dpg.add_button(label=tr('view.download_view.copy_info_hash_888f9ec6', " Copy Info Hash "), callback=self._properties_copy_info_hash)
@@ -619,6 +706,96 @@ class DownloadView:
                 properties_folder_button = dpg.add_button(label=tr('view.download_view.open_folder', " Open Folder "), callback=self._properties_open_folder)
                 add_help_tooltip(properties_folder_button, "OPEN_FOLDER")
                 dpg.add_button(label=tr('view.download_view.close', " Close "), callback=lambda: dpg.hide_item(self.properties_modal))
+
+        with dpg.window(
+            label=tr('view.download_view.seeding_goal_for_torrent', "Seeding Goal for Torrent"),
+            modal=True,
+            show=False,
+            no_resize=True,
+            width=620,
+            height=365,
+        ) as self.seeding_goal_modal:
+            self.seeding_goal_modal_title = dpg.add_text(
+                tr('view.download_view.seeding_goal_for_torrent', "Seeding Goal for Torrent"),
+                color=(255, 190, 100),
+            )
+            add_help_tooltip(self.seeding_goal_modal_title, "SEEDING_GOAL")
+            self.seeding_goal_modal_current = dpg.add_text("", wrap=570)
+            dpg.add_separator()
+            with dpg.group(horizontal=True):
+                dpg.add_text(tr('view.download_view.goal_mode', "Goal mode"))
+                self.seeding_goal_modal_combo = dpg.add_combo(
+                    items=localized_choices(SEEDING_GOAL_MODES),
+                    default_value=tr_value(SEEDING_GOAL_FOREVER),
+                    width=250,
+                )
+            with dpg.group(horizontal=True):
+                ratio_label = dpg.add_text(tr('view.download_view.ratio_target', "Ratio target"))
+                self.seeding_goal_modal_ratio = dpg.add_input_float(
+                    default_value=1.0,
+                    min_value=0.1,
+                    max_value=1000.0,
+                    min_clamped=True,
+                    max_clamped=True,
+                    format="%.2f",
+                    width=120,
+                )
+            add_help_tooltip(self.seeding_goal_modal_combo, "SEEDING_GOAL")
+            add_help_tooltip(ratio_label, "SEEDING_RATIO")
+            add_help_tooltip(self.seeding_goal_modal_ratio, "SEEDING_RATIO")
+
+            time_label = dpg.add_text(tr('view.download_view.time_target', "Time target"))
+            add_help_tooltip(time_label, "SEEDING_TIME")
+            # Stack the exact duration editor vertically.  The focused modal is
+            # deliberately compact, and a single horizontal row clips unit
+            # labels once DPI scaling or translated text becomes wider.
+            with dpg.table(
+                header_row=False,
+                policy=dpg.mvTable_SizingFixedFit,
+                borders_outerH=False,
+                borders_innerH=False,
+                borders_outerV=False,
+                borders_innerV=False,
+                width=280,
+            ):
+                dpg.add_table_column(width_fixed=True, init_width_or_weight=90)
+                dpg.add_table_column(width_fixed=True, init_width_or_weight=170)
+                with dpg.table_row():
+                    dpg.add_text(tr('view.download_view.days', "Days"))
+                    self.seeding_goal_modal_time_days = dpg.add_input_int(
+                        default_value=0, min_value=0, max_value=365,
+                        min_clamped=True, max_clamped=True, width=130,
+                    )
+                with dpg.table_row():
+                    dpg.add_text(tr('view.download_view.hours', "Hours"))
+                    self.seeding_goal_modal_time_hours = dpg.add_input_int(
+                        default_value=1, min_value=0, max_value=23,
+                        min_clamped=True, max_clamped=True, width=130,
+                    )
+                with dpg.table_row():
+                    dpg.add_text(tr('view.download_view.minutes', "Minutes"))
+                    self.seeding_goal_modal_time_minutes = dpg.add_input_int(
+                        default_value=0, min_value=0, max_value=59,
+                        min_clamped=True, max_clamped=True, width=130,
+                    )
+            for item in (
+                self.seeding_goal_modal_time_days,
+                self.seeding_goal_modal_time_hours,
+                self.seeding_goal_modal_time_minutes,
+            ):
+                add_help_tooltip(item, "SEEDING_TIME")
+            self.seeding_goal_modal_status = dpg.add_text("", color=(150, 200, 160))
+            dpg.add_spacer(height=8)
+            with dpg.group(horizontal=True):
+                apply_goal_button = dpg.add_button(
+                    label=tr('view.download_view.apply_seeding_goal', " Apply Seeding Goal "),
+                    callback=self._seeding_goal_modal_apply,
+                )
+                add_help_tooltip(apply_goal_button, "SEEDING_GOAL")
+                dpg.add_button(
+                    label=tr('view.download_view.close', " Close "),
+                    callback=lambda: dpg.hide_item(self.seeding_goal_modal),
+                )
 
         with dpg.window(
             label=tr('view.download_view.download_complete', "Download Complete"),
@@ -1146,13 +1323,294 @@ class DownloadView:
             except Exception:
                 pass
 
-    def _show_properties(self, info_hash: str):
+    @staticmethod
+    def _format_seeding_duration(total_minutes: object) -> str:
+        days, hours, minutes = seeding_time_parts_from_minutes(total_minutes)
+        return tr(
+            'view.download_view.duration_days_hours_minutes',
+            '{days}d {hours:02d}h {minutes:02d}m',
+            days=days,
+            hours=hours,
+            minutes=minutes,
+        )
+
+    @staticmethod
+    def _format_seeding_goal(stats: dict) -> str:
+        mode = str(stats.get("seeding_goal_mode") or SEEDING_GOAL_FOREVER)
+        ratio_target = float(stats.get("seeding_ratio_limit", 1.0) or 1.0)
+        current_ratio = max(0.0, float(stats.get("seeding_goal_ratio", 0.0) or 0.0))
+        target_minutes = int(stats.get("seeding_time_limit_minutes", 60) or 60)
+        elapsed_seconds = max(
+            0.0,
+            float(
+                stats.get(
+                    "seeding_goal_elapsed_seconds",
+                    stats.get("seeding_elapsed_seconds", 0.0),
+                )
+                or 0.0
+            ),
+        )
+        elapsed_text = DownloadView._format_seeding_duration(int(elapsed_seconds // 60))
+        target_text = DownloadView._format_seeding_duration(target_minutes)
+        if mode == "Stop at Ratio":
+            return f"{tr_value(mode)} ({current_ratio:.2f} / {ratio_target:.2f})"
+        if mode == "Stop after Time":
+            return f"{tr_value(mode)} ({elapsed_text} / {target_text})"
+        if mode == "Stop at Ratio or Time":
+            return (
+                f"{tr_value(mode)} "
+                f"({current_ratio:.2f}/{ratio_target:.2f} | {elapsed_text}/{target_text})"
+            )
+        return tr_value(SEEDING_GOAL_FOREVER)
+
+    def _merge_seeding_goal_cache(
+        self,
+        info_hash: str,
+        *,
+        mode: object,
+        ratio_limit: object,
+        time_limit_minutes: object,
+        elapsed_seconds: object | None = None,
+        goal_elapsed_seconds: object | None = None,
+        time_baseline_seconds: object | None = None,
+        time_components: object | None = None,
+        current_ratio: object | None = None,
+        reached: object | None = None,
+    ):
+        stats = self.latest_stats.get(info_hash)
+        if not stats:
+            return
+        stats["seeding_goal_mode"] = str(mode or SEEDING_GOAL_FOREVER)
+        stats["seeding_ratio_limit"] = float(ratio_limit or 1.0)
+        stats["seeding_time_limit_minutes"] = int(time_limit_minutes or 60)
+        if elapsed_seconds is not None:
+            stats["seeding_elapsed_seconds"] = max(0.0, float(elapsed_seconds or 0.0))
+        if goal_elapsed_seconds is not None:
+            stats["seeding_goal_elapsed_seconds"] = max(
+                0.0, float(goal_elapsed_seconds or 0.0)
+            )
+        if time_baseline_seconds is not None:
+            stats["seeding_time_goal_baseline_seconds"] = max(
+                0.0, float(time_baseline_seconds or 0.0)
+            )
+        if isinstance(time_components, (list, tuple)) and len(time_components) == 3:
+            stats["seeding_time_days"] = max(0, int(time_components[0] or 0))
+            stats["seeding_time_hours"] = max(0, int(time_components[1] or 0))
+            stats["seeding_time_minutes_component"] = max(
+                0, int(time_components[2] or 0)
+            )
+        if current_ratio is not None:
+            stats["seeding_goal_ratio"] = max(0.0, float(current_ratio or 0.0))
+        if reached is not None:
+            stats["seeding_goal_reached"] = bool(reached)
+
+        if self.active_info_hash == info_hash:
+            self._render_inspector(stats)
+        self._refresh_context_menu_state(info_hash)
+
+    def _handle_seeding_goal_updated(self, msg: dict):
+        info_hash = str(msg.get("info_hash") or "")
+        if not info_hash or info_hash not in self.latest_stats:
+            return
+        self._merge_seeding_goal_cache(
+            info_hash,
+            mode=msg.get("seeding_goal_mode", SEEDING_GOAL_FOREVER),
+            ratio_limit=msg.get("seeding_ratio_limit", 1.0),
+            time_limit_minutes=msg.get("seeding_time_limit_minutes", 60),
+            elapsed_seconds=msg.get("seeding_elapsed_seconds"),
+            goal_elapsed_seconds=msg.get("seeding_goal_elapsed_seconds"),
+            time_baseline_seconds=msg.get("seeding_time_goal_baseline_seconds"),
+            time_components=(
+                msg.get("seeding_time_days", 0),
+                msg.get("seeding_time_hours", 0),
+                msg.get("seeding_time_minutes_component", 0),
+            ),
+            current_ratio=msg.get("seeding_goal_ratio"),
+            reached=msg.get("seeding_goal_reached"),
+        )
+
+        if self.active_info_hash == info_hash:
+            dpg.set_value(
+                self.properties_text,
+                self._properties_text_for_stats(self.latest_stats[info_hash]),
+            )
+            dpg.set_value(
+                self.properties_seeding_goal_combo,
+                tr_value(msg.get("seeding_goal_mode", SEEDING_GOAL_FOREVER)),
+            )
+            dpg.set_value(
+                self.properties_seeding_ratio_input,
+                float(msg.get("seeding_ratio_limit", 1.0) or 1.0),
+            )
+            days, hours, minutes = seeding_time_parts_from_minutes(
+                msg.get("seeding_time_limit_minutes", 60)
+            )
+            dpg.set_value(self.properties_seeding_time_days, days)
+            dpg.set_value(self.properties_seeding_time_hours, hours)
+            dpg.set_value(self.properties_seeding_time_minutes, minutes)
+
+        if self._seeding_goal_edit_info_hash == info_hash:
+            dpg.set_value(
+                self.seeding_goal_modal_combo,
+                tr_value(msg.get("seeding_goal_mode", SEEDING_GOAL_FOREVER)),
+            )
+            dpg.set_value(
+                self.seeding_goal_modal_ratio,
+                float(msg.get("seeding_ratio_limit", 1.0) or 1.0),
+            )
+            days, hours, minutes = seeding_time_parts_from_minutes(
+                msg.get("seeding_time_limit_minutes", 60)
+            )
+            dpg.set_value(self.seeding_goal_modal_time_days, days)
+            dpg.set_value(self.seeding_goal_modal_time_hours, hours)
+            dpg.set_value(self.seeding_goal_modal_time_minutes, minutes)
+
+    def _show_seeding_goal_editor(self, info_hash: str):
         stats = self.latest_stats.get(info_hash, {})
         if not stats:
             return
         self._select_torrent(info_hash)
-        dpg.set_value(self.properties_title, tr('view.download_view.torrent_properties_value', 'Torrent Properties - {value0}', value0=stats.get('torrent_name', '')))
+        self._seeding_goal_edit_info_hash = info_hash
+        torrent_name = str(stats.get("torrent_name") or info_hash)
+        dpg.set_value(
+            self.seeding_goal_modal_title,
+            tr(
+                'view.download_view.seeding_goal_torrent_name',
+                'Seeding Goal - {torrent_name}',
+                torrent_name=torrent_name,
+            ),
+        )
+        dpg.set_value(
+            self.seeding_goal_modal_current,
+            tr(
+                'view.download_view.current_seeding_goal_value',
+                'Current: {goal_text}. Changes apply only to this torrent and persist across restart. Applying a timed goal starts its countdown from now.',
+                goal_text=self._format_seeding_goal(stats),
+            ),
+        )
+        dpg.set_value(
+            self.seeding_goal_modal_combo,
+            tr_value(stats.get("seeding_goal_mode", SEEDING_GOAL_FOREVER)),
+        )
+        dpg.set_value(
+            self.seeding_goal_modal_ratio,
+            float(stats.get("seeding_ratio_limit", 1.0) or 1.0),
+        )
+        days, hours, minutes = seeding_time_parts_from_minutes(
+            stats.get("seeding_time_limit_minutes", 60)
+        )
+        dpg.set_value(self.seeding_goal_modal_time_days, days)
+        dpg.set_value(self.seeding_goal_modal_time_hours, hours)
+        dpg.set_value(self.seeding_goal_modal_time_minutes, minutes)
+        dpg.set_value(self.seeding_goal_modal_status, "")
+        dpg.show_item(self.seeding_goal_modal)
 
+    def _seeding_goal_modal_apply(self):
+        info_hash = self._seeding_goal_edit_info_hash
+        if not info_hash:
+            return
+        stats = self.latest_stats.get(info_hash, {})
+        if not stats:
+            return
+        mode = canonical_choice(
+            dpg.get_value(self.seeding_goal_modal_combo),
+            SEEDING_GOAL_MODES,
+            SEEDING_GOAL_FOREVER,
+        )
+        ratio = float(dpg.get_value(self.seeding_goal_modal_ratio) or 1.0)
+        minutes = seeding_time_parts_to_minutes(
+            dpg.get_value(self.seeding_goal_modal_time_days),
+            dpg.get_value(self.seeding_goal_modal_time_hours),
+            dpg.get_value(self.seeding_goal_modal_time_minutes),
+        )
+        quick_components = seeding_time_components_from_minutes(minutes)
+        if self.manager.set_seeding_goal(
+            info_hash,
+            mode,
+            ratio,
+            minutes,
+            time_components=quick_components,
+        ):
+            # Configure Targets remains the exact-value path. If that exact
+            # duration can also be represented by the additive quick tree,
+            # expose the equivalent checks there; otherwise leave them clear.
+            components = quick_components or (0, 0, 0)
+            self._merge_seeding_goal_cache(
+                info_hash,
+                mode=mode,
+                ratio_limit=ratio,
+                time_limit_minutes=minutes,
+                goal_elapsed_seconds=(0.0 if seeding_goal_uses_time(mode) else None),
+                time_baseline_seconds=(
+                    stats.get("seeding_elapsed_seconds", 0.0)
+                    if seeding_goal_uses_time(mode)
+                    else None
+                ),
+                time_components=components,
+            )
+            dpg.set_value(
+                self.seeding_goal_modal_current,
+                tr(
+                    'view.download_view.current_seeding_goal_value',
+                    'Current: {goal_text}. Changes apply only to this torrent and persist across restart. Applying a timed goal starts its countdown from now.',
+                    goal_text=self._format_seeding_goal(self.latest_stats.get(info_hash, {})),
+                ),
+            )
+            dpg.set_value(
+                self.seeding_goal_modal_status,
+                tr('view.download_view.seeding_goal_saved_for_torrent', 'Seeding goal saved for this torrent.'),
+            )
+
+    def _properties_apply_seeding_goal(self):
+        if not self.active_info_hash:
+            return
+        mode = canonical_choice(
+            dpg.get_value(self.properties_seeding_goal_combo),
+            SEEDING_GOAL_MODES,
+            SEEDING_GOAL_FOREVER,
+        )
+        ratio = float(dpg.get_value(self.properties_seeding_ratio_input) or 1.0)
+        minutes = seeding_time_parts_to_minutes(
+            dpg.get_value(self.properties_seeding_time_days),
+            dpg.get_value(self.properties_seeding_time_hours),
+            dpg.get_value(self.properties_seeding_time_minutes),
+        )
+        quick_components = seeding_time_components_from_minutes(minutes)
+        if self.manager.set_seeding_goal(
+            self.active_info_hash,
+            mode,
+            ratio,
+            minutes,
+            time_components=quick_components,
+        ):
+            components = quick_components or (0, 0, 0)
+            self._merge_seeding_goal_cache(
+                self.active_info_hash,
+                mode=mode,
+                ratio_limit=ratio,
+                time_limit_minutes=minutes,
+                goal_elapsed_seconds=(0.0 if seeding_goal_uses_time(mode) else None),
+                time_baseline_seconds=(
+                    self.latest_stats.get(self.active_info_hash, {}).get(
+                        "seeding_elapsed_seconds", 0.0
+                    )
+                    if seeding_goal_uses_time(mode)
+                    else None
+                ),
+                time_components=components,
+            )
+            dpg.set_value(
+                self.properties_text,
+                self._properties_text_for_stats(
+                    self.latest_stats.get(self.active_info_hash, {})
+                ),
+            )
+            dpg.set_value(
+                self.properties_seeding_goal_status,
+                tr('view.download_view.seeding_goal_saved_for_torrent', "Seeding goal saved for this torrent."),
+            )
+
+    def _properties_text_for_stats(self, stats: dict) -> str:
         trackers = list(stats.get("trackers") or [])
         tracker_text = "\n    ".join(trackers) if trackers else "--"
         ratio = stats.get("share_ratio")
@@ -1164,10 +1622,77 @@ class DownloadView:
         scrape_completed = stats.get("scrape_completed")
         scrape_age = self._format_age(stats.get("scrape_age_seconds"))
         scrape_source = stats.get("scrape_source") or "--"
-        properties = (
-            tr('view.download_view.name_value_state_value_info_hash_value_private_value', 'Name: {value0}\nState: {value1}\nInfo Hash: {value2}\nPrivate: {value3}\nTotal Size: {value4}\nDownloaded: {value5}\nUploaded Total: {value6}\nUploaded This Session: {value7}\nUpload Requests: {value8} served / {value9} received\nLast Upload: {value10}\nShare Ratio: {ratio_text}\nPieces: {value12} x {value13}\nFiles: {value14}\nSeeds / Leechers: {value15} / {value16}\nTracker Scrape S/L/C: {value17} / {value18} / {value19}\nTracker Scrape Source: {scrape_source} | {scrape_age}\nAvailability: {value22:.2f}\nDiscovery: {value23}\nActive Time: {value24}\nIncoming Peers: {value25} active / {value26} this session\nETA: {value27}\n\nStorage Mode: {value28}\nStorage Path: {value29}\n.torrent File: {value30}\n\nCreated By: {value31}\nCreated: {value32}\nComment: {value33}\n\nTrackers:\n    {tracker_text}', value0=stats.get('torrent_name', '--'), value1=stats.get('state_label', stats.get('state', '--')), value2=stats.get('info_hash', '--'), value3=tr_value('Yes' if stats.get('private') else 'No'), value4=self._format_bytes(stats.get('total_bytes')), value5=self._format_bytes(stats.get('downloaded_bytes')), value6=self._format_bytes(stats.get('uploaded_bytes')), value7=self._format_bytes(stats.get('uploaded_this_session_bytes')), value8=int(stats.get('upload_requests_served', 0) or 0), value9=int(stats.get('upload_requests_received', 0) or 0), value10=self._format_age(stats.get('last_upload_seconds')), ratio_text=ratio_text, value12=stats.get('total_pieces', 0), value13=self._format_bytes(stats.get('piece_length')), value14=stats.get('file_count', 0), value15=seeders if seeders is not None else '--', value16=leechers if leechers is not None else '--', value17=scrape_seeders if scrape_seeders is not None else '--', value18=scrape_leechers if scrape_leechers is not None else '--', value19=scrape_completed if scrape_completed is not None else '--', scrape_source=scrape_source, scrape_age=scrape_age, value22=float(stats.get('swarm_availability', 0.0) or 0.0), value23=stats.get('discovery_summary', '--'), value24=self._format_duration(stats.get('elapsed_seconds')), value25=int(stats.get('incoming_peers', 0) or 0), value26=int(stats.get('incoming_connections_total', 0) or 0), value27=self._format_duration(stats.get('eta_seconds')), value28=stats.get('storage_mode', '--'), value29=stats.get('storage_path', '--'), value30=stats.get('torrent_path', '--'), value31=stats.get('created_by') or '--', value32=self._format_creation_date(stats.get('creation_date')), value33=stats.get('comment') or '--', tracker_text=tracker_text)
+        return tr(
+            'view.download_view.name_value_state_value_info_hash_value_private_value',
+            'Name: {value0}\nState: {value1}\nInfo Hash: {value2}\nPrivate: {value3}\nTotal Size: {value4}\nDownloaded: {value5}\nUploaded Total: {value6}\nUploaded This Session: {value7}\nUpload Requests: {value8} served / {value9} received\nLast Upload: {value10}\nShare Ratio: {ratio_text}\nSeeding Goal: {seeding_goal}\nSeed Time: {seeding_time}\nPieces: {value12} x {value13}\nFiles: {value14}\nSeeds / Leechers: {value15} / {value16}\nTracker Scrape S/L/C: {value17} / {value18} / {value19}\nTracker Scrape Source: {scrape_source} | {scrape_age}\nAvailability: {value22:.2f}\nDiscovery: {value23}\nActive Time: {value24}\nIncoming Peers: {value25} active / {value26} this session\nETA: {value27}\n\nStorage Mode: {value28}\nStorage Path: {value29}\n.torrent File: {value30}\n\nCreated By: {value31}\nCreated: {value32}\nComment: {value33}\n\nTrackers:\n    {tracker_text}',
+            value0=stats.get('torrent_name', '--'),
+            value1=stats.get('state_label', stats.get('state', '--')),
+            value2=stats.get('info_hash', '--'),
+            value3=tr_value('Yes' if stats.get('private') else 'No'),
+            value4=self._format_bytes(stats.get('total_bytes')),
+            value5=self._format_bytes(stats.get('downloaded_bytes')),
+            value6=self._format_bytes(stats.get('uploaded_bytes')),
+            value7=self._format_bytes(stats.get('uploaded_this_session_bytes')),
+            value8=int(stats.get('upload_requests_served', 0) or 0),
+            value9=int(stats.get('upload_requests_received', 0) or 0),
+            value10=self._format_age(stats.get('last_upload_seconds')),
+            ratio_text=ratio_text,
+            seeding_goal=self._format_seeding_goal(stats),
+            seeding_time=self._format_duration(stats.get('seeding_elapsed_seconds')),
+            value12=stats.get('total_pieces', 0),
+            value13=self._format_bytes(stats.get('piece_length')),
+            value14=stats.get('file_count', 0),
+            value15=seeders if seeders is not None else '--',
+            value16=leechers if leechers is not None else '--',
+            value17=scrape_seeders if scrape_seeders is not None else '--',
+            value18=scrape_leechers if scrape_leechers is not None else '--',
+            value19=scrape_completed if scrape_completed is not None else '--',
+            scrape_source=scrape_source,
+            scrape_age=scrape_age,
+            value22=float(stats.get('swarm_availability', 0.0) or 0.0),
+            value23=stats.get('discovery_summary', '--'),
+            value24=self._format_duration(stats.get('elapsed_seconds')),
+            value25=int(stats.get('incoming_peers', 0) or 0),
+            value26=int(stats.get('incoming_connections_total', 0) or 0),
+            value27=self._format_duration(stats.get('eta_seconds')),
+            value28=stats.get('storage_mode', '--'),
+            value29=stats.get('storage_path', '--'),
+            value30=stats.get('torrent_path', '--'),
+            value31=stats.get('created_by') or '--',
+            value32=self._format_creation_date(stats.get('creation_date')),
+            value33=stats.get('comment') or '--',
+            tracker_text=tracker_text,
         )
-        dpg.set_value(self.properties_text, properties)
+
+    def _show_properties(self, info_hash: str):
+        stats = self.latest_stats.get(info_hash, {})
+        if not stats:
+            return
+        self._select_torrent(info_hash)
+        dpg.set_value(
+            self.properties_title,
+            tr(
+                'view.download_view.torrent_properties_value',
+                'Torrent Properties - {value0}',
+                value0=stats.get('torrent_name', ''),
+            ),
+        )
+        dpg.set_value(self.properties_text, self._properties_text_for_stats(stats))
+        dpg.set_value(
+            self.properties_seeding_goal_combo,
+            tr_value(stats.get("seeding_goal_mode", SEEDING_GOAL_FOREVER)),
+        )
+        dpg.set_value(
+            self.properties_seeding_ratio_input,
+            float(stats.get("seeding_ratio_limit", 1.0) or 1.0),
+        )
+        days, hours, minutes = seeding_time_parts_from_minutes(
+            stats.get("seeding_time_limit_minutes", 60)
+        )
+        dpg.set_value(self.properties_seeding_time_days, days)
+        dpg.set_value(self.properties_seeding_time_hours, hours)
+        dpg.set_value(self.properties_seeding_time_minutes, minutes)
+        dpg.set_value(self.properties_seeding_goal_status, "")
         dpg.show_item(self.properties_modal)
         self.layout.trigger(("download_view", "properties"))
 
@@ -1214,6 +1739,49 @@ class DownloadView:
             self.completion_notice_text,
             tr('view.download_view.value_downloaded_value_you_can_open_the_payload', '{state}. Downloaded {downloaded}. You can open the payload folder now or dismiss this notice.', state=state, downloaded=downloaded),
         )
+        dpg.show_item(self.completion_notice_modal)
+
+    def _show_seeding_goal_notice(self, msg: dict):
+        info_hash = str(msg.get("info_hash") or "")
+        if not info_hash:
+            return
+        self._seeding_goal_notice_info_hash = info_hash
+        torrent_name = str(msg.get("torrent_name") or "Torrent")
+        reason = str(msg.get("reason") or "")
+        if reason == "ratio":
+            reason_text = tr(
+                'view.download_view.seeding_ratio_target_reached',
+                'share-ratio target reached',
+            )
+        elif reason == "time":
+            reason_text = tr(
+                'view.download_view.seeding_time_target_reached',
+                'seeding-time target reached',
+            )
+        else:
+            reason_text = tr(
+                'view.download_view.seeding_goal_target_reached',
+                'configured seeding goal reached',
+            )
+
+        settings = self.manager.get_app_settings()
+        title = tr('view.download_view.seeding_goal_reached_title', "SalixTorrent - Seeding goal reached")
+        body = tr(
+            'view.download_view.seeding_goal_reached_body',
+            '{torrent_name} stopped automatically: {reason_text}.',
+            torrent_name=torrent_name,
+            reason_text=reason_text,
+        )
+        if settings.get("native_notifications", True):
+            self.desktop.notify(title, body)
+        if not self.manager.completion_notifications_enabled():
+            return
+        self._completion_notice_info_hash = info_hash
+        dpg.set_value(
+            self.completion_notice_title,
+            tr('view.download_view.seeding_goal_reached', 'Seeding goal reached - {torrent_name}', torrent_name=torrent_name),
+        )
+        dpg.set_value(self.completion_notice_text, body)
         dpg.show_item(self.completion_notice_modal)
 
     def _request_force_recheck(self, info_hash: str):
@@ -1300,6 +1868,64 @@ class DownloadView:
                     )
                     add_help_tooltip(rate_items[unit], "TRANSFER_RATE")
             add_help_tooltip(rate_menu, "TRANSFER_RATE")
+
+            with dpg.menu(
+                label=tr('view.download_view.seeding_goal_menu', "Seeding Goal")
+            ) as seeding_goal_menu:
+                seeding_goal_items = {}
+                for mode in SEEDING_GOAL_MODES:
+                    if mode == SEEDING_GOAL_TIME:
+                        continue
+                    seeding_goal_items[mode] = dpg.add_menu_item(
+                        label=tr_value(mode),
+                        check=True,
+                        user_data=(info_hash, mode),
+                        callback=lambda s, a, u: self._context_set_seeding_goal_mode(
+                            u[0], u[1]
+                        ),
+                    )
+
+                # Stop after Time is a submenu instead of a plain mode item.
+                # Days/Hours/Minutes are independent additive components; each
+                # component click updates the per-torrent target immediately.
+                # Unit branches are permanent; their numeric children are
+                # populated lazily only for the active context menu.
+                with dpg.menu(
+                    label=tr_value(SEEDING_GOAL_TIME)
+                ) as seeding_goal_time_menu:
+                    seeding_goal_time_clear_item = dpg.add_menu_item(
+                        label=tr(
+                            'view.download_view.clear_seeding_time_components',
+                            'Clear Time (Days/Hrs/Mins)',
+                        ),
+                        user_data=info_hash,
+                        callback=lambda s, a, u: self._context_clear_seeding_time_components(u),
+                    )
+                    dpg.add_separator()
+                    seeding_goal_time_unit_menus = {}
+                    for unit, _multiplier, _maximum in SEEDING_TIME_COMPONENT_SPECS:
+                        if unit == "days":
+                            label = tr('view.download_view.days', "Days")
+                        elif unit == "hours":
+                            label = tr('view.download_view.hours', "Hours")
+                        else:
+                            label = tr('view.download_view.minutes_title', "Minutes")
+                        seeding_goal_time_unit_menus[unit] = dpg.add_menu(label=label)
+
+                dpg.add_separator()
+                seeding_goal_configure_item = dpg.add_menu_item(
+                    label=tr('view.download_view.configure_seeding_goal', "Configure targets..."),
+                    user_data=info_hash,
+                    callback=lambda s, a, u: self._show_seeding_goal_editor(u),
+                )
+            add_help_tooltip(seeding_goal_menu, "SEEDING_GOAL")
+            add_help_tooltip(seeding_goal_time_menu, "SEEDING_TIME")
+            add_help_tooltip(seeding_goal_time_clear_item, "SEEDING_TIME")
+            for unit_menu in seeding_goal_time_unit_menus.values():
+                add_help_tooltip(unit_menu, "SEEDING_TIME")
+            add_help_tooltip(seeding_goal_configure_item, "SEEDING_GOAL")
+            for item in seeding_goal_items.values():
+                add_help_tooltip(item, "SEEDING_GOAL")
 
             dpg.add_separator()
 
@@ -1415,6 +2041,14 @@ class DownloadView:
             "priority_normal": priority_normal_item,
             "priority_low": priority_low_item,
             "rate_items": rate_items,
+            "seeding_goal_items": seeding_goal_items,
+            "seeding_goal_time_menu": seeding_goal_time_menu,
+            "seeding_goal_time_clear": seeding_goal_time_clear_item,
+            "seeding_goal_time_unit_menus": seeding_goal_time_unit_menus,
+            "seeding_goal_time_preset_items": {
+                unit: {} for unit, _multiplier, _maximum in SEEDING_TIME_COMPONENT_SPECS
+            },
+            "seeding_goal_configure": seeding_goal_configure_item,
             "start": start_item,
             "pause": pause_item,
             "resume": resume_item,
@@ -1432,12 +2066,173 @@ class DownloadView:
 
     def _on_row_right_clicked(self, info_hash: str, popup_id):
         self._select_torrent(info_hash)
+        self._populate_seeding_time_presets(info_hash)
         self._refresh_context_menu_states()
         dpg.configure_item(popup_id, show=True)
+
+    def _clear_seeding_time_presets(self, info_hash: str):
+        row = self.torrent_rows.get(info_hash)
+        if not row:
+            return
+        menu = row.get("menu", {})
+        preset_groups = menu.get("seeding_goal_time_preset_items", {})
+        for items in preset_groups.values():
+            for item in list(items.values()):
+                if dpg.does_item_exist(item):
+                    dpg.delete_item(item)
+            items.clear()
+
+    def _populate_seeding_time_presets(self, info_hash: str):
+        """Populate the quick duration tree for only one torrent context menu."""
+        if self._seeding_time_preset_info_hash != info_hash:
+            if self._seeding_time_preset_info_hash:
+                self._clear_seeding_time_presets(self._seeding_time_preset_info_hash)
+            self._seeding_time_preset_info_hash = info_hash
+
+        row = self.torrent_rows.get(info_hash)
+        if not row:
+            return
+        menu = row.get("menu", {})
+        unit_menus = menu.get("seeding_goal_time_unit_menus", {})
+        preset_groups = menu.get("seeding_goal_time_preset_items", {})
+        for unit, _multiplier, maximum in SEEDING_TIME_COMPONENT_SPECS:
+            group = preset_groups.setdefault(unit, {})
+            if group:
+                continue
+            parent = unit_menus.get(unit)
+            if not parent:
+                continue
+            for value in range(1, maximum + 1):
+                item = dpg.add_menu_item(
+                    label=str(value),
+                    check=True,
+                    parent=parent,
+                    user_data=(info_hash, unit, value),
+                    callback=lambda s, a, u: self._context_set_seeding_time_component(
+                        u[0], u[1], u[2]
+                    ),
+                )
+                group[value] = item
 
     def _context_set_priority(self, info_hash: str, priority: str):
         self._select_torrent(info_hash)
         self.manager.set_torrent_priority(info_hash, priority)
+
+    def _context_set_seeding_goal_mode(self, info_hash: str, mode: str):
+        self._select_torrent(info_hash)
+        stats = self.latest_stats.get(info_hash, {})
+        ratio = float(stats.get("seeding_ratio_limit", 1.0) or 1.0)
+        minutes = int(stats.get("seeding_time_limit_minutes", 60) or 60)
+        if self.manager.set_seeding_goal(info_hash, mode, ratio, minutes):
+            # Changing only the goal mode must not rewrite the user's saved
+            # quick-menu component representation (for example Minutes > 60).
+            components = self._time_components_from_stats(stats)
+            self._merge_seeding_goal_cache(
+                info_hash,
+                mode=mode,
+                ratio_limit=ratio,
+                time_limit_minutes=minutes,
+                goal_elapsed_seconds=(0.0 if seeding_goal_uses_time(mode) else None),
+                time_baseline_seconds=(
+                    self.latest_stats.get(info_hash, {}).get("seeding_elapsed_seconds", 0.0)
+                    if seeding_goal_uses_time(mode)
+                    else None
+                ),
+                time_components=components,
+            )
+
+    @staticmethod
+    def _time_components_from_stats(stats: dict) -> tuple[int, int, int]:
+        component_keys = (
+            "seeding_time_days",
+            "seeding_time_hours",
+            "seeding_time_minutes_component",
+        )
+        if all(key in stats for key in component_keys):
+            return (
+                max(0, int(stats.get("seeding_time_days", 0) or 0)),
+                max(0, int(stats.get("seeding_time_hours", 0) or 0)),
+                max(0, int(stats.get("seeding_time_minutes_component", 0) or 0)),
+            )
+        derived = seeding_time_components_from_minutes(
+            stats.get("seeding_time_limit_minutes", 60)
+        )
+        return derived or (0, 0, 0)
+
+    def _context_set_seeding_time_component(
+        self, info_hash: str, unit: str, value: int
+    ):
+        """Toggle one additive Days/Hours/Minutes component for one torrent."""
+        self._select_torrent(info_hash)
+        stats = self.latest_stats.get(info_hash, {})
+        ratio = float(stats.get("seeding_ratio_limit", 1.0) or 1.0)
+        days, hours, minutes_component = self._time_components_from_stats(stats)
+        components = {
+            "days": days,
+            "hours": hours,
+            "minutes": minutes_component,
+        }
+        current = int(components.get(unit, 0) or 0)
+        components[unit] = 0 if current == int(value) else int(value)
+        time_components = (
+            components["days"],
+            components["hours"],
+            components["minutes"],
+        )
+        target_minutes = seeding_time_components_to_minutes(*time_components)
+
+        if target_minutes <= 0:
+            self._context_clear_seeding_time_components(info_hash)
+            return
+
+        if self.manager.set_seeding_goal(
+            info_hash,
+            SEEDING_GOAL_TIME,
+            ratio,
+            target_minutes,
+            time_components=time_components,
+        ):
+            total_elapsed = float(stats.get("seeding_elapsed_seconds", 0.0) or 0.0)
+            self._merge_seeding_goal_cache(
+                info_hash,
+                mode=SEEDING_GOAL_TIME,
+                ratio_limit=ratio,
+                time_limit_minutes=target_minutes,
+                goal_elapsed_seconds=0.0,
+                time_baseline_seconds=total_elapsed,
+                time_components=time_components,
+                reached=False,
+            )
+
+    def _context_clear_seeding_time_components(self, info_hash: str):
+        """Clear quick time components and remove the active time condition."""
+        self._select_torrent(info_hash)
+        stats = self.latest_stats.get(info_hash, {})
+        ratio = float(stats.get("seeding_ratio_limit", 1.0) or 1.0)
+        current_mode = str(stats.get("seeding_goal_mode") or SEEDING_GOAL_FOREVER)
+        if current_mode == SEEDING_GOAL_TIME:
+            next_mode = SEEDING_GOAL_FOREVER
+        elif current_mode == SEEDING_GOAL_EITHER:
+            next_mode = SEEDING_GOAL_RATIO
+        else:
+            next_mode = current_mode
+        existing_minutes = int(stats.get("seeding_time_limit_minutes", 60) or 60)
+        if self.manager.set_seeding_goal(
+            info_hash,
+            next_mode,
+            ratio,
+            existing_minutes,
+            time_components=(0, 0, 0),
+            restart_time_window=False,
+        ):
+            self._merge_seeding_goal_cache(
+                info_hash,
+                mode=next_mode,
+                ratio_limit=ratio,
+                time_limit_minutes=existing_minutes,
+                time_components=(0, 0, 0),
+                reached=False,
+            )
 
     def _context_set_transfer_rate_unit(self, unit: str):
         self._set_transfer_rate_unit(unit, persist=True)
@@ -1662,6 +2457,41 @@ class DownloadView:
         dpg.configure_item(menu["priority_low"], enabled=queue_priority != "Low")
         for unit, item in menu.get("rate_items", {}).items():
             dpg.set_value(item, unit == self._transfer_rate_unit)
+        seeding_goal_mode = str(
+            stats.get("seeding_goal_mode") or SEEDING_GOAL_FOREVER
+        )
+        for mode, item in menu.get("seeding_goal_items", {}).items():
+            dpg.set_value(item, mode == seeding_goal_mode)
+
+        time_mode_active = seeding_goal_mode == SEEDING_GOAL_TIME
+        time_menu = menu.get("seeding_goal_time_menu")
+        if time_menu:
+            base_label = tr_value(SEEDING_GOAL_TIME)
+            dpg.configure_item(
+                time_menu,
+                label=base_label + (" ✓" if time_mode_active else ""),
+            )
+
+        days, hours, minutes_component = self._time_components_from_stats(stats)
+        selected_components = {
+            "days": days,
+            "hours": hours,
+            "minutes": minutes_component,
+        }
+        unit_labels = {
+            "days": tr('view.download_view.days', "Days"),
+            "hours": tr('view.download_view.hours', "Hours"),
+            "minutes": tr('view.download_view.minutes_title', "Minutes"),
+        }
+        for unit, unit_menu in menu.get("seeding_goal_time_unit_menus", {}).items():
+            dpg.configure_item(
+                unit_menu,
+                label=unit_labels[unit] + (" ✓" if selected_components[unit] > 0 else ""),
+            )
+        for unit, items in menu.get("seeding_goal_time_preset_items", {}).items():
+            for value, item in items.items():
+                dpg.set_value(item, int(value) == selected_components.get(unit, 0))
+
         dpg.configure_item(menu["start"], enabled=can_start and state != "Error")
         dpg.configure_item(menu["pause"], enabled=can_pause)
         dpg.configure_item(menu["resume"], enabled=can_resume)
@@ -1704,6 +2534,8 @@ class DownloadView:
         dpg.set_value(self.eta_text, tr('view.download_view.eta', "ETA: --"))
         dpg.set_value(self.elapsed_text, tr('view.download_view.active_time_00_00', "Active Time: 00:00"))
         dpg.set_value(self.ratio_text, tr('view.download_view.share_ratio', "Share Ratio: --"))
+        dpg.set_value(self.seeding_goal_text, tr('view.download_view.seeding_goal_indefinite', "Seeding Goal: Seed Indefinitely"))
+        dpg.set_value(self.seeding_time_text, tr('view.download_view.seed_time_00_00', "Seed Time: 00:00"))
         dpg.set_value(self.peers_text, tr('view.download_view.connected_peers_0', "Connected Peers: 0"))
         dpg.set_value(self.error_text, "")
         dpg.configure_item(self.retry_button, enabled=False)
@@ -1767,6 +2599,8 @@ class DownloadView:
 
         if info_hash in self.torrent_order:
             self.torrent_order.remove(info_hash)
+        if self._seeding_time_preset_info_hash == info_hash:
+            self._seeding_time_preset_info_hash = ""
 
         selected = msg.get("selected_info_hash", "")
         if self.active_info_hash == info_hash:
@@ -2002,6 +2836,21 @@ class DownloadView:
         ratio = msg.get("share_ratio")
         ratio_text = f"{float(ratio):.3f}" if ratio is not None else "--"
         dpg.set_value(self.ratio_text, tr('view.download_view.share_ratio_value', 'Share Ratio: {ratio_text}', ratio_text=ratio_text))
+        goal_text = self._format_seeding_goal(msg)
+        if msg.get("seeding_goal_reached"):
+            goal_text += " - " + tr('view.download_view.goal_reached', "Goal reached")
+        dpg.set_value(
+            self.seeding_goal_text,
+            tr('view.download_view.seeding_goal_value', 'Seeding Goal: {goal_text}', goal_text=goal_text),
+        )
+        dpg.set_value(
+            self.seeding_time_text,
+            tr(
+                'view.download_view.seed_time_value',
+                'Seed Time: {value0}',
+                value0=self._format_duration(msg.get('seeding_elapsed_seconds')),
+            ),
+        )
         dpg.set_value(
             self.peers_text,
             tr('view.download_view.connected_peers_value', 'Connected Peers: {connected_peers}', connected_peers=msg['connected_peers']),
@@ -2242,6 +3091,8 @@ class DownloadView:
         # every stale 0.5-second snapshot on return can lock the UI for seconds.
         latest_transfer = {}
         removed_messages = []
+        seeding_goal_update_messages = []
+        seeding_goal_messages = []
         latest_magnet = {}
 
         while True:
@@ -2259,6 +3110,10 @@ class DownloadView:
                 h = str(msg.get("info_hash") or "")
                 latest_transfer.pop(h, None)
                 removed_messages.append(msg)
+            elif msg_type == "SEEDING_GOAL_UPDATED":
+                seeding_goal_update_messages.append(msg)
+            elif msg_type == "SEEDING_GOAL_REACHED":
+                seeding_goal_messages.append(msg)
             elif msg_type in {
                 "MAGNET_PROGRESS",
                 "MAGNET_READY",
@@ -2320,6 +3175,12 @@ class DownloadView:
             # incomplete torrent, allow a fresh future completion notice.
             if new_state in {"Downloading", "Checking"} and not msg.get("wanted_finished"):
                 self._completion_notified.discard(h)
+
+        for msg in seeding_goal_update_messages:
+            self._handle_seeding_goal_updated(msg)
+
+        for msg in seeding_goal_messages:
+            self._show_seeding_goal_notice(msg)
 
         # Filtering walks the whole queue; do it once per UI frame instead of
         # once for every torrent snapshot.

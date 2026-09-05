@@ -7,12 +7,19 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
 from tests.helpers import PROJECT_ROOT
 
 from app.logic.bencode import Bencode
+from app.logic.seeding_policy import (
+    SEEDING_GOAL_EITHER,
+    SEEDING_GOAL_FOREVER,
+    SEEDING_GOAL_RATIO,
+    SEEDING_GOAL_TIME,
+)
 from app.logic.torrent_file import TorrentFile
 from app.logic.torrent_manager import TorrentManager
 from app.persistence import (
@@ -33,13 +40,20 @@ except ImportError:
     salixorm = None
 
 if salixorm is not None:
+    from salixorm import Database, MigrationManager, MigrationRegistry
+
     from app.persistence.session_salixorm import (
+        INITIAL_MIGRATION_REVISION,
+        SEEDING_GOAL_MIGRATION_REVISION,
         META_TABLE,
         MIGRATION_REVISION,
         SESSION_KIND,
         SESSION_SCHEMA,
         TORRENTS_TABLE,
         SalixORMSessionStateStore,
+        _AddSeedingGoalState,
+        _CreateSessionStateSchema,
+        _sqlite_url_for_path,
     )
 
 
@@ -64,6 +78,16 @@ def _snapshot(*, selected: str = "hash-a", hashes=("hash-a", "hash-b")) -> dict:
                 "protocol_policy": "Auto",
                 "file_priorities": ["High", "Normal"],
                 "queue_priority": "High" if index == 0 else "Low",
+                "seeding_goal_mode": (
+                    SEEDING_GOAL_EITHER if index == 0 else SEEDING_GOAL_RATIO
+                ),
+                "seeding_ratio_limit": 1.5 + index,
+                "seeding_time_limit_minutes": 45 + index,
+                "seeding_elapsed_seconds": 120.5 + index,
+                "seeding_time_goal_baseline_seconds": 20.0 + index,
+                "seeding_time_days": 0,
+                "seeding_time_hours": 0,
+                "seeding_time_minutes_component": 45 + index,
             }
         )
     return {
@@ -73,10 +97,14 @@ def _snapshot(*, selected: str = "hash-a", hashes=("hash-a", "hash-b")) -> dict:
     }
 
 
-def _write_torrent(path: Path) -> TorrentFile:
-    payload = b"session-persistence-test"
+def _write_torrent(
+    path: Path,
+    *,
+    payload: bytes = b"session-persistence-test",
+    name: bytes = b"session.bin",
+) -> TorrentFile:
     info = {
-        b"name": b"session.bin",
+        b"name": name,
         b"piece length": 16 * 1024,
         b"pieces": hashlib.sha1(payload).digest(),
         b"length": len(payload),
@@ -130,11 +158,11 @@ class JsonSessionStatePersistenceTests(_ManagerEnvironmentMixin, unittest.TestCa
             self.assertEqual(store.load(), snapshot)
             self.assertFalse(Path(str(path) + ".tmp").exists())
 
-    def test_json_store_accepts_historical_versions_one_through_six(self):
+    def test_json_store_accepts_historical_versions_one_through_eight(self):
         with tempfile.TemporaryDirectory() as td:
             path = Path(td) / "session.json"
             store = JsonSessionStateStore(path)
-            for version in range(1, 7):
+            for version in range(1, 9):
                 path.write_text(
                     json.dumps(
                         {
@@ -199,7 +227,7 @@ class JsonSessionStatePersistenceTests(_ManagerEnvironmentMixin, unittest.TestCa
             self.assertFalse(Path(td, "session.json").exists())
             self.assertFalse(Path(td, DEFAULT_SESSION_DATABASE).exists())
 
-    def test_session_v7_no_longer_duplicates_max_active_downloads(self):
+    def test_current_session_no_longer_duplicates_max_active_downloads(self):
         with tempfile.TemporaryDirectory() as td:
             os.environ["SALIX_T_STATE_DIR"] = td
             Path(td, "settings.json").write_text(
@@ -233,6 +261,283 @@ class JsonSessionStatePersistenceTests(_ManagerEnvironmentMixin, unittest.TestCa
             self.assertEqual(manager.restore_previous_session(), 0)
             self.assertEqual(manager.get_max_active_downloads(), 7)
             self.assertEqual(manager.get_app_settings()["max_active_downloads"], 7)
+
+
+    def test_application_default_changes_only_affect_new_torrents(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            os.environ["SALIX_T_STATE_DIR"] = td
+            manager = TorrentManager()
+            manager.update_app_settings(
+                {
+                    "default_seeding_goal_mode": SEEDING_GOAL_RATIO,
+                    "default_seeding_ratio": 2.0,
+                    "default_seeding_time_minutes": 90,
+                }
+            )
+
+            first_path = root / "first.torrent"
+            _write_torrent(first_path, payload=b"first-payload", name=b"first.bin")
+            first = manager.add_torrent(str(first_path), persist=False)
+            self.assertEqual(first.seeding_goal_mode, SEEDING_GOAL_RATIO)
+            self.assertEqual(first.seeding_ratio_limit, 2.0)
+
+            manager.update_app_settings(
+                {
+                    "default_seeding_goal_mode": SEEDING_GOAL_TIME,
+                    "default_seeding_ratio": 5.0,
+                    "default_seeding_time_minutes": 30,
+                }
+            )
+
+            # Changing Preferences changes the template for future torrents only.
+            self.assertEqual(first.seeding_goal_mode, SEEDING_GOAL_RATIO)
+            self.assertEqual(first.seeding_ratio_limit, 2.0)
+            self.assertEqual(first.seeding_time_limit_minutes, 90)
+
+            second_path = root / "second.torrent"
+            _write_torrent(second_path, payload=b"second-payload", name=b"second.bin")
+            second = manager.add_torrent(str(second_path), persist=False)
+            self.assertEqual(second.seeding_goal_mode, SEEDING_GOAL_TIME)
+            self.assertEqual(second.seeding_ratio_limit, 5.0)
+            self.assertEqual(second.seeding_time_limit_minutes, 30)
+
+    def test_explicit_bulk_seeding_goal_apply_persists_every_existing_torrent(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            os.environ["SALIX_T_STATE_DIR"] = td
+            manager = TorrentManager()
+
+            first_path = root / "bulk-first.torrent"
+            second_path = root / "bulk-second.torrent"
+            first_torrent = _write_torrent(
+                first_path, payload=b"bulk-first", name=b"bulk-first.bin"
+            )
+            second_torrent = _write_torrent(
+                second_path, payload=b"bulk-second", name=b"bulk-second.bin"
+            )
+            manager.add_torrent(str(first_path), persist=True)
+            manager.add_torrent(str(second_path), persist=True)
+
+            applied = manager.apply_seeding_goal_to_all_existing(
+                SEEDING_GOAL_EITHER, 2.75, 33
+            )
+            self.assertEqual(applied, 2)
+            for session in manager.sessions.values():
+                self.assertEqual(session.seeding_goal_mode, SEEDING_GOAL_EITHER)
+                self.assertEqual(session.seeding_ratio_limit, 2.75)
+                self.assertEqual(session.seeding_time_limit_minutes, 33)
+
+            persisted = JsonSessionStateStore(root / "session.json").load()
+            self.assertIsNotNone(persisted)
+            self.assertEqual(len(persisted["torrents"]), 2)
+            for entry in persisted["torrents"]:
+                self.assertEqual(entry["seeding_goal_mode"], SEEDING_GOAL_EITHER)
+                self.assertEqual(entry["seeding_ratio_limit"], 2.75)
+                self.assertEqual(entry["seeding_time_limit_minutes"], 33)
+
+            # Prove the per-torrent values survive a normal manager restart.
+            manager.shutdown()
+            TorrentManager._instance = None
+            restored = TorrentManager()
+            self.assertEqual(restored.restore_previous_session(), 2)
+            for info_hash in (first_torrent.hex_info_hash, second_torrent.hex_info_hash):
+                session = restored.sessions[info_hash]
+                self.assertEqual(session.seeding_goal_mode, SEEDING_GOAL_EITHER)
+                self.assertEqual(session.seeding_ratio_limit, 2.75)
+                self.assertEqual(session.seeding_time_limit_minutes, 33)
+
+    def test_running_manager_bulk_apply_uses_command_boundary_and_emits_updates(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            os.environ["SALIX_T_STATE_DIR"] = td
+            manager = TorrentManager()
+
+            first_path = root / "running-first.torrent"
+            second_path = root / "running-second.torrent"
+            _write_torrent(first_path, payload=b"running-first", name=b"running-first.bin")
+            _write_torrent(second_path, payload=b"running-second", name=b"running-second.bin")
+            manager.add_torrent(str(first_path), persist=True)
+            manager.add_torrent(str(second_path), persist=True)
+
+            while True:
+                try:
+                    manager.ui_queue.get_nowait()
+                except Exception:
+                    break
+
+            manager.start_engine()
+            self.assertEqual(
+                manager.apply_seeding_goal_to_all_existing(SEEDING_GOAL_TIME, 4.0, 17),
+                2,
+            )
+
+            deadline = time.monotonic() + 3.0
+            while time.monotonic() < deadline:
+                if all(
+                    session.seeding_goal_mode == SEEDING_GOAL_TIME
+                    and session.seeding_time_limit_minutes == 17
+                    for session in manager.sessions.values()
+                ):
+                    break
+                time.sleep(0.01)
+            else:
+                self.fail("Timed out waiting for bulk seeding-goal command")
+
+            update_hashes = set()
+            deadline = time.monotonic() + 1.0
+            while time.monotonic() < deadline and len(update_hashes) < 2:
+                try:
+                    event = manager.ui_queue.get_nowait()
+                except Exception:
+                    time.sleep(0.01)
+                    continue
+                if event.get("type") == "SEEDING_GOAL_UPDATED":
+                    update_hashes.add(event.get("info_hash"))
+            self.assertEqual(update_hashes, set(manager.sessions))
+
+    def test_historical_v8_timed_goal_starts_a_fresh_instance_window(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            os.environ["SALIX_T_STATE_DIR"] = td
+            torrent_path = root / "historical-v8.torrent"
+            torrent = _write_torrent(torrent_path)
+            elapsed = 70 * 60.0
+            Path(td, "session.json").write_text(
+                json.dumps(
+                    {
+                        "version": 8,
+                        "selected_info_hash": torrent.hex_info_hash,
+                        "torrents": [
+                            {
+                                "info_hash": torrent.hex_info_hash,
+                                "torrent_path": str(torrent_path),
+                                "cached_torrent_path": "",
+                                "max_peers": 25,
+                                "download_dir": str(root / "downloads"),
+                                "intent": "stopped",
+                                "paused_from_state": None,
+                                "download_limit_value": 0.0,
+                                "download_limit_unit": "KB/s",
+                                "upload_limit_value": 0.0,
+                                "upload_limit_unit": "KB/s",
+                                "uploaded_bytes": 0,
+                                "seed_source_path": "",
+                                "protocol_policy": "Auto",
+                                "file_priorities": ["Normal"],
+                                "queue_priority": "Normal",
+                                "seeding_goal_mode": SEEDING_GOAL_TIME,
+                                "seeding_ratio_limit": 1.0,
+                                "seeding_time_limit_minutes": 60,
+                                "seeding_elapsed_seconds": elapsed,
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            manager = TorrentManager()
+            self.assertEqual(manager.restore_previous_session(), 1)
+            session = manager.sessions[torrent.hex_info_hash]
+            self.assertEqual(session.seeding_elapsed_seconds, elapsed)
+            self.assertEqual(session.seeding_time_goal_baseline_seconds, elapsed)
+            self.assertEqual(session.seeding_goal_elapsed_seconds, 0.0)
+            self.assertFalse(session.seeding_goal_status().reached)
+
+            rewritten = JsonSessionStateStore(root / "session.json").load()
+            self.assertEqual(rewritten["version"], CURRENT_SESSION_STATE_VERSION)
+            entry = rewritten["torrents"][0]
+            self.assertEqual(entry["seeding_time_goal_baseline_seconds"], elapsed)
+
+    def test_historical_v7_restore_defaults_to_indefinite_seeding_policy(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            os.environ["SALIX_T_STATE_DIR"] = td
+            torrent_path = root / "historical-v7.torrent"
+            torrent = _write_torrent(torrent_path)
+            Path(td, "settings.json").write_text(
+                json.dumps(
+                    {
+                        "default_seeding_goal_mode": SEEDING_GOAL_RATIO,
+                        "default_seeding_ratio": 3.0,
+                        "default_seeding_time_minutes": 240,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            legacy = _snapshot(selected=torrent.hex_info_hash, hashes=(torrent.hex_info_hash,))
+            legacy["version"] = 7
+            entry = legacy["torrents"][0]
+            for key in (
+                "seeding_goal_mode",
+                "seeding_ratio_limit",
+                "seeding_time_limit_minutes",
+                "seeding_elapsed_seconds",
+            ):
+                entry.pop(key, None)
+            entry.update(
+                {
+                    "torrent_path": str(torrent_path),
+                    "cached_torrent_path": "",
+                    "download_dir": str(root / "downloads"),
+                    "intent": "stopped",
+                    "paused_from_state": None,
+                }
+            )
+            Path(td, "session.json").write_text(json.dumps(legacy), encoding="utf-8")
+
+            manager = TorrentManager()
+            self.assertEqual(manager.restore_previous_session(), 1)
+            session = manager.sessions[torrent.hex_info_hash]
+            self.assertEqual(session.seeding_goal_mode, SEEDING_GOAL_FOREVER)
+            self.assertEqual(session.seeding_ratio_limit, 1.0)
+            self.assertEqual(session.seeding_time_limit_minutes, 60)
+            self.assertEqual(session.seeding_elapsed_seconds, 0.0)
+
+            rewritten = JsonSessionStateStore(root / "session.json").load()
+            self.assertEqual(rewritten["version"], CURRENT_SESSION_STATE_VERSION)
+            self.assertEqual(
+                rewritten["torrents"][0]["seeding_goal_mode"],
+                SEEDING_GOAL_FOREVER,
+            )
+
+    def test_manager_snapshot_persists_per_torrent_seeding_goal_and_elapsed_time(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            os.environ["SALIX_T_STATE_DIR"] = td
+            torrent_path = root / "policy.torrent"
+            torrent = _write_torrent(torrent_path)
+            manager = TorrentManager()
+            session = manager.add_torrent(
+                str(torrent_path),
+                persist=True,
+                download_dir=str(root / "downloads"),
+            )
+            session._seeding_elapsed_seconds = 321.5
+            session.set_seeding_goal(
+                SEEDING_GOAL_EITHER,
+                2.25,
+                75,
+                time_components=(0, 1, 15),
+                restart_time_window=True,
+                emit=False,
+            )
+
+            snapshot = manager._build_persistent_state()
+            entry = next(
+                item for item in snapshot["torrents"]
+                if item["info_hash"] == torrent.hex_info_hash
+            )
+            self.assertEqual(snapshot["version"], CURRENT_SESSION_STATE_VERSION)
+            self.assertEqual(entry["seeding_goal_mode"], SEEDING_GOAL_EITHER)
+            self.assertEqual(entry["seeding_ratio_limit"], 2.25)
+            self.assertEqual(entry["seeding_time_limit_minutes"], 75)
+            self.assertEqual(entry["seeding_elapsed_seconds"], 321.5)
+            self.assertEqual(entry["seeding_time_goal_baseline_seconds"], 321.5)
+            self.assertEqual(entry["seeding_time_days"], 0)
+            self.assertEqual(entry["seeding_time_hours"], 1)
+            self.assertEqual(entry["seeding_time_minutes_component"], 15)
 
 
     def test_queue_table_starts_in_persisted_queue_order_mode(self):
@@ -342,6 +647,140 @@ class SalixORMSessionStatePersistenceTests(_ManagerEnvironmentMixin, unittest.Te
                 self.assertEqual(
                     con.execute(
                         "SELECT revision FROM _salixorm_migrations ORDER BY applied_at DESC LIMIT 1"
+                    ).fetchone()[0],
+                    MIGRATION_REVISION,
+                )
+            finally:
+                con.close()
+
+    def test_initial_session_migration_checksum_remains_immutable(self):
+        self.assertEqual(
+            _CreateSessionStateSchema().compute_checksum(),
+            "e0d8b8f62f187fe7d458507d0ce6b6e32c17b0d094a50b8ef21a8273ec058c99",
+        )
+
+    def test_v8_seeding_goal_migration_checksum_remains_immutable(self):
+        self.assertEqual(
+            _AddSeedingGoalState().compute_checksum(),
+            "3cb516ab6f4db35197ea5f4d7e8204e03fca42a2caa561d2bdb6c0394c87098c",
+        )
+
+    def test_salixorm_v8_database_migrates_to_instanced_time_goal_state(self):
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / DEFAULT_SESSION_DATABASE
+            url = _sqlite_url_for_path(path)
+            v8_registry = MigrationRegistry([
+                _CreateSessionStateSchema,
+                _AddSeedingGoalState,
+            ])
+            elapsed = 70 * 60.0
+            with Database(url, options={"foreign_keys": True}) as db:
+                MigrationManager(db).upgrade_to(
+                    v8_registry, SEEDING_GOAL_MIGRATION_REVISION
+                )
+                db.execute(
+                    f"INSERT INTO {META_TABLE} "
+                    "(id, kind, schema_version, snapshot_version, selected_info_hash) "
+                    "VALUES (?, ?, ?, ?, ?)",
+                    (1, SESSION_KIND, SESSION_SCHEMA, 8, "hash-a"),
+                )
+                db.execute(
+                    f"INSERT INTO {TORRENTS_TABLE} ("
+                    "info_hash, queue_position, torrent_path, cached_torrent_path, "
+                    "max_peers, download_dir, intent, paused_from_state, "
+                    "download_limit_value, download_limit_unit, upload_limit_value, "
+                    "upload_limit_unit, uploaded_bytes, seed_source_path, protocol_policy, "
+                    "file_priorities_json, queue_priority, seeding_goal_mode, "
+                    "seeding_ratio_limit, seeding_time_limit_minutes, seeding_elapsed_seconds"
+                    ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        "hash-a", 0, "C:/source/hash-a.torrent", "C:/cache/hash-a.torrent",
+                        25, "C:/downloads/hash-a", "stopped", "", 0.0, "KB/s",
+                        0.0, "KB/s", 1234, "", "Auto", "[]", "Normal",
+                        SEEDING_GOAL_TIME, 1.0, 60, elapsed,
+                    ),
+                )
+
+            restored = SalixORMSessionStateStore(path).load()
+            self.assertEqual(restored["version"], CURRENT_SESSION_STATE_VERSION)
+            entry = restored["torrents"][0]
+            self.assertEqual(entry["seeding_time_goal_baseline_seconds"], elapsed)
+            self.assertEqual(entry["seeding_time_days"], 0)
+            self.assertEqual(entry["seeding_time_hours"], 0)
+            self.assertEqual(entry["seeding_time_minutes_component"], 0)
+
+            con = sqlite3.connect(path)
+            try:
+                self.assertEqual(
+                    con.execute(
+                        "SELECT revision FROM _salixorm_migrations "
+                        "ORDER BY applied_at DESC LIMIT 1"
+                    ).fetchone()[0],
+                    MIGRATION_REVISION,
+                )
+            finally:
+                con.close()
+
+    def test_salixorm_v7_database_migrates_through_current_session_schema(self):
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / DEFAULT_SESSION_DATABASE
+            url = _sqlite_url_for_path(path)
+            initial_registry = MigrationRegistry([_CreateSessionStateSchema])
+            with Database(url, options={"foreign_keys": True}) as db:
+                MigrationManager(db).upgrade_to(
+                    initial_registry, INITIAL_MIGRATION_REVISION
+                )
+                db.execute(
+                    f"INSERT INTO {META_TABLE} "
+                    "(id, kind, schema_version, snapshot_version, selected_info_hash) "
+                    "VALUES (?, ?, ?, ?, ?)",
+                    (1, SESSION_KIND, SESSION_SCHEMA, 7, "hash-a"),
+                )
+                db.execute(
+                    f"INSERT INTO {TORRENTS_TABLE} ("
+                    "info_hash, queue_position, torrent_path, cached_torrent_path, "
+                    "max_peers, download_dir, intent, paused_from_state, "
+                    "download_limit_value, download_limit_unit, upload_limit_value, "
+                    "upload_limit_unit, uploaded_bytes, seed_source_path, protocol_policy, "
+                    "file_priorities_json, queue_priority"
+                    ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        "hash-a", 0, "C:/source/hash-a.torrent", "C:/cache/hash-a.torrent",
+                        25, "C:/downloads/hash-a", "stopped", "", 0.0, "KB/s",
+                        0.0, "KB/s", 1234, "", "Auto", "[]", "Normal",
+                    ),
+                )
+
+            restored = SalixORMSessionStateStore(path).load()
+            self.assertEqual(restored["version"], CURRENT_SESSION_STATE_VERSION)
+            self.assertEqual(restored["selected_info_hash"], "hash-a")
+            entry = restored["torrents"][0]
+            self.assertEqual(entry["seeding_goal_mode"], SEEDING_GOAL_FOREVER)
+            self.assertEqual(entry["seeding_ratio_limit"], 1.0)
+            self.assertEqual(entry["seeding_time_limit_minutes"], 60)
+            self.assertEqual(entry["seeding_elapsed_seconds"], 0.0)
+
+            con = sqlite3.connect(path)
+            try:
+                columns = {
+                    row[1] for row in con.execute(f"PRAGMA table_info({TORRENTS_TABLE})")
+                }
+                self.assertTrue(
+                    {
+                        "seeding_goal_mode",
+                        "seeding_ratio_limit",
+                        "seeding_time_limit_minutes",
+                        "seeding_elapsed_seconds",
+                        "seeding_time_goal_baseline_seconds",
+                        "seeding_time_days",
+                        "seeding_time_hours",
+                        "seeding_time_minutes_component",
+                    }.issubset(columns)
+                )
+                self.assertEqual(
+                    con.execute(
+                        "SELECT revision FROM _salixorm_migrations "
+                        "ORDER BY applied_at DESC LIMIT 1"
                     ).fetchone()[0],
                     MIGRATION_REVISION,
                 )
@@ -515,6 +954,10 @@ class SalixORMSessionStatePersistenceTests(_ManagerEnvironmentMixin, unittest.Te
             self.assertIsNotNone(session)
             self.assertEqual(session.queue_priority, "High")
             self.assertEqual(session.uploaded_bytes, 1000)
+            self.assertEqual(session.seeding_goal_mode, SEEDING_GOAL_EITHER)
+            self.assertEqual(session.seeding_ratio_limit, 1.5)
+            self.assertEqual(session.seeding_time_limit_minutes, 45)
+            self.assertEqual(session.seeding_elapsed_seconds, 120.5)
 
 
 if __name__ == "__main__":

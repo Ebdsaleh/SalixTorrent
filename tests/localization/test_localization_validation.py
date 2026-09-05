@@ -93,9 +93,9 @@ class LocalizationValidationTests(unittest.TestCase):
         second = s7.build_locale_manifest()
         self.assertEqual(first, second)
         self.assertFalse(s7.locale_manifest_drift())
-        self.assertEqual(first["locales"]["en-AU"]["canonical_entries"], 1271)
+        self.assertEqual(first["locales"]["en-AU"]["canonical_entries"], 1337)
         self.assertTrue(first["locales"]["en-AU"]["complete"])
-        self.assertEqual(first["locales"]["pt-BR"]["missing_entries"], 1158)
+        self.assertEqual(first["locales"]["pt-BR"]["missing_entries"], 1224)
         self.assertFalse(first["locales"]["pt-BR"]["complete"])
         self.assertIn("en-XA", first["development_locales"])
 
@@ -105,7 +105,7 @@ class LocalizationValidationTests(unittest.TestCase):
         self.assertTrue(package.ok, package.errors)
         self.assertGreaterEqual(package.checked_resources, 19)
         self.assertTrue(pseudo.ok)
-        self.assertEqual(pseudo.entries, 1271)
+        self.assertEqual(pseudo.entries, 1337)
 
     def test_stale_translation_source_hash_is_a_validation_error(self):
         with patch.object(gt, "_load_cache", return_value={}):

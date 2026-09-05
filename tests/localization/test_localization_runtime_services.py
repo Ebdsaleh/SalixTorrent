@@ -148,9 +148,9 @@ class LocalizationRuntimeServicesTests(unittest.TestCase):
 
     def test_existing_semantic_documents_still_have_expected_structure(self):
         snapshot = document_structure_snapshot()
-        self.assertEqual(snapshot["topic_count"], 19)
-        self.assertEqual(snapshot["section_count"], 104)
-        self.assertEqual(snapshot["term_count"], 186)
+        self.assertEqual(snapshot["topic_count"], 20)
+        self.assertEqual(snapshot["section_count"], 110)
+        self.assertEqual(snapshot["term_count"], 191)
 
     def test_framework_audit_now_includes_runtime_and_semantic_services(self):
         report = framework_audit()

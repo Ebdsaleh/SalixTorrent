@@ -2,7 +2,7 @@
 
 SalixTorrent is a desktop BitTorrent client written in Python with a custom asynchronous protocol engine and a Dear PyGui interface. Its transfer engine is generation-aware across BitTorrent v1, BitTorrent v2 and hybrid torrents, while keeping protocol identity, storage verification, discovery provenance and torrent creation explicit. The project aims to expose what a torrent client is doing rather than hiding the protocol behind a single progress bar: transfers, peers, pieces, files, trackers, discovery sources, bandwidth history, connectivity, and protocol terminology are all inspectable from the application.
 
-> **Release status:** v0.3.0 remains the current development version string while post-v0.3.0 roadmap work is integrated. Phases 1-11 are complete. Phase 12 adds the offline-first localization framework, semantic Help/Glossary services, provider-neutral translation tooling, and optional SalixORM-backed development translation memory while keeping normal runtime localization offline and storage-independent. Application persistence now also has backend-neutral settings and desktop-session storage boundaries: deterministic JSON remains the default/reference format and optional SalixORM/SQLite adapters can be selected explicitly for integration testing.
+> **Release status:** v0.3.0 remains the current development version string while v0.4.0-targeted roadmap work is integrated. Phases 1-11 are complete. Phase 12 adds the offline-first localization framework, semantic Help/Glossary services, provider-neutral translation tooling, and optional SalixORM-backed development translation memory while keeping normal runtime localization offline and storage-independent. Application persistence has backend-neutral settings and desktop-session storage boundaries, and the current transfer-lifecycle work adds durable per-torrent seeding goals with ratio/time automatic-stop policies. Deterministic JSON remains the default/reference persistence format and optional SalixORM/SQLite adapters can be selected explicitly for integration testing.
 
 ## Highlights
 
@@ -17,6 +17,7 @@ SalixTorrent is a desktop BitTorrent client written in Python with a custom asyn
 - Fast resume with generation-aware SHA-1 / SHA-256-Merkle recheck fallback.
 - Single-file and multi-file torrents with selective file downloading and file priorities.
 - Torrent queue priorities, move up/down ordering, and configurable active download slots.
+- Durable per-torrent seeding goals: seed indefinitely, stop at a ratio, stop after a newly instanced seeding-time window, or stop when either target is reached first.
 - Per-torrent and true global upload/download rate limits.
 - Live General, Peers, Pieces, Files, Sources, and Speed views.
 - Compact piece map, peer client identification, source diagnostics, and rolling speed history.
@@ -84,7 +85,7 @@ Headless status is rate-limited terminal output by default. For scripts and exte
 python main.py --cli path/to/file.torrent --json-status
 ```
 
-Useful headless options include `--download-dir`, `--max-peers`, `--status-interval`, and `--exit-on-complete`. Without `--exit-on-complete`, a completed transfer remains alive and seeds until interrupted. `Ctrl+C`, SIGTERM, and Windows SIGBREAK request the same centralized TorrentManager shutdown used by desktop exit. Headless runs are deliberately excluded from the desktop application's persistent transfer queue and resolved magnet metainfo is held only for the lifetime of the headless process.
+Useful headless options include `--download-dir`, `--max-peers`, `--status-interval`, and `--exit-on-complete`. Without `--exit-on-complete`, a completed transfer remains alive and seeds until interrupted or until its configured seeding goal automatically stops it. `Ctrl+C`, SIGTERM, and Windows SIGBREAK request the same centralized TorrentManager shutdown used by desktop exit. Headless runs are deliberately excluded from the desktop application's persistent transfer queue and resolved magnet metainfo is held only for the lifetime of the headless process.
 
 ## Shared transfer-add architecture
 
@@ -226,6 +227,16 @@ Bandwidth can be controlled at two levels:
 
 Transfer-rate presentation can be switched between Automatic, KB/s, MB/s, kbps, and Mbps without changing the underlying limiter values.
 
+### Seeding goals and automatic stop
+
+Each torrent can carry its own durable seeding policy. **Seed Indefinitely** preserves the traditional behavior. **Stop at Ratio** compares cumulative Uploaded Total with the full torrent payload size, **Stop after Time** counts only new time spent in Seeding state after that timed goal is applied, and **Stop at Ratio or Time** stops when either target is reached first. A ratio target of `1.0` means one payload-equivalent has been uploaded. Using full payload size for this goal keeps ratio targets meaningful for source-backed seeds as well as torrents downloaded by SalixTorrent.
+
+Preferences defines the policy copied into newly added torrents. Existing torrents keep their own policy when the application default changes. An explicit **Apply this seeding goal to all existing torrents when saving** checkbox can push the current default to every loaded torrent as a one-shot bulk action. For individual control, right-click a torrent and use **Seeding Goal**. **Stop after Time** expands into additive **Days (1-31)**, **Hours (1-12)**, and **Minutes (1-60)** branches, so `1 day + 5 hours + 10 minutes` becomes one 1,750-minute target. Each selected branch and number is visibly marked; selecting the already-selected number clears that component, while **Clear Time (Days/Hrs/Mins)** clears all three quick components and removes the active time condition. **Configure targets...** remains the comprehensive exact-value path for durations outside the quick ranges and for ratio/time values, while Torrent Properties exposes the same durable per-torrent controls. Each torrent keeps its last saved policy independently across restart.
+
+The displayed **Seed Time** remains a cumulative seeding-history counter, but time-based automatic stop is instanced from the moment the user applies or changes the timed goal. If a torrent has already seeded for 70 minutes and you apply a 60-minute target, the goal starts at zero then and stops after 60 additional minutes, at roughly 130 minutes total Seed Time. Paused/stopped/downloading time and application downtime do not advance the timed window. General shows timed-goal progress as readable Days/Hours/Minutes instead of large raw minute totals. **Configure targets...** and the compact Preferences default stack Days, Hours, and Minutes vertically so every unit label and +/- control remains readable; Torrent Properties exposes the same three-part duration editor. All three still persist one normalized duration in minutes internally.
+
+When a goal is reached, `TorrentManager` changes that torrent's durable lifecycle intent to **Stopped**, persists the session, rebalances the download queue, and emits the normal desktop/in-app notification when those notifications are enabled. It therefore remains stopped after restart. Reapplying the same timed target intentionally starts a fresh timed window; starting a torrent again without reapplying or changing an already-satisfied goal can make it stop again promptly.
+
 ## Storage and state
 
 On Windows, persistent application state is stored under:
@@ -303,6 +314,8 @@ python -m unittest tests.network.test_transport_security -v
 python -m unittest tests.protocol.test_v2_peer_wire -v
 python -m unittest discover -s tests\localization -t . -v
 ```
+
+The current real Windows development baseline is **334 / 334 tests passing**, with one expected non-Windows shell-behavior skip. Both canonical `tests/` discovery and plain repository-root discovery produce the same result.
 
 The release-critical regression coverage includes strict BEP-52 v2 identity/file-tree/piece-layer/Merkle validation, MSE/RC4 interoperability, rarest-first/endgame scheduling, bounded request pipelines, asynchronous disk backpressure/caching, source binding, encryption fallback rules, multi-torrent port mappings, finite/permanent mapping-lease handling, structured UPnP/NAT-PMP diagnostics, source-severity accounting, Interface Lock, real inbound seeding uploads, IPv6 peer TCP, BEP-7/BEP-15 tracker peers, BEP-11 IPv6 PEX, BEP-32 DHT behavior, BEP-48 HTTP scrape batching, BEP-15 UDP scrape batching, scrape/announce telemetry isolation, Windows Proactor reset handling, application/session persistence, offline localization, responsive content-bounds geometry, framework property-cascade fallback/provenance, per-page documentation layout overrides, and semantic documentation typography/media sizing.
 
@@ -549,7 +562,7 @@ semantic document sources, so Help/Glossary remain fully offline in standalone,
 portable and installed builds.
 
 The documentation-shell cleanup adds four localized navigation/tool-tip
-strings, bringing the current canonical UI catalog to **653 entries**.
+strings, bringing the current canonical UI catalog to **695 entries**.
 
 Target-language Help and Glossary prose is intentionally still ungenerated at
 this checkpoint; missing entries continue to fall back to bundled `en-AU` until
@@ -1038,7 +1051,7 @@ next normalized save makes the selected database authoritative without deleting 
 the legacy JSON file.
 
 Desktop transfer/session state now has the same storage boundary. JSON `session.json` remains the
-default/reference backend and continues to import historical state versions 1-6. An explicit
+default/reference backend and continues to import historical state versions 1-8. An explicit
 source/development run can select the optional SalixORM session store with:
 
 ```text
@@ -1047,10 +1060,13 @@ SALIX_T_SESSION_URL=...
 ```
 
 With no session URL, the database defaults to `session.db` inside the state directory. The current
-snapshot format is version 7 and deliberately no longer stores `max_active_downloads`; that value
-is an application preference and `settings` is now its single durable authority. The session store
-owns queue order, selected transfer, lifecycle intent, per-torrent transfer limits, uploaded total,
-source/cache paths, file priorities, queue priority and torrent protocol policy.
+snapshot format is version 9. Version 7 removed `max_active_downloads`; that value remains an
+application preference and `settings` is its single durable authority. Version 8 adds the per-torrent
+seeding-goal mode, ratio target, time target and cumulative seeding clock. Version 9 adds a separate
+timed-goal baseline plus persisted Days/Hours/Minutes components, so an explicit timed goal starts
+counting from the moment it is applied without erasing historical Seed Time. The session store owns
+queue order, selected transfer, lifecycle intent, per-torrent transfer limits, uploaded total,
+source/cache paths, file priorities, queue priority, torrent protocol policy and seeding policy.
 
 One session save is one coherent snapshot transaction. Queue position is persisted explicitly and
 validated on reopen. The transfer table starts in queue-order presentation mode, so the persisted

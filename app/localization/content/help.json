@@ -120,6 +120,53 @@
       ]
     },
     {
+      "id": "seeding_goals",
+      "title": "Seeding Goals & Automatic Stop",
+      "summary": "Control how long a completed torrent keeps seeding, using an indefinite policy, a share-ratio target, a seeding-time target, or whichever target is reached first.",
+      "sections": [
+        {
+          "id": "what_a_seeding_goal_controls",
+          "title": "What a seeding goal controls",
+          "body": "A seeding goal is a per-torrent policy used after the complete payload is available and the torrent enters Seeding. It does not change piece verification, downloading, peer discovery, or upload limits. The policy only decides when SalixTorrent should automatically change that torrent to Stopped."
+        },
+        {
+          "id": "goal_modes",
+          "title": "Available goal modes",
+          "body": "Seed Indefinitely never stops a torrent because of a seeding goal. Stop at Ratio stops when the configured share-ratio target is reached. Stop after Time stops after the configured timed-goal window has elapsed. Stop at Ratio or Time stops when either target is reached first."
+        },
+        {
+          "id": "share_ratio_goal",
+          "title": "Share-ratio targets",
+          "body": "For an automatic seeding goal, SalixTorrent compares the persisted Uploaded Total with the torrent's full payload size. A target of 1.0 means one payload-equivalent has been uploaded, 2.0 means two payload-equivalents, and so on. Using payload size keeps the goal meaningful for torrents seeded from existing local data as well as torrents downloaded by SalixTorrent."
+        },
+        {
+          "id": "seeding_time_goal",
+          "title": "Seeding-time targets",
+          "body": "Seed Time is the torrent's cumulative lifetime-style seeding counter and counts only while the torrent is actually in Seeding state. A timed seeding goal uses an independent instance baseline: whenever you apply or change a timed goal, SalixTorrent snapshots the current Seed Time and begins that goal from zero at that moment. General presents timed-goal progress as Days/Hours/Minutes for both elapsed and target duration, so long goals remain readable without converting large minute totals mentally. For example, if Seed Time is already 70 minutes and you apply a 60-minute target, the torrent stops after 60 additional minutes of seeding, when total Seed Time reaches about 130 minutes. Paused, stopped, checking, downloading, and application-closed time do not advance either counter. Both the cumulative counter and timed-goal baseline persist across restart."
+        },
+        {
+          "id": "defaults_and_overrides",
+          "title": "Defaults and per-torrent overrides",
+          "body": "Preferences contains the default seeding policy copied into newly added torrents. Changing that application default does not silently rewrite existing torrents. To push the current default to every loaded torrent deliberately, select Apply this seeding goal to all existing torrents when saving. The checkbox is a one-shot bulk action and clears after Save Preferences. The default time target is edited as separate Days, Hours, and Minutes rows so the labels and +/- controls remain readable in the compact Preferences panel. For an individual torrent, right-click its queue row and use Seeding Goal. Stop after Time provides additive Days (1-31), Hours (1-12), and Minutes (1-60) branches, so selections such as 1 day + 5 hours + 10 minutes form one duration. Each non-zero branch is passively marked and its selected number has the normal menu check mark. Selecting the already-selected number clears that one component; Clear Time (Days/Hrs/Mins) clears all three quick components and removes the active time condition. Configure targets remains the comprehensive path and edits its time target as vertically stacked Days/Hours/Minutes rows; Torrent Properties provides the same three-part per-torrent time editor. Applying a timed goal from either editor starts a fresh timed-goal window from that moment. Each torrent keeps its last saved policy independently across restart."
+        },
+        {
+          "id": "automatic_stop_and_restart",
+          "title": "Automatic stop and restart behavior",
+          "body": "When a configured goal is reached, SalixTorrent changes that torrent's durable lifecycle intent to Stopped, saves the session state, and emits the normal user notification when enabled. The torrent therefore stays stopped after restart. Reapplying or changing a timed goal starts a new countdown from that action without erasing the torrent's cumulative Seed Time. If you manually start a torrent whose unchanged goal instance is already satisfied, it can stop again promptly; apply a new timed target, increase the target, or choose Seed Indefinitely when you want additional seeding."
+        }
+      ],
+      "related_terms": [
+        "SEEDING_GOAL",
+        "SEEDING_RATIO",
+        "SEEDING_TIME",
+        "TIMED_GOAL_WINDOW",
+        "AUTOMATIC_STOP",
+        "SHARE_RATIO",
+        "UPLOADED",
+        "TORRENT_STATUS"
+      ]
+    },
+    {
       "id": "peers_swarms",
       "title": "Peers & Swarms",
       "summary": "What peers, seeds, leechers, choking, interest, client identifiers and swarm availability mean in the live Peers view.",

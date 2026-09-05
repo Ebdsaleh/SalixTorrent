@@ -39,6 +39,11 @@ from app.logic.network_binding import (
     normalise_bind_address,
 )
 from app.logic.peer import PEER_ENCRYPTION_POLICIES
+from app.logic.seeding_policy import (
+    SEEDING_GOAL_MODES,
+    seeding_time_parts_from_minutes,
+    seeding_time_parts_to_minutes,
+)
 from app.logic.torrent_manager import TorrentManager
 from app.logic.transfer_add import (
     TORRENT_PROTOCOL_AUTO,
@@ -332,7 +337,7 @@ class SettingsView:
 
             dpg.add_spacer(height=7)
             with dpg.group(horizontal=True):
-                with dpg.child_window(width=530, height=205, border=True) as self.new_defaults_panel:
+                with dpg.child_window(width=530, height=350, border=True) as self.new_defaults_panel:
                     dpg.add_text(tr('view.settings_view.new_torrent_defaults', "NEW TORRENT DEFAULTS"), color=(100, 180, 255))
                     dpg.add_separator()
                     new_torrent_defaults_note = dpg.add_text(tr('view.settings_view.per_torrent_limits_assigned_when_a_torrent', "Per-torrent limits assigned when a torrent is added."))
@@ -369,6 +374,95 @@ class SettingsView:
                         )
                         add_help_tooltip(self.upload_limit_input, "NEW_TORRENT_LIMITS")
                         add_help_tooltip(self.upload_limit_unit, "NEW_TORRENT_LIMITS")
+
+                    dpg.add_spacer(height=5)
+                    with dpg.group(horizontal=True):
+                        seeding_goal_label = dpg.add_text(
+                            tr("settings.default_seeding_goal", "Default seeding goal")
+                        )
+                        self.default_seeding_goal_combo = dpg.add_combo(
+                            items=localized_choices(SEEDING_GOAL_MODES),
+                            default_value=tr_value(self.settings["default_seeding_goal_mode"]),
+                            width=230,
+                        )
+                        add_help_tooltip(seeding_goal_label, "SEEDING_GOAL")
+                        add_help_tooltip(self.default_seeding_goal_combo, "SEEDING_GOAL")
+                    with dpg.group(horizontal=True):
+                        ratio_label = dpg.add_text(tr("settings.default_seed_ratio", "Ratio target"))
+                        self.default_seeding_ratio_input = dpg.add_input_float(
+                            default_value=float(self.settings["default_seeding_ratio"]),
+                            min_value=0.1,
+                            max_value=1000.0,
+                            min_clamped=True,
+                            max_clamped=True,
+                            format="%.2f",
+                            width=120,
+                        )
+                    add_help_tooltip(ratio_label, "SEEDING_RATIO")
+                    add_help_tooltip(self.default_seeding_ratio_input, "SEEDING_RATIO")
+
+                    time_label = dpg.add_text(tr("settings.default_seed_time", "Time target"))
+                    add_help_tooltip(time_label, "SEEDING_TIME")
+                    default_days, default_hours, default_minutes = seeding_time_parts_from_minutes(
+                        self.settings["default_seeding_time_minutes"]
+                    )
+                    # The defaults pane is intentionally narrow.  Keep the
+                    # duration controls stacked so translated unit labels and
+                    # Dear PyGui's +/- buttons always have enough room.
+                    with dpg.table(
+                        header_row=False,
+                        policy=dpg.mvTable_SizingFixedFit,
+                        borders_outerH=False,
+                        borders_innerH=False,
+                        borders_outerV=False,
+                        borders_innerV=False,
+                        width=250,
+                    ):
+                        dpg.add_table_column(width_fixed=True, init_width_or_weight=80)
+                        dpg.add_table_column(width_fixed=True, init_width_or_weight=150)
+                        with dpg.table_row():
+                            dpg.add_text(tr("settings.seed_time_days", "Days"))
+                            self.default_seeding_time_days_input = dpg.add_input_int(
+                                default_value=default_days, min_value=0, max_value=365,
+                                min_clamped=True, max_clamped=True, width=120,
+                            )
+                        with dpg.table_row():
+                            dpg.add_text(tr("settings.seed_time_hours", "Hours"))
+                            self.default_seeding_time_hours_input = dpg.add_input_int(
+                                default_value=default_hours, min_value=0, max_value=23,
+                                min_clamped=True, max_clamped=True, width=120,
+                            )
+                        with dpg.table_row():
+                            dpg.add_text(tr("settings.seed_time_minutes", "Minutes"))
+                            self.default_seeding_time_minutes_input = dpg.add_input_int(
+                                default_value=default_minutes, min_value=0, max_value=59,
+                                min_clamped=True, max_clamped=True, width=120,
+                            )
+                    for item in (
+                        self.default_seeding_time_days_input,
+                        self.default_seeding_time_hours_input,
+                        self.default_seeding_time_minutes_input,
+                    ):
+                        add_help_tooltip(item, "SEEDING_TIME")
+                    seed_defaults_note = dpg.add_text(
+                        tr(
+                            "settings.seeding_defaults_note",
+                            "Used as the default for new torrents. Existing torrents keep their own seeding goal unless the option below is selected.",
+                        ),
+                        color=(150, 150, 150),
+                        wrap=480,
+                    )
+                    add_help_tooltip(seed_defaults_note, "SEEDING_GOAL")
+                    self.apply_seeding_goal_existing_checkbox = dpg.add_checkbox(
+                        label=tr(
+                            "settings.apply_seeding_goal_existing",
+                            "Apply this seeding goal to all existing torrents when saving",
+                        ),
+                        default_value=False,
+                    )
+                    add_help_tooltip(
+                        self.apply_seeding_goal_existing_checkbox, "SEEDING_GOAL"
+                    )
 
                 with dpg.child_window(width=-1, height=350, border=True) as self.desktop_panel:
                     dpg.add_text(tr("settings.desktop.heading", "DESKTOP"), color=(0, 255, 128))
@@ -624,6 +718,19 @@ class SettingsView:
             "default_upload_limit_value": float(dpg.get_value(self.upload_limit_input) or 0.0),
             "default_upload_limit_unit": str(dpg.get_value(self.upload_limit_unit) or "KB/s"),
             "default_queue_priority": canonical_choice(dpg.get_value(self.default_priority_combo), ("High", "Normal", "Low"), "Normal"),
+            "default_seeding_goal_mode": canonical_choice(
+                dpg.get_value(self.default_seeding_goal_combo),
+                SEEDING_GOAL_MODES,
+                SEEDING_GOAL_MODES[0],
+            ),
+            "default_seeding_ratio": float(
+                dpg.get_value(self.default_seeding_ratio_input) or 1.0
+            ),
+            "default_seeding_time_minutes": seeding_time_parts_to_minutes(
+                dpg.get_value(self.default_seeding_time_days_input),
+                dpg.get_value(self.default_seeding_time_hours_input),
+                dpg.get_value(self.default_seeding_time_minutes_input),
+            ),
         }
 
     def _sync_controls(self, settings: dict):
@@ -672,9 +779,20 @@ class SettingsView:
             self.upload_limit_input: settings["default_upload_limit_value"],
             self.upload_limit_unit: settings["default_upload_limit_unit"],
             self.default_priority_combo: tr_value(settings["default_queue_priority"]),
+            self.default_seeding_goal_combo: tr_value(
+                settings.get("default_seeding_goal_mode", SEEDING_GOAL_MODES[0])
+            ),
+            self.default_seeding_ratio_input: settings.get("default_seeding_ratio", 1.0),
         }
         for item, value in values.items():
             dpg.set_value(item, value)
+
+        default_days, default_hours, default_minutes = seeding_time_parts_from_minutes(
+            settings.get("default_seeding_time_minutes", 60)
+        )
+        dpg.set_value(self.default_seeding_time_days_input, default_days)
+        dpg.set_value(self.default_seeding_time_hours_input, default_hours)
+        dpg.set_value(self.default_seeding_time_minutes_input, default_minutes)
 
     @staticmethod
     def _format_duration(seconds):
@@ -817,14 +935,38 @@ class SettingsView:
 
     def _save(self):
         previous_language = str(self.settings.get("language", "auto"))
+        apply_existing = bool(
+            dpg.get_value(self.apply_seeding_goal_existing_checkbox)
+        )
         settings = self.manager.update_app_settings(self._collect())
+        applied_count = 0
+        if apply_existing:
+            applied_count = self.manager.apply_seeding_goal_to_all_existing(
+                settings.get("default_seeding_goal_mode", SEEDING_GOAL_MODES[0]),
+                settings.get("default_seeding_ratio", 1.0),
+                settings.get("default_seeding_time_minutes", 60),
+            )
+
         self.desktop.configure(settings)
         self.typography.apply_font_size(settings.get("ui_font_size", 15))
         language_changed = str(settings.get("language", "auto")) != previous_language
         if language_changed:
             self.localization.configure(settings.get("language", "auto"))
         self._sync_controls(settings)
-        if language_changed:
+        dpg.set_value(self.apply_seeding_goal_existing_checkbox, False)
+
+        if apply_existing:
+            status_text = tr(
+                "settings.saved_applied_seeding_goal",
+                "Preferences saved. Seeding goal applied to {count} existing torrent(s).",
+                count=applied_count,
+            )
+            if language_changed:
+                status_text += " " + tr(
+                    "settings.saved_restart_language_suffix",
+                    "Restart SalixTorrent to apply the selected language everywhere.",
+                )
+        elif language_changed:
             status_text = tr(
                 "settings.saved_restart",
                 "Preferences saved. Restart SalixTorrent to apply the selected language everywhere.",
@@ -840,6 +982,7 @@ class SettingsView:
         self.desktop.configure(settings)
         self.typography.apply_font_size(settings.get("ui_font_size", 15))
         self._sync_controls(settings)
+        dpg.set_value(self.apply_seeding_goal_existing_checkbox, False)
         dpg.set_value(
             self.status_text,
             tr("settings.defaults_restored", "Defaults restored and applied"),
@@ -851,6 +994,7 @@ class SettingsView:
         settings = self.manager.get_app_settings()
         settings["max_active_downloads"] = self.manager.get_max_active_downloads()
         self._sync_controls(settings)
+        dpg.set_value(self.apply_seeding_goal_existing_checkbox, False)
         self._render_connectivity()
         self._last_connectivity_refresh = time.monotonic()
         dpg.set_value(self.status_text, "")
@@ -861,7 +1005,3 @@ class SettingsView:
         if now - self._last_connectivity_refresh >= 1.0:
             self._last_connectivity_refresh = now
             self._render_connectivity()
-
-
-
-

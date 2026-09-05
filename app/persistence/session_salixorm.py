@@ -41,11 +41,19 @@ except ImportError as exc:
 MINIMUM_SALIXORM_VERSION = (0, 2, 0)
 SESSION_KIND = "salix-session-state"
 SESSION_SCHEMA = 1
-MIGRATION_REVISION = "session-state-0001"
+INITIAL_MIGRATION_REVISION = "session-state-0001"
+SEEDING_GOAL_MIGRATION_REVISION = "session-state-0002"
+MIGRATION_REVISION = "session-state-0003"
 META_TABLE = "salix_session_meta"
 TORRENTS_TABLE = "salix_session_torrents"
 MIGRATION_TABLE = "_salixorm_migrations"
 _VALID_INTENTS = {"active", "paused", "stopped", "idle"}
+_VALID_SEEDING_GOAL_MODES = {
+    "Seed Indefinitely",
+    "Stop at Ratio",
+    "Stop after Time",
+    "Stop at Ratio or Time",
+}
 
 
 def _version_tuple(value: str) -> tuple[int, ...]:
@@ -75,7 +83,9 @@ class _SessionMetaRow(Model):
     selected_info_hash = Text(nullable=False)
 
 
-class _SessionTorrentRow(Model):
+class _SessionTorrentV7Row(Model):
+    """Frozen session-state-0001 table shape; do not change retroactively."""
+
     __table__ = TORRENTS_TABLE
 
     id = Integer(primary_key=True, auto=True)
@@ -104,21 +114,144 @@ class _SessionTorrentRow(Model):
         ]
 
 
+class _SessionTorrentRow(Model):
+    __table__ = TORRENTS_TABLE
+
+    id = Integer(primary_key=True, auto=True)
+    info_hash = Text(nullable=False)
+    queue_position = Integer(nullable=False)
+    torrent_path = Text(nullable=False)
+    cached_torrent_path = Text(nullable=False)
+    max_peers = Integer(nullable=False)
+    download_dir = Text(nullable=False)
+    intent = Text(nullable=False)
+    paused_from_state = Text(nullable=False)
+    download_limit_value = Float(nullable=False)
+    download_limit_unit = Text(nullable=False)
+    upload_limit_value = Float(nullable=False)
+    upload_limit_unit = Text(nullable=False)
+    uploaded_bytes = Integer(nullable=False)
+    seed_source_path = Text(nullable=False)
+    protocol_policy = Text(nullable=False)
+    file_priorities_json = Text(nullable=False)
+    queue_priority = Text(nullable=False)
+    seeding_goal_mode = Text(nullable=False)
+    seeding_ratio_limit = Float(nullable=False)
+    seeding_time_limit_minutes = Integer(nullable=False)
+    seeding_elapsed_seconds = Float(nullable=False)
+    seeding_time_goal_baseline_seconds = Float(nullable=False)
+    seeding_time_days = Integer(nullable=False)
+    seeding_time_hours = Integer(nullable=False)
+    seeding_time_minutes_component = Integer(nullable=False)
+
+    class Meta:
+        unique_constraints = [
+            Unique("info_hash", name="uq_salix_session_info_hash"),
+            Unique("queue_position", name="uq_salix_session_queue_position"),
+        ]
+
+
 class _CreateSessionStateSchema(Migration):
-    revision = MIGRATION_REVISION
+    revision = INITIAL_MIGRATION_REVISION
     parent = None
 
     def upgrade(self, op):
         builder = SchemaBuilder(SQLiteDialect())
         op.create_table(builder.model_to_table_schema(_SessionMetaRow.__meta__))
-        op.create_table(builder.model_to_table_schema(_SessionTorrentRow.__meta__))
+        op.create_table(builder.model_to_table_schema(_SessionTorrentV7Row.__meta__))
 
     def downgrade(self, op):
         op.drop_table(TORRENTS_TABLE)
         op.drop_table(META_TABLE)
 
 
-MIGRATION_REGISTRY = MigrationRegistry([_CreateSessionStateSchema])
+class _AddSeedingGoalState(Migration):
+    """Frozen session-state-0002 migration; do not change retroactively."""
+
+    revision = SEEDING_GOAL_MIGRATION_REVISION
+    parent = INITIAL_MIGRATION_REVISION
+
+    def upgrade(self, op):
+        op.add_column(
+            TORRENTS_TABLE,
+            "seeding_goal_mode",
+            Text(
+                nullable=False,
+                default="Seed Indefinitely",
+                server_default="Seed Indefinitely",
+            ),
+        )
+        op.add_column(
+            TORRENTS_TABLE,
+            "seeding_ratio_limit",
+            Float(nullable=False, default=1.0, server_default=1.0),
+        )
+        op.add_column(
+            TORRENTS_TABLE,
+            "seeding_time_limit_minutes",
+            Integer(nullable=False, default=60, server_default=60),
+        )
+        op.add_column(
+            TORRENTS_TABLE,
+            "seeding_elapsed_seconds",
+            Float(nullable=False, default=0.0, server_default=0.0),
+        )
+
+    def downgrade(self, op):
+        op.drop_column(TORRENTS_TABLE, "seeding_elapsed_seconds")
+        op.drop_column(TORRENTS_TABLE, "seeding_time_limit_minutes")
+        op.drop_column(TORRENTS_TABLE, "seeding_ratio_limit")
+        op.drop_column(TORRENTS_TABLE, "seeding_goal_mode")
+
+
+class _AddInstancedTimeGoalState(Migration):
+    """Add v9 timed-goal baseline and additive quick-menu components."""
+
+    revision = MIGRATION_REVISION
+    parent = SEEDING_GOAL_MIGRATION_REVISION
+
+    def upgrade(self, op):
+        op.add_column(
+            TORRENTS_TABLE,
+            "seeding_time_goal_baseline_seconds",
+            Float(nullable=False, default=0.0, server_default=0.0),
+        )
+        op.add_column(
+            TORRENTS_TABLE,
+            "seeding_time_days",
+            Integer(nullable=False, default=0, server_default=0),
+        )
+        op.add_column(
+            TORRENTS_TABLE,
+            "seeding_time_hours",
+            Integer(nullable=False, default=0, server_default=0),
+        )
+        op.add_column(
+            TORRENTS_TABLE,
+            "seeding_time_minutes_component",
+            Integer(nullable=False, default=0, server_default=0),
+        )
+        # v8 compared timed goals against lifetime seed time. On upgrade, begin
+        # any existing timed goal from the migration moment represented by its
+        # persisted cumulative counter, avoiding an immediate legacy auto-stop.
+        op.execute_sql(
+            "UPDATE salix_session_torrents "
+            "SET seeding_time_goal_baseline_seconds = seeding_elapsed_seconds "
+            "WHERE seeding_goal_mode IN ('Stop after Time', 'Stop at Ratio or Time');"
+        )
+
+    def downgrade(self, op):
+        op.drop_column(TORRENTS_TABLE, "seeding_time_minutes_component")
+        op.drop_column(TORRENTS_TABLE, "seeding_time_hours")
+        op.drop_column(TORRENTS_TABLE, "seeding_time_days")
+        op.drop_column(TORRENTS_TABLE, "seeding_time_goal_baseline_seconds")
+
+
+MIGRATION_REGISTRY = MigrationRegistry([
+    _CreateSessionStateSchema,
+    _AddSeedingGoalState,
+    _AddInstancedTimeGoalState,
+])
 
 
 def _sqlite_url_for_path(path: Path) -> str:
@@ -248,6 +381,13 @@ def _prepare_snapshot(snapshot: Mapping[str, object]) -> tuple[str, list[dict]]:
             raise SessionStateStoreError(
                 f"Session torrent {info_hash!r} has invalid intent {intent!r}"
             )
+        seeding_goal_mode = _string(
+            raw.get("seeding_goal_mode") or "Seed Indefinitely"
+        ).strip()
+        if seeding_goal_mode not in _VALID_SEEDING_GOAL_MODES:
+            raise SessionStateStoreError(
+                f"Session torrent {info_hash!r} has invalid seeding goal {seeding_goal_mode!r}"
+            )
 
         entries.append(
             {
@@ -278,6 +418,42 @@ def _prepare_snapshot(snapshot: Mapping[str, object]) -> tuple[str, list[dict]]:
                 "protocol_policy": _string(raw.get("protocol_policy")),
                 "file_priorities_json": _encode_priorities(raw.get("file_priorities", [])),
                 "queue_priority": _string(raw.get("queue_priority")),
+                "seeding_goal_mode": seeding_goal_mode,
+                "seeding_ratio_limit": _float(
+                    raw.get("seeding_ratio_limit", 1.0),
+                    minimum=0.1,
+                    field="seeding_ratio_limit",
+                ),
+                "seeding_time_limit_minutes": _int(
+                    raw.get("seeding_time_limit_minutes", 60),
+                    minimum=1,
+                    field="seeding_time_limit_minutes",
+                ),
+                "seeding_elapsed_seconds": _float(
+                    raw.get("seeding_elapsed_seconds", 0.0),
+                    minimum=0.0,
+                    field="seeding_elapsed_seconds",
+                ),
+                "seeding_time_goal_baseline_seconds": _float(
+                    raw.get("seeding_time_goal_baseline_seconds", 0.0),
+                    minimum=0.0,
+                    field="seeding_time_goal_baseline_seconds",
+                ),
+                "seeding_time_days": _int(
+                    raw.get("seeding_time_days", 0),
+                    minimum=0,
+                    field="seeding_time_days",
+                ),
+                "seeding_time_hours": _int(
+                    raw.get("seeding_time_hours", 0),
+                    minimum=0,
+                    field="seeding_time_hours",
+                ),
+                "seeding_time_minutes_component": _int(
+                    raw.get("seeding_time_minutes_component", 0),
+                    minimum=0,
+                    field="seeding_time_minutes_component",
+                ),
             }
         )
 
@@ -348,10 +524,10 @@ class SalixORMSessionStateStore:
             f"SELECT revision FROM {MIGRATION_TABLE} ORDER BY applied_at DESC LIMIT 1;"
         ).fetchone()
         revision = str(row[0]) if row else ""
-        if revision != MIGRATION_REVISION:
+        if revision not in MIGRATION_REGISTRY.revisions():
             raise SessionStateStoreError(
-                f"session-state database revision {revision!r} does not match required "
-                f"{MIGRATION_REVISION!r}"
+                f"session-state database revision {revision!r} is not part of the supported "
+                "migration lineage"
             )
         return "initialized"
 
@@ -372,7 +548,7 @@ class SalixORMSessionStateStore:
             raise SessionStateStoreError("session-state metadata kind is invalid")
         if row.schema_version != SESSION_SCHEMA:
             raise SessionStateStoreError("session-state semantic schema is unsupported")
-        if row.snapshot_version != CURRENT_SESSION_STATE_VERSION:
+        if row.snapshot_version not in {7, 8, CURRENT_SESSION_STATE_VERSION}:
             raise SessionStateStoreError("session-state snapshot version is unsupported")
 
     def _ensure_schema(self, db: Database) -> None:
@@ -382,6 +558,7 @@ class SalixORMSessionStateStore:
             manager.upgrade_to(MIGRATION_REGISTRY, MIGRATION_REVISION)
         else:
             manager.validate_history(MIGRATION_REGISTRY)
+            manager.upgrade_to(MIGRATION_REGISTRY, MIGRATION_REVISION)
             manager.require_schema(MIGRATION_REVISION, registry=MIGRATION_REGISTRY)
 
     def load(self) -> dict | None:
@@ -393,6 +570,7 @@ class SalixORMSessionStateStore:
                 state = self._schema_state(db)
                 if state in {"empty", "ledger_only"}:
                     return None
+                self._ensure_schema(db)
 
                 with Session(db) as session:
                     meta = self._metadata_row(session)
@@ -432,6 +610,12 @@ class SalixORMSessionStateStore:
                             raise SessionStateStoreError(
                                 f"session torrent {info_hash!r} has invalid intent {intent!r}"
                             )
+                        seeding_goal_mode = _string(row.seeding_goal_mode).strip()
+                        if seeding_goal_mode not in _VALID_SEEDING_GOAL_MODES:
+                            raise SessionStateStoreError(
+                                f"session torrent {info_hash!r} has invalid seeding goal "
+                                f"{seeding_goal_mode!r}"
+                            )
                         entries.append(
                             (
                                 position,
@@ -468,6 +652,42 @@ class SalixORMSessionStateStore:
                                         row.file_priorities_json, info_hash
                                     ),
                                     "queue_priority": _string(row.queue_priority),
+                                    "seeding_goal_mode": seeding_goal_mode,
+                                    "seeding_ratio_limit": _float(
+                                        row.seeding_ratio_limit,
+                                        minimum=0.1,
+                                        field="seeding_ratio_limit",
+                                    ),
+                                    "seeding_time_limit_minutes": _int(
+                                        row.seeding_time_limit_minutes,
+                                        minimum=1,
+                                        field="seeding_time_limit_minutes",
+                                    ),
+                                    "seeding_elapsed_seconds": _float(
+                                        row.seeding_elapsed_seconds,
+                                        minimum=0.0,
+                                        field="seeding_elapsed_seconds",
+                                    ),
+                                    "seeding_time_goal_baseline_seconds": _float(
+                                        row.seeding_time_goal_baseline_seconds,
+                                        minimum=0.0,
+                                        field="seeding_time_goal_baseline_seconds",
+                                    ),
+                                    "seeding_time_days": _int(
+                                        row.seeding_time_days,
+                                        minimum=0,
+                                        field="seeding_time_days",
+                                    ),
+                                    "seeding_time_hours": _int(
+                                        row.seeding_time_hours,
+                                        minimum=0,
+                                        field="seeding_time_hours",
+                                    ),
+                                    "seeding_time_minutes_component": _int(
+                                        row.seeding_time_minutes_component,
+                                        minimum=0,
+                                        field="seeding_time_minutes_component",
+                                    ),
                                 },
                             )
                         )

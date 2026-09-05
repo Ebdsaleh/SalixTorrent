@@ -15,10 +15,10 @@ from tools.localization.build_locales import main as build_locales_main
 class LocaleGenerationTests(unittest.TestCase):
     def test_generation_status_matches_current_translation_pipeline_baseline(self):
         status = s6.locale_generation_status("pt-BR")
-        self.assertEqual(status.canonical, 1271)
+        self.assertEqual(status.canonical, 1337)
         self.assertEqual(status.packaged, 113)
         self.assertEqual(status.cache_valid, 113)
-        self.assertEqual(status.missing, 1158)
+        self.assertEqual(status.missing, 1224)
         self.assertFalse(status.complete)
 
     def test_status_cli_is_offline_and_non_mutating(self):

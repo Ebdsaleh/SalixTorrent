@@ -24,29 +24,29 @@
   },
   "locales": {
     "en-AU": {
-      "canonical_entries": 1271,
+      "canonical_entries": 1337,
       "catalogs": {
         "glossary": {
-          "canonical_entries": 372,
-          "canonical_hash": "6cd8e3aa85653d17d12cd3220efa9f732f441b958142dfeb5b6edc2083ce6cfd",
-          "catalog_hash": "6cd8e3aa85653d17d12cd3220efa9f732f441b958142dfeb5b6edc2083ce6cfd",
-          "entries": 372,
+          "canonical_entries": 382,
+          "canonical_hash": "ed6772b18b93896933a177cba3f68c11fbffe813bd06642f66d11a2da9b6c473",
+          "catalog_hash": "ed6772b18b93896933a177cba3f68c11fbffe813bd06642f66d11a2da9b6c473",
+          "entries": 382,
           "missing": 0,
           "stale": 0
         },
         "help": {
-          "canonical_entries": 246,
-          "canonical_hash": "d5f395b60d2f52804f151efe7a42af7d1ef80ec0f9318e09bc1e6d505ba07877",
-          "catalog_hash": "d5f395b60d2f52804f151efe7a42af7d1ef80ec0f9318e09bc1e6d505ba07877",
-          "entries": 246,
+          "canonical_entries": 260,
+          "canonical_hash": "5c1feaef97eda2af8e258f644dad2c55ffd0fa735e58b8799498a7ded5b8d469",
+          "catalog_hash": "5c1feaef97eda2af8e258f644dad2c55ffd0fa735e58b8799498a7ded5b8d469",
+          "entries": 260,
           "missing": 0,
           "stale": 0
         },
         "ui": {
-          "canonical_entries": 653,
-          "canonical_hash": "001e116db1cf5daf9366ffc5bd992e66db9e7d8f2fe89e6f4cc408a993085eb4",
-          "catalog_hash": "001e116db1cf5daf9366ffc5bd992e66db9e7d8f2fe89e6f4cc408a993085eb4",
-          "entries": 653,
+          "canonical_entries": 695,
+          "canonical_hash": "8b2ab02d79f9052f2c3126ad990b12816c4cc915221c0cd19c621e59c61e241e",
+          "catalog_hash": "8b2ab02d79f9052f2c3126ad990b12816c4cc915221c0cd19c621e59c61e241e",
+          "entries": 695,
           "missing": 0,
           "stale": 0
         }
@@ -60,40 +60,40 @@
       "stale_entries": 0,
       "support_status": "canonical",
       "text_direction": "ltr",
-      "total_entries": 1271
+      "total_entries": 1337
     },
     "en-GB": {
-      "canonical_entries": 1271,
+      "canonical_entries": 1337,
       "catalogs": {
         "glossary": {
-          "canonical_entries": 372,
-          "canonical_hash": "6cd8e3aa85653d17d12cd3220efa9f732f441b958142dfeb5b6edc2083ce6cfd",
+          "canonical_entries": 382,
+          "canonical_hash": "ed6772b18b93896933a177cba3f68c11fbffe813bd06642f66d11a2da9b6c473",
           "catalog_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
           "entries": 0,
-          "missing": 372,
+          "missing": 382,
           "stale": 0
         },
         "help": {
-          "canonical_entries": 246,
-          "canonical_hash": "d5f395b60d2f52804f151efe7a42af7d1ef80ec0f9318e09bc1e6d505ba07877",
+          "canonical_entries": 260,
+          "canonical_hash": "5c1feaef97eda2af8e258f644dad2c55ffd0fa735e58b8799498a7ded5b8d469",
           "catalog_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
           "entries": 0,
-          "missing": 246,
+          "missing": 260,
           "stale": 0
         },
         "ui": {
-          "canonical_entries": 653,
-          "canonical_hash": "001e116db1cf5daf9366ffc5bd992e66db9e7d8f2fe89e6f4cc408a993085eb4",
+          "canonical_entries": 695,
+          "canonical_hash": "8b2ab02d79f9052f2c3126ad990b12816c4cc915221c0cd19c621e59c61e241e",
           "catalog_hash": "1711caec58e729e2a0d97067a8370435aa2b0167dc4ea163da562d2483276071",
           "entries": 113,
-          "missing": 540,
+          "missing": 582,
           "stale": 0
         }
       },
       "complete": false,
       "display_name": "English (United Kingdom)",
       "font_profile": "latin",
-      "missing_entries": 1158,
+      "missing_entries": 1224,
       "native_name": "English (United Kingdom)",
       "script": "Latn",
       "stale_entries": 0,
@@ -102,37 +102,37 @@
       "total_entries": 113
     },
     "en-US": {
-      "canonical_entries": 1271,
+      "canonical_entries": 1337,
       "catalogs": {
         "glossary": {
-          "canonical_entries": 372,
-          "canonical_hash": "6cd8e3aa85653d17d12cd3220efa9f732f441b958142dfeb5b6edc2083ce6cfd",
+          "canonical_entries": 382,
+          "canonical_hash": "ed6772b18b93896933a177cba3f68c11fbffe813bd06642f66d11a2da9b6c473",
           "catalog_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
           "entries": 0,
-          "missing": 372,
+          "missing": 382,
           "stale": 0
         },
         "help": {
-          "canonical_entries": 246,
-          "canonical_hash": "d5f395b60d2f52804f151efe7a42af7d1ef80ec0f9318e09bc1e6d505ba07877",
+          "canonical_entries": 260,
+          "canonical_hash": "5c1feaef97eda2af8e258f644dad2c55ffd0fa735e58b8799498a7ded5b8d469",
           "catalog_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
           "entries": 0,
-          "missing": 246,
+          "missing": 260,
           "stale": 0
         },
         "ui": {
-          "canonical_entries": 653,
-          "canonical_hash": "001e116db1cf5daf9366ffc5bd992e66db9e7d8f2fe89e6f4cc408a993085eb4",
+          "canonical_entries": 695,
+          "canonical_hash": "8b2ab02d79f9052f2c3126ad990b12816c4cc915221c0cd19c621e59c61e241e",
           "catalog_hash": "1711caec58e729e2a0d97067a8370435aa2b0167dc4ea163da562d2483276071",
           "entries": 113,
-          "missing": 540,
+          "missing": 582,
           "stale": 0
         }
       },
       "complete": false,
       "display_name": "English (United States)",
       "font_profile": "latin",
-      "missing_entries": 1158,
+      "missing_entries": 1224,
       "native_name": "English (United States)",
       "script": "Latn",
       "stale_entries": 0,
@@ -141,37 +141,37 @@
       "total_entries": 113
     },
     "fil-PH": {
-      "canonical_entries": 1271,
+      "canonical_entries": 1337,
       "catalogs": {
         "glossary": {
-          "canonical_entries": 372,
-          "canonical_hash": "6cd8e3aa85653d17d12cd3220efa9f732f441b958142dfeb5b6edc2083ce6cfd",
+          "canonical_entries": 382,
+          "canonical_hash": "ed6772b18b93896933a177cba3f68c11fbffe813bd06642f66d11a2da9b6c473",
           "catalog_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
           "entries": 0,
-          "missing": 372,
+          "missing": 382,
           "stale": 0
         },
         "help": {
-          "canonical_entries": 246,
-          "canonical_hash": "d5f395b60d2f52804f151efe7a42af7d1ef80ec0f9318e09bc1e6d505ba07877",
+          "canonical_entries": 260,
+          "canonical_hash": "5c1feaef97eda2af8e258f644dad2c55ffd0fa735e58b8799498a7ded5b8d469",
           "catalog_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
           "entries": 0,
-          "missing": 246,
+          "missing": 260,
           "stale": 0
         },
         "ui": {
-          "canonical_entries": 653,
-          "canonical_hash": "001e116db1cf5daf9366ffc5bd992e66db9e7d8f2fe89e6f4cc408a993085eb4",
+          "canonical_entries": 695,
+          "canonical_hash": "8b2ab02d79f9052f2c3126ad990b12816c4cc915221c0cd19c621e59c61e241e",
           "catalog_hash": "d623c79c10713d2d1647f6eacda3b2bab9e871993f5b56d87bc26f2cd8954d18",
           "entries": 113,
-          "missing": 540,
+          "missing": 582,
           "stale": 0
         }
       },
       "complete": false,
       "display_name": "Filipino",
       "font_profile": "latin",
-      "missing_entries": 1158,
+      "missing_entries": 1224,
       "native_name": "Filipino",
       "script": "Latn",
       "stale_entries": 0,
@@ -180,37 +180,37 @@
       "total_entries": 113
     },
     "pt-BR": {
-      "canonical_entries": 1271,
+      "canonical_entries": 1337,
       "catalogs": {
         "glossary": {
-          "canonical_entries": 372,
-          "canonical_hash": "6cd8e3aa85653d17d12cd3220efa9f732f441b958142dfeb5b6edc2083ce6cfd",
+          "canonical_entries": 382,
+          "canonical_hash": "ed6772b18b93896933a177cba3f68c11fbffe813bd06642f66d11a2da9b6c473",
           "catalog_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
           "entries": 0,
-          "missing": 372,
+          "missing": 382,
           "stale": 0
         },
         "help": {
-          "canonical_entries": 246,
-          "canonical_hash": "d5f395b60d2f52804f151efe7a42af7d1ef80ec0f9318e09bc1e6d505ba07877",
+          "canonical_entries": 260,
+          "canonical_hash": "5c1feaef97eda2af8e258f644dad2c55ffd0fa735e58b8799498a7ded5b8d469",
           "catalog_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
           "entries": 0,
-          "missing": 246,
+          "missing": 260,
           "stale": 0
         },
         "ui": {
-          "canonical_entries": 653,
-          "canonical_hash": "001e116db1cf5daf9366ffc5bd992e66db9e7d8f2fe89e6f4cc408a993085eb4",
+          "canonical_entries": 695,
+          "canonical_hash": "8b2ab02d79f9052f2c3126ad990b12816c4cc915221c0cd19c621e59c61e241e",
           "catalog_hash": "bf0d5e1ef1882578be493e7c71ad7c410c50d13d475da36eb0041e3d202a602f",
           "entries": 113,
-          "missing": 540,
+          "missing": 582,
           "stale": 0
         }
       },
       "complete": false,
       "display_name": "Portuguese (Brazil)",
       "font_profile": "latin",
-      "missing_entries": 1158,
+      "missing_entries": 1224,
       "native_name": "Português (Brasil)",
       "script": "Latn",
       "stale_entries": 0,

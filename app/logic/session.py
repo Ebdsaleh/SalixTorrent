@@ -56,6 +56,19 @@ from app.logic.piece_manager import (
     PieceManager,
 )
 from app.logic.torrent_file import TorrentFile
+from app.logic.seeding_policy import (
+    DEFAULT_SEEDING_RATIO,
+    DEFAULT_SEEDING_TIME_MINUTES,
+    SEEDING_GOAL_FOREVER,
+    evaluate_seeding_goal,
+    normalise_seeding_goal_mode,
+    normalise_seeding_ratio,
+    normalise_seeding_time_component,
+    normalise_seeding_time_minutes,
+    seeding_goal_uses_time,
+    seeding_time_components_from_minutes,
+    seeding_time_components_to_minutes,
+)
 from app.logic.torrent_v2 import expected_piece_layer_count, piece_layer_depth, zero_hash
 from app.logic.tracker import TrackerClient
 from app.logic.transfer_add import (
@@ -238,6 +251,15 @@ class TorrentSession:
         global_upload_limiter: Optional[AsyncBandwidthLimiter] = None,
         listen_port_callback: Optional[Callable[..., None]] = None,
         incoming_peer_callback: Optional[Callable[[int, str], None]] = None,
+        seeding_goal_mode: str = SEEDING_GOAL_FOREVER,
+        seeding_ratio_limit: float = DEFAULT_SEEDING_RATIO,
+        seeding_time_limit_minutes: int = DEFAULT_SEEDING_TIME_MINUTES,
+        seeding_elapsed_seconds: float = 0.0,
+        seeding_time_goal_baseline_seconds: float = 0.0,
+        seeding_time_days: Optional[int] = None,
+        seeding_time_hours: Optional[int] = None,
+        seeding_time_minutes_component: Optional[int] = None,
+        seeding_goal_callback: Optional[Callable[[str, str], None]] = None,
     ):
         self.torrent_path = torrent_path
         self.torrent = TorrentFile(torrent_path)
@@ -388,6 +410,51 @@ class TorrentSession:
         # paused/stopped/queued is not counted.
         self._elapsed_active_seconds: float = 0.0
         self._activity_started_at: Optional[float] = None
+
+        # Seeding goals are per-torrent policy copied from application defaults
+        # when a torrent is added, then persisted with the session. The dedicated
+        # seeding clock excludes downloading, checking, pause, queue and stop time.
+        self.seeding_goal_mode = normalise_seeding_goal_mode(seeding_goal_mode)
+        self.seeding_ratio_limit = normalise_seeding_ratio(seeding_ratio_limit)
+        self.seeding_time_limit_minutes = normalise_seeding_time_minutes(
+            seeding_time_limit_minutes
+        )
+        try:
+            self._seeding_elapsed_seconds = max(0.0, float(seeding_elapsed_seconds or 0.0))
+        except (TypeError, ValueError):
+            self._seeding_elapsed_seconds = 0.0
+        try:
+            baseline = max(0.0, float(seeding_time_goal_baseline_seconds or 0.0))
+        except (TypeError, ValueError):
+            baseline = 0.0
+        self._seeding_time_goal_baseline_seconds = min(
+            baseline, self._seeding_elapsed_seconds
+        )
+
+        supplied_components = (
+            seeding_time_days,
+            seeding_time_hours,
+            seeding_time_minutes_component,
+        )
+        if all(value is None for value in supplied_components):
+            derived = seeding_time_components_from_minutes(
+                self.seeding_time_limit_minutes
+            )
+            supplied_components = derived or (0, 0, 0)
+        self.seeding_time_days = normalise_seeding_time_component(
+            "days", supplied_components[0]
+        )
+        self.seeding_time_hours = normalise_seeding_time_component(
+            "hours", supplied_components[1]
+        )
+        self.seeding_time_minutes_component = normalise_seeding_time_component(
+            "minutes", supplied_components[2]
+        )
+
+        self._seeding_started_at: Optional[float] = None
+        self._seeding_goal_callback = seeding_goal_callback
+        self._seeding_goal_notified = False
+        self._seeding_goal_last_reason = ""
 
         # Per-torrent transfer limits. The user-facing value/unit pair is kept
         # alongside canonical bytes-per-second values so the GUI can restore
@@ -557,6 +624,137 @@ class TorrentSession:
         if self._activity_started_at is not None:
             elapsed += max(0.0, time.monotonic() - self._activity_started_at)
         return elapsed
+
+    def _begin_seeding_clock(self):
+        if self._seeding_started_at is None:
+            self._seeding_started_at = time.monotonic()
+
+    def _pause_seeding_clock(self):
+        if self._seeding_started_at is None:
+            return
+        self._seeding_elapsed_seconds += max(
+            0.0, time.monotonic() - self._seeding_started_at
+        )
+        self._seeding_started_at = None
+
+    @property
+    def seeding_elapsed_seconds(self) -> float:
+        elapsed = self._seeding_elapsed_seconds
+        if self._seeding_started_at is not None:
+            elapsed += max(0.0, time.monotonic() - self._seeding_started_at)
+        return elapsed
+
+    @property
+    def seeding_time_goal_baseline_seconds(self) -> float:
+        return min(
+            max(0.0, self._seeding_time_goal_baseline_seconds),
+            self.seeding_elapsed_seconds,
+        )
+
+    @property
+    def seeding_goal_elapsed_seconds(self) -> float:
+        return max(
+            0.0,
+            self.seeding_elapsed_seconds - self.seeding_time_goal_baseline_seconds,
+        )
+
+    @property
+    def seeding_time_components(self) -> tuple[int, int, int]:
+        return (
+            int(self.seeding_time_days),
+            int(self.seeding_time_hours),
+            int(self.seeding_time_minutes_component),
+        )
+
+    def seeding_goal_status(self):
+        return evaluate_seeding_goal(
+            self.seeding_goal_mode,
+            self.seeding_ratio_limit,
+            self.seeding_time_limit_minutes,
+            uploaded_bytes=self.uploaded_bytes,
+            payload_bytes=self.torrent.total_length,
+            elapsed_seconds=self.seeding_elapsed_seconds,
+            time_baseline_seconds=self.seeding_time_goal_baseline_seconds,
+        )
+
+    def set_seeding_goal(
+        self,
+        mode: object,
+        ratio_limit: object,
+        time_limit_minutes: object,
+        *,
+        time_components: Optional[tuple[object, object, object]] = None,
+        restart_time_window: bool = False,
+        emit: bool = True,
+    ) -> bool:
+        normalized_mode = normalise_seeding_goal_mode(mode)
+        normalized_ratio = normalise_seeding_ratio(ratio_limit)
+        normalized_time = normalise_seeding_time_minutes(time_limit_minutes)
+
+        if time_components is None:
+            if normalized_time != self.seeding_time_limit_minutes:
+                derived = seeding_time_components_from_minutes(normalized_time)
+                normalized_components = derived or (0, 0, 0)
+            else:
+                normalized_components = self.seeding_time_components
+        else:
+            normalized_components = (
+                normalise_seeding_time_component("days", time_components[0]),
+                normalise_seeding_time_component("hours", time_components[1]),
+                normalise_seeding_time_component("minutes", time_components[2]),
+            )
+            component_minutes = seeding_time_components_to_minutes(
+                *normalized_components
+            )
+            if component_minutes > 0:
+                normalized_time = normalise_seeding_time_minutes(component_minutes)
+
+        new_baseline = self.seeding_time_goal_baseline_seconds
+        if restart_time_window and seeding_goal_uses_time(normalized_mode):
+            # Snapshot cumulative seed time now. The timed policy counts only
+            # seeding performed after this explicit user action.
+            new_baseline = self.seeding_elapsed_seconds
+
+        changed = (
+            normalized_mode != self.seeding_goal_mode
+            or normalized_ratio != self.seeding_ratio_limit
+            or normalized_time != self.seeding_time_limit_minutes
+            or tuple(normalized_components) != self.seeding_time_components
+            or new_baseline != self.seeding_time_goal_baseline_seconds
+        )
+        self.seeding_goal_mode = normalized_mode
+        self.seeding_ratio_limit = normalized_ratio
+        self.seeding_time_limit_minutes = normalized_time
+        (
+            self.seeding_time_days,
+            self.seeding_time_hours,
+            self.seeding_time_minutes_component,
+        ) = normalized_components
+        self._seeding_time_goal_baseline_seconds = new_baseline
+        self._seeding_goal_notified = False
+        self._seeding_goal_last_reason = ""
+        if emit:
+            self._emit_snapshot()
+        if self.state == SessionState.SEEDING:
+            self._check_seeding_goal()
+        return changed
+
+    def _check_seeding_goal(self) -> bool:
+        if self.state != SessionState.SEEDING or self._seeding_goal_notified:
+            return False
+        status = self.seeding_goal_status()
+        if not status.reached:
+            return False
+
+        self._seeding_goal_notified = True
+        self._seeding_goal_last_reason = status.reason
+        self._emit_snapshot()
+        if self._seeding_goal_callback is not None:
+            try:
+                self._seeding_goal_callback(self.torrent.hex_info_hash, status.reason)
+            except Exception:
+                pass
+        return True
 
     def emit_snapshot(self):
         self._emit_snapshot()
@@ -831,6 +1029,8 @@ class TorrentSession:
             self._prepare_pause_event.clear()
 
         self._pause_activity_clock()
+        if self._paused_from_state == SessionState.SEEDING:
+            self._pause_seeding_clock()
         self._record_speed_sample(0.0, 0.0)
         self._emit_snapshot()
 
@@ -847,6 +1047,8 @@ class TorrentSession:
 
         self._pause_event.set()
         self._begin_activity_clock()
+        if resume_state == SessionState.SEEDING:
+            self._begin_seeding_clock()
         self._emit_snapshot()
 
     def stop(self):
@@ -919,6 +1121,7 @@ class TorrentSession:
         self.piece_mgr.reset_inflight_requests()
         self.piece_mgr.save_resume_state(force=True)
         self._pause_activity_clock()
+        self._pause_seeding_clock()
         self._record_speed_sample(0.0, 0.0)
         self._emit_snapshot()
 
@@ -1670,6 +1873,7 @@ class TorrentSession:
         down_bps = max(0.0, float(speed_kbps or 0.0)) * 1024.0
         eta_seconds = (remaining_bytes / down_bps) if remaining_bytes > 0 and down_bps > 1.0 else None
         share_ratio = (self.uploaded_bytes / downloaded_bytes) if downloaded_bytes > 0 else None
+        seeding_goal_status = self.seeding_goal_status()
         encrypted_peer_count = sum(
             1 for peer in peer_snapshots
             if str(peer.get("transport_security")) == "MSE/RC4"
@@ -1735,6 +1939,20 @@ class TorrentSession:
             "eta_seconds": eta_seconds,
             "elapsed_seconds": self.elapsed_active_seconds,
             "share_ratio": share_ratio,
+            "seeding_goal_mode": self.seeding_goal_mode,
+            "seeding_ratio_limit": self.seeding_ratio_limit,
+            "seeding_time_limit_minutes": self.seeding_time_limit_minutes,
+            "seeding_elapsed_seconds": self.seeding_elapsed_seconds,
+            "seeding_goal_elapsed_seconds": seeding_goal_status.elapsed_seconds,
+            "seeding_time_goal_baseline_seconds": self.seeding_time_goal_baseline_seconds,
+            "seeding_time_days": int(self.seeding_time_days),
+            "seeding_time_hours": int(self.seeding_time_hours),
+            "seeding_time_minutes_component": int(self.seeding_time_minutes_component),
+            "seeding_goal_ratio": seeding_goal_status.current_ratio,
+            "seeding_goal_remaining_ratio": seeding_goal_status.remaining_ratio,
+            "seeding_goal_remaining_seconds": seeding_goal_status.remaining_seconds,
+            "seeding_goal_reached": seeding_goal_status.reached,
+            "seeding_goal_reason": self._seeding_goal_last_reason,
             "connected_peers": self._connected_peer_count(),
             "encrypted_peer_count": encrypted_peer_count,
             "plaintext_peer_count": plaintext_peer_count,
@@ -2981,6 +3199,16 @@ class TorrentSession:
 
         self.state = SessionState.SEEDING
         self._pause_event.set()
+        self._seeding_goal_notified = False
+        self._seeding_goal_last_reason = ""
+
+        # A torrent restored or manually restarted with an already-satisfied
+        # goal should not reopen listeners and announce to the swarm merely to
+        # discover half a second later that it must stop again. Evaluate the
+        # persisted ratio/time state before starting seeding networking.
+        if self._check_seeding_goal():
+            return
+
         await self._open_seed_server(run_token)
         listen_port = self._seed_port if self._seed_server else 0
         if self.enable_lan_discovery:
@@ -2991,6 +3219,10 @@ class TorrentSession:
             for dht in self._dht_by_generation.values():
                 await dht.start(announce_port=listen_port)
                 dht.update_announce_port(listen_port)
+
+        # Count only established Seeding-state lifetime, not listener/DHT/LPD
+        # setup. If setup fails, no phantom seeding time can accumulate.
+        self._begin_seeding_clock()
         self._emit_snapshot()
 
         first_event = "completed" if completion_event else "started"
@@ -3091,6 +3323,7 @@ class TorrentSession:
                 await asyncio.sleep(0.5)
 
         finally:
+            self._pause_seeding_clock()
             tasks = [
                 task
                 for task in list(tracker_tasks.values()) + list(dht_tasks.values())
@@ -3949,9 +4182,8 @@ class TorrentSession:
                     upload_speed_bps / 1024.0,
                 )
 
+                self._check_seeding_goal()
                 self._emit_snapshot(drop_if_ui_busy=True)
 
         except asyncio.CancelledError:
             pass
-
-

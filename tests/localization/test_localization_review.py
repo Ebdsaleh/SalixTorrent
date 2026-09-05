@@ -43,8 +43,8 @@ class TranslationReviewTests(unittest.TestCase):
 
     def test_current_review_summary_separates_missing_from_awaiting_review(self):
         summary = review.review_summary("pt-BR")
-        self.assertEqual(summary.total, 1271)
-        self.assertEqual(summary.missing, 1158)
+        self.assertEqual(summary.total, 1337)
+        self.assertEqual(summary.missing, 1224)
         self.assertEqual(summary.review_needed, 113)
         self.assertEqual(summary.reviewed, 0)
         self.assertEqual(summary.locked, 0)
@@ -56,7 +56,7 @@ class TranslationReviewTests(unittest.TestCase):
     def test_review_export_contains_source_hash_context_and_editable_state(self):
         bundle = review.build_review_bundle("pt-BR")
         self.assertEqual(bundle["_meta"]["kind"], "salix-translation-review")
-        self.assertEqual(bundle["_meta"]["canonical_entries"], 1271)
+        self.assertEqual(bundle["_meta"]["canonical_entries"], 1337)
         entry = bundle["catalogs"]["ui"]["menu.file"]
         self.assertEqual(entry["source"], "File")
         self.assertEqual(len(entry["source_hash"]), 64)
