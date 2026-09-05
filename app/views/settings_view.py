@@ -8,6 +8,12 @@ from tkinter import filedialog
 import dearpygui.dearpygui as dpg
 
 from app.engine.desktop_integration import DesktopIntegration
+from app.engine.components import (
+    DurationEditor,
+    LabeledComboField,
+    LabeledNumericField,
+    NumericKind,
+)
 from app.engine.documentation import (
     DOCUMENTATION_SCALE_LABELS,
     DOCUMENTATION_SCALES,
@@ -376,68 +382,68 @@ class SettingsView:
                         add_help_tooltip(self.upload_limit_unit, "NEW_TORRENT_LIMITS")
 
                     dpg.add_spacer(height=5)
-                    with dpg.group(horizontal=True):
-                        seeding_goal_label = dpg.add_text(
-                            tr("settings.default_seeding_goal", "Default seeding goal")
-                        )
-                        self.default_seeding_goal_combo = dpg.add_combo(
-                            items=localized_choices(SEEDING_GOAL_MODES),
-                            default_value=tr_value(self.settings["default_seeding_goal_mode"]),
-                            width=230,
-                        )
-                        add_help_tooltip(seeding_goal_label, "SEEDING_GOAL")
-                        add_help_tooltip(self.default_seeding_goal_combo, "SEEDING_GOAL")
-                    with dpg.group(horizontal=True):
-                        ratio_label = dpg.add_text(tr("settings.default_seed_ratio", "Ratio target"))
-                        self.default_seeding_ratio_input = dpg.add_input_float(
-                            default_value=float(self.settings["default_seeding_ratio"]),
-                            min_value=0.1,
-                            max_value=1000.0,
-                            min_clamped=True,
-                            max_clamped=True,
-                            format="%.2f",
-                            width=120,
-                        )
-                    add_help_tooltip(ratio_label, "SEEDING_RATIO")
+                    self.default_seeding_goal_field = LabeledComboField(
+                        tr("settings.default_seeding_goal", "Default seeding goal"),
+                        localized_choices(SEEDING_GOAL_MODES),
+                        default_value=tr_value(self.settings["default_seeding_goal_mode"]),
+                        control_width=230,
+                    )
+                    self.default_seeding_goal_field.build()
+                    self.default_seeding_goal_combo = self.default_seeding_goal_field.control.require_item()
+                    add_help_tooltip(
+                        self.default_seeding_goal_field.label.require_item(),
+                        "SEEDING_GOAL",
+                    )
+                    add_help_tooltip(self.default_seeding_goal_combo, "SEEDING_GOAL")
+
+                    self.default_seeding_ratio_field = LabeledNumericField(
+                        tr("settings.default_seed_ratio", "Ratio target"),
+                        kind=NumericKind.FLOAT,
+                        default_value=float(self.settings["default_seeding_ratio"]),
+                        min_value=0.1,
+                        max_value=1000.0,
+                        min_clamped=True,
+                        max_clamped=True,
+                        format="%.2f",
+                        control_width=120,
+                    )
+                    self.default_seeding_ratio_field.build()
+                    self.default_seeding_ratio_input = self.default_seeding_ratio_field.control.require_item()
+                    add_help_tooltip(
+                        self.default_seeding_ratio_field.label.require_item(),
+                        "SEEDING_RATIO",
+                    )
                     add_help_tooltip(self.default_seeding_ratio_input, "SEEDING_RATIO")
 
-                    time_label = dpg.add_text(tr("settings.default_seed_time", "Time target"))
-                    add_help_tooltip(time_label, "SEEDING_TIME")
                     default_days, default_hours, default_minutes = seeding_time_parts_from_minutes(
                         self.settings["default_seeding_time_minutes"]
                     )
-                    # The defaults pane is intentionally narrow.  Keep the
-                    # duration controls stacked so translated unit labels and
-                    # Dear PyGui's +/- buttons always have enough room.
-                    with dpg.table(
-                        header_row=False,
-                        policy=dpg.mvTable_SizingFixedFit,
-                        borders_outerH=False,
-                        borders_innerH=False,
-                        borders_outerV=False,
-                        borders_innerV=False,
-                        width=250,
-                    ):
-                        dpg.add_table_column(width_fixed=True, init_width_or_weight=80)
-                        dpg.add_table_column(width_fixed=True, init_width_or_weight=150)
-                        with dpg.table_row():
-                            dpg.add_text(tr("settings.seed_time_days", "Days"))
-                            self.default_seeding_time_days_input = dpg.add_input_int(
-                                default_value=default_days, min_value=0, max_value=365,
-                                min_clamped=True, max_clamped=True, width=120,
-                            )
-                        with dpg.table_row():
-                            dpg.add_text(tr("settings.seed_time_hours", "Hours"))
-                            self.default_seeding_time_hours_input = dpg.add_input_int(
-                                default_value=default_hours, min_value=0, max_value=23,
-                                min_clamped=True, max_clamped=True, width=120,
-                            )
-                        with dpg.table_row():
-                            dpg.add_text(tr("settings.seed_time_minutes", "Minutes"))
-                            self.default_seeding_time_minutes_input = dpg.add_input_int(
-                                default_value=default_minutes, min_value=0, max_value=59,
-                                min_clamped=True, max_clamped=True, width=120,
-                            )
+                    # The defaults pane remains deliberately narrow.  The
+                    # reusable DurationEditor preserves the stacked aligned
+                    # presentation while standardising its primitive controls.
+                    self.default_seeding_duration_editor = DurationEditor(
+                        heading=tr("settings.default_seed_time", "Time target"),
+                        day_label=tr("settings.seed_time_days", "Days"),
+                        hour_label=tr("settings.seed_time_hours", "Hours"),
+                        minute_label=tr("settings.seed_time_minutes", "Minutes"),
+                        days=default_days,
+                        hours=default_hours,
+                        minutes=default_minutes,
+                        input_width=120,
+                        grid_width=250,
+                        label_column_width=80,
+                        control_column_width=150,
+                    )
+                    self.default_seeding_duration_editor.build()
+                    add_help_tooltip(
+                        self.default_seeding_duration_editor.heading.require_item(),
+                        "SEEDING_TIME",
+                    )
+                    (
+                        self.default_seeding_time_days_input,
+                        self.default_seeding_time_hours_input,
+                        self.default_seeding_time_minutes_input,
+                    ) = self.default_seeding_duration_editor.value_items()
                     for item in (
                         self.default_seeding_time_days_input,
                         self.default_seeding_time_hours_input,

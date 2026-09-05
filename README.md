@@ -323,6 +323,16 @@ The release-critical regression coverage includes strict BEP-52 v2 identity/file
 
 v0.4.0 is the current release checkpoint. Phases 1-11 remain complete, including the native Windows standalone/portable/installer architecture and the cross-platform desktop/tray abstraction. Phase 12 provides the offline-first localization framework, semantic Help/Glossary services, provider-neutral translation tooling, optional SalixORM-backed development translation memory, backend-neutral application/session persistence, and the tracked regression suite. The v0.4.0 transfer-lifecycle milestone adds durable per-torrent seeding goals and automatic-stop policy. Linux/BSD/macOS native desktop behavior and full target-locale population/review remain active hardening work.
 
+Post-v0.4.0 development has begun the reusable GUI component layer intended for later RAD/framework extraction. The first tranche introduces backend-neutral primitive controls, semantic `AUTO`/`FILL` sizing, the generic one-row `ControlRow` container, aligned `ControlGrid`/`ControlColumn` composition, and reusable labeled-field/duration composites. The seeding-goal controls are the first application surface migrated onto this layer so framework behavior is proven against an already validated real GUI before broader conversion.
+
+The component layer deliberately reuses the existing property-cascade rule:
+
+```text
+framework default -> active theme -> explicit instance override
+```
+
+Width, height and row spacing resolve independently, preserving safe framework defaults while allowing sparse themes and per-instance overrides. Dear PyGui remains the current renderer, but its bridge is kept behind the component contract so the component model can be extracted without making application views own backend-specific construction details.
+
 ## Project structure
 
 ```text
@@ -360,7 +370,8 @@ SalixTorrent/
 │   │   └── test_localization_packaging.py
 │   ├── presentation/
 │   │   ├── test_responsive_layout.py
-│   │   └── test_documentation.py
+│   │   ├── test_documentation.py
+│   │   └── test_gui_components.py
 │   ├── cli/
 │   │   └── test_headless_cli.py
 │   └── localization/
@@ -389,6 +400,13 @@ SalixTorrent/
 │   ├── cli/
 │   │   └── headless.py
 │   ├── engine/
+│   │   ├── components/
+│   │   │   ├── base.py
+│   │   │   ├── containers.py
+│   │   │   ├── controls.py
+│   │   │   ├── fields.py
+│   │   │   ├── layout.py
+│   │   │   └── renderer.py
 │   │   ├── documentation/
 │   │   │   ├── layout.py
 │   │   │   ├── model.py

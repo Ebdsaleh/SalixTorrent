@@ -139,24 +139,18 @@ class LocalizationUIStringTests(unittest.TestCase):
         self.assertIn("_format_seeding_duration", download_source)
         self.assertIn("duration_days_hours_minutes", download_source)
 
-        settings_time_start = settings_source.index(
-            'time_label = dpg.add_text(tr("settings.default_seed_time", "Time target"))'
-        )
-        settings_time_end = settings_source.index("seed_defaults_note =", settings_time_start)
-        settings_time_block = settings_source[settings_time_start:settings_time_end]
-        self.assertIn("with dpg.table(", settings_time_block)
-        self.assertGreaterEqual(settings_time_block.count("with dpg.table_row():"), 3)
-
-        modal_time_start = download_source.index(
-            "time_label = dpg.add_text(tr('view.download_view.time_target', \"Time target\"))",
-            download_source.index("as self.seeding_goal_modal:"),
-        )
-        modal_time_end = download_source.index(
-            "self.seeding_goal_modal_status", modal_time_start
-        )
-        modal_time_block = download_source[modal_time_start:modal_time_end]
-        self.assertIn("with dpg.table(", modal_time_block)
-        self.assertGreaterEqual(modal_time_block.count("with dpg.table_row():"), 3)
+        # The polished seeding-goal fields are now built from framework-owned
+        # primitives/composites rather than view-local Dear PyGui tables/groups.
+        self.assertIn("LabeledComboField(", settings_source)
+        self.assertIn("LabeledNumericField(", settings_source)
+        self.assertIn("DurationEditor(", settings_source)
+        self.assertIn("ControlRow(", download_source)
+        self.assertIn("LabeledComboField(", download_source)
+        self.assertIn("LabeledNumericField(", download_source)
+        self.assertIn("DurationEditor(", download_source)
+        self.assertIn("NumericStepper(", download_source)
+        self.assertIn("self.seeding_goal_duration_editor.value_items()", download_source)
+        self.assertIn("self.default_seeding_duration_editor.value_items()", settings_source)
 
     def test_seeding_goal_time_progress_uses_days_hours_minutes_display(self):
         download_source = (ROOT / "app/views/download_view.py").read_text(encoding="utf-8")

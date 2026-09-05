@@ -30,6 +30,17 @@ from app.logic.seeding_policy import (
 from app.logic.torrent_manager import TorrentManager
 from app.logic.transfer_add import TransferAddRequest
 from app.engine.desktop_integration import DesktopIntegration
+from app.engine.components import (
+    ComboBox,
+    ControlLayout,
+    ControlRow,
+    DurationEditor,
+    Label,
+    LabeledComboField,
+    LabeledNumericField,
+    NumericKind,
+    NumericStepper,
+)
 from app.engine.responsive_layout import DialogMetrics, ResponsiveLayout, clamp, fill_height, split_widths
 from app.views.peer_view import PeerView
 from app.views.piece_view import PieceView
@@ -644,46 +655,88 @@ class DownloadView:
                 color=(255, 190, 100),
             )
             add_help_tooltip(seeding_goal_heading, "SEEDING_GOAL")
-            with dpg.group(horizontal=True):
-                self.properties_seeding_goal_combo = dpg.add_combo(
-                    items=localized_choices(SEEDING_GOAL_MODES),
-                    default_value=tr_value(SEEDING_GOAL_FOREVER),
-                    width=230,
+            # This dense Properties row is the first live proof that ControlRow
+            # can own an arbitrary number of framework components without
+            # changing the existing presentation contract.
+            self.properties_seeding_goal_control = ComboBox(
+                localized_choices(SEEDING_GOAL_MODES),
+                default_value=tr_value(SEEDING_GOAL_FOREVER),
+                layout=ControlLayout(width=230),
+            )
+            ratio_target_label_control = Label(
+                tr('view.download_view.ratio_target', "Ratio target")
+            )
+            self.properties_seeding_ratio_control = NumericStepper(
+                kind=NumericKind.FLOAT,
+                default_value=1.0,
+                min_value=0.1,
+                max_value=1000.0,
+                min_clamped=True,
+                max_clamped=True,
+                format="%.2f",
+                layout=ControlLayout(width=110),
+            )
+            time_target_label_control = Label(
+                tr('view.download_view.time_target', "Time target")
+            )
+            properties_days_label = Label(tr('view.download_view.days', "Days"))
+            self.properties_seeding_days_control = NumericStepper(
+                kind=NumericKind.INTEGER,
+                default_value=0,
+                min_value=0,
+                max_value=365,
+                min_clamped=True,
+                max_clamped=True,
+                layout=ControlLayout(width=58),
+            )
+            properties_hours_label = Label(tr('view.download_view.hours', "Hours"))
+            self.properties_seeding_hours_control = NumericStepper(
+                kind=NumericKind.INTEGER,
+                default_value=1,
+                min_value=0,
+                max_value=23,
+                min_clamped=True,
+                max_clamped=True,
+                layout=ControlLayout(width=58),
+            )
+            properties_minutes_label = Label(tr('view.download_view.minutes', "Minutes"))
+            self.properties_seeding_minutes_control = NumericStepper(
+                kind=NumericKind.INTEGER,
+                default_value=0,
+                min_value=0,
+                max_value=59,
+                min_clamped=True,
+                max_clamped=True,
+                layout=ControlLayout(width=58),
+            )
+            self.properties_seeding_goal_row = ControlRow(
+                (
+                    self.properties_seeding_goal_control,
+                    ratio_target_label_control,
+                    self.properties_seeding_ratio_control,
+                    time_target_label_control,
+                    properties_days_label,
+                    self.properties_seeding_days_control,
+                    properties_hours_label,
+                    self.properties_seeding_hours_control,
+                    properties_minutes_label,
+                    self.properties_seeding_minutes_control,
                 )
-                ratio_target_label = dpg.add_text(
-                    tr('view.download_view.ratio_target', "Ratio target")
-                )
-                self.properties_seeding_ratio_input = dpg.add_input_float(
-                    default_value=1.0,
-                    min_value=0.1,
-                    max_value=1000.0,
-                    min_clamped=True,
-                    max_clamped=True,
-                    format="%.2f",
-                    width=110,
-                )
-                time_target_label = dpg.add_text(
-                    tr('view.download_view.time_target', "Time target")
-                )
-                dpg.add_text(tr('view.download_view.days', "Days"))
-                self.properties_seeding_time_days = dpg.add_input_int(
-                    default_value=0, min_value=0, max_value=365,
-                    min_clamped=True, max_clamped=True, width=58,
-                )
-                dpg.add_text(tr('view.download_view.hours', "Hours"))
-                self.properties_seeding_time_hours = dpg.add_input_int(
-                    default_value=1, min_value=0, max_value=23,
-                    min_clamped=True, max_clamped=True, width=58,
-                )
-                dpg.add_text(tr('view.download_view.minutes', "Minutes"))
-                self.properties_seeding_time_minutes = dpg.add_input_int(
-                    default_value=0, min_value=0, max_value=59,
-                    min_clamped=True, max_clamped=True, width=58,
-                )
+            )
+            self.properties_seeding_goal_row.build()
+
+            # Preserve the existing item-id attributes while the wider view tree
+            # migrates incrementally onto framework component objects.
+            self.properties_seeding_goal_combo = self.properties_seeding_goal_control.require_item()
+            self.properties_seeding_ratio_input = self.properties_seeding_ratio_control.require_item()
+            self.properties_seeding_time_days = self.properties_seeding_days_control.require_item()
+            self.properties_seeding_time_hours = self.properties_seeding_hours_control.require_item()
+            self.properties_seeding_time_minutes = self.properties_seeding_minutes_control.require_item()
+
             add_help_tooltip(self.properties_seeding_goal_combo, "SEEDING_GOAL")
-            add_help_tooltip(ratio_target_label, "SEEDING_RATIO")
+            add_help_tooltip(ratio_target_label_control.require_item(), "SEEDING_RATIO")
             add_help_tooltip(self.properties_seeding_ratio_input, "SEEDING_RATIO")
-            add_help_tooltip(time_target_label, "SEEDING_TIME")
+            add_help_tooltip(time_target_label_control.require_item(), "SEEDING_TIME")
             for item in (
                 self.properties_seeding_time_days,
                 self.properties_seeding_time_hours,
@@ -722,62 +775,56 @@ class DownloadView:
             add_help_tooltip(self.seeding_goal_modal_title, "SEEDING_GOAL")
             self.seeding_goal_modal_current = dpg.add_text("", wrap=570)
             dpg.add_separator()
-            with dpg.group(horizontal=True):
-                dpg.add_text(tr('view.download_view.goal_mode', "Goal mode"))
-                self.seeding_goal_modal_combo = dpg.add_combo(
-                    items=localized_choices(SEEDING_GOAL_MODES),
-                    default_value=tr_value(SEEDING_GOAL_FOREVER),
-                    width=250,
-                )
-            with dpg.group(horizontal=True):
-                ratio_label = dpg.add_text(tr('view.download_view.ratio_target', "Ratio target"))
-                self.seeding_goal_modal_ratio = dpg.add_input_float(
-                    default_value=1.0,
-                    min_value=0.1,
-                    max_value=1000.0,
-                    min_clamped=True,
-                    max_clamped=True,
-                    format="%.2f",
-                    width=120,
-                )
+            self.seeding_goal_mode_field = LabeledComboField(
+                tr('view.download_view.goal_mode', "Goal mode"),
+                localized_choices(SEEDING_GOAL_MODES),
+                default_value=tr_value(SEEDING_GOAL_FOREVER),
+                control_width=250,
+            )
+            self.seeding_goal_mode_field.build()
+            self.seeding_goal_modal_combo = self.seeding_goal_mode_field.control.require_item()
+
+            self.seeding_goal_ratio_field = LabeledNumericField(
+                tr('view.download_view.ratio_target', "Ratio target"),
+                kind=NumericKind.FLOAT,
+                default_value=1.0,
+                min_value=0.1,
+                max_value=1000.0,
+                min_clamped=True,
+                max_clamped=True,
+                format="%.2f",
+                control_width=120,
+            )
+            self.seeding_goal_ratio_field.build()
+            self.seeding_goal_modal_ratio = self.seeding_goal_ratio_field.control.require_item()
+
             add_help_tooltip(self.seeding_goal_modal_combo, "SEEDING_GOAL")
-            add_help_tooltip(ratio_label, "SEEDING_RATIO")
+            add_help_tooltip(self.seeding_goal_ratio_field.label.require_item(), "SEEDING_RATIO")
             add_help_tooltip(self.seeding_goal_modal_ratio, "SEEDING_RATIO")
 
-            time_label = dpg.add_text(tr('view.download_view.time_target', "Time target"))
-            add_help_tooltip(time_label, "SEEDING_TIME")
-            # Stack the exact duration editor vertically.  The focused modal is
-            # deliberately compact, and a single horizontal row clips unit
-            # labels once DPI scaling or translated text becomes wider.
-            with dpg.table(
-                header_row=False,
-                policy=dpg.mvTable_SizingFixedFit,
-                borders_outerH=False,
-                borders_innerH=False,
-                borders_outerV=False,
-                borders_innerV=False,
-                width=280,
-            ):
-                dpg.add_table_column(width_fixed=True, init_width_or_weight=90)
-                dpg.add_table_column(width_fixed=True, init_width_or_weight=170)
-                with dpg.table_row():
-                    dpg.add_text(tr('view.download_view.days', "Days"))
-                    self.seeding_goal_modal_time_days = dpg.add_input_int(
-                        default_value=0, min_value=0, max_value=365,
-                        min_clamped=True, max_clamped=True, width=130,
-                    )
-                with dpg.table_row():
-                    dpg.add_text(tr('view.download_view.hours', "Hours"))
-                    self.seeding_goal_modal_time_hours = dpg.add_input_int(
-                        default_value=1, min_value=0, max_value=23,
-                        min_clamped=True, max_clamped=True, width=130,
-                    )
-                with dpg.table_row():
-                    dpg.add_text(tr('view.download_view.minutes', "Minutes"))
-                    self.seeding_goal_modal_time_minutes = dpg.add_input_int(
-                        default_value=0, min_value=0, max_value=59,
-                        min_clamped=True, max_clamped=True, width=130,
-                    )
+            # DurationEditor retains the compact aligned D/H/M presentation
+            # while moving its primitive labels/steppers behind framework
+            # components that can later be extracted into the RAD layer.
+            self.seeding_goal_duration_editor = DurationEditor(
+                heading=tr('view.download_view.time_target', "Time target"),
+                day_label=tr('view.download_view.days', "Days"),
+                hour_label=tr('view.download_view.hours', "Hours"),
+                minute_label=tr('view.download_view.minutes', "Minutes"),
+                days=0,
+                hours=1,
+                minutes=0,
+                input_width=130,
+                grid_width=280,
+                label_column_width=90,
+                control_column_width=170,
+            )
+            self.seeding_goal_duration_editor.build()
+            add_help_tooltip(self.seeding_goal_duration_editor.heading.require_item(), "SEEDING_TIME")
+            (
+                self.seeding_goal_modal_time_days,
+                self.seeding_goal_modal_time_hours,
+                self.seeding_goal_modal_time_minutes,
+            ) = self.seeding_goal_duration_editor.value_items()
             for item in (
                 self.seeding_goal_modal_time_days,
                 self.seeding_goal_modal_time_hours,

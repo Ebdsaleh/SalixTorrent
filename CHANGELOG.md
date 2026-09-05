@@ -4,7 +4,17 @@ Notable SalixTorrent changes are recorded here.
 
 ## Unreleased
 
-No unreleased changes have been recorded after v0.4.0.
+### Reusable GUI Component Foundation
+
+- Added a framework-owned component package under `app/engine/components/` with backend-neutral primitive controls, semantic layout sizing, a Dear PyGui renderer bridge, and value/configuration helpers.
+- Added semantic `AUTO` / `FILL` sizing so framework-facing code no longer needs to depend on Dear PyGui's raw sizing sentinel values.
+- Added `ControlRow`, a generic single-row container for an arbitrary number of child components, with width, height and spacing resolved through the existing `framework default -> active theme -> explicit instance override` property cascade.
+- Added `ControlGrid` and `ControlColumn` composition primitives for aligned form rows and vertical component groups.
+- Added reusable `LabeledComboField`, `LabeledNumericField`, and `DurationEditor` composites built from the primitive component layer.
+- Migrated the seeding-goal controls in Torrent Properties, `Configure targets...`, and Preferences new-torrent defaults onto the new component layer while preserving the existing GUI behavior, localized strings, durable policy semantics, and legacy item-id aliases used by the surrounding views.
+- Added headless component regressions covering layout provenance/fallback, semantic sizing, arbitrary `ControlRow` composition, integer/float numeric dispatch, value/configuration access, grid validation, and the three-part duration editor.
+- Regenerated deterministic localization extraction metadata after the view-level component migration; no canonical UI/Help/Glossary strings changed.
+
 
 ## v0.4.0 - 2026-09-05
 
