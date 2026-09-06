@@ -1,5 +1,5 @@
 #ifndef MyAppVersion
-  #define MyAppVersion "0.3.0"
+  #define MyAppVersion "0.5.0"
 #endif
 #ifndef BuildDir
   #define BuildDir "..\..\dist\phase10\standalone"

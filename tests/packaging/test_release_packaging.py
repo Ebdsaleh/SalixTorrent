@@ -4,8 +4,10 @@ Regression lineage:
 - introduced during the Phase 10 packaging/runtime-path milestone.
 """
 
+import re
 import unittest
 
+from app.version import APP_VERSION
 from tests.helpers import PROJECT_ROOT
 
 
@@ -27,6 +29,20 @@ class ReleasePackagingTests(unittest.TestCase):
         self.assertIn("Flags: unchecked", installer)
         self.assertIn("--unregister-torrent-handler", installer)
         self.assertIn("--unregister-magnet-handler", installer)
+
+    def test_inno_fallback_version_matches_application_version(self):
+        """Manual Inno builds must not fall back to a stale release version."""
+        installer = (
+            PROJECT_ROOT / "packaging" / "windows" / "SalixTorrent.iss"
+        ).read_text()
+
+        match = re.search(
+            r'#define\s+MyAppVersion\s+"([^"]+)"',
+            installer,
+        )
+
+        self.assertIsNotNone(match)
+        self.assertEqual(match.group(1), APP_VERSION)
 
     def test_runtime_manager_no_longer_uses_cwd_download_fallback(self):
         root = PROJECT_ROOT

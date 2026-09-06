@@ -4,6 +4,10 @@ Notable SalixTorrent changes are recorded here.
 
 ## Unreleased
 
+## v0.5.0 - 2026-09-07
+
+v0.5.0 completes the reusable GUI component/framework foundation developed after v0.4.0 while preserving the established torrent engine, persistence, localization, and packaging behavior. The release keeps the framework namespace provisional: final external package/repository naming and a frozen third-party API remain later work.
+
 ### GUI/RAD Extraction — Backend-Neutral Responsive Coordination
 
 - Added a reusable `LayoutHost` protocol and `LayoutCoordinator` under `app/framework/responsive.py`, separating keyed callback coordination, explicit refresh/trigger behavior, item-watch replacement, and memoized geometry application from any concrete GUI toolkit.
@@ -11,8 +15,8 @@ Notable SalixTorrent changes are recorded here.
 - Reduced `app/engine/responsive_layout.py` to the SalixTorrent singleton/composition surface over the framework coordinator plus Dear PyGui host, while preserving existing view/documentation call sites and framework-geometry compatibility exports.
 - Kept native clipboard/file-dialog/network services, transfer tables/graphs, scene ownership, and Dear PyGui handler objects outside the reusable framework.
 - Extended responsive-layout regression coverage from 7 to 14 tests and extended the isolated framework relocation probe to construct/use the responsive coordinator after package rename. The expected full real-Windows suite advances from 408 to 415 tests.
-- The completed component/documentation/geometry/relocation/responsive boundaries now satisfy the planned v0.5.0 reusable-GUI-foundation feature scope. After this tranche passes its Windows/live smoke gate, the next step is a dedicated v0.5.0 release-preparation commit and full build/install/frozen-version gate rather than another feature tranche.
-- No user-facing strings, transfer/network behavior, persistence schema, SalixORM integration, or application version changed.
+- The completed component/documentation/geometry/relocation/responsive boundaries satisfy the planned v0.5.0 reusable-GUI-foundation feature scope. The tranche passed its 415-test Windows gate and live GUI smoke before the separate v0.5.0 release-preparation change.
+- No user-facing strings, transfer/network behavior, persistence schema, or SalixORM integration changed in the feature tranche; the v0.5.0 release-preparation commit then advances the application version and release-facing metadata.
 
 ### GUI/RAD Extraction — Framework Package Relocation Readiness
 
@@ -143,6 +147,15 @@ Notable SalixTorrent changes are recorded here.
 - Added eight headless regressions for attachment timing, context-managed row/column composition, panel heading/separator ownership, declarative panel children, profile-owned dialog sizing, Preferences structural ownership, and the Configure-targets dialog boundary.
 - Regenerated deterministic localization extraction metadata after source movement; canonical UI/Help/Glossary strings remain unchanged at 1337 entries.
 
+
+
+### Release Preparation
+
+- Advanced `APP_VERSION` from `0.4.0` to `0.5.0` after the complete reusable-GUI-foundation feature scope passed the 415-test Windows gate and live GUI smoke.
+- Updated release-facing README and roadmap state to make v0.5.0 the current release checkpoint while preserving v0.4.0 as the previous immutable release boundary.
+- Updated the Inno Setup fallback `MyAppVersion` to `0.5.0`; normal Windows builds still inject `APP_VERSION` explicitly.
+- Added a release-packaging regression that requires the Inno fallback version to match `APP_VERSION`, preventing stale manual-installer metadata in future releases.
+- The final release gate is 416 tests on Windows with one expected non-Windows skip, followed by standalone GUI/CLI, portable ZIP, installer, and frozen `SalixTorrent 0.5.0` verification before the annotated tag is pushed.
 
 ## v0.4.0 - 2026-09-05
 
