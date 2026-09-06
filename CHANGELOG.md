@@ -4,6 +4,16 @@ Notable SalixTorrent changes are recorded here.
 
 ## Unreleased
 
+### GUI Component/RAD Extraction — Explicit Preference Bindings
+
+- Added backend-neutral `ValueBinding` and `BindingSet` contracts for explicit, synchronous component-to-model synchronization without observers, background mutation, or implicit two-way reactivity.
+- Added per-binding read/write transforms and explicit defaults so application code can convert localized presentation values, numeric input, booleans, and storage-facing canonical values at a single named boundary.
+- Migrated Preferences collection/synchronization onto the binding contract while retaining the existing application-owned normalization and persistence APIs.
+- Removed direct Dear PyGui usage from `settings_view.py`: Preferences status/connectivity text, network-interface refresh, file-path value access, save/restore synchronization, seeding-default reset, and ordinary control reads/writes now use component APIs.
+- Kept `ResponsiveLayout`, Tk/native folder selection, networking services, localization conversion, and seeding-duration composition as explicit application concerns rather than folding unrelated services into binding.
+- Preserved the established Preferences layout, Help/Glossary strings, settings schema, save/apply semantics, networking refresh behavior, and seeding-goal bulk-apply behavior.
+- Added five binding/runtime regressions, increasing the component suite from 46 to 51 and the expected real-Windows full-suite total from 380 to 385.
+
 ### GUI Component/RAD Extraction — Transfer Utility Dialogs
 
 - Added backend-neutral dialog minimum-size and viewport-centering behavior to the reusable `Dialog`/renderer contract instead of positioning ordinary dialogs with Dear PyGui viewport calls in view logic.
@@ -12,7 +22,7 @@ Notable SalixTorrent changes are recorded here.
 - Migrated the Remove Torrent, Removal Notice, Force Recheck and Download Complete utility dialogs onto the same reusable structural/control/profile boundaries while preserving their existing callbacks, destructive-action safeguards and notification behavior.
 - Centralized the established magnet/remove/recheck/completion dialog dimensions in the SalixTorrent component profile, including the magnet field/progress dimensions.
 - Proved the renderer-neutral runtime-state contract on a second independent workflow: magnet input, progress overlay/value, status, Add/Cancel enabled state and dialog visibility no longer use Dear PyGui state calls directly.
-- Added six component/dialog regressions, increasing the component suite from 40 to 46 and the expected real-Windows full-suite total from 374 to 380.
+- Added six component/dialog regressions, increasing the component suite from 40 to 46; real-Windows validation passed both full discovery paths at 380/380 with one expected non-Windows skip before the tranche was committed and pushed.
 
 ### GUI Component/RAD Extraction — Backend-Neutral Runtime State
 

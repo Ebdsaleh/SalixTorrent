@@ -42,6 +42,7 @@ from app.engine.components.fields import (
     NumericUnitField,
 )
 from app.engine.components.state import ComponentGroup
+from app.engine.components.bindings import BindingSet, ValueBinding
 from app.engine.components.renderer import (
     ComponentRenderer,
     DearPyGuiRenderer,
@@ -52,6 +53,7 @@ __all__ = [
     "AUTO",
     "FILL",
     "FRAMEWORK_COMPONENT_PROFILE",
+    "BindingSet",
     "Button",
     "CheckBox",
     "ComboBox",
@@ -82,6 +84,7 @@ __all__ = [
     "Spacer",
     "TextInput",
     "Tooltip",
+    "ValueBinding",
     "get_default_renderer",
     "resolve_control_layout",
 ]

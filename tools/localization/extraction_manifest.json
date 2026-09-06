@@ -1730,7 +1730,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 562,
+              "line": 585,
               "column": 25,
               "kind": "python-tr"
             }
@@ -1744,7 +1744,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 122,
+              "line": 128,
               "column": 29,
               "kind": "python-tr"
             }
@@ -1758,7 +1758,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 675,
+              "line": 698,
               "column": 25,
               "kind": "python-tr"
             }
@@ -1772,7 +1772,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 645,
+              "line": 668,
               "column": 25,
               "kind": "python-tr"
             }
@@ -1786,7 +1786,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 115,
+              "line": 121,
               "column": 21,
               "kind": "python-tr"
             }
@@ -1800,7 +1800,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 500,
+              "line": 522,
               "column": 25,
               "kind": "python-tr"
             }
@@ -1814,7 +1814,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 525,
+              "line": 547,
               "column": 33,
               "kind": "python-tr"
             }
@@ -1828,7 +1828,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 486,
+              "line": 508,
               "column": 25,
               "kind": "python-tr"
             }
@@ -1842,7 +1842,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 1123,
+              "line": 1247,
               "column": 13,
               "kind": "python-tr"
             }
@@ -1856,7 +1856,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 576,
+              "line": 599,
               "column": 21,
               "kind": "python-tr"
             }
@@ -1870,7 +1870,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 609,
+              "line": 632,
               "column": 25,
               "kind": "python-tr"
             }
@@ -1884,8 +1884,8 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 94,
-              "column": 48,
+              "line": 97,
+              "column": 17,
               "kind": "python-tr"
             }
           ]
@@ -1898,7 +1898,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 598,
+              "line": 621,
               "column": 25,
               "kind": "python-tr"
             }
@@ -1912,7 +1912,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 97,
+              "line": 102,
               "column": 17,
               "kind": "python-tr"
             }
@@ -1926,7 +1926,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 587,
+              "line": 610,
               "column": 25,
               "kind": "python-tr"
             }
@@ -1940,7 +1940,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 581,
+              "line": 604,
               "column": 45,
               "kind": "python-tr"
             }
@@ -1954,7 +1954,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 668,
+              "line": 691,
               "column": 25,
               "kind": "python-tr"
             }
@@ -1968,7 +1968,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 654,
+              "line": 677,
               "column": 25,
               "kind": "python-tr"
             }
@@ -1982,7 +1982,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 702,
+              "line": 725,
               "column": 25,
               "kind": "python-tr"
             }
@@ -1996,7 +1996,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 700,
+              "line": 723,
               "column": 28,
               "kind": "python-tr"
             }
@@ -2010,7 +2010,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 1110,
+              "line": 1235,
               "column": 27,
               "kind": "python-tr"
             }
@@ -2028,7 +2028,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 1094,
+              "line": 1219,
               "column": 27,
               "kind": "python-tr"
             }
@@ -2042,7 +2042,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 1105,
+              "line": 1230,
               "column": 27,
               "kind": "python-tr"
             }
@@ -2056,7 +2056,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 1100,
+              "line": 1225,
               "column": 38,
               "kind": "python-tr"
             }
@@ -2070,7 +2070,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 526,
+              "line": 548,
               "column": 35,
               "kind": "python-tr"
             }
@@ -2084,7 +2084,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 527,
+              "line": 549,
               "column": 36,
               "kind": "python-tr"
             }
@@ -2098,7 +2098,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 528,
+              "line": 550,
               "column": 38,
               "kind": "python-tr"
             }
@@ -2112,7 +2112,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 553,
+              "line": 575,
               "column": 25,
               "kind": "python-tr"
             }
@@ -2126,7 +2126,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 661,
+              "line": 684,
               "column": 25,
               "kind": "python-tr"
             }
@@ -2140,7 +2140,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 627,
+              "line": 650,
               "column": 25,
               "kind": "python-tr"
             }
@@ -9634,7 +9634,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 358,
+              "line": 376,
               "column": 33,
               "kind": "python-tr"
             }
@@ -9648,7 +9648,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 348,
+              "line": 366,
               "column": 25,
               "kind": "python-tr"
             }
@@ -9662,7 +9662,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 395,
+              "line": 413,
               "column": 25,
               "kind": "python-tr"
             }
@@ -9676,13 +9676,19 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 767,
+              "line": 758,
+              "column": 39,
+              "kind": "python-tr"
+            },
+            {
+              "path": "app/views/settings_view.py",
+              "line": 989,
               "column": 30,
               "kind": "python-tr"
             },
             {
               "path": "app/views/settings_view.py",
-              "line": 784,
+              "line": 1006,
               "column": 31,
               "kind": "python-tr"
             }
@@ -9696,7 +9702,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 330,
+              "line": 347,
               "column": 21,
               "kind": "python-tr"
             }
@@ -9710,7 +9716,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 144,
+              "line": 150,
               "column": 25,
               "kind": "python-tr"
             }
@@ -9724,7 +9730,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 802,
+              "line": 1029,
               "column": 19,
               "kind": "python-tr"
             }
@@ -9738,8 +9744,8 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 1069,
-              "column": 41,
+              "line": 1196,
+              "column": 40,
               "kind": "python-tr"
             }
           ]
@@ -9752,7 +9758,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 182,
+              "line": 188,
               "column": 25,
               "kind": "python-tr"
             }
@@ -9766,7 +9772,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 371,
+              "line": 389,
               "column": 25,
               "kind": "python-tr"
             }
@@ -9788,7 +9794,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 687,
+              "line": 710,
               "column": 25,
               "kind": "python-tr"
             }
@@ -9802,13 +9808,13 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 400,
+              "line": 419,
               "column": 25,
               "kind": "python-tr"
             },
             {
               "path": "app/views/settings_view.py",
-              "line": 449,
+              "line": 471,
               "column": 25,
               "kind": "python-tr"
             }
@@ -9822,7 +9828,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 109,
+              "line": 115,
               "column": 17,
               "kind": "python-tr"
             }
@@ -9836,7 +9842,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 197,
+              "line": 203,
               "column": 25,
               "kind": "python-tr"
             }
@@ -9850,7 +9856,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 209,
+              "line": 215,
               "column": 25,
               "kind": "python-tr"
             }
@@ -9864,7 +9870,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 203,
+              "line": 209,
               "column": 25,
               "kind": "python-tr"
             }
@@ -9878,8 +9884,8 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 246,
-              "column": 63,
+              "line": 256,
+              "column": 66,
               "kind": "python-tr"
             }
           ]
@@ -9892,7 +9898,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 1002,
+              "line": 1134,
               "column": 34,
               "kind": "python-tr"
             }
@@ -9906,7 +9912,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 1004,
+              "line": 1136,
               "column": 34,
               "kind": "python-tr"
             }
@@ -9926,7 +9932,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 1000,
+              "line": 1132,
               "column": 34,
               "kind": "python-tr"
             }
@@ -9948,7 +9954,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 988,
+              "line": 1120,
               "column": 34,
               "kind": "python-tr"
             }
@@ -9962,7 +9968,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 156,
+              "line": 162,
               "column": 33,
               "kind": "python-tr"
             }
@@ -9976,7 +9982,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 389,
+              "line": 407,
               "column": 21,
               "kind": "python-tr"
             }
@@ -9990,7 +9996,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 233,
+              "line": 239,
               "column": 21,
               "kind": "python-tr"
             }
@@ -10004,7 +10010,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 318,
+              "line": 335,
               "column": 21,
               "kind": "python-tr"
             }
@@ -10022,7 +10028,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 981,
+              "line": 1113,
               "column": 26,
               "kind": "python-tr"
             }
@@ -10036,8 +10042,8 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 250,
-              "column": 63,
+              "line": 262,
+              "column": 66,
               "kind": "python-tr"
             }
           ]
@@ -10056,7 +10062,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 1024,
+              "line": 1153,
               "column": 13,
               "kind": "python-tr"
             }
@@ -10070,8 +10076,8 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 252,
-              "column": 66,
+              "line": 265,
+              "column": 69,
               "kind": "python-tr"
             }
           ]
@@ -10088,7 +10094,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 1028,
+              "line": 1156,
               "column": 13,
               "kind": "python-tr"
             }
@@ -10102,7 +10108,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 166,
+              "line": 172,
               "column": 54,
               "kind": "python-tr"
             }
@@ -10116,8 +10122,8 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 244,
-              "column": 60,
+              "line": 253,
+              "column": 63,
               "kind": "python-tr"
             }
           ]
@@ -10134,7 +10140,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 996,
+              "line": 1128,
               "column": 27,
               "kind": "python-tr"
             }
@@ -10154,7 +10160,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 984,
+              "line": 1116,
               "column": 27,
               "kind": "python-tr"
             }
@@ -10168,7 +10174,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 268,
+              "line": 284,
               "column": 25,
               "kind": "python-tr"
             }
@@ -10182,8 +10188,8 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 248,
-              "column": 64,
+              "line": 259,
+              "column": 67,
               "kind": "python-tr"
             }
           ]
@@ -10200,7 +10206,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 1016,
+              "line": 1146,
               "column": 13,
               "kind": "python-tr"
             }
@@ -10214,8 +10220,8 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 240,
-              "column": 61,
+              "line": 247,
+              "column": 64,
               "kind": "python-tr"
             }
           ]
@@ -10232,8 +10238,8 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 1007,
-              "column": 49,
+              "line": 1139,
+              "column": 53,
               "kind": "python-tr"
             }
           ]
@@ -10246,7 +10252,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 324,
+              "line": 341,
               "column": 21,
               "kind": "python-tr"
             }
@@ -10260,8 +10266,8 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 242,
-              "column": 62,
+              "line": 250,
+              "column": 65,
               "kind": "python-tr"
             }
           ]
@@ -10280,7 +10286,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 1010,
+              "line": 1141,
               "column": 13,
               "kind": "python-tr"
             }
@@ -10294,7 +10300,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 221,
+              "line": 227,
               "column": 33,
               "kind": "python-tr"
             }
@@ -10308,8 +10314,8 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 794,
-              "column": 41,
+              "line": 1017,
+              "column": 13,
               "kind": "python-tr"
             }
           ]
@@ -10322,7 +10328,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 297,
+              "line": 314,
               "column": 21,
               "kind": "python-tr"
             }
@@ -10336,7 +10342,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 138,
+              "line": 144,
               "column": 21,
               "kind": "python-tr"
             }
@@ -10350,7 +10356,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 441,
+              "line": 460,
               "column": 21,
               "kind": "python-tr"
             }
@@ -10364,8 +10370,8 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 254,
-              "column": 67,
+              "line": 268,
+              "column": 70,
               "kind": "python-tr"
             }
           ]
@@ -10382,7 +10388,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 1040,
+              "line": 1167,
               "column": 13,
               "kind": "python-tr"
             }
@@ -10396,7 +10402,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 283,
+              "line": 300,
               "column": 21,
               "kind": "python-tr"
             }
@@ -10410,8 +10416,8 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 446,
-              "column": 62,
+              "line": 466,
+              "column": 25,
               "kind": "python-tr"
             }
           ]
@@ -10424,7 +10430,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 277,
+              "line": 294,
               "column": 17,
               "kind": "python-tr"
             }
@@ -10438,7 +10444,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 342,
+              "line": 360,
               "column": 21,
               "kind": "python-tr"
             }
@@ -10452,7 +10458,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 305,
+              "line": 322,
               "column": 29,
               "kind": "python-tr"
             }
@@ -10466,7 +10472,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 262,
+              "line": 278,
               "column": 25,
               "kind": "python-tr"
             }
@@ -10480,7 +10486,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 713,
+              "line": 737,
               "column": 55,
               "kind": "python-tr"
             }
@@ -10494,7 +10500,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 382,
+              "line": 400,
               "column": 25,
               "kind": "python-tr"
             }
@@ -10508,7 +10514,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 712,
+              "line": 736,
               "column": 55,
               "kind": "python-tr"
             }
@@ -10526,7 +10532,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 717,
+              "line": 741,
               "column": 17,
               "kind": "python-tr"
             }
@@ -10544,8 +10550,8 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 1006,
-              "column": 49,
+              "line": 1138,
+              "column": 53,
               "kind": "python-tr"
             }
           ]
@@ -10558,8 +10564,8 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 238,
-              "column": 61,
+              "line": 244,
+              "column": 64,
               "kind": "python-tr"
             }
           ]
@@ -10572,7 +10578,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 169,
+              "line": 175,
               "column": 25,
               "kind": "python-tr"
             }
@@ -10590,7 +10596,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 779,
+              "line": 1001,
               "column": 31,
               "kind": "python-tr"
             }
@@ -10604,13 +10610,13 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 419,
+              "line": 438,
               "column": 25,
               "kind": "python-tr"
             },
             {
               "path": "app/views/settings_view.py",
-              "line": 467,
+              "line": 489,
               "column": 25,
               "kind": "python-tr"
             }
@@ -10624,7 +10630,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 217,
+              "line": 223,
               "column": 33,
               "kind": "python-tr"
             }
@@ -10646,7 +10652,7 @@
           "occurrences": [
             {
               "path": "app/views/settings_view.py",
-              "line": 983,
+              "line": 1115,
               "column": 26,
               "kind": "python-tr"
             }
@@ -21348,32 +21354,24 @@
       "view.settings_view.any_interface_system_routing": [
         {
           "path": "app/views/settings_view.py",
-          "line": 767,
+          "line": 758,
+          "column": 39,
+          "kind": "python-tr"
+        },
+        {
+          "path": "app/views/settings_view.py",
+          "line": 989,
           "column": 30,
           "kind": "python-tr"
         },
         {
           "path": "app/views/settings_view.py",
-          "line": 784,
+          "line": 1006,
           "column": 31,
           "kind": "python-tr"
         }
       ],
       "view.settings_view.download": [
-        {
-          "path": "app/views/settings_view.py",
-          "line": 400,
-          "column": 25,
-          "kind": "python-tr"
-        },
-        {
-          "path": "app/views/settings_view.py",
-          "line": 449,
-          "column": 25,
-          "kind": "python-tr"
-        }
-      ],
-      "view.settings_view.upload": [
         {
           "path": "app/views/settings_view.py",
           "line": 419,
@@ -21382,7 +21380,21 @@
         },
         {
           "path": "app/views/settings_view.py",
-          "line": 467,
+          "line": 471,
+          "column": 25,
+          "kind": "python-tr"
+        }
+      ],
+      "view.settings_view.upload": [
+        {
+          "path": "app/views/settings_view.py",
+          "line": 438,
+          "column": 25,
+          "kind": "python-tr"
+        },
+        {
+          "path": "app/views/settings_view.py",
+          "line": 489,
           "column": 25,
           "kind": "python-tr"
         }

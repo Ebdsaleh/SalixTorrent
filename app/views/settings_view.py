@@ -5,14 +5,14 @@ import time
 import tkinter as tk
 from tkinter import filedialog
 
-import dearpygui.dearpygui as dpg
-
 from app.engine.desktop_integration import DesktopIntegration
 from app.engine.components import (
+    BindingSet,
     Button,
     CheckBox,
     ComboBox,
     ControlColumn,
+    ControlLayout,
     ControlRow,
     DurationEditor,
     Label,
@@ -23,7 +23,9 @@ from app.engine.components import (
     NumericStepper,
     NumericUnitField,
     SectionPanel,
+    Spacer,
     TextInput,
+    ValueBinding,
 )
 from app.engine.documentation import (
     DOCUMENTATION_SCALE_LABELS,
@@ -91,9 +93,12 @@ class SettingsView:
     def build_view(self, parent_tag):
         self.preferences_root = ControlColumn()
         with self.preferences_root.context(parent=parent_tag):
-            preferences_heading = dpg.add_text(tr("settings.heading", "PREFERENCES"), color=(0, 255, 128))
+            preferences_heading_component = Label(
+                tr("settings.heading", "PREFERENCES"), color=(0, 255, 128)
+            )
+            preferences_heading = preferences_heading_component.build()
             add_help_tooltip(preferences_heading, "PREFERENCES_VIEW")
-            self.preferences_intro = dpg.add_text(
+            self.preferences_intro_component = Label(
                 tr(
                     "settings.intro",
                     "Network toggles and global limits apply to active sessions immediately. "
@@ -102,8 +107,9 @@ class SettingsView:
                 color=(155, 155, 160),
                 wrap=1000,
             )
+            self.preferences_intro = self.preferences_intro_component.build()
             add_help_tooltip(self.preferences_intro, "PREFERENCES_VIEW")
-            dpg.add_spacer(height=6)
+            Spacer(layout=ControlLayout(height=6)).build()
 
             self.downloads_section = SectionPanel(
                 tr('view.settings_view.downloads', "DOWNLOADS"),
@@ -131,7 +137,7 @@ class SettingsView:
                 add_help_tooltip(self.download_dir_input, "DEFAULT_DOWNLOAD_DIR")
                 add_help_tooltip(choose_download_dir_button, "DEFAULT_DOWNLOAD_DIR")
 
-            dpg.add_spacer(height=7)
+            Spacer(layout=ControlLayout(height=7)).build()
             self.networking_pair = ControlRow()
             with self.networking_pair.context():
                 self.networking_section = SectionPanel(
@@ -235,44 +241,55 @@ class SettingsView:
                     profile_key="settings.connectivity_panel",
                 )
                 with self.connectivity_section.context() as self.connectivity_panel:
-                    self.connectivity_status = dpg.add_text(tr('view.settings_view.status_waiting', "Status: Waiting"))
+                    self.connectivity_status_component = Label(tr('view.settings_view.status_waiting', "Status: Waiting"))
+                    self.connectivity_status = self.connectivity_status_component.build()
                     add_help_tooltip(self.connectivity_status, "PORT_MAPPING")
-                    self.connectivity_method = dpg.add_text(tr('view.settings_view.mapping', "Mapping: --"))
+                    self.connectivity_method_component = Label(tr('view.settings_view.mapping', "Mapping: --"))
+                    self.connectivity_method = self.connectivity_method_component.build()
                     add_help_tooltip(self.connectivity_method, "PORT_MAPPING")
-                    self.connectivity_methods = dpg.add_text(tr('view.settings_view.methods_upnp_nat_pmp', "Methods: UPnP -- | NAT-PMP --"))
+                    self.connectivity_methods_component = Label(tr('view.settings_view.methods_upnp_nat_pmp', "Methods: UPnP -- | NAT-PMP --"))
+                    self.connectivity_methods = self.connectivity_methods_component.build()
                     add_help_tooltip(self.connectivity_methods, "MAPPING_METHOD_STATUS")
-                    self.connectivity_local = dpg.add_text(tr('view.settings_view.local', "Local: --"))
+                    self.connectivity_local_component = Label(tr('view.settings_view.local', "Local: --"))
+                    self.connectivity_local = self.connectivity_local_component.build()
                     add_help_tooltip(self.connectivity_local, "LOCAL_ENDPOINT")
-                    self.connectivity_external = dpg.add_text(tr('view.settings_view.external', "External: --"))
+                    self.connectivity_external_component = Label(tr('view.settings_view.external', "External: --"))
+                    self.connectivity_external = self.connectivity_external_component.build()
                     add_help_tooltip(self.connectivity_external, "EXTERNAL_ENDPOINT")
-                    self.connectivity_protocols = dpg.add_text(tr('view.settings_view.mapped_protocols', "Mapped protocols: --"))
+                    self.connectivity_protocols_component = Label(tr('view.settings_view.mapped_protocols', "Mapped protocols: --"))
+                    self.connectivity_protocols = self.connectivity_protocols_component.build()
                     add_help_tooltip(self.connectivity_protocols, "MAPPED_PROTOCOLS")
-                    self.connectivity_incoming = dpg.add_text(tr('view.settings_view.last_incoming_peer', "Last incoming peer: --"))
+                    self.connectivity_incoming_component = Label(tr('view.settings_view.last_incoming_peer', "Last incoming peer: --"))
+                    self.connectivity_incoming = self.connectivity_incoming_component.build()
                     add_help_tooltip(self.connectivity_incoming, "LAST_INCOMING")
-                    self.connectivity_refresh_age = dpg.add_text(tr('view.settings_view.last_mapping_check', "Last mapping check: --"))
+                    self.connectivity_refresh_age_component = Label(tr('view.settings_view.last_mapping_check', "Last mapping check: --"))
+                    self.connectivity_refresh_age = self.connectivity_refresh_age_component.build()
                     add_help_tooltip(self.connectivity_refresh_age, "MAPPING_METHOD_STATUS")
-                    self.connectivity_next_refresh = dpg.add_text(tr('view.settings_view.next_lease_refresh', "Next lease refresh: --"))
+                    self.connectivity_next_refresh_component = Label(tr('view.settings_view.next_lease_refresh', "Next lease refresh: --"))
+                    self.connectivity_next_refresh = self.connectivity_next_refresh_component.build()
                     add_help_tooltip(self.connectivity_next_refresh, "MAPPING_LEASE")
-                    self.connectivity_error = dpg.add_text(
+                    self.connectivity_error_component = Label(
                         "", color=(220, 180, 100), wrap=480
                     )
+                    self.connectivity_error = self.connectivity_error_component.build()
                     add_help_tooltip(self.connectivity_error, "PORT_MAPPING")
-                    dpg.add_spacer(height=6)
+                    Spacer(layout=ControlLayout(height=6)).build()
                     self.refresh_connectivity_control = Button(
                         tr('view.settings_view.refresh_remap_now', " Refresh / Remap Now "),
                         callback=self._refresh_connectivity,
                     )
                     refresh_connectivity_button = self.refresh_connectivity_control.build()
                     add_help_tooltip(refresh_connectivity_button, "PORT_MAPPING")
-                    self.connectivity_note = dpg.add_text(
+                    self.connectivity_note_component = Label(
                         tr('view.settings_view.mapped_means_the_router_accepted_a_mapping', "'Mapped' means the router accepted a mapping. 'Incoming Confirmed' "
                         "means a real remote peer has reached SalixTorrent."),
                         color=(145, 145, 150),
                         wrap=480,
                     )
+                    self.connectivity_note = self.connectivity_note_component.build()
                     add_help_tooltip(self.connectivity_note, "PORT_MAPPING")
 
-            dpg.add_spacer(height=7)
+            Spacer(layout=ControlLayout(height=7)).build()
             self.privacy_section = SectionPanel(
                 tr('view.settings_view.privacy_transport', "PRIVACY / TRANSPORT"),
                 heading_color=(100, 220, 200),
@@ -326,16 +343,17 @@ class SettingsView:
                 )
                 self.mask_peer_ips_checkbox = self.mask_peer_ips_control.build()
                 add_help_tooltip(self.mask_peer_ips_checkbox, "IP_MASKING")
-                self.transport_note = dpg.add_text(
+                self.transport_note_component = Label(
                     tr('view.settings_view.binding_chooses_one_local_ipv4_or_ipv6', "Binding chooses one local IPv4 or IPv6 source address for torrent traffic. "
                     "Any interface uses both families when the operating system provides them. Interface Lock "
                     "additionally monitors the selected address and stops torrent networking immediately if it disappears."),
                     color=(145, 145, 150),
                     wrap=1000,
                 )
+                self.transport_note = self.transport_note_component.build()
                 add_help_tooltip(self.transport_note, "INTERFACE_LOCK")
 
-            dpg.add_spacer(height=7)
+            Spacer(layout=ControlLayout(height=7)).build()
             self.queue_bandwidth_pair = ControlRow()
             with self.queue_bandwidth_pair.context():
                 self.queue_section = SectionPanel(
@@ -391,10 +409,11 @@ class SettingsView:
                     profile_key="settings.global_bandwidth_panel",
                 )
                 with self.global_bandwidth_section.context() as self.global_bandwidth_panel:
-                    global_bandwidth_note = dpg.add_text(
+                    global_bandwidth_note_component = Label(
                         tr('view.settings_view.aggregate_limit_shared_by_every_active_torrent', "Aggregate limit shared by every active torrent. 0 = Unlimited."),
                         color=(150, 150, 150),
                     )
+                    global_bandwidth_note = global_bandwidth_note_component.build()
                     add_help_tooltip(global_bandwidth_note, "GLOBAL_BANDWIDTH")
                     self.global_download_limit_field = NumericUnitField(
                         tr('view.settings_view.download', "Download"),
@@ -434,7 +453,7 @@ class SettingsView:
                     add_help_tooltip(self.global_upload_limit_input, "GLOBAL_BANDWIDTH")
                     add_help_tooltip(self.global_upload_limit_unit, "GLOBAL_BANDWIDTH")
 
-            dpg.add_spacer(height=7)
+            Spacer(layout=ControlLayout(height=7)).build()
             self.defaults_desktop_pair = ControlRow()
             with self.defaults_desktop_pair.context():
                 self.new_defaults_section = SectionPanel(
@@ -443,7 +462,10 @@ class SettingsView:
                     profile_key="settings.new_defaults_panel",
                 )
                 with self.new_defaults_section.context() as self.new_defaults_panel:
-                    new_torrent_defaults_note = dpg.add_text(tr('view.settings_view.per_torrent_limits_assigned_when_a_torrent', "Per-torrent limits assigned when a torrent is added."))
+                    new_torrent_defaults_note_component = Label(
+                        tr('view.settings_view.per_torrent_limits_assigned_when_a_torrent', "Per-torrent limits assigned when a torrent is added.")
+                    )
+                    new_torrent_defaults_note = new_torrent_defaults_note_component.build()
                     add_help_tooltip(new_torrent_defaults_note, "NEW_TORRENT_LIMITS")
                     self.default_download_limit_field = NumericUnitField(
                         tr('view.settings_view.download', "Download"),
@@ -481,7 +503,7 @@ class SettingsView:
                     add_help_tooltip(self.upload_limit_input, "NEW_TORRENT_LIMITS")
                     add_help_tooltip(self.upload_limit_unit, "NEW_TORRENT_LIMITS")
 
-                    dpg.add_spacer(height=5)
+                    Spacer(layout=ControlLayout(height=5)).build()
                     self.default_seeding_goal_field = LabeledComboField(
                         tr("settings.default_seeding_goal", "Default seeding goal"),
                         localized_choices(SEEDING_GOAL_MODES),
@@ -549,7 +571,7 @@ class SettingsView:
                         self.default_seeding_time_minutes_input,
                     ):
                         add_help_tooltip(item, "SEEDING_TIME")
-                    seed_defaults_note = dpg.add_text(
+                    seed_defaults_note_component = Label(
                         tr(
                             "settings.seeding_defaults_note",
                             "Used as the default for new torrents. Existing torrents keep their own seeding goal unless the option below is selected.",
@@ -557,6 +579,7 @@ class SettingsView:
                         color=(150, 150, 150),
                         wrap=480,
                     )
+                    seed_defaults_note = seed_defaults_note_component.build()
                     add_help_tooltip(seed_defaults_note, "SEEDING_GOAL")
                     self.apply_seeding_goal_existing_control = CheckBox(
                         tr(
@@ -686,15 +709,15 @@ class SettingsView:
                     desktop_status = (
                         tr('view.settings_view.desktop_backend_value_tray_value_notifications_value', 'Desktop backend: {tray_backend} | Tray: {tray_state} | Notifications: {value2}', tray_backend=desktop_caps.tray_backend, tray_state=tray_state, value2='available' if desktop_caps.notifications_supported else 'unavailable')
                     )
-                    dpg.add_text(desktop_status, color=(155, 155, 160))
+                    Label(desktop_status, color=(155, 155, 160)).build()
                     if desktop_caps.detail:
-                        dpg.add_text(
+                        Label(
                             desktop_caps.detail,
                             color=(155, 155, 160),
                             wrap=680,
-                        )
+                        ).build()
 
-            dpg.add_spacer(height=10)
+            Spacer(layout=ControlLayout(height=10)).build()
             self.preference_actions_row = ControlRow(
                 (
                     Button(tr("settings.save", " Save Preferences "), callback=self._save),
@@ -708,22 +731,221 @@ class SettingsView:
             self.preference_actions_row.build()
             save_preferences_button = self.preference_actions_row.children[0].require_item()
             restore_defaults_button = self.preference_actions_row.children[1].require_item()
-            self.status_text = self.preference_actions_row.children[2].require_item()
+            self.status_component = self.preference_actions_row.children[2]
+            self.status_text = self.status_component.require_item()
             add_text_tooltip(save_preferences_button, tr('view.settings_view.save_preferences_validates_persists_and_applies_the', "Save Preferences\n\nValidates, persists and applies the values shown on this page. Networking toggles and global limits can affect active sessions immediately."))
             add_text_tooltip(restore_defaults_button, tr('view.settings_view.restore_defaults_replaces_the_current_application_preferences', "Restore Defaults\n\nReplaces the current application preferences with SalixTorrent's built-in defaults and applies them. This does not delete torrents or payload data."))
 
-            dpg.add_spacer(height=7)
-            settings_path_text = dpg.add_text(
+            Spacer(layout=ControlLayout(height=7)).build()
+            settings_path_component = Label(
                 tr('view.settings_view.settings_file_value', 'Settings file: {settings_path}', settings_path=self.manager.settings_path),
                 color=(130, 130, 135),
             )
+            settings_path_text = settings_path_component.build()
             add_help_tooltip(settings_path_text, "SETTINGS_FILE")
 
+        self.preference_bindings = self._build_preference_bindings()
         self._layout_root = parent_tag
         self.layout.watch_item(
             parent_tag,
             ("settings_view", "root"),
             self._layout_settings_view,
+        )
+
+    def _build_preference_bindings(self) -> BindingSet:
+        """Create the explicit, synchronous Preferences value-binding contract."""
+
+        any_interface_label = lambda: tr(
+            "view.settings_view.any_interface_system_routing",
+            "Any interface (system routing)",
+        )
+
+        return BindingSet(
+            ValueBinding(
+                "download_dir",
+                self.download_directory_field.control,
+                read_transform=lambda value: str(value or "downloads"),
+                default="downloads",
+            ),
+            ValueBinding(
+                "default_max_peers",
+                self.max_peers_field.control,
+                read_transform=lambda value: int(value or 25),
+                default=25,
+            ),
+            ValueBinding(
+                "max_active_downloads",
+                self.active_slots_field.control,
+                read_transform=lambda value: int(value or 0),
+                default=0,
+            ),
+            ValueBinding("auto_resume_active", self.auto_resume_control, read_transform=bool),
+            ValueBinding(
+                "completion_notifications",
+                self.completion_notifications_control,
+                read_transform=bool,
+            ),
+            ValueBinding("native_notifications", self.native_notifications_control, read_transform=bool),
+            ValueBinding("system_tray_enabled", self.system_tray_control, read_transform=bool),
+            ValueBinding("minimize_to_tray", self.minimize_to_tray_control, read_transform=bool),
+            ValueBinding(
+                "close_to_tray",
+                self.close_to_tray_control,
+                read_transform=bool,
+                default=True,
+            ),
+            ValueBinding(
+                "transfer_rate_display_unit",
+                self.transfer_rate_display_field.control,
+                read_transform=lambda value: canonical_choice(
+                    value, TRANSFER_RATE_UNITS, "Auto"
+                ),
+                write_transform=tr_value,
+                default="Auto",
+            ),
+            ValueBinding(
+                "ui_font_size",
+                self.ui_font_size_field.control,
+                read_transform=ui_font_size_from_label,
+                write_transform=ui_font_label,
+                default=15,
+            ),
+            ValueBinding(
+                "documentation_scale",
+                self.documentation_scale_field.control,
+                read_transform=documentation_scale_from_label,
+                write_transform=documentation_scale_label,
+                default=100,
+            ),
+            ValueBinding(
+                "language",
+                self.language_field.control,
+                read_transform=locale_code_from_label,
+                write_transform=locale_label,
+                default="auto",
+            ),
+            ValueBinding(
+                "listen_port",
+                self.listen_port_field.control,
+                read_transform=lambda value: int(value or 6881),
+                default=6881,
+            ),
+            ValueBinding(
+                "peer_encryption",
+                self.peer_encryption_field.control,
+                read_transform=lambda value: canonical_choice(
+                    value, PEER_ENCRYPTION_POLICIES, "Prefer Encryption"
+                ),
+                write_transform=tr_value,
+                default="Prefer Encryption",
+            ),
+            ValueBinding(
+                "torrent_protocol_policy",
+                self.torrent_protocol_field.control,
+                read_transform=lambda value: canonical_choice(
+                    value, TORRENT_PROTOCOL_POLICIES, TORRENT_PROTOCOL_AUTO
+                ),
+                write_transform=tr_value,
+                default=TORRENT_PROTOCOL_AUTO,
+            ),
+            ValueBinding(
+                "network_bind_address",
+                self.network_bind_field.control,
+                read_transform=lambda value: self._bind_option_to_address.get(
+                    str(value or ""), ""
+                ),
+                write_transform=lambda value: self._bind_address_to_option.get(
+                    normalise_bind_address(value), any_interface_label()
+                ),
+                default="",
+            ),
+            ValueBinding("interface_lock", self.interface_lock_control, read_transform=bool),
+            ValueBinding("mask_peer_ips", self.mask_peer_ips_control, read_transform=bool),
+            ValueBinding("enable_dht", self.enable_dht_control, read_transform=bool),
+            ValueBinding("enable_pex", self.enable_pex_control, read_transform=bool),
+            ValueBinding("enable_lan_discovery", self.enable_lan_control, read_transform=bool),
+            ValueBinding(
+                "enable_upnp",
+                self.port_mapping_row.children[0],
+                read_transform=bool,
+            ),
+            ValueBinding(
+                "enable_natpmp",
+                self.port_mapping_row.children[1],
+                read_transform=bool,
+            ),
+            ValueBinding(
+                "global_download_limit_value",
+                self.global_download_limit_field.value_control,
+                read_transform=lambda value: float(value or 0.0),
+                default=0.0,
+            ),
+            ValueBinding(
+                "global_download_limit_unit",
+                self.global_download_limit_field.unit_control,
+                read_transform=lambda value: str(value or "KB/s"),
+                default="KB/s",
+            ),
+            ValueBinding(
+                "global_upload_limit_value",
+                self.global_upload_limit_field.value_control,
+                read_transform=lambda value: float(value or 0.0),
+                default=0.0,
+            ),
+            ValueBinding(
+                "global_upload_limit_unit",
+                self.global_upload_limit_field.unit_control,
+                read_transform=lambda value: str(value or "KB/s"),
+                default="KB/s",
+            ),
+            ValueBinding(
+                "default_download_limit_value",
+                self.default_download_limit_field.value_control,
+                read_transform=lambda value: float(value or 0.0),
+                default=0.0,
+            ),
+            ValueBinding(
+                "default_download_limit_unit",
+                self.default_download_limit_field.unit_control,
+                read_transform=lambda value: str(value or "KB/s"),
+                default="KB/s",
+            ),
+            ValueBinding(
+                "default_upload_limit_value",
+                self.default_upload_limit_field.value_control,
+                read_transform=lambda value: float(value or 0.0),
+                default=0.0,
+            ),
+            ValueBinding(
+                "default_upload_limit_unit",
+                self.default_upload_limit_field.unit_control,
+                read_transform=lambda value: str(value or "KB/s"),
+                default="KB/s",
+            ),
+            ValueBinding(
+                "default_queue_priority",
+                self.default_priority_field.control,
+                read_transform=lambda value: canonical_choice(
+                    value, ("High", "Normal", "Low"), "Normal"
+                ),
+                write_transform=tr_value,
+                default="Normal",
+            ),
+            ValueBinding(
+                "default_seeding_goal_mode",
+                self.default_seeding_goal_field.control,
+                read_transform=lambda value: canonical_choice(
+                    value, SEEDING_GOAL_MODES, SEEDING_GOAL_MODES[0]
+                ),
+                write_transform=tr_value,
+                default=SEEDING_GOAL_MODES[0],
+            ),
+            ValueBinding(
+                "default_seeding_ratio",
+                self.default_seeding_ratio_field.control,
+                read_transform=lambda value: float(value or 1.0),
+                default=1.0,
+            ),
         )
 
     def _layout_settings_view(self):
@@ -786,150 +1008,60 @@ class SettingsView:
         return list(option_to_address), selected_label
 
     def _refresh_network_interfaces(self):
-        selected_label = str(dpg.get_value(self.network_bind_combo) or "")
+        selected_label = str(self.network_bind_field.control.get_value() or "")
         selected_address = self._bind_option_to_address.get(selected_label, "")
         options, selected = self._build_network_interface_options(selected_address)
-        dpg.configure_item(self.network_bind_combo, items=options)
-        dpg.set_value(self.network_bind_combo, selected)
-        dpg.set_value(self.status_text, tr('view.settings_view.network_interface_list_refreshed', "Network interface list refreshed"))
+        self.network_bind_field.control.set_items(options)
+        self.network_bind_field.control.set_value(selected)
+        self.status_component.set_text(
+            tr(
+                'view.settings_view.network_interface_list_refreshed',
+                "Network interface list refreshed",
+            )
+        )
 
     def _choose_download_dir(self):
         root = tk.Tk()
         root.withdraw()
         root.attributes("-topmost", True)
-        initial = str(dpg.get_value(self.download_dir_input) or os.getcwd())
+        initial = str(self.download_directory_field.control.get_value() or os.getcwd())
         folder = filedialog.askdirectory(
-            title=tr('view.settings_view.choose_default_download_directory', "Choose Default Download Directory"),
+            title=tr(
+                'view.settings_view.choose_default_download_directory',
+                "Choose Default Download Directory",
+            ),
             initialdir=initial if os.path.isdir(initial) else os.getcwd(),
         )
         root.destroy()
         if folder:
-            dpg.set_value(self.download_dir_input, os.path.abspath(folder))
+            self.download_directory_field.control.set_value(os.path.abspath(folder))
 
     def _collect(self) -> dict:
-        return {
-            "download_dir": str(dpg.get_value(self.download_dir_input) or "downloads"),
-            "default_max_peers": int(dpg.get_value(self.max_peers_input) or 25),
-            "max_active_downloads": int(dpg.get_value(self.active_slots_input) or 0),
-            "auto_resume_active": bool(dpg.get_value(self.auto_resume_checkbox)),
-            "completion_notifications": bool(dpg.get_value(self.completion_notifications_checkbox)),
-            "native_notifications": bool(dpg.get_value(self.native_notifications_checkbox)),
-            "system_tray_enabled": bool(dpg.get_value(self.system_tray_checkbox)),
-            "minimize_to_tray": bool(dpg.get_value(self.minimize_to_tray_checkbox)),
-            "close_to_tray": bool(dpg.get_value(self.close_to_tray_checkbox)),
-            "transfer_rate_display_unit": canonical_choice(
-                dpg.get_value(self.transfer_rate_display_combo), TRANSFER_RATE_UNITS, "Auto"
-            ),
-            "ui_font_size": ui_font_size_from_label(
-                dpg.get_value(self.ui_font_size_combo)
-            ),
-            "documentation_scale": documentation_scale_from_label(
-                dpg.get_value(self.documentation_scale_combo)
-            ),
-            "language": locale_code_from_label(dpg.get_value(self.language_combo)),
-            "listen_port": int(dpg.get_value(self.listen_port_input) or 6881),
-            "peer_encryption": canonical_choice(
-                dpg.get_value(self.peer_encryption_combo), PEER_ENCRYPTION_POLICIES, "Prefer Encryption"
-            ),
-            "torrent_protocol_policy": canonical_choice(
-                dpg.get_value(self.torrent_protocol_combo), TORRENT_PROTOCOL_POLICIES, TORRENT_PROTOCOL_AUTO
-            ),
-            "network_bind_address": self._bind_option_to_address.get(
-                str(dpg.get_value(self.network_bind_combo) or ""), ""
-            ),
-            "interface_lock": bool(dpg.get_value(self.interface_lock_checkbox)),
-            "mask_peer_ips": bool(dpg.get_value(self.mask_peer_ips_checkbox)),
-            "enable_dht": bool(dpg.get_value(self.enable_dht_checkbox)),
-            "enable_pex": bool(dpg.get_value(self.enable_pex_checkbox)),
-            "enable_lan_discovery": bool(dpg.get_value(self.enable_lan_checkbox)),
-            "enable_upnp": bool(dpg.get_value(self.enable_upnp_checkbox)),
-            "enable_natpmp": bool(dpg.get_value(self.enable_natpmp_checkbox)),
-            "global_download_limit_value": float(dpg.get_value(self.global_download_limit_input) or 0.0),
-            "global_download_limit_unit": str(dpg.get_value(self.global_download_limit_unit) or "KB/s"),
-            "global_upload_limit_value": float(dpg.get_value(self.global_upload_limit_input) or 0.0),
-            "global_upload_limit_unit": str(dpg.get_value(self.global_upload_limit_unit) or "KB/s"),
-            "default_download_limit_value": float(dpg.get_value(self.download_limit_input) or 0.0),
-            "default_download_limit_unit": str(dpg.get_value(self.download_limit_unit) or "KB/s"),
-            "default_upload_limit_value": float(dpg.get_value(self.upload_limit_input) or 0.0),
-            "default_upload_limit_unit": str(dpg.get_value(self.upload_limit_unit) or "KB/s"),
-            "default_queue_priority": canonical_choice(dpg.get_value(self.default_priority_combo), ("High", "Normal", "Low"), "Normal"),
-            "default_seeding_goal_mode": canonical_choice(
-                dpg.get_value(self.default_seeding_goal_combo),
-                SEEDING_GOAL_MODES,
-                SEEDING_GOAL_MODES[0],
-            ),
-            "default_seeding_ratio": float(
-                dpg.get_value(self.default_seeding_ratio_input) or 1.0
-            ),
-            "default_seeding_time_minutes": seeding_time_parts_to_minutes(
-                dpg.get_value(self.default_seeding_time_days_input),
-                dpg.get_value(self.default_seeding_time_hours_input),
-                dpg.get_value(self.default_seeding_time_minutes_input),
-            ),
-        }
+        values = self.preference_bindings.collect()
+        values["default_seeding_time_minutes"] = seeding_time_parts_to_minutes(
+            self.default_seeding_duration_editor.days.get_value(),
+            self.default_seeding_duration_editor.hours.get_value(),
+            self.default_seeding_duration_editor.minutes.get_value(),
+        )
+        return values
 
     def _sync_controls(self, settings: dict):
         self.settings = dict(settings)
-        bind_options, bind_selected = self._build_network_interface_options(
+        bind_options, _bind_selected = self._build_network_interface_options(
             settings.get("network_bind_address", "")
         )
-        if hasattr(self, "network_bind_combo") and dpg.does_item_exist(self.network_bind_combo):
-            dpg.configure_item(self.network_bind_combo, items=bind_options)
+        if self.network_bind_field.control.exists():
+            self.network_bind_field.control.set_items(bind_options)
 
-        values = {
-            self.download_dir_input: settings["download_dir"],
-            self.max_peers_input: settings["default_max_peers"],
-            self.active_slots_input: settings["max_active_downloads"],
-            self.auto_resume_checkbox: settings["auto_resume_active"],
-            self.completion_notifications_checkbox: settings["completion_notifications"],
-            self.native_notifications_checkbox: settings["native_notifications"],
-            self.system_tray_checkbox: settings["system_tray_enabled"],
-            self.minimize_to_tray_checkbox: settings["minimize_to_tray"],
-            self.close_to_tray_checkbox: settings.get("close_to_tray", True),
-            self.transfer_rate_display_combo: tr_value(settings.get("transfer_rate_display_unit", "Auto")),
-            self.ui_font_size_combo: ui_font_label(settings.get("ui_font_size", 15)),
-            self.documentation_scale_combo: documentation_scale_label(
-                settings.get("documentation_scale", 100)
-            ),
-            self.language_combo: locale_label(settings.get("language", "auto")),
-            self.listen_port_input: settings["listen_port"],
-            self.peer_encryption_combo: tr_value(settings.get("peer_encryption", "Prefer Encryption")),
-            self.torrent_protocol_combo: tr_value(settings.get(
-                "torrent_protocol_policy", TORRENT_PROTOCOL_AUTO
-            )),
-            self.network_bind_combo: bind_selected,
-            self.interface_lock_checkbox: settings.get("interface_lock", False),
-            self.mask_peer_ips_checkbox: settings.get("mask_peer_ips", False),
-            self.enable_dht_checkbox: settings["enable_dht"],
-            self.enable_pex_checkbox: settings["enable_pex"],
-            self.enable_lan_checkbox: settings["enable_lan_discovery"],
-            self.enable_upnp_checkbox: settings["enable_upnp"],
-            self.enable_natpmp_checkbox: settings["enable_natpmp"],
-            self.global_download_limit_input: settings["global_download_limit_value"],
-            self.global_download_limit_unit: settings["global_download_limit_unit"],
-            self.global_upload_limit_input: settings["global_upload_limit_value"],
-            self.global_upload_limit_unit: settings["global_upload_limit_unit"],
-            self.download_limit_input: settings["default_download_limit_value"],
-            self.download_limit_unit: settings["default_download_limit_unit"],
-            self.upload_limit_input: settings["default_upload_limit_value"],
-            self.upload_limit_unit: settings["default_upload_limit_unit"],
-            self.default_priority_combo: tr_value(settings["default_queue_priority"]),
-            self.default_seeding_goal_combo: tr_value(
-                settings.get("default_seeding_goal_mode", SEEDING_GOAL_MODES[0])
-            ),
-            self.default_seeding_ratio_input: settings.get("default_seeding_ratio", 1.0),
-        }
-        for item, value in values.items():
-            dpg.set_value(item, value)
+        self.preference_bindings.apply(settings)
 
         default_days, default_hours, default_minutes = seeding_time_parts_from_minutes(
             settings.get("default_seeding_time_minutes", 60)
         )
-        dpg.set_value(self.default_seeding_time_days_input, default_days)
-        dpg.set_value(self.default_seeding_time_hours_input, default_hours)
-        dpg.set_value(self.default_seeding_time_minutes_input, default_minutes)
+        self.default_seeding_duration_editor.days.set_value(default_days)
+        self.default_seeding_duration_editor.hours.set_value(default_hours)
+        self.default_seeding_duration_editor.minutes.set_value(default_minutes)
 
-    @staticmethod
     def _format_duration(seconds):
         if seconds is None:
             return "--"
@@ -1003,29 +1135,25 @@ class SettingsView:
             else:
                 external_value = tr("view.settings_view.external_unknown", "External: --")
 
-        dpg.set_value(self.connectivity_status, tr('view.settings_view.status_value', 'Status: {status}', status=status))
-        dpg.set_value(self.connectivity_method, tr('view.settings_view.mapping_value', 'Mapping: {method}', method=method))
-        dpg.set_value(
-            self.connectivity_methods,
-            tr('view.settings_view.methods_upnp_value_nat_pmp_value', 'Methods: UPnP {value0} | NAT-PMP {value1}', value0=snap.get('upnp_status', '--'), value1=snap.get('natpmp_status', '--')),
+        self.connectivity_status_component.set_text(tr('view.settings_view.status_value', 'Status: {status}', status=status))
+        self.connectivity_method_component.set_text(tr('view.settings_view.mapping_value', 'Mapping: {method}', method=method))
+        self.connectivity_methods_component.set_text(
+            tr('view.settings_view.methods_upnp_value_nat_pmp_value', 'Methods: UPnP {value0} | NAT-PMP {value1}', value0=snap.get('upnp_status', '--'), value1=snap.get('natpmp_status', '--'))
         )
-        dpg.set_value(self.connectivity_local, local_value)
-        dpg.set_value(self.connectivity_external, external_value)
-        dpg.set_value(
-            self.connectivity_protocols,
-            tr('view.settings_view.mapped_protocols_value', 'Mapped protocols: {value0}', value0=' + '.join(protocols) if protocols else 'not applicable to IPv6 direct' if ipv6_direct else '--'),
+        self.connectivity_local_component.set_text(local_value)
+        self.connectivity_external_component.set_text(external_value)
+        self.connectivity_protocols_component.set_text(
+            tr('view.settings_view.mapped_protocols_value', 'Mapped protocols: {value0}', value0=' + '.join(protocols) if protocols else 'not applicable to IPv6 direct' if ipv6_direct else '--')
         )
         incoming_peer = str(snap.get("last_incoming_peer") or "--")
         if self.settings.get("mask_peer_ips") and incoming_peer not in {"", "--"}:
             incoming_peer = mask_ip_for_display(incoming_peer)
         incoming_age = self._format_age(snap.get("last_incoming_seconds"))
-        dpg.set_value(
-            self.connectivity_incoming,
-            tr('view.settings_view.last_incoming_peer_value_value', 'Last incoming peer: {incoming_peer} ({incoming_age})', incoming_peer=incoming_peer, incoming_age=incoming_age),
+        self.connectivity_incoming_component.set_text(
+            tr('view.settings_view.last_incoming_peer_value_value', 'Last incoming peer: {incoming_peer} ({incoming_age})', incoming_peer=incoming_peer, incoming_age=incoming_age)
         )
-        dpg.set_value(
-            self.connectivity_refresh_age,
-            tr('view.settings_view.last_mapping_check_value', 'Last mapping check: {value0}', value0=self._format_age(snap.get('last_refresh_seconds'))),
+        self.connectivity_refresh_age_component.set_text(
+            tr('view.settings_view.last_mapping_check_value', 'Last mapping check: {value0}', value0=self._format_age(snap.get('last_refresh_seconds')))
         )
         next_refresh = snap.get("next_mapping_refresh_seconds")
         if snap.get("mapping_permanent") and int(snap.get("mapping_count") or 0) > 0:
@@ -1035,9 +1163,8 @@ class SettingsView:
                 f"in {self._format_duration(next_refresh)}"
                 if next_refresh is not None else "--"
             )
-        dpg.set_value(
-            self.connectivity_next_refresh,
-            tr('view.settings_view.next_lease_refresh_value', 'Next lease refresh: {next_refresh_text}', next_refresh_text=next_refresh_text),
+        self.connectivity_next_refresh_component.set_text(
+            tr('view.settings_view.next_lease_refresh_value', 'Next lease refresh: {next_refresh_text}', next_refresh_text=next_refresh_text)
         )
         details = []
         upnp_summary = str(snap.get("upnp_summary") or "").strip()
@@ -1053,7 +1180,7 @@ class SettingsView:
         if action_hint:
             details.append(f"Suggested action: {action_hint}")
         mapping_notice = "\n".join(details)
-        dpg.set_value(self.connectivity_error, mapping_notice)
+        self.connectivity_error_component.set_text(mapping_notice)
         if status == "Incoming Confirmed":
             notice_color = (0, 220, 128)
         elif status.startswith("Mapped"):
@@ -1062,17 +1189,15 @@ class SettingsView:
             notice_color = (255, 200, 100)
         else:
             notice_color = (170, 170, 175)
-        dpg.configure_item(self.connectivity_error, color=notice_color)
+        self.connectivity_error_component.configure(color=notice_color)
 
     def _refresh_connectivity(self):
         self.manager.refresh_connectivity()
-        dpg.set_value(self.status_text, tr('view.settings_view.connectivity_refresh_started', "Connectivity refresh started"))
+        self.status_component.set_text(tr('view.settings_view.connectivity_refresh_started', "Connectivity refresh started"))
 
     def _save(self):
         previous_language = str(self.settings.get("language", "auto"))
-        apply_existing = bool(
-            dpg.get_value(self.apply_seeding_goal_existing_checkbox)
-        )
+        apply_existing = bool(self.apply_seeding_goal_existing_control.get_value())
         settings = self.manager.update_app_settings(self._collect())
         applied_count = 0
         if apply_existing:
@@ -1088,7 +1213,7 @@ class SettingsView:
         if language_changed:
             self.localization.configure(settings.get("language", "auto"))
         self._sync_controls(settings)
-        dpg.set_value(self.apply_seeding_goal_existing_checkbox, False)
+        self.apply_seeding_goal_existing_control.set_value(False)
 
         if apply_existing:
             status_text = tr(
@@ -1108,7 +1233,7 @@ class SettingsView:
             )
         else:
             status_text = tr("settings.saved", "Preferences saved and applied")
-        dpg.set_value(self.status_text, status_text)
+        self.status_component.set_text(status_text)
         self._render_connectivity()
 
     def _restore_defaults(self):
@@ -1117,10 +1242,9 @@ class SettingsView:
         self.desktop.configure(settings)
         self.typography.apply_font_size(settings.get("ui_font_size", 15))
         self._sync_controls(settings)
-        dpg.set_value(self.apply_seeding_goal_existing_checkbox, False)
-        dpg.set_value(
-            self.status_text,
-            tr("settings.defaults_restored", "Defaults restored and applied"),
+        self.apply_seeding_goal_existing_control.set_value(False)
+        self.status_component.set_text(
+            tr("settings.defaults_restored", "Defaults restored and applied")
         )
         self._render_connectivity()
 
@@ -1129,10 +1253,10 @@ class SettingsView:
         settings = self.manager.get_app_settings()
         settings["max_active_downloads"] = self.manager.get_max_active_downloads()
         self._sync_controls(settings)
-        dpg.set_value(self.apply_seeding_goal_existing_checkbox, False)
+        self.apply_seeding_goal_existing_control.set_value(False)
         self._render_connectivity()
         self._last_connectivity_refresh = time.monotonic()
-        dpg.set_value(self.status_text, "")
+        self.status_component.set_text("")
 
     def update(self, delta_time: float):
         del delta_time

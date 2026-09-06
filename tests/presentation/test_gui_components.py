@@ -7,9 +7,11 @@ from tests.helpers import PROJECT_ROOT
 
 from app.engine.components import (
     AUTO,
+    BindingSet,
     FILL,
     FRAMEWORK_COMPONENT_PROFILE,
     Button,
+    CheckBox,
     ComponentGroup,
     ComponentLayoutProfile,
     ComboBox,
@@ -33,6 +35,7 @@ from app.engine.components import (
     Separator,
     TextInput,
     Tooltip,
+    ValueBinding,
     resolve_control_layout,
 )
 from app.engine.components.layout import backend_dimension
@@ -100,6 +103,7 @@ class GuiComponentFoundationTests(unittest.TestCase):
             "__init__.py",
             "attachments.py",
             "base.py",
+            "bindings.py",
             "containers.py",
             "controls.py",
             "fields.py",
@@ -890,6 +894,74 @@ class GuiComponentFoundationTests(unittest.TestCase):
         self.assertIn('"download.remove.dialog": ControlLayoutDefaults(width=520, height=230)', profile_source)
         self.assertIn('"download.recheck.dialog": ControlLayoutDefaults(width=560, height=190)', profile_source)
         self.assertIn('"download.completion_notice.dialog": ControlLayoutDefaults(width=480, height=150)', profile_source)
+    def test_value_binding_round_trips_with_explicit_transforms(self):
+        renderer = RecordingRenderer()
+        control = TextInput(default_value="42")
+        control.build(renderer=renderer)
+        binding = ValueBinding(
+            "answer",
+            control,
+            read_transform=lambda value: int(value),
+            write_transform=lambda value: str(int(value)),
+        )
+
+        self.assertEqual(binding.read(), 42)
+        self.assertTrue(binding.write({"answer": 7}))
+        self.assertEqual(control.get_value(), "7")
+
+    def test_binding_set_collects_and_applies_only_when_explicitly_called(self):
+        renderer = RecordingRenderer()
+        name = TextInput(default_value="alpha")
+        enabled = CheckBox("Enabled", default_value=True)
+        name.build(renderer=renderer)
+        enabled.build(renderer=renderer)
+        bindings = BindingSet(
+            ValueBinding("name", name, read_transform=str),
+            ValueBinding("enabled", enabled, read_transform=bool),
+        )
+
+        self.assertEqual(bindings.collect(), {"name": "alpha", "enabled": True})
+        name.set_value("local-only")
+        self.assertEqual(enabled.get_value(), True)
+        self.assertEqual(bindings.apply({"name": "model-value", "enabled": False}), ("name", "enabled"))
+        self.assertEqual(name.get_value(), "model-value")
+        self.assertFalse(enabled.get_value())
+
+    def test_binding_set_rejects_invalid_or_duplicate_bindings(self):
+        control = TextInput(default_value="")
+        with self.assertRaises(TypeError):
+            ValueBinding("bad", Button("Not a value"))
+        first = ValueBinding("same", control)
+        second = ValueBinding("same", control)
+        with self.assertRaises(ValueError):
+            BindingSet(first, second)
+        with self.assertRaises(TypeError):
+            BindingSet(first, object())
+
+    def test_binding_defaults_are_explicit_and_missing_values_do_not_require_observers(self):
+        renderer = RecordingRenderer()
+        control = TextInput(default_value="")
+        control.build(renderer=renderer)
+        binding = ValueBinding("path", control, default="downloads")
+
+        self.assertEqual(binding.read(), "downloads")
+        self.assertTrue(binding.write({}))
+        self.assertEqual(control.get_value(), "downloads")
+
+    def test_preferences_runtime_values_use_explicit_component_bindings_not_dearpygui(self):
+        source = (PROJECT_ROOT / "app" / "views" / "settings_view.py").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertNotIn("import dearpygui", source)
+        self.assertNotIn("dpg.", source)
+        self.assertIn("BindingSet(", source)
+        self.assertIn("ValueBinding(", source)
+        self.assertIn("self.preference_bindings.collect()", source)
+        self.assertIn("self.preference_bindings.apply(settings)", source)
+        self.assertIn("self.connectivity_status_component.set_text", source)
+        self.assertIn("self.status_component.set_text", source)
+
 
 
 if __name__ == "__main__":
