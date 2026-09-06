@@ -315,7 +315,7 @@ python -m unittest tests.protocol.test_v2_peer_wire -v
 python -m unittest discover -s tests\localization -t . -v
 ```
 
-The current pushed real Windows development baseline is **354 / 354 tests passing**, with one expected non-Windows shell-behavior skip. Both canonical `tests/` discovery and plain repository-root discovery produce the same result. The structural-component tranche adds eight headless component regressions, so its expected Windows total is 362 after application.
+The current pushed real Windows development baseline before the two newest GUI/RAD tranches is **354 / 354 tests passing**, with one expected non-Windows shell-behavior skip. The structural-composition tranche adds eight headless component regressions for an expected 362-test Windows gate; the subsequent Create Torrent form/tooltip tranche adds eight more, bringing its expected real-Windows total to 370.
 
 The release-critical regression coverage includes strict BEP-52 v2 identity/file-tree/piece-layer/Merkle validation, MSE/RC4 interoperability, rarest-first/endgame scheduling, bounded request pipelines, asynchronous disk backpressure/caching, source binding, encryption fallback rules, multi-torrent port mappings, finite/permanent mapping-lease handling, structured UPnP/NAT-PMP diagnostics, source-severity accounting, Interface Lock, real inbound seeding uploads, IPv6 peer TCP, BEP-7/BEP-15 tracker peers, BEP-11 IPv6 PEX, BEP-32 DHT behavior, BEP-48 HTTP scrape batching, BEP-15 UDP scrape batching, scrape/announce telemetry isolation, Windows Proactor reset handling, application/session persistence, offline localization, responsive content-bounds geometry, framework property-cascade fallback/provenance, per-page documentation layout overrides, and semantic documentation typography/media sizing.
 
@@ -323,7 +323,7 @@ The release-critical regression coverage includes strict BEP-52 v2 identity/file
 
 v0.4.0 is the current release checkpoint. Phases 1-11 remain complete, including the native Windows standalone/portable/installer architecture and the cross-platform desktop/tray abstraction. Phase 12 provides the offline-first localization framework, semantic Help/Glossary services, provider-neutral translation tooling, optional SalixORM-backed development translation memory, backend-neutral application/session persistence, and the tracked regression suite. The v0.4.0 transfer-lifecycle milestone adds durable per-torrent seeding goals and automatic-stop policy. Linux/BSD/macOS native desktop behavior and full target-locale population/review remain active hardening work.
 
-Post-v0.4.0 development is building the reusable GUI component layer intended for later RAD/framework extraction. The first tranche introduced backend-neutral primitives, semantic `AUTO`/`FILL` sizing, `ControlRow`/`ControlGrid`/`ControlColumn`, and reusable labeled-field/duration composites. The second tranche added `TextInput`, generic `LabeledField` accessory composition, and `NumericUnitField`, then migrated Preferences value controls onto the framework layer. The third tranche moved concrete component dimensions out of views into a renderer-selected `ComponentLayoutProfile`; it is committed/pushed and Windows-validated at 354/354 with visual parity confirmed. The current structural tranche adds reusable section/dialog boundaries, context-managed incremental composition, and generic post-build attachment hooks, then migrates Preferences panel structure and the focused seeding-goal target dialog without changing application semantics.
+Post-v0.4.0 development is building the reusable GUI component layer intended for later RAD/framework extraction. The first tranche introduced backend-neutral primitives, semantic `AUTO`/`FILL` sizing, `ControlRow`/`ControlGrid`/`ControlColumn`, and reusable labeled-field/duration composites. The second tranche added `TextInput`, generic `LabeledField` accessory composition, and `NumericUnitField`, then migrated Preferences value controls onto the framework layer. The third tranche moved concrete component dimensions out of views into a renderer-selected `ComponentLayoutProfile`; it is committed/pushed and Windows-validated at 354/354 with visual parity confirmed. The fourth tranche extends ownership into reusable section/dialog structures and generic post-build attachments. The fifth tranche then adds a renderer-neutral `Tooltip` attachment, `ProgressBar`, profile-owned Create Torrent form metrics, and migrates the complete Create Torrent form onto the component/structural layer while preserving raw item IDs, ResponsiveLayout behavior, callbacks, creation semantics and localized wording.
 
 The component layer deliberately reuses the existing property-cascade rule:
 
@@ -331,7 +331,7 @@ The component layer deliberately reuses the existing property-cascade rule:
 framework default -> active theme -> explicit instance override
 ```
 
-Width, height and row spacing resolve independently. Named profile slots now provide the framework/application default layer, sparse component themes can override those defaults, and explicit instance layout remains the final override. Generic field composition follows `label -> primary control -> 0..n accessories`, which covers patterns such as `Network interface / VPN + ComboBox + Refresh`, `Active download slots + NumericStepper + 0 = Unlimited`, and `Download + NumericStepper + unit ComboBox` without creating one-off framework classes for every row shape. Structural composition now adds reusable `SectionPanel` and `Dialog` boundaries plus context-managed `ControlRow` / `ControlColumn` construction so existing views can migrate container ownership without an all-at-once rewrite. Dear PyGui remains the current renderer, but its bridge is kept behind the component contract and carries the active profile selected by the application composition root.
+Width, height and row spacing resolve independently. Named profile slots now provide the framework/application default layer, sparse component themes can override those defaults, and explicit instance layout remains the final override. Generic field composition follows `label -> primary control -> 0..n accessories`, which covers patterns such as `Network interface / VPN + ComboBox + Refresh`, `Active download slots + NumericStepper + 0 = Unlimited`, and `Download + NumericStepper + unit ComboBox` without creating one-off framework classes for every row shape. Structural composition now adds reusable `SectionPanel` and `Dialog` boundaries plus context-managed `ControlRow` / `ControlColumn` construction so existing views can migrate container ownership without an all-at-once rewrite. Renderer-adjacent tooltip creation is also behind the component renderer: generic `Tooltip` attachments carry explanatory text while SalixTorrent converts Help/Glossary terms through an application adapter. Create Torrent is the first complete ordinary form to use that attachment path together with framework-owned panels, rows, value controls and a reusable `ProgressBar`. Dear PyGui remains the current renderer, but its bridge is kept behind the component contract and carries the active profile selected by the application composition root.
 
 Component/model names used during extraction are working names. Final public RAD-framework naming is intentionally deferred until the complete framework boundary and API are proven, so architecture work is not churned by premature renaming.
 
@@ -403,6 +403,7 @@ SalixTorrent/
 │   │   └── headless.py
 │   ├── engine/
 │   │   ├── components/
+│   │   │   ├── attachments.py
 │   │   │   ├── base.py
 │   │   │   ├── containers.py
 │   │   │   ├── controls.py
@@ -424,6 +425,7 @@ SalixTorrent/
 │   │   ├── shell_integration.py
 │   │   ├── scene_manager.py
 │   │   ├── texture_manager.py
+│   │   ├── ui_component_attachments.py
 │   │   ├── ui_component_profile.py
 │   │   └── ui_typography.py
 │   ├── logic/

@@ -27,9 +27,11 @@ from app.engine.components import (
     NumericKind,
     NumericStepper,
     NumericUnitField,
+    ProgressBar,
     SectionPanel,
     Separator,
     TextInput,
+    Tooltip,
     resolve_control_layout,
 )
 from app.engine.components.layout import backend_dimension
@@ -43,6 +45,7 @@ class RecordingRenderer:
         self.containers = []
         self.values = {}
         self.configured = {}
+        self.tooltips = []
 
     def _new_item(self, prefix: str) -> str:
         return f"{prefix}:{len(self.created) + len(self.containers) + 1}"
@@ -74,6 +77,11 @@ class RecordingRenderer:
     def exists(self, item):
         return item in self.values or any(entry[1] == item for entry in self.containers)
 
+    def attach_tooltip(self, item, text, *, wrap=450):
+        record = (item, str(text), int(wrap))
+        self.tooltips.append(record)
+        return record
+
 
 class GuiComponentFoundationTests(unittest.TestCase):
     def test_component_model_keeps_dearpygui_imports_behind_renderer_bridge(self):
@@ -82,6 +90,7 @@ class GuiComponentFoundationTests(unittest.TestCase):
         component_dir = PROJECT_ROOT / "app" / "engine" / "components"
         model_files = (
             "__init__.py",
+            "attachments.py",
             "base.py",
             "containers.py",
             "controls.py",
@@ -615,6 +624,107 @@ class GuiComponentFoundationTests(unittest.TestCase):
         self.assertIn("self.seeding_goal_dialog_separator = Separator()", source)
         self.assertNotIn("width=620,\n            height=365", source)
         self.assertIn('"configure_targets.dialog": ControlLayoutDefaults(width=620, height=365)', profile_source)
+
+    def test_progress_bar_dispatches_through_renderer_and_value_api(self):
+        renderer = RecordingRenderer()
+        progress = ProgressBar(default_value=0.25)
+
+        progress.build(renderer=renderer)
+
+        self.assertEqual(renderer.created[-1][0], "progress_bar")
+        self.assertEqual(progress.get_value(), 0.25)
+        progress.set_value(0.75)
+        self.assertEqual(progress.get_value(), 0.75)
+
+    def test_tooltip_attachment_uses_renderer_boundary(self):
+        renderer = RecordingRenderer()
+        button = Button("Create").attach(Tooltip("Create a torrent", wrap=420))
+
+        item = button.build(renderer=renderer)
+
+        self.assertEqual(renderer.tooltips, [(item, "Create a torrent", 420)])
+
+    def test_empty_tooltip_attachment_is_a_safe_noop(self):
+        renderer = RecordingRenderer()
+        label = Label("Status").attach(Tooltip("   "))
+
+        label.build(renderer=renderer)
+
+        self.assertEqual(renderer.tooltips, [])
+
+    def test_create_torrent_structure_is_component_owned(self):
+        source = (PROJECT_ROOT / "app" / "views" / "create_torrent_view.py").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("self.create_root = ControlColumn()", source)
+        self.assertIn("SectionPanel(", source)
+        self.assertIn("ControlRow()", source)
+        self.assertNotIn("with dpg.child_window", source)
+        self.assertNotIn("with dpg.group", source)
+
+    def test_create_torrent_value_controls_are_component_owned(self):
+        source = (PROJECT_ROOT / "app" / "views" / "create_torrent_view.py").read_text(
+            encoding="utf-8"
+        )
+
+        for token in (
+            "dpg.add_button(",
+            "dpg.add_combo(",
+            "dpg.add_checkbox(",
+            "dpg.add_input_text(",
+            "dpg.add_progress_bar(",
+        ):
+            self.assertNotIn(token, source)
+        self.assertIn("ProgressBar(", source)
+        self.assertIn("TextInput(", source)
+        self.assertIn("ComboBox(", source)
+
+    def test_create_torrent_dimensions_are_profile_owned(self):
+        source = (PROJECT_ROOT / "app" / "views" / "create_torrent_view.py").read_text(
+            encoding="utf-8"
+        )
+        profile_source = (PROJECT_ROOT / "app" / "engine" / "ui_component_profile.py").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertNotIn("width=235", source)
+        self.assertNotIn("width=130", source)
+        self.assertNotIn("height=155", source)
+        self.assertNotIn("height=190", source)
+        self.assertNotIn("height=145", source)
+        self.assertIn('profile_key="create_torrent.generation"', source)
+        self.assertIn('profile_key="create_torrent.progress_bar"', source)
+        self.assertIn('"create_torrent.source_panel": ControlLayoutDefaults(width=FILL, height=155)', profile_source)
+        self.assertIn('"create_torrent.progress_bar": ControlLayoutDefaults(width=FILL, height=22)', profile_source)
+
+    def test_create_torrent_uses_attachment_adapters_for_component_help(self):
+        source = (PROJECT_ROOT / "app" / "views" / "create_torrent_view.py").read_text(
+            encoding="utf-8"
+        )
+        adapter_source = (PROJECT_ROOT / "app" / "engine" / "ui_component_attachments.py").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("from app.engine.ui_component_attachments import help_tooltip, text_tooltip", source)
+        self.assertIn('.attach(help_tooltip("CREATE_TORRENT"))', source)
+        self.assertIn(".attach(text_tooltip(", source)
+        self.assertNotIn("add_help_tooltip(", source)
+        self.assertNotIn("add_text_tooltip(", source)
+        self.assertNotIn("app.views", adapter_source)
+        self.assertIn("app.localization.documents", adapter_source)
+
+    def test_help_tooltip_backend_creation_is_centralized_in_renderer(self):
+        help_source = (PROJECT_ROOT / "app" / "views" / "help_terms.py").read_text(
+            encoding="utf-8"
+        )
+        renderer_source = (PROJECT_ROOT / "app" / "engine" / "components" / "renderer.py").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertNotIn("import dearpygui", help_source)
+        self.assertIn("get_default_renderer().attach_tooltip", help_source)
+        self.assertIn("dpg.add_tooltip(parent=item)", renderer_source)
 
 
 if __name__ == "__main__":

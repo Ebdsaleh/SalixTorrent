@@ -41,6 +41,9 @@ class ComponentRenderer(Protocol):
     def exists(self, item: object) -> bool:
         ...
 
+    def attach_tooltip(self, item: object, text: str, *, wrap: int = 450) -> object | None:
+        ...
+
 
 class DearPyGuiRenderer:
     """Dear PyGui implementation of :class:`ComponentRenderer`."""
@@ -91,6 +94,8 @@ class DearPyGuiRenderer:
             return dpg.add_spacer(**kwargs)
         if kind == "separator":
             return dpg.add_separator(**kwargs)
+        if kind == "progress_bar":
+            return dpg.add_progress_bar(**kwargs)
         if kind == "grid_column":
             return dpg.add_table_column(**kwargs)
         raise ValueError(f"unsupported GUI component kind: {kind!r}")
@@ -140,6 +145,25 @@ class DearPyGuiRenderer:
 
     def exists(self, item: object) -> bool:
         return bool(self._dpg().does_item_exist(item))
+
+    def attach_tooltip(self, item: object, text: str, *, wrap: int = 450) -> object | None:
+        """Attach tooltip text without disturbing the backend container stack."""
+
+        if not item or not str(text or "").strip():
+            return None
+
+        dpg = self._dpg()
+        tooltip_id = None
+        try:
+            tooltip_id = dpg.add_tooltip(parent=item)
+            return dpg.add_text(str(text), parent=tooltip_id, wrap=max(1, int(wrap)))
+        except Exception:
+            try:
+                if tooltip_id and dpg.does_item_exist(tooltip_id):
+                    dpg.delete_item(tooltip_id)
+            except Exception:
+                pass
+            return None
 
 
 def get_default_renderer() -> ComponentRenderer:

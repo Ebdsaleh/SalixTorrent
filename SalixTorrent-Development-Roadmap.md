@@ -2,8 +2,8 @@
 
 **Current application version string:** `0.4.0`
 **Roadmap status:** active development planning
-**Current implementation checkpoint:** post-v0.4.0 reusable GUI components — three tranches committed/Windows-validated; structural-component tranche prepared
-**Current real Windows regression baseline:** 348 / 348 tests passing, with one expected non-Windows skip; next prepared tranche expects 354
+**Current implementation checkpoint:** post-v0.4.0 reusable GUI components — structural tranche accepted for commit; Create Torrent form/tooltip tranche implemented
+**Current real Windows regression baseline:** 354 / 354 at the last pushed GUI checkpoint, with one expected non-Windows skip; structural tranche targets 362 and the Create Torrent form/tooltip tranche targets 370
 
 This roadmap records intended engineering direction rather than promising dates or release numbers. Changes should remain incremental, testable, reviewable, and compatible with SalixTorrent's existing protocol, persistence, packaging, localization, and cross-platform boundaries.
 
@@ -549,7 +549,7 @@ A relational database is not automatically the right format for every durable ar
 
 ## Priority A — immediate
 
-**Continue the reusable GUI component layer after three committed and Windows-validated tranches.**
+**Continue the reusable GUI/RAD extraction through proven application forms and renderer-adjacent behavior.**
 
 First tranche — complete/pushed (`66b46fa7070128f13bc87fbe4f9556a86049e895`):
 
@@ -609,6 +609,22 @@ Fourth tranche — structural composition and attachment boundary:
 - [ ] run focused Windows component/localization validation;
 - [ ] run both full Windows discovery commands and account for the expected 354 -> 362 test-count increase;
 - [ ] visually confirm Preferences and `Configure targets...` retain their established structure and behavior.
+
+Fifth tranche — Create Torrent form composition and tooltip renderer boundary:
+
+- [x] add a backend-neutral `Tooltip` attachment that delegates backend tooltip creation through `ComponentRenderer`;
+- [x] centralize Dear PyGui tooltip creation/failure isolation in the renderer while preserving existing Help helper compatibility;
+- [x] add an application attachment adapter that turns SalixTorrent Help/Glossary terms into generic tooltip attachments;
+- [x] add reusable `ProgressBar` and backend-neutral `TextInput` label support;
+- [x] move Create Torrent panel/control dimensions into the application component profile;
+- [x] migrate the complete Create Torrent form onto `ControlColumn`, `ControlRow`, `SectionPanel`, primitive/value components and generic attachments;
+- [x] retain the existing raw item IDs consumed by background creation, state updates and `ResponsiveLayout`;
+- [x] preserve exact user-facing strings, torrent-generation choices, callbacks and torrent-creation semantics;
+- [x] add eight form/tooltip regressions (36 component tests total);
+- [x] regenerate deterministic localization extraction metadata with no canonical string changes;
+- [x] source-side component and focused localization/documentation validation;
+- [ ] run both real-Windows full discovery commands and account for the expected 362 -> 370 test-count increase;
+- [ ] visually/behaviorally smoke source selection, output selection, generation/piece-size/private/comment controls, tracker editor, progress controls, cancellation and Start Seeding visibility.
 
 ## Priority B — user-facing durability
 
@@ -677,6 +693,7 @@ Primitive controls
     TextInput
     NumericStepper
     CheckBox
+    ProgressBar
     Separator
     Spacer
         |
@@ -699,7 +716,8 @@ Field composition
 
 Cross-cutting component hooks
     post-build attachments
-        -> application-owned tooltip/accessibility/diagnostic semantics
+        -> Tooltip
+        -> application-owned Help/Glossary/accessibility/diagnostic semantics
 ```
 
 `ControlRow` is the generic single-row-capacity composition primitive: it accepts an arbitrary number of child components and resolves width, height and horizontal spacing independently through the existing framework property cascade. `AUTO` and `FILL` are semantic framework sizes; Dear PyGui-specific values are translated only inside the renderer bridge.
@@ -716,6 +734,8 @@ The third tranche introduces renderer-selected `ComponentLayoutProfile` policy. 
 
 The fourth tranche extends the reusable layer upward into structural composition without wrapping complex tables or telemetry views cosmetically. `SectionPanel` owns child-window/panel sizing, heading and separator structure; `Dialog` owns window/dialog construction and semantic profile sizing; `ControlRow` and `ControlColumn` support context-managed incremental migration where existing view logic still needs imperative construction. Preferences now uses those structural boundaries instead of direct Dear PyGui groups/child windows, and `Configure targets...` uses the reusable dialog boundary. The same tranche adds a generic post-build attachment hook so future tooltip/accessibility metadata can attach to components without embedding SalixTorrent-specific Help semantics in the framework.
 
+The fifth tranche proves those contracts on a complete ordinary form. Create Torrent now uses framework-owned rows, panels, value controls and profile dimensions throughout its construction path, including a reusable `ProgressBar`. Generic `Tooltip` attachments call the active renderer rather than Dear PyGui directly, while a SalixTorrent adapter converts glossary/help terms into tooltip text. Existing raw item IDs remain available to background creation callbacks and ResponsiveLayout, so the architectural migration does not rewrite torrent-creation behavior.
+
 Names such as `components`, `SectionPanel`, `Dialog`, and profile identifiers remain working extraction names. Final RAD-framework naming and public API terminology are deliberately deferred until the full reusable boundary has been extracted and proven.
 
 ### Possible v0.5.0 theme
@@ -724,11 +744,11 @@ Names such as `components`, `SectionPanel`, `Dialog`, and profile identifiers re
 Reusable GUI component foundation
 ```
 
-Candidate follow-up work after the structural tranche validates:
+Candidate follow-up work after the Create Torrent form tranche validates:
 
-- use the attachment boundary to centralize tooltip/accessibility attachment where it removes repeated view glue while keeping Help semantics application-owned;
-- migrate additional ordinary dialogs/forms only where the structural contract is reusable and proven;
-- introduce backend-neutral state/binding or lifecycle metadata only after real duplicated view logic demonstrates the need;
+- migrate only additional ordinary dialogs/forms where the current structural and attachment contracts remove real duplication;
+- evaluate a backend-neutral state/binding lifecycle contract using duplicated value-enable/show/update patterns from already migrated forms rather than designing it speculatively;
+- continue using application-owned adapters for Help/Glossary/accessibility semantics while keeping generic attachments product-neutral;
 - continue separating component model/state from the Dear PyGui renderer where that improves future RAD extraction;
 - avoid converting complex tables/graphs merely for cosmetic uniformity;
 - postpone the final framework naming/API pass until the full RAD extraction boundary is visible.

@@ -128,6 +128,7 @@ FRAMEWORK_COMPONENT_PROFILE = ComponentLayoutProfile(
         "checkbox": DEFAULT_CONTROL_LAYOUT,
         "spacer": DEFAULT_CONTROL_LAYOUT,
         "separator": DEFAULT_CONTROL_LAYOUT,
+        "progress_bar": DEFAULT_CONTROL_LAYOUT,
         "section_panel": DEFAULT_CONTROL_LAYOUT,
         "dialog": DEFAULT_CONTROL_LAYOUT,
         "control_row": DEFAULT_CONTROL_LAYOUT,

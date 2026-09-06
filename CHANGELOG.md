@@ -4,6 +4,16 @@ Notable SalixTorrent changes are recorded here.
 
 ## Unreleased
 
+### GUI Component/RAD Extraction — Create Torrent Form and Tooltip Boundary
+
+- Added a backend-neutral `Tooltip` component attachment and moved Dear PyGui tooltip creation/failure isolation behind the reusable component renderer contract.
+- Kept SalixTorrent Help/Glossary semantics application-owned through a small attachment adapter rather than embedding torrent terminology in generic controls.
+- Added a reusable `ProgressBar` value component and extended `TextInput` with backend-neutral label support needed by ordinary form migration.
+- Migrated the complete Create Torrent form onto `ControlColumn`, `ControlRow`, `SectionPanel`, primitive/value components and attachment adapters while preserving existing raw item IDs, callbacks, background creation behavior and responsive tracker-panel resizing.
+- Centralized Create Torrent panel/control dimensions in the application component profile instead of keeping Dear PyGui width/height literals in view construction.
+- Kept canonical UI/Help/Glossary wording unchanged; only deterministic localization extraction locations/manifests move with the refactor.
+- Added eight component/form/tooltip regressions, increasing the component suite from 28 to 36 and the expected real-Windows full-suite total from 362 to 370 after the structural tranche is accepted.
+
 ### Reusable GUI Component Foundation
 
 - Added a framework-owned component package under `app/engine/components/` with backend-neutral primitive controls, semantic layout sizing, a Dear PyGui renderer bridge, and value/configuration helpers.

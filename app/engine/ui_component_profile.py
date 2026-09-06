@@ -41,6 +41,17 @@ SALIXTORRENT_COMPONENT_PROFILE = ComponentLayoutProfile(
         "settings.ui_text_size": ControlLayoutDefaults(width=180),
         "settings.documentation_scale": ControlLayoutDefaults(width=190),
         "settings.transfer_rate_display": ControlLayoutDefaults(width=105),
+        # Create Torrent form structure and controls.
+        "create_torrent.source_panel": ControlLayoutDefaults(width=FILL, height=155),
+        "create_torrent.output_panel": ControlLayoutDefaults(width=FILL, height=190),
+        "create_torrent.trackers_panel": ControlLayoutDefaults(width=FILL, height=175),
+        "create_torrent.progress_panel": ControlLayoutDefaults(width=FILL, height=145),
+        "create_torrent.section_gap": ControlLayoutDefaults(height=8),
+        "create_torrent.generation": ControlLayoutDefaults(width=235),
+        "create_torrent.piece_size": ControlLayoutDefaults(width=130),
+        "create_torrent.comment": ControlLayoutDefaults(width=FILL),
+        "create_torrent.trackers_input": ControlLayoutDefaults(width=FILL, height=105),
+        "create_torrent.progress_bar": ControlLayoutDefaults(width=FILL, height=22),
         # Torrent Properties / Configure targets.
         "configure_targets.dialog": ControlLayoutDefaults(width=620, height=365),
         "torrent_properties.seeding_goal": ControlLayoutDefaults(width=230),

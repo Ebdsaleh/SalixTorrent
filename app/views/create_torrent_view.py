@@ -12,7 +12,20 @@ import dearpygui.dearpygui as dpg
 
 from app.localization import canonical_choice, localized_choices, tr, tr_value
 
+from app.engine.components import (
+    Button,
+    CheckBox,
+    ComboBox,
+    ControlColumn,
+    ControlRow,
+    Label,
+    ProgressBar,
+    SectionPanel,
+    Spacer,
+    TextInput,
+)
 from app.engine.responsive_layout import ResponsiveLayout, clamp
+from app.engine.ui_component_attachments import help_tooltip, text_tooltip
 from app.logic.torrent_creator import (
     TORRENT_GENERATION_HYBRID,
     TORRENT_GENERATIONS,
@@ -22,7 +35,6 @@ from app.logic.torrent_creator import (
 )
 from app.logic.torrent_file import FALLBACK_TRACKERS
 from app.logic.torrent_manager import TorrentManager
-from app.views.help_terms import add_help_tooltip, add_text_tooltip
 
 
 class CreateTorrentView:
@@ -58,143 +70,209 @@ class CreateTorrentView:
         return root
 
     def build_view(self, parent_tag: str | int = "primary_window"):
-        with dpg.group(parent=parent_tag):
-            create_heading = dpg.add_text(tr('view.create_torrent_view.create_torrent', "CREATE TORRENT"), color=(0, 255, 128))
-            add_help_tooltip(create_heading, "CREATE_TORRENT")
-            self.create_intro = dpg.add_text(
-                tr('view.create_torrent_view.create_a_bittorrent_v1_v2_or_hybrid', "Create a BitTorrent v1, v2, or hybrid .torrent from a file, archive, or folder."),
-                color=(170, 170, 170),
-            )
-            add_help_tooltip(self.create_intro, "CREATE_TORRENT")
-            dpg.add_spacer(height=8)
+        self.create_root = ControlColumn()
+        with self.create_root.context(parent=parent_tag):
+            self.create_heading_component = Label(
+                tr('view.create_torrent_view.create_torrent', "CREATE TORRENT"),
+                color=(0, 255, 128),
+            ).attach(help_tooltip("CREATE_TORRENT"))
+            self.create_heading = self.create_heading_component.build()
 
-            with dpg.child_window(height=155, width=-1, border=True) as self.source_panel:
-                dpg.add_text(tr('view.create_torrent_view.source', "SOURCE"), color=(100, 180, 255))
-                dpg.add_separator()
-                with dpg.group(horizontal=True):
-                    self.select_file_button = dpg.add_button(
-                        label=tr('view.create_torrent_view.select_file_archive', " Select File / Archive "),
+            self.create_intro_component = Label(
+                tr(
+                    'view.create_torrent_view.create_a_bittorrent_v1_v2_or_hybrid',
+                    "Create a BitTorrent v1, v2, or hybrid .torrent from a file, archive, or folder.",
+                ),
+                color=(170, 170, 170),
+            ).attach(help_tooltip("CREATE_TORRENT"))
+            self.create_intro = self.create_intro_component.build()
+            Spacer(profile_key="create_torrent.section_gap").build()
+
+            self.source_section = SectionPanel(
+                tr('view.create_torrent_view.source', "SOURCE"),
+                heading_color=(100, 180, 255),
+                profile_key="create_torrent.source_panel",
+            )
+            with self.source_section.context() as self.source_panel:
+                self.source_action_row = ControlRow()
+                with self.source_action_row.context():
+                    self.select_file_component = Button(
+                        tr('view.create_torrent_view.select_file_archive', " Select File / Archive "),
                         callback=self._select_file_source,
-                    )
-                    add_help_tooltip(self.select_file_button, "TORRENT_SOURCE_FILE")
-                    self.select_folder_button = dpg.add_button(
-                        label=tr('view.create_torrent_view.select_folder', " Select Folder "),
+                    ).attach(help_tooltip("TORRENT_SOURCE_FILE"))
+                    self.select_file_button = self.select_file_component.build()
+
+                    self.select_folder_component = Button(
+                        tr('view.create_torrent_view.select_folder', " Select Folder "),
                         callback=self._select_folder_source,
+                    ).attach(help_tooltip("TORRENT_SOURCE_FOLDER"))
+                    self.select_folder_button = self.select_folder_component.build()
+
+                self.source_text_component = Label(
+                    tr('view.create_torrent_view.no_source_selected', "No source selected"),
+                    wrap=1000,
+                ).attach(text_tooltip(
+                    tr(
+                        'view.create_torrent_view.selected_source_path_this_is_the_file',
+                        "Selected source path\n\nThis is the file or folder whose bytes will be hashed into the new torrent. Torrent creation reads this source; it does not modify or move it.",
                     )
-                    add_help_tooltip(self.select_folder_button, "TORRENT_SOURCE_FOLDER")
-                self.source_text = dpg.add_text(tr('view.create_torrent_view.no_source_selected', "No source selected"), wrap=1000)
-                add_text_tooltip(
-                    self.source_text,
-                    tr('view.create_torrent_view.selected_source_path_this_is_the_file', "Selected source path\n\nThis is the file or folder whose bytes will be hashed into the new torrent. Torrent creation reads this source; it does not modify or move it."),
-                )
-                self.source_summary = dpg.add_text(
-                    tr('view.create_torrent_view.files_such_as_zip_7z_and_iso', "Files such as .zip, .7z and .iso are normal single-file torrents."),
+                ))
+                self.source_text = self.source_text_component.build()
+
+                self.source_summary_component = Label(
+                    tr(
+                        'view.create_torrent_view.files_such_as_zip_7z_and_iso',
+                        "Files such as .zip, .7z and .iso are normal single-file torrents.",
+                    ),
                     color=(160, 160, 160),
                     wrap=1000,
-                )
-                add_text_tooltip(self.source_summary, tr('view.create_torrent_view.source_summary_describes_whether_the_current_source', "Source summary\n\nDescribes whether the current source will become a single-file or multi-file torrent and, when known, its payload size. The source itself remains untouched during torrent creation."))
+                ).attach(text_tooltip(
+                    tr(
+                        'view.create_torrent_view.source_summary_describes_whether_the_current_source',
+                        "Source summary\n\nDescribes whether the current source will become a single-file or multi-file torrent and, when known, its payload size. The source itself remains untouched during torrent creation.",
+                    )
+                ))
+                self.source_summary = self.source_summary_component.build()
 
-            dpg.add_spacer(height=8)
+            Spacer(profile_key="create_torrent.section_gap").build()
 
-            with dpg.child_window(height=190, width=-1, border=True) as self.output_panel:
-                dpg.add_text(tr('view.create_torrent_view.output', "OUTPUT"), color=(100, 180, 255))
-                dpg.add_separator()
-                with dpg.group(horizontal=True):
-                    self.choose_output_button = dpg.add_button(
-                        label=tr('view.create_torrent_view.choose_save_location', " Choose Save Location "),
+            self.output_section = SectionPanel(
+                tr('view.create_torrent_view.output', "OUTPUT"),
+                heading_color=(100, 180, 255),
+                profile_key="create_torrent.output_panel",
+            )
+            with self.output_section.context() as self.output_panel:
+                self.output_action_row = ControlRow()
+                with self.output_action_row.context():
+                    self.choose_output_component = Button(
+                        tr('view.create_torrent_view.choose_save_location', " Choose Save Location "),
                         callback=self._choose_output,
-                    )
-                    add_help_tooltip(self.choose_output_button, "TORRENT_OUTPUT")
-                    self.output_text = dpg.add_text(tr('view.create_torrent_view.no_output_selected', "No output selected"), wrap=830)
-                    add_help_tooltip(self.output_text, "TORRENT_OUTPUT")
+                    ).attach(help_tooltip("TORRENT_OUTPUT"))
+                    self.choose_output_button = self.choose_output_component.build()
 
-                with dpg.group(horizontal=True):
-                    generation_label = dpg.add_text(tr('view.create_torrent_view.torrent_generation', "Torrent Generation"))
-                    add_help_tooltip(generation_label, "TORRENT_GENERATION")
-                    self.generation_combo = dpg.add_combo(
-                        items=localized_choices(TORRENT_GENERATIONS),
+                    self.output_text_component = Label(
+                        tr('view.create_torrent_view.no_output_selected', "No output selected"),
+                        wrap=830,
+                    ).attach(help_tooltip("TORRENT_OUTPUT"))
+                    self.output_text = self.output_text_component.build()
+
+                self.generation_row = ControlRow()
+                with self.generation_row.context():
+                    self.generation_label_component = Label(
+                        tr('view.create_torrent_view.torrent_generation', "Torrent Generation")
+                    ).attach(help_tooltip("TORRENT_GENERATION"))
+                    self.generation_label = self.generation_label_component.build()
+                    self.generation_component = ComboBox(
+                        localized_choices(TORRENT_GENERATIONS),
                         default_value=tr_value(TORRENT_GENERATION_HYBRID),
-                        width=235,
-                    )
-                    add_help_tooltip(self.generation_combo, "TORRENT_GENERATION")
+                        profile_key="create_torrent.generation",
+                    ).attach(help_tooltip("TORRENT_GENERATION"))
+                    self.generation_combo = self.generation_component.build()
 
-                with dpg.group(horizontal=True):
-                    piece_size_label = dpg.add_text(tr('view.create_torrent_view.piece_size', "Piece Size"))
-                    add_help_tooltip(piece_size_label, "PIECE_SIZE")
-                    self.piece_size_combo = dpg.add_combo(
-                        items=[tr_value("Auto"), *[label for label in self.PIECE_SIZE_OPTIONS if label != "Auto"]],
+                self.piece_size_row = ControlRow()
+                with self.piece_size_row.context():
+                    self.piece_size_label_component = Label(
+                        tr('view.create_torrent_view.piece_size', "Piece Size")
+                    ).attach(help_tooltip("PIECE_SIZE"))
+                    self.piece_size_label = self.piece_size_label_component.build()
+                    self.piece_size_component = ComboBox(
+                        [tr_value("Auto"), *[label for label in self.PIECE_SIZE_OPTIONS if label != "Auto"]],
                         default_value=tr_value("Auto"),
-                        width=130,
-                    )
-                    add_help_tooltip(self.piece_size_combo, "PIECE_SIZE")
-                    self.private_checkbox = dpg.add_checkbox(
-                        label=tr('view.create_torrent_view.private_torrent', "Private torrent"),
+                        profile_key="create_torrent.piece_size",
+                    ).attach(help_tooltip("PIECE_SIZE"))
+                    self.piece_size_combo = self.piece_size_component.build()
+                    self.private_component = CheckBox(
+                        tr('view.create_torrent_view.private_torrent', "Private torrent"),
                         default_value=False,
-                    )
-                    add_help_tooltip(self.private_checkbox, "PRIVATE_TORRENT")
+                    ).attach(help_tooltip("PRIVATE_TORRENT"))
+                    self.private_checkbox = self.private_component.build()
 
-                self.comment_input = dpg.add_input_text(
+                self.comment_component = TextInput(
                     label=tr('view.create_torrent_view.comment', "Comment"),
-                    hint=tr('view.create_torrent_view.optional_comment_stored_in_the_torrent_metadata', "Optional comment stored in the .torrent metadata"),
-                    width=-1,
-                )
-                add_help_tooltip(self.comment_input, "TORRENT_COMMENT")
+                    hint=tr(
+                        'view.create_torrent_view.optional_comment_stored_in_the_torrent_metadata',
+                        "Optional comment stored in the .torrent metadata",
+                    ),
+                    profile_key="create_torrent.comment",
+                ).attach(help_tooltip("TORRENT_COMMENT"))
+                self.comment_input = self.comment_component.build()
 
-            dpg.add_spacer(height=8)
+            Spacer(profile_key="create_torrent.section_gap").build()
 
-            with dpg.child_window(height=175, width=-1, border=True) as self.trackers_panel:
-                dpg.add_text(tr('view.create_torrent_view.trackers', "TRACKERS"), color=(255, 200, 100))
-                trackers_note = dpg.add_text(
-                    tr('view.create_torrent_view.one_tracker_url_per_line_blank_lines', "One tracker URL per line. Blank lines and lines beginning with # are ignored."),
+            self.trackers_section = SectionPanel(
+                tr('view.create_torrent_view.trackers', "TRACKERS"),
+                heading_color=(255, 200, 100),
+                separated=False,
+                profile_key="create_torrent.trackers_panel",
+            )
+            with self.trackers_section.context() as self.trackers_panel:
+                self.trackers_note_component = Label(
+                    tr(
+                        'view.create_torrent_view.one_tracker_url_per_line_blank_lines',
+                        "One tracker URL per line. Blank lines and lines beginning with # are ignored.",
+                    ),
                     color=(160, 160, 160),
-                )
-                add_help_tooltip(trackers_note, "TRACKER_LIST")
-                self.trackers_input = dpg.add_input_text(
+                ).attach(help_tooltip("TRACKER_LIST"))
+                self.trackers_note = self.trackers_note_component.build()
+
+                self.trackers_component = TextInput(
                     multiline=True,
-                    width=-1,
-                    height=105,
                     default_value="\n".join(FALLBACK_TRACKERS),
-                )
-                add_help_tooltip(self.trackers_input, "TRACKER_LIST")
+                    profile_key="create_torrent.trackers_input",
+                ).attach(help_tooltip("TRACKER_LIST"))
+                self.trackers_input = self.trackers_component.build()
 
-            dpg.add_spacer(height=8)
+            Spacer(profile_key="create_torrent.section_gap").build()
 
-            with dpg.child_window(height=145, width=-1, border=True) as self.creation_progress_panel:
-                dpg.add_text(tr('view.create_torrent_view.creation_progress', "CREATION PROGRESS"), color=(180, 160, 255))
-                dpg.add_separator()
-                self.progress_bar = dpg.add_progress_bar(
+            self.creation_progress_section = SectionPanel(
+                tr('view.create_torrent_view.creation_progress', "CREATION PROGRESS"),
+                heading_color=(180, 160, 255),
+                profile_key="create_torrent.progress_panel",
+            )
+            with self.creation_progress_section.context() as self.creation_progress_panel:
+                self.progress_component = ProgressBar(
                     default_value=0.0,
-                    width=-1,
-                    height=22,
-                )
-                add_help_tooltip(self.progress_bar, "CREATION_PROGRESS")
-                self.status_text = dpg.add_text(tr('view.create_torrent_view.ready', "Ready"))
-                add_help_tooltip(self.status_text, "CREATION_PROGRESS")
-                self.detail_text = dpg.add_text("", wrap=1000)
-                add_help_tooltip(self.detail_text, "CREATION_PROGRESS")
+                    profile_key="create_torrent.progress_bar",
+                ).attach(help_tooltip("CREATION_PROGRESS"))
+                self.progress_bar = self.progress_component.build()
 
-                with dpg.group(horizontal=True):
-                    self.create_button = dpg.add_button(
-                        label=tr('view.create_torrent_view.create_torrent_da3ef520', " Create Torrent "),
+                self.status_component = Label(
+                    tr('view.create_torrent_view.ready', "Ready")
+                ).attach(help_tooltip("CREATION_PROGRESS"))
+                self.status_text = self.status_component.build()
+
+                self.detail_component = Label("", wrap=1000).attach(
+                    help_tooltip("CREATION_PROGRESS")
+                )
+                self.detail_text = self.detail_component.build()
+
+                self.creation_action_row = ControlRow()
+                with self.creation_action_row.context():
+                    self.create_component = Button(
+                        tr('view.create_torrent_view.create_torrent_da3ef520', " Create Torrent "),
                         callback=self._start_creation,
-                    )
-                    add_help_tooltip(self.create_button, "CREATE_TORRENT")
-                    self.cancel_button = dpg.add_button(
-                        label=tr('view.create_torrent_view.cancel', " Cancel "),
+                    ).attach(help_tooltip("CREATE_TORRENT"))
+                    self.create_button = self.create_component.build()
+
+                    self.cancel_component = Button(
+                        tr('view.create_torrent_view.cancel', " Cancel "),
                         callback=self._cancel_creation,
                         enabled=False,
-                    )
-                    add_text_tooltip(
-                        self.cancel_button,
-                        tr('view.create_torrent_view.cancel_torrent_creation_requests_cancellation_of_the', "Cancel torrent creation\n\nRequests cancellation of the background hashing job. SalixTorrent does not replace the chosen output with a half-written .torrent file."),
-                    )
-                    self.start_seeding_button = dpg.add_button(
-                        label=tr('view.create_torrent_view.start_seeding', " Start Seeding "),
+                    ).attach(text_tooltip(
+                        tr(
+                            'view.create_torrent_view.cancel_torrent_creation_requests_cancellation_of_the',
+                            "Cancel torrent creation\n\nRequests cancellation of the background hashing job. SalixTorrent does not replace the chosen output with a half-written .torrent file.",
+                        )
+                    ))
+                    self.cancel_button = self.cancel_component.build()
+
+                    self.start_seeding_component = Button(
+                        tr('view.create_torrent_view.start_seeding', " Start Seeding "),
                         callback=self._start_seeding_created_torrent,
                         enabled=False,
                         show=False,
-                    )
-                    add_help_tooltip(self.start_seeding_button, "START_SEEDING")
+                    ).attach(help_tooltip("START_SEEDING"))
+                    self.start_seeding_button = self.start_seeding_component.build()
 
         self._layout_root = parent_tag
         self.layout.watch_item(

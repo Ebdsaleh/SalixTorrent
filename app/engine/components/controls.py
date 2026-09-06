@@ -136,6 +136,7 @@ class TextInput(ValueComponent):
     def __init__(
         self,
         *,
+        label: str | None = None,
         default_value: str = "",
         hint: str | None = None,
         multiline: bool = False,
@@ -149,6 +150,7 @@ class TextInput(ValueComponent):
         profile_key: str | None = None,
     ):
         super().__init__(theme=theme, layout=layout, profile_key=profile_key)
+        self.label = None if label is None else str(label)
         self.default_value = str(default_value)
         self.hint = hint
         self.multiline = bool(multiline)
@@ -163,6 +165,7 @@ class TextInput(ValueComponent):
         resolved = self._resolve_layout(renderer=renderer)
         kwargs = self._layout_kwargs(resolved)
         kwargs.update(
+            label=self.label,
             default_value=self.default_value,
             hint=self.hint,
             multiline=self.multiline,
@@ -239,6 +242,39 @@ class NumericStepper(ValueComponent):
         self._with_parent(kwargs, parent)
         kind = "numeric_int" if self.kind is NumericKind.INTEGER else "numeric_float"
         return self._bind(renderer, renderer.create(kind, **kwargs))
+
+
+class ProgressBar(ValueComponent):
+    """Backend-neutral progress indicator with a normalized numeric value."""
+
+    profile_key = "progress_bar"
+
+    def __init__(
+        self,
+        *,
+        default_value: float = 0.0,
+        overlay: str | None = None,
+        show: bool = True,
+        theme: ControlLayoutTheme | None = None,
+        layout: ControlLayout | None = None,
+        profile_key: str | None = None,
+    ):
+        super().__init__(theme=theme, layout=layout, profile_key=profile_key)
+        self.default_value = float(default_value)
+        self.overlay = overlay
+        self.show = bool(show)
+
+    def build(self, *, renderer=None, parent=None) -> object:
+        renderer = renderer or get_default_renderer()
+        resolved = self._resolve_layout(renderer=renderer)
+        kwargs = self._layout_kwargs(resolved)
+        kwargs.update(
+            default_value=self.default_value,
+            overlay=self.overlay,
+            show=self.show,
+        )
+        self._with_parent(kwargs, parent)
+        return self._bind(renderer, renderer.create("progress_bar", **kwargs))
 
 
 class CheckBox(ValueComponent):

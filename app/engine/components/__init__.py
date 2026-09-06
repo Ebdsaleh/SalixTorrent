@@ -10,6 +10,7 @@ from app.engine.components.layout import (
     ResolvedControlLayout,
     resolve_control_layout,
 )
+from app.engine.components.attachments import Tooltip
 from app.engine.components.profile import (
     ComponentLayoutProfile,
     FRAMEWORK_COMPONENT_PROFILE,
@@ -21,6 +22,7 @@ from app.engine.components.controls import (
     Label,
     NumericKind,
     NumericStepper,
+    ProgressBar,
     Separator,
     Spacer,
     TextInput,
@@ -70,12 +72,14 @@ __all__ = [
     "LabeledNumericField",
     "NumericKind",
     "NumericStepper",
+    "ProgressBar",
     "NumericUnitField",
     "ResolvedControlLayout",
     "SectionPanel",
     "Separator",
     "Spacer",
     "TextInput",
+    "Tooltip",
     "get_default_renderer",
     "resolve_control_layout",
 ]

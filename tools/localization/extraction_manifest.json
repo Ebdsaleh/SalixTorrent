@@ -3468,7 +3468,7 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 399,
+              "line": 477,
               "column": 17,
               "kind": "python-tr"
             }
@@ -3482,13 +3482,13 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 264,
+              "line": 342,
               "column": 29,
               "kind": "python-tr"
             },
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 292,
+              "line": 370,
               "column": 107,
               "kind": "python-tr"
             }
@@ -3502,8 +3502,8 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 183,
-              "column": 31,
+              "line": 258,
+              "column": 25,
               "kind": "python-tr"
             }
           ]
@@ -3516,7 +3516,7 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 189,
+              "line": 262,
               "column": 25,
               "kind": "python-tr"
             }
@@ -3530,7 +3530,7 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 420,
+              "line": 498,
               "column": 45,
               "kind": "python-tr"
             }
@@ -3544,8 +3544,8 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 104,
-              "column": 31,
+              "line": 148,
+              "column": 25,
               "kind": "python-tr"
             }
           ]
@@ -3558,7 +3558,7 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 334,
+              "line": 412,
               "column": 45,
               "kind": "python-tr"
             }
@@ -3572,7 +3572,7 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 137,
+              "line": 191,
               "column": 27,
               "kind": "python-tr"
             }
@@ -3586,7 +3586,7 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 414,
+              "line": 492,
               "column": 45,
               "kind": "python-tr"
             }
@@ -3600,7 +3600,7 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 65,
+              "line": 82,
               "column": 17,
               "kind": "python-tr"
             }
@@ -3614,8 +3614,8 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 62,
-              "column": 43,
+              "line": 76,
+              "column": 17,
               "kind": "python-tr"
             }
           ]
@@ -3628,8 +3628,8 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 178,
-              "column": 31,
+              "line": 252,
+              "column": 25,
               "kind": "python-tr"
             }
           ]
@@ -3642,7 +3642,7 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 489,
+              "line": 567,
               "column": 49,
               "kind": "python-tr"
             }
@@ -3656,7 +3656,7 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 494,
+              "line": 572,
               "column": 49,
               "kind": "python-tr"
             }
@@ -3670,8 +3670,8 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 163,
-              "column": 30,
+              "line": 228,
+              "column": 17,
               "kind": "python-tr"
             }
           ]
@@ -3688,7 +3688,7 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 439,
+              "line": 517,
               "column": 23,
               "kind": "python-tr"
             }
@@ -3702,7 +3702,7 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 91,
+              "line": 123,
               "column": 21,
               "kind": "python-tr"
             }
@@ -3716,7 +3716,7 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 244,
+              "line": 322,
               "column": 17,
               "kind": "python-tr"
             }
@@ -3734,7 +3734,7 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 435,
+              "line": 513,
               "column": 17,
               "kind": "python-tr"
             }
@@ -3748,8 +3748,8 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 108,
-              "column": 53,
+              "line": 154,
+              "column": 25,
               "kind": "python-tr"
             }
           ]
@@ -3762,8 +3762,8 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 85,
-              "column": 49,
+              "line": 112,
+              "column": 21,
               "kind": "python-tr"
             }
           ]
@@ -3776,7 +3776,7 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 490,
+              "line": 568,
               "column": 49,
               "kind": "python-tr"
             }
@@ -3790,7 +3790,7 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 148,
+              "line": 210,
               "column": 21,
               "kind": "python-tr"
             }
@@ -3804,7 +3804,7 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 138,
+              "line": 192,
               "column": 26,
               "kind": "python-tr"
             }
@@ -3818,8 +3818,8 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 100,
-              "column": 30,
+              "line": 140,
+              "column": 17,
               "kind": "python-tr"
             }
           ]
@@ -3832,8 +3832,8 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 122,
-              "column": 53,
+              "line": 175,
+              "column": 25,
               "kind": "python-tr"
             }
           ]
@@ -3846,8 +3846,8 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 131,
-              "column": 31,
+              "line": 185,
+              "column": 25,
               "kind": "python-tr"
             }
           ]
@@ -3860,14 +3860,14 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 255,
+              "line": 333,
               "column": 41,
               "kind": "python-tr"
             },
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 171,
-              "column": 49,
+              "line": 240,
+              "column": 21,
               "kind": "python-tr"
             }
           ]
@@ -3880,7 +3880,7 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 288,
+              "line": 366,
               "column": 23,
               "kind": "python-tr"
             }
@@ -3894,7 +3894,7 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 330,
+              "line": 408,
               "column": 45,
               "kind": "python-tr"
             }
@@ -3908,8 +3908,8 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 76,
-              "column": 31,
+              "line": 100,
+              "column": 25,
               "kind": "python-tr"
             }
           ]
@@ -3922,7 +3922,7 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 263,
+              "line": 341,
               "column": 23,
               "kind": "python-tr"
             }
@@ -3936,8 +3936,8 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 81,
-              "column": 31,
+              "line": 106,
+              "column": 25,
               "kind": "python-tr"
             }
           ]
@@ -3950,7 +3950,7 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 274,
+              "line": 352,
               "column": 23,
               "kind": "python-tr"
             }
@@ -3964,7 +3964,7 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 88,
+              "line": 115,
               "column": 21,
               "kind": "python-tr"
             }
@@ -3982,7 +3982,7 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 238,
+              "line": 316,
               "column": 17,
               "kind": "python-tr"
             }
@@ -3996,8 +3996,8 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 72,
-              "column": 30,
+              "line": 92,
+              "column": 17,
               "kind": "python-tr"
             }
           ]
@@ -4014,7 +4014,7 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 404,
+              "line": 482,
               "column": 21,
               "kind": "python-tr"
             }
@@ -4028,8 +4028,8 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 95,
-              "column": 55,
+              "line": 130,
+              "column": 21,
               "kind": "python-tr"
             }
           ]
@@ -4042,8 +4042,8 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 192,
-              "column": 31,
+              "line": 270,
+              "column": 25,
               "kind": "python-tr"
             }
           ]
@@ -4056,7 +4056,7 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 352,
+              "line": 430,
               "column": 41,
               "kind": "python-tr"
             }
@@ -4074,7 +4074,7 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 471,
+              "line": 549,
               "column": 21,
               "kind": "python-tr"
             }
@@ -4088,7 +4088,7 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 468,
+              "line": 546,
               "column": 49,
               "kind": "python-tr"
             }
@@ -4102,7 +4102,7 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 292,
+              "line": 370,
               "column": 29,
               "kind": "python-tr"
             }
@@ -4116,8 +4116,8 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 112,
-              "column": 53,
+              "line": 162,
+              "column": 25,
               "kind": "python-tr"
             }
           ]
@@ -4130,8 +4130,8 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 146,
-              "column": 30,
+              "line": 203,
+              "column": 17,
               "kind": "python-tr"
             }
           ]
@@ -4154,7 +4154,7 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 443,
+              "line": 521,
               "column": 21,
               "kind": "python-tr"
             }
@@ -4190,7 +4190,7 @@
           "occurrences": [
             {
               "path": "app/views/create_torrent_view.py",
-              "line": 478,
+              "line": 556,
               "column": 25,
               "kind": "python-tr"
             }
@@ -20292,13 +20292,13 @@
       "view.create_torrent_view.all_files": [
         {
           "path": "app/views/create_torrent_view.py",
-          "line": 264,
+          "line": 342,
           "column": 29,
           "kind": "python-tr"
         },
         {
           "path": "app/views/create_torrent_view.py",
-          "line": 292,
+          "line": 370,
           "column": 107,
           "kind": "python-tr"
         }
@@ -20306,14 +20306,14 @@
       "view.create_torrent_view.ready": [
         {
           "path": "app/views/create_torrent_view.py",
-          "line": 255,
+          "line": 333,
           "column": 41,
           "kind": "python-tr"
         },
         {
           "path": "app/views/create_torrent_view.py",
-          "line": 171,
-          "column": 49,
+          "line": 240,
+          "column": 21,
           "kind": "python-tr"
         }
       ],
