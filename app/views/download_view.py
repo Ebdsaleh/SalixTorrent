@@ -32,7 +32,6 @@ from app.logic.transfer_add import TransferAddRequest
 from app.engine.desktop_integration import DesktopIntegration
 from app.engine.components import (
     ComboBox,
-    ControlLayout,
     ControlRow,
     DurationEditor,
     Label,
@@ -661,7 +660,7 @@ class DownloadView:
             self.properties_seeding_goal_control = ComboBox(
                 localized_choices(SEEDING_GOAL_MODES),
                 default_value=tr_value(SEEDING_GOAL_FOREVER),
-                layout=ControlLayout(width=230),
+                profile_key="torrent_properties.seeding_goal",
             )
             ratio_target_label_control = Label(
                 tr('view.download_view.ratio_target', "Ratio target")
@@ -674,7 +673,7 @@ class DownloadView:
                 min_clamped=True,
                 max_clamped=True,
                 format="%.2f",
-                layout=ControlLayout(width=110),
+                profile_key="torrent_properties.seeding_ratio",
             )
             time_target_label_control = Label(
                 tr('view.download_view.time_target', "Time target")
@@ -687,7 +686,7 @@ class DownloadView:
                 max_value=365,
                 min_clamped=True,
                 max_clamped=True,
-                layout=ControlLayout(width=58),
+                profile_key="torrent_properties.seeding_time_part",
             )
             properties_hours_label = Label(tr('view.download_view.hours', "Hours"))
             self.properties_seeding_hours_control = NumericStepper(
@@ -697,7 +696,7 @@ class DownloadView:
                 max_value=23,
                 min_clamped=True,
                 max_clamped=True,
-                layout=ControlLayout(width=58),
+                profile_key="torrent_properties.seeding_time_part",
             )
             properties_minutes_label = Label(tr('view.download_view.minutes', "Minutes"))
             self.properties_seeding_minutes_control = NumericStepper(
@@ -707,7 +706,7 @@ class DownloadView:
                 max_value=59,
                 min_clamped=True,
                 max_clamped=True,
-                layout=ControlLayout(width=58),
+                profile_key="torrent_properties.seeding_time_part",
             )
             self.properties_seeding_goal_row = ControlRow(
                 (
@@ -779,7 +778,7 @@ class DownloadView:
                 tr('view.download_view.goal_mode', "Goal mode"),
                 localized_choices(SEEDING_GOAL_MODES),
                 default_value=tr_value(SEEDING_GOAL_FOREVER),
-                control_width=250,
+                control_profile_key="configure_targets.seeding_goal",
             )
             self.seeding_goal_mode_field.build()
             self.seeding_goal_modal_combo = self.seeding_goal_mode_field.control.require_item()
@@ -793,7 +792,7 @@ class DownloadView:
                 min_clamped=True,
                 max_clamped=True,
                 format="%.2f",
-                control_width=120,
+                control_profile_key="configure_targets.seeding_ratio",
             )
             self.seeding_goal_ratio_field.build()
             self.seeding_goal_modal_ratio = self.seeding_goal_ratio_field.control.require_item()
@@ -813,10 +812,9 @@ class DownloadView:
                 days=0,
                 hours=1,
                 minutes=0,
-                input_width=130,
-                grid_width=280,
-                label_column_width=90,
-                control_column_width=170,
+                input_profile_key="configure_targets.duration.input",
+                grid_profile_key="configure_targets.duration.grid",
+                columns_profile_key="configure_targets.duration.columns",
             )
             self.seeding_goal_duration_editor.build()
             add_help_tooltip(self.seeding_goal_duration_editor.heading.require_item(), "SEEDING_TIME")

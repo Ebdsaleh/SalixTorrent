@@ -12,7 +12,6 @@ from app.engine.components import (
     Button,
     CheckBox,
     ComboBox,
-    ControlLayout,
     ControlRow,
     DurationEditor,
     Label,
@@ -110,7 +109,7 @@ class SettingsView:
                     tr("settings.default_download_directory", "Default download directory"),
                     TextInput(
                         default_value=self.settings["download_dir"],
-                        layout=ControlLayout(width=700),
+                        profile_key="settings.download_path",
                     ),
                     accessories=(
                         Button(
@@ -140,7 +139,7 @@ class SettingsView:
                             max_value=65535,
                             min_clamped=True,
                             max_clamped=True,
-                            layout=ControlLayout(width=100),
+                            profile_key="settings.listen_port",
                         ),
                         accessories=(
                             Label(
@@ -162,7 +161,7 @@ class SettingsView:
                         default_value=tr_value(self.settings.get(
                             "torrent_protocol_policy", TORRENT_PROTOCOL_AUTO
                         )),
-                        control_width=220,
+                        control_profile_key="settings.protocol",
                     )
                     self.torrent_protocol_field.build()
                     self.torrent_protocol_combo = self.torrent_protocol_field.control.require_item()
@@ -177,7 +176,7 @@ class SettingsView:
                         max_value=500,
                         min_clamped=True,
                         max_clamped=True,
-                        control_width=90,
+                        control_profile_key="settings.max_peers",
                     )
                     self.max_peers_field.build()
                     self.max_peers_input = self.max_peers_field.control.require_item()
@@ -268,7 +267,7 @@ class SettingsView:
                     tr('view.settings_view.peer_transport_encryption', "Peer transport encryption"),
                     localized_choices(PEER_ENCRYPTION_POLICIES),
                     default_value=tr_value(self.settings.get("peer_encryption", "Prefer Encryption")),
-                    control_width=190,
+                    control_profile_key="settings.peer_encryption",
                 )
                 self.peer_encryption_field.build()
                 self.peer_encryption_combo = self.peer_encryption_field.control.require_item()
@@ -283,7 +282,7 @@ class SettingsView:
                     ComboBox(
                         bind_options,
                         default_value=selected_bind_option,
-                        layout=ControlLayout(width=430),
+                        profile_key="settings.network_interface",
                     ),
                     accessories=(
                         Button(
@@ -332,7 +331,7 @@ class SettingsView:
                             default_value=int(self.settings["max_active_downloads"]),
                             min_value=0,
                             min_clamped=True,
-                            layout=ControlLayout(width=90),
+                            profile_key="settings.active_slots",
                         ),
                         accessories=(
                             Label(
@@ -352,7 +351,7 @@ class SettingsView:
                         tr('view.settings_view.default_queue_priority', "Default queue priority"),
                         localized_choices(("High", "Normal", "Low")),
                         default_value=tr_value(self.settings["default_queue_priority"]),
-                        control_width=130,
+                        control_profile_key="settings.queue_priority",
                     )
                     self.default_priority_field.build()
                     self.default_priority_combo = self.default_priority_field.control.require_item()
@@ -382,8 +381,8 @@ class SettingsView:
                         min_value=0.0,
                         min_clamped=True,
                         format="%.2f",
-                        value_width=110,
-                        unit_width=90,
+                        value_profile_key="settings.bandwidth.value",
+                        unit_profile_key="settings.bandwidth.unit",
                     )
                     self.global_download_limit_field.build()
                     (
@@ -401,8 +400,8 @@ class SettingsView:
                         min_value=0.0,
                         min_clamped=True,
                         format="%.2f",
-                        value_width=110,
-                        unit_width=90,
+                        value_profile_key="settings.bandwidth.value",
+                        unit_profile_key="settings.bandwidth.unit",
                     )
                     self.global_upload_limit_field.build()
                     (
@@ -427,8 +426,8 @@ class SettingsView:
                         min_value=0.0,
                         min_clamped=True,
                         format="%.2f",
-                        value_width=110,
-                        unit_width=90,
+                        value_profile_key="settings.bandwidth.value",
+                        unit_profile_key="settings.bandwidth.unit",
                     )
                     self.default_download_limit_field.build()
                     self.download_limit_input, self.download_limit_unit = (
@@ -445,8 +444,8 @@ class SettingsView:
                         min_value=0.0,
                         min_clamped=True,
                         format="%.2f",
-                        value_width=110,
-                        unit_width=90,
+                        value_profile_key="settings.bandwidth.value",
+                        unit_profile_key="settings.bandwidth.unit",
                     )
                     self.default_upload_limit_field.build()
                     self.upload_limit_input, self.upload_limit_unit = (
@@ -460,7 +459,7 @@ class SettingsView:
                         tr("settings.default_seeding_goal", "Default seeding goal"),
                         localized_choices(SEEDING_GOAL_MODES),
                         default_value=tr_value(self.settings["default_seeding_goal_mode"]),
-                        control_width=230,
+                        control_profile_key="settings.seeding_goal",
                     )
                     self.default_seeding_goal_field.build()
                     self.default_seeding_goal_combo = self.default_seeding_goal_field.control.require_item()
@@ -479,7 +478,7 @@ class SettingsView:
                         min_clamped=True,
                         max_clamped=True,
                         format="%.2f",
-                        control_width=120,
+                        control_profile_key="settings.seeding_ratio",
                     )
                     self.default_seeding_ratio_field.build()
                     self.default_seeding_ratio_input = self.default_seeding_ratio_field.control.require_item()
@@ -503,10 +502,9 @@ class SettingsView:
                         days=default_days,
                         hours=default_hours,
                         minutes=default_minutes,
-                        input_width=120,
-                        grid_width=250,
-                        label_column_width=80,
-                        control_column_width=150,
+                        input_profile_key="settings.seeding_duration.input",
+                        grid_profile_key="settings.seeding_duration.grid",
+                        columns_profile_key="settings.seeding_duration.columns",
                     )
                     self.default_seeding_duration_editor.build()
                     add_help_tooltip(
@@ -559,7 +557,7 @@ class SettingsView:
                         tr("settings.language.label", "Application language"),
                         list(LANGUAGE_OPTION_LABELS.values()),
                         default_value=locale_label(self.settings.get("language", "auto")),
-                        control_width=205,
+                        control_profile_key="settings.language",
                     )
                     self.language_field.build()
                     self.language_combo = self.language_field.control.require_item()
@@ -570,7 +568,7 @@ class SettingsView:
                         tr("settings.interface_text_size", "Interface text size"),
                         [UI_FONT_LABELS[size] for size in UI_FONT_SIZES],
                         default_value=ui_font_label(self.settings.get("ui_font_size", 15)),
-                        control_width=180,
+                        control_profile_key="settings.ui_text_size",
                     )
                     self.ui_font_size_field.build()
                     self.ui_font_size_combo = self.ui_font_size_field.control.require_item()
@@ -583,7 +581,7 @@ class SettingsView:
                         default_value=documentation_scale_label(
                             self.settings.get("documentation_scale", 100)
                         ),
-                        control_width=190,
+                        control_profile_key="settings.documentation_scale",
                     )
                     self.documentation_scale_field.build()
                     self.documentation_scale_combo = (
@@ -601,7 +599,7 @@ class SettingsView:
                         default_value=tr_value(
                             self.settings.get("transfer_rate_display_unit", "Auto")
                         ),
-                        control_width=105,
+                        control_profile_key="settings.transfer_rate_display",
                     )
                     self.transfer_rate_display_field.build()
                     self.transfer_rate_display_combo = (

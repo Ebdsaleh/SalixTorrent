@@ -20,6 +20,8 @@ from app.engine.desktop_integration import (
 from app.engine.ui_typography import UiTypography
 from app.engine.responsive_layout import ResponsiveLayout
 from app.engine.runtime_paths import state_directory
+from app.engine.components import get_default_renderer
+from app.engine.ui_component_profile import SALIXTORRENT_COMPONENT_PROFILE
 
 
 class GuiEngine:
@@ -96,6 +98,12 @@ class GuiEngine:
         except Exception:
             pass
         dpg.setup_dearpygui()
+
+        # Select SalixTorrent's application-level component metrics once at the
+        # composition root. Reusable components remain backend/application neutral;
+        # views refer only to semantic profile keys, while explicit per-instance
+        # layout overrides remain available for exceptional cases.
+        get_default_renderer().set_component_profile(SALIXTORRENT_COMPONENT_PROFILE)
 
         if self._intercept_viewport_close:
             try:

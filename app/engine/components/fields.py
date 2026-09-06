@@ -19,6 +19,8 @@ class LabeledField(Component):
     tooltips without teaching this generic layer about application concepts.
     """
 
+    profile_key = "control_row"
+
     def __init__(
         self,
         label: str | Label,
@@ -27,8 +29,9 @@ class LabeledField(Component):
         accessories: Iterable[Component] = (),
         theme: ControlLayoutTheme | None = None,
         layout: ControlLayout | None = None,
+        profile_key: str | None = None,
     ):
-        super().__init__(theme=theme, layout=layout)
+        super().__init__(theme=theme, layout=layout, profile_key=profile_key)
         self.label = label if isinstance(label, Label) else Label(label)
         self.control = control
         self.accessories = list(accessories)
@@ -36,6 +39,7 @@ class LabeledField(Component):
             (self.label, self.control, *self.accessories),
             theme=self.theme,
             layout=self.layout,
+            profile_key=self.profile_key,
         )
 
     def build(self, *, renderer=None, parent=None) -> object:
@@ -56,9 +60,11 @@ class LabeledComboField(LabeledField):
         *,
         default_value=None,
         control_width: int | None = None,
+        control_profile_key: str | None = None,
         callback=None,
         theme: ControlLayoutTheme | None = None,
         layout: ControlLayout | None = None,
+        profile_key: str | None = None,
     ):
         control_layout = ControlLayout(width=control_width) if control_width else ControlLayout()
         control = ComboBox(
@@ -66,12 +72,14 @@ class LabeledComboField(LabeledField):
             default_value=default_value,
             callback=callback,
             layout=control_layout,
+            profile_key=control_profile_key,
         )
         super().__init__(
             label,
             control,
             theme=theme,
             layout=layout,
+            profile_key=profile_key,
         )
 
 
@@ -90,9 +98,11 @@ class LabeledNumericField(LabeledField):
         step=None,
         step_fast=None,
         control_width: int | None = None,
+        control_profile_key: str | None = None,
         callback=None,
         theme: ControlLayoutTheme | None = None,
         layout: ControlLayout | None = None,
+        profile_key: str | None = None,
     ):
         control_layout = ControlLayout(width=control_width) if control_width else ControlLayout()
 
@@ -106,6 +116,7 @@ class LabeledNumericField(LabeledField):
             format=format,
             callback=callback,
             layout=control_layout,
+            profile_key=control_profile_key,
         )
         if step is not None:
             numeric_kwargs["step"] = step
@@ -117,6 +128,7 @@ class LabeledNumericField(LabeledField):
             NumericStepper(**numeric_kwargs),
             theme=theme,
             layout=layout,
+            profile_key=profile_key,
         )
 
 
@@ -140,10 +152,13 @@ class NumericUnitField(LabeledField):
         step_fast=None,
         value_width: int | None = None,
         unit_width: int | None = None,
+        value_profile_key: str = "numeric_unit.value",
+        unit_profile_key: str = "numeric_unit.unit",
         callback=None,
         unit_callback=None,
         theme: ControlLayoutTheme | None = None,
         layout: ControlLayout | None = None,
+        profile_key: str | None = None,
     ):
         value_layout = ControlLayout(width=value_width) if value_width else ControlLayout()
         unit_layout = ControlLayout(width=unit_width) if unit_width else ControlLayout()
@@ -158,6 +173,7 @@ class NumericUnitField(LabeledField):
             format=format,
             callback=callback,
             layout=value_layout,
+            profile_key=value_profile_key,
         )
         if step is not None:
             numeric_kwargs["step"] = step
@@ -170,6 +186,7 @@ class NumericUnitField(LabeledField):
             default_value=default_unit,
             callback=unit_callback,
             layout=unit_layout,
+            profile_key=unit_profile_key,
         )
         super().__init__(
             label,
@@ -177,6 +194,7 @@ class NumericUnitField(LabeledField):
             accessories=(self.unit_control,),
             theme=theme,
             layout=layout,
+            profile_key=profile_key,
         )
 
     def value_items(self) -> tuple[object, object]:
@@ -185,6 +203,8 @@ class NumericUnitField(LabeledField):
 
 class DurationEditor(Component):
     """Three-part Days/Hours/Minutes editor with one aligned grid."""
+
+    profile_key = "control_column"
 
     def __init__(
         self,
@@ -199,19 +219,23 @@ class DurationEditor(Component):
         maximum_days: int = 365,
         maximum_hours: int = 23,
         maximum_minutes: int = 59,
-        input_width: int = 120,
-        grid_width: int = 250,
-        label_column_width: int = 80,
-        control_column_width: int = 150,
+        input_width: int | None = None,
+        grid_width: int | None = None,
+        label_column_width: int | None = None,
+        control_column_width: int | None = None,
+        input_profile_key: str = "duration_editor.input",
+        grid_profile_key: str = "duration_editor.grid",
+        columns_profile_key: str = "duration_editor.columns",
         theme: ControlLayoutTheme | None = None,
         layout: ControlLayout | None = None,
+        profile_key: str | None = None,
     ):
-        super().__init__(theme=theme, layout=layout)
+        super().__init__(theme=theme, layout=layout, profile_key=profile_key)
         self.heading = Label(heading)
         self.day_label = Label(day_label)
         self.hour_label = Label(hour_label)
         self.minute_label = Label(minute_label)
-        value_layout = ControlLayout(width=input_width)
+        value_layout = ControlLayout(width=input_width) if input_width else ControlLayout()
         self.days = NumericStepper(
             kind=NumericKind.INTEGER,
             default_value=days,
@@ -220,6 +244,7 @@ class DurationEditor(Component):
             min_clamped=True,
             max_clamped=True,
             layout=value_layout,
+            profile_key=input_profile_key,
         )
         self.hours = NumericStepper(
             kind=NumericKind.INTEGER,
@@ -229,6 +254,7 @@ class DurationEditor(Component):
             min_clamped=True,
             max_clamped=True,
             layout=value_layout,
+            profile_key=input_profile_key,
         )
         self.minutes = NumericStepper(
             kind=NumericKind.INTEGER,
@@ -238,20 +264,32 @@ class DurationEditor(Component):
             min_clamped=True,
             max_clamped=True,
             layout=value_layout,
+            profile_key=input_profile_key,
         )
+        explicit_columns = ()
+        if label_column_width is not None or control_column_width is not None:
+            if label_column_width is None or control_column_width is None:
+                raise ValueError(
+                    "label_column_width and control_column_width must be supplied together"
+                )
+            explicit_columns = (int(label_column_width), int(control_column_width))
+
         self.grid = ControlGrid(
             (
                 (self.day_label, self.days),
                 (self.hour_label, self.hours),
                 (self.minute_label, self.minutes),
             ),
-            column_widths=(label_column_width, control_column_width),
-            layout=ControlLayout(width=grid_width),
+            column_widths=explicit_columns,
+            column_profile_key=columns_profile_key,
+            layout=ControlLayout(width=grid_width) if grid_width else ControlLayout(),
+            profile_key=grid_profile_key,
         )
         self.column = ControlColumn(
             (self.heading, self.grid),
             theme=self.theme,
             layout=self.layout,
+            profile_key=self.profile_key,
         )
 
     def build(self, *, renderer=None, parent=None) -> object:

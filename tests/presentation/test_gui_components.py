@@ -8,10 +8,13 @@ from tests.helpers import PROJECT_ROOT
 from app.engine.components import (
     AUTO,
     FILL,
+    FRAMEWORK_COMPONENT_PROFILE,
     Button,
+    ComponentLayoutProfile,
     ComboBox,
     ControlGrid,
     ControlLayout,
+    ControlLayoutDefaults,
     ControlLayoutTheme,
     ControlRow,
     DurationEditor,
@@ -30,7 +33,8 @@ from app.engine.property_cascade import PropertySource
 
 
 class RecordingRenderer:
-    def __init__(self):
+    def __init__(self, component_profile=None):
+        self.component_profile = component_profile or FRAMEWORK_COMPONENT_PROFILE
         self.created = []
         self.containers = []
         self.values = {}
@@ -79,6 +83,7 @@ class GuiComponentFoundationTests(unittest.TestCase):
             "controls.py",
             "fields.py",
             "layout.py",
+            "profile.py",
         )
         for name in model_files:
             tree = ast.parse(
@@ -299,6 +304,150 @@ class GuiComponentFoundationTests(unittest.TestCase):
         self.assertNotIn("dpg.add_input_", source)
         self.assertNotIn("dpg.add_combo(", source)
         self.assertNotIn("dpg.add_checkbox(", source)
+
+
+    def test_named_profile_supplies_component_defaults_without_instance_widths(self):
+        profile = ComponentLayoutProfile(
+            name="test-profile",
+            parent=FRAMEWORK_COMPONENT_PROFILE,
+            layouts={
+                "demo.combo": ControlLayoutDefaults(width=321, height=28),
+            },
+        )
+        renderer = RecordingRenderer(profile)
+        control = ComboBox(("A", "B"), default_value="A", profile_key="demo.combo")
+
+        control.build(renderer=renderer)
+
+        self.assertEqual(control.resolved_layout.width, 321)
+        self.assertEqual(control.resolved_layout.height, 28)
+        self.assertEqual(control.resolved_layout.source_for("width"), PropertySource.DEFAULT)
+        self.assertEqual(renderer.created[0][2]["width"], 321)
+        self.assertEqual(renderer.created[0][2]["height"], 28)
+
+    def test_theme_and_instance_still_override_profile_defaults_independently(self):
+        profile = ComponentLayoutProfile(
+            name="test-profile",
+            parent=FRAMEWORK_COMPONENT_PROFILE,
+            layouts={
+                "demo.numeric": ControlLayoutDefaults(width=140, height=24),
+            },
+        )
+        renderer = RecordingRenderer(profile)
+        control = NumericStepper(
+            kind=NumericKind.INTEGER,
+            profile_key="demo.numeric",
+            theme=ControlLayoutTheme(width=180, height=30),
+            layout=ControlLayout(width=220),
+        )
+
+        control.build(renderer=renderer)
+
+        self.assertEqual(control.resolved_layout.width, 220)
+        self.assertEqual(control.resolved_layout.height, 30)
+        self.assertEqual(control.resolved_layout.source_for("width"), PropertySource.INSTANCE)
+        self.assertEqual(control.resolved_layout.source_for("height"), PropertySource.THEME)
+
+    def test_unknown_profile_slot_falls_back_to_safe_framework_auto(self):
+        renderer = RecordingRenderer(
+            ComponentLayoutProfile(name="empty", parent=FRAMEWORK_COMPONENT_PROFILE)
+        )
+        control = ComboBox(("A",), default_value="A", profile_key="missing.slot")
+
+        control.build(renderer=renderer)
+
+        self.assertIs(control.resolved_layout.width, AUTO)
+        self.assertNotIn("width", renderer.created[0][2])
+
+    def test_numeric_unit_field_consumes_profile_owned_value_and_unit_widths(self):
+        profile = ComponentLayoutProfile(
+            name="wide-bandwidth",
+            parent=FRAMEWORK_COMPONENT_PROFILE,
+            layouts={
+                "numeric_unit.value": ControlLayoutDefaults(width=140),
+                "numeric_unit.unit": ControlLayoutDefaults(width=100),
+            },
+        )
+        renderer = RecordingRenderer(profile)
+        field = NumericUnitField(
+            "Download",
+            ("KB/s", "MB/s"),
+            default_value=1.0,
+            default_unit="MB/s",
+        )
+
+        field.build(renderer=renderer)
+
+        numeric = next(entry for entry in renderer.created if entry[0] == "numeric_float")
+        unit = next(entry for entry in renderer.created if entry[0] == "combo_box")
+        self.assertEqual(numeric[2]["width"], 140)
+        self.assertEqual(unit[2]["width"], 100)
+
+    def test_duration_editor_consumes_profile_grid_input_and_column_metrics(self):
+        profile = ComponentLayoutProfile(
+            name="wide-duration",
+            parent=FRAMEWORK_COMPONENT_PROFILE,
+            layouts={
+                "duration_editor.input": ControlLayoutDefaults(width=132),
+                "duration_editor.grid": ControlLayoutDefaults(width=300),
+            },
+            columns={
+                "duration_editor.columns": (95, 180),
+            },
+        )
+        renderer = RecordingRenderer(profile)
+        editor = DurationEditor(
+            heading="Time target",
+            day_label="Days",
+            hour_label="Hours",
+            minute_label="Minutes",
+            days=1,
+            hours=2,
+            minutes=3,
+        )
+
+        editor.build(renderer=renderer)
+
+        numeric_calls = [entry for entry in renderer.created if entry[0] == "numeric_int"]
+        self.assertEqual([entry[2]["width"] for entry in numeric_calls], [132, 132, 132])
+        grid_call = next(entry for entry in renderer.containers if entry[0] == "grid")
+        self.assertEqual(grid_call[2]["width"], 300)
+        columns = [entry for entry in renderer.created if entry[0] == "grid_column"]
+        self.assertEqual(
+            [entry[2]["init_width_or_weight"] for entry in columns],
+            [95, 180],
+        )
+
+    def test_salix_view_component_dimensions_are_profile_owned(self):
+        settings_source = (PROJECT_ROOT / "app" / "views" / "settings_view.py").read_text(
+            encoding="utf-8"
+        )
+        download_source = (PROJECT_ROOT / "app" / "views" / "download_view.py").read_text(
+            encoding="utf-8"
+        )
+        profile_source = (PROJECT_ROOT / "app" / "engine" / "ui_component_profile.py").read_text(
+            encoding="utf-8"
+        )
+
+        forbidden = (
+            "ControlLayout(width=",
+            "control_width=",
+            "value_width=",
+            "unit_width=",
+            "input_width=",
+            "grid_width=",
+            "label_column_width=",
+            "control_column_width=",
+        )
+        for source in (settings_source, download_source):
+            for token in forbidden:
+                self.assertNotIn(token, source)
+
+        self.assertIn('profile_key="settings.download_path"', settings_source)
+        self.assertIn('control_profile_key="settings.protocol"', settings_source)
+        self.assertIn('profile_key="torrent_properties.seeding_ratio"', download_source)
+        self.assertIn('"settings.download_path": ControlLayoutDefaults(width=700)', profile_source)
+        self.assertIn('"configure_targets.duration.columns": (90, 170)', profile_source)
 
     def test_duration_editor_is_three_validated_numeric_controls_in_one_grid(self):
         renderer = RecordingRenderer()

@@ -2,8 +2,8 @@
 
 **Current application version string:** `0.4.0`
 **Roadmap status:** active development planning
-**Current implementation checkpoint:** post-v0.4.0 reusable GUI component foundation — first tranche committed/Windows-validated; Preferences composition tranche prepared
-**Current real Windows regression baseline:** 343 / 343 tests passing, with one expected non-Windows skip; next prepared tranche expects 348
+**Current implementation checkpoint:** post-v0.4.0 reusable GUI components — first two tranches committed/Windows-validated; component-profile tranche prepared
+**Current real Windows regression baseline:** 348 / 348 tests passing, with one expected non-Windows skip; next prepared tranche expects 354
 
 This roadmap records intended engineering direction rather than promising dates or release numbers. Changes should remain incremental, testable, reviewable, and compatible with SalixTorrent's existing protocol, persistence, packaging, localization, and cross-platform boundaries.
 
@@ -549,7 +549,7 @@ A relational database is not automatically the right format for every durable ar
 
 ## Priority A — immediate
 
-**Continue the reusable GUI component layer after the committed and Windows-validated first tranche.**
+**Continue the reusable GUI component layer after the first two committed and Windows-validated tranches.**
 
 First tranche — complete/pushed (`66b46fa7070128f13bc87fbe4f9556a86049e895`):
 
@@ -566,7 +566,7 @@ First tranche — complete/pushed (`66b46fa7070128f13bc87fbe4f9556a86049e895`):
 - [x] both full Windows discovery commands at 343/343 with one expected skip;
 - [x] visual parity smoke for Torrent Properties, `Configure targets...`, and Preferences.
 
-Second tranche — Preferences composition expansion:
+Second tranche — Preferences composition expansion — complete/pushed (`139931246280818694de1920b4b49c4e5cf734ca`):
 
 - [x] add backend-neutral `TextInput`;
 - [x] add generic `LabeledField` with one primary control plus zero-or-more trailing/accessory components;
@@ -575,9 +575,24 @@ Second tranche — Preferences composition expansion:
 - [x] migrate Preferences value controls and action rows while retaining existing item-id compatibility aliases;
 - [x] add five additional headless component regressions (14 component tests total);
 - [x] regenerate deterministic localization extraction metadata with no canonical string changes;
+- [x] focused Windows component/localization validation;
+- [x] both full Windows discovery commands at 348/348 with one expected skip;
+- [x] visual/behavior smoke across Preferences before commit.
+
+Third tranche — component layout profiles:
+
+- [x] add backend-neutral `ComponentLayoutProfile` with named layout and aligned-grid column slots;
+- [x] keep a framework profile with safe `AUTO` fallbacks and established composite defaults;
+- [x] let the active renderer carry one application-selected profile;
+- [x] select SalixTorrent's desktop profile once in `GuiEngine` rather than inside individual views;
+- [x] preserve profile/default -> component theme -> explicit instance precedence;
+- [x] move Preferences and seeding-goal component dimensions out of view construction into `ui_component_profile.py`;
+- [x] retain explicit width overrides in the generic APIs for exceptional one-off layouts;
+- [x] add six profile/layout regressions (20 component tests total);
+- [x] regenerate deterministic localization extraction metadata with no canonical string changes;
 - [ ] run focused Windows component/localization validation;
-- [ ] run both full Windows discovery commands and account for the expected 343 -> 348 test-count increase;
-- [ ] visually smoke Downloads, Networking, Privacy/Transport, Queue, Global Bandwidth, New Torrent Defaults and Desktop Preferences before the next architectural tranche.
+- [ ] run both full Windows discovery commands and account for the expected 348 -> 354 test-count increase;
+- [ ] visually confirm Preferences, Torrent Properties and `Configure targets...` retain their established dimensions.
 
 ## Priority B — user-facing durability
 
@@ -674,15 +689,16 @@ The first live migration deliberately targeted the already-polished seeding-goal
 
 The second tranche broadens the same contract across Preferences. `LabeledField` provides the generic row shape for a label, one primary control and arbitrary trailing accessories; `NumericUnitField` is a convenience built on that contract rather than a parallel layout system. Preferences no longer constructs input/combo/checkbox value controls directly through Dear PyGui, while its surrounding panel/child-window structure remains intentionally application-specific. Existing raw item-id aliases are retained temporarily so persistence, refresh, tooltips and save/restore logic continue through their proven boundaries.
 
+The third tranche introduces renderer-selected `ComponentLayoutProfile` policy. Framework components select semantic profile slots for layout defaults; SalixTorrent's application profile centralizes the exact established Preferences and seeding-goal dimensions in one place. Missing slots fall back safely to framework `AUTO` sizing, sparse `ControlLayoutTheme` values remain the theme layer, and `ControlLayout` stays the explicit per-instance override. `DurationEditor` also resolves its aligned grid/input/column metrics from profile slots, so views no longer need to repeat those numbers.
+
 ### Possible v0.5.0 theme
 
 ```text
 Reusable GUI component foundation
 ```
 
-Candidate follow-up work after the Preferences composition tranche validates:
+Candidate follow-up work after the component-profile tranche validates:
 
-- introduce a deliberate application-level component theme/profile object instead of repeating common width constants in views;
 - add generic component metadata/hooks for tooltip and accessibility attachment without moving SalixTorrent-specific Help semantics into the framework;
 - consider framework-owned panel/form-section composition only where it removes repeated layout contracts rather than wrapping every Dear PyGui container cosmetically;
 - continue separating component model/state from the Dear PyGui renderer where that improves future RAD extraction;
@@ -731,11 +747,11 @@ session persistence: 34 / 34 OK
 semantic-documentation + localization-UI focus: 17 / 17 OK
 
 Full canonical discovery:
-334 / 334 OK
+348 / 348 OK
 1 expected non-Windows skip
 
 Plain repository-root discovery:
-334 / 334 OK
+348 / 348 OK
 1 expected non-Windows skip
 
 Localization:
@@ -766,6 +782,6 @@ process restart restored 2 torrents
 first GUI frame displayed persisted queue order
 ```
 
-The v0.4.0 release baseline remains 334/334 tests with one expected non-Windows skip. The first GUI-component tranche is committed/pushed at `66b46fa7070128f13bc87fbe4f9556a86049e895` and is now the authoritative real-Windows development baseline at 343/343 tests with one expected skip; its visual parity smoke also passed. The second Preferences-composition tranche adds five headless component regressions, bringing source-side component coverage to 14/14 and the expected real-Windows discoverable total to 348 after application. Focused documentation/localization tests pass 34/34 source-side and deterministic localization extraction is current; the 348 Windows/full visual gate remains pending.
+The v0.4.0 release baseline remains 334/334 tests with one expected non-Windows skip. The first GUI-component tranche is committed/pushed at `66b46fa7070128f13bc87fbe4f9556a86049e895` and passed 343/343 on the real Windows checkout. The second Preferences-composition tranche is committed/pushed at `139931246280818694de1920b4b49c4e5cf734ca` and advances the authoritative real-Windows development baseline to 348/348 with one expected skip. The third component-profile tranche adds six headless regressions, bringing component coverage to 20/20 and the expected real-Windows discoverable total to 354 after application. Focused documentation/localization tests pass 34/34 source-side and deterministic localization extraction is current; the 354 Windows/full visual gate remains pending.
 
 The v0.4.0 live GUI smoke covers per-torrent editing, additive Days/Hours/Minutes quick controls, explicit bulk Preferences application, persistence, in-app/native notifications, instanced time-based automatic stop, Days/Hours/Minutes exact editors, stacked compact duration controls, and the widened Preferences ratio field. Ratio-threshold behavior remains covered by deterministic regressions without requiring a second live peer. Future changes must preserve the applicable baseline or account explicitly for every intentional test-count change.

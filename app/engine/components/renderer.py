@@ -11,10 +11,17 @@ from __future__ import annotations
 from contextlib import contextmanager
 from typing import ContextManager, Iterator, Protocol, runtime_checkable
 
+from app.engine.components.profile import ComponentLayoutProfile, FRAMEWORK_COMPONENT_PROFILE
+
 
 @runtime_checkable
 class ComponentRenderer(Protocol):
     """Minimal renderer contract consumed by the component layer."""
+
+    component_profile: ComponentLayoutProfile
+
+    def set_component_profile(self, profile: ComponentLayoutProfile) -> None:
+        ...
 
     def create(self, kind: str, **kwargs) -> object:
         ...
@@ -43,7 +50,13 @@ class DearPyGuiRenderer:
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
+            cls._instance.component_profile = FRAMEWORK_COMPONENT_PROFILE
         return cls._instance
+
+    def set_component_profile(self, profile: ComponentLayoutProfile) -> None:
+        if not isinstance(profile, ComponentLayoutProfile):
+            raise TypeError("component profile must be a ComponentLayoutProfile")
+        self.component_profile = profile
 
     @staticmethod
     def _dpg():

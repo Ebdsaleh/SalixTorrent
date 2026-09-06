@@ -16,6 +16,8 @@ class NumericKind(str, Enum):
 
 
 class Label(Component):
+    profile_key = "label"
+
     def __init__(
         self,
         text: str,
@@ -25,8 +27,9 @@ class Label(Component):
         bullet: bool = False,
         theme: ControlLayoutTheme | None = None,
         layout: ControlLayout | None = None,
+        profile_key: str | None = None,
     ):
-        super().__init__(theme=theme, layout=layout)
+        super().__init__(theme=theme, layout=layout, profile_key=profile_key)
         self.text = str(text)
         self.color = color
         self.wrap = wrap
@@ -34,7 +37,7 @@ class Label(Component):
 
     def build(self, *, renderer=None, parent=None) -> object:
         renderer = renderer or get_default_renderer()
-        resolved = self._resolve_layout()
+        resolved = self._resolve_layout(renderer=renderer)
         kwargs = self._layout_kwargs(resolved)
         kwargs.update(text=self.text, color=self.color, wrap=self.wrap, bullet=self.bullet)
         self._with_parent(kwargs, parent)
@@ -47,6 +50,8 @@ class Label(Component):
 
 
 class Button(Component):
+    profile_key = "button"
+
     def __init__(
         self,
         label: str,
@@ -57,8 +62,9 @@ class Button(Component):
         show: bool = True,
         theme: ControlLayoutTheme | None = None,
         layout: ControlLayout | None = None,
+        profile_key: str | None = None,
     ):
-        super().__init__(theme=theme, layout=layout)
+        super().__init__(theme=theme, layout=layout, profile_key=profile_key)
         self.label = str(label)
         self.callback = callback
         self.user_data = user_data
@@ -67,7 +73,7 @@ class Button(Component):
 
     def build(self, *, renderer=None, parent=None) -> object:
         renderer = renderer or get_default_renderer()
-        resolved = self._resolve_layout()
+        resolved = self._resolve_layout(renderer=renderer)
         kwargs = self._layout_kwargs(resolved)
         kwargs.update(
             label=self.label,
@@ -81,6 +87,8 @@ class Button(Component):
 
 
 class ComboBox(ValueComponent):
+    profile_key = "combo_box"
+
     def __init__(
         self,
         items,
@@ -92,8 +100,9 @@ class ComboBox(ValueComponent):
         show: bool = True,
         theme: ControlLayoutTheme | None = None,
         layout: ControlLayout | None = None,
+        profile_key: str | None = None,
     ):
-        super().__init__(theme=theme, layout=layout)
+        super().__init__(theme=theme, layout=layout, profile_key=profile_key)
         self.items = tuple(items)
         self.default_value = default_value
         self.callback = callback
@@ -103,7 +112,7 @@ class ComboBox(ValueComponent):
 
     def build(self, *, renderer=None, parent=None) -> object:
         renderer = renderer or get_default_renderer()
-        resolved = self._resolve_layout()
+        resolved = self._resolve_layout(renderer=renderer)
         kwargs = self._layout_kwargs(resolved)
         kwargs.update(
             items=list(self.items),
@@ -122,6 +131,8 @@ class ComboBox(ValueComponent):
 
 
 class TextInput(ValueComponent):
+    profile_key = "text_input"
+
     def __init__(
         self,
         *,
@@ -135,8 +146,9 @@ class TextInput(ValueComponent):
         show: bool = True,
         theme: ControlLayoutTheme | None = None,
         layout: ControlLayout | None = None,
+        profile_key: str | None = None,
     ):
-        super().__init__(theme=theme, layout=layout)
+        super().__init__(theme=theme, layout=layout, profile_key=profile_key)
         self.default_value = str(default_value)
         self.hint = hint
         self.multiline = bool(multiline)
@@ -148,7 +160,7 @@ class TextInput(ValueComponent):
 
     def build(self, *, renderer=None, parent=None) -> object:
         renderer = renderer or get_default_renderer()
-        resolved = self._resolve_layout()
+        resolved = self._resolve_layout(renderer=renderer)
         kwargs = self._layout_kwargs(resolved)
         kwargs.update(
             default_value=self.default_value,
@@ -166,6 +178,8 @@ class TextInput(ValueComponent):
 
 class NumericStepper(ValueComponent):
     """Validated integer/float input with backend-native step buttons."""
+
+    profile_key = "numeric_stepper"
 
     def __init__(
         self,
@@ -185,8 +199,9 @@ class NumericStepper(ValueComponent):
         show: bool = True,
         theme: ControlLayoutTheme | None = None,
         layout: ControlLayout | None = None,
+        profile_key: str | None = None,
     ):
-        super().__init__(theme=theme, layout=layout)
+        super().__init__(theme=theme, layout=layout, profile_key=profile_key)
         self.kind = NumericKind(str(getattr(kind, "value", kind)).lower())
         self.default_value = default_value
         self.min_value = min_value
@@ -203,7 +218,7 @@ class NumericStepper(ValueComponent):
 
     def build(self, *, renderer=None, parent=None) -> object:
         renderer = renderer or get_default_renderer()
-        resolved = self._resolve_layout()
+        resolved = self._resolve_layout(renderer=renderer)
         kwargs = self._layout_kwargs(resolved)
         kwargs.update(
             default_value=self.default_value,
@@ -227,6 +242,8 @@ class NumericStepper(ValueComponent):
 
 
 class CheckBox(ValueComponent):
+    profile_key = "checkbox"
+
     def __init__(
         self,
         label: str,
@@ -238,8 +255,9 @@ class CheckBox(ValueComponent):
         show: bool = True,
         theme: ControlLayoutTheme | None = None,
         layout: ControlLayout | None = None,
+        profile_key: str | None = None,
     ):
-        super().__init__(theme=theme, layout=layout)
+        super().__init__(theme=theme, layout=layout, profile_key=profile_key)
         self.label = str(label)
         self.default_value = bool(default_value)
         self.callback = callback
@@ -249,7 +267,7 @@ class CheckBox(ValueComponent):
 
     def build(self, *, renderer=None, parent=None) -> object:
         renderer = renderer or get_default_renderer()
-        resolved = self._resolve_layout()
+        resolved = self._resolve_layout(renderer=renderer)
         kwargs = self._layout_kwargs(resolved)
         kwargs.update(
             label=self.label,
@@ -264,9 +282,10 @@ class CheckBox(ValueComponent):
 
 
 class Spacer(Component):
+    profile_key = "spacer"
     def build(self, *, renderer=None, parent=None) -> object:
         renderer = renderer or get_default_renderer()
-        resolved = self._resolve_layout()
+        resolved = self._resolve_layout(renderer=renderer)
         kwargs = self._layout_kwargs(resolved)
         self._with_parent(kwargs, parent)
         return self._bind(renderer, renderer.create("spacer", **kwargs))

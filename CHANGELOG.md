@@ -25,6 +25,19 @@ Notable SalixTorrent changes are recorded here.
 - Preserved the existing Dear PyGui item identifiers as compatibility aliases so persistence, refresh, tooltips, validation, and save/restore behavior continue through the established view logic while construction becomes framework-owned.
 - Added five component regressions covering generic trailing accessories, numeric+unit composition, text-input rendering/value access, specialized-field inheritance, and the rule that Preferences no longer constructs input/combo/checkbox value controls directly through Dear PyGui.
 - Regenerated deterministic localization extraction metadata after the Preferences migration; canonical UI/Help/Glossary strings remain unchanged.
+- Validated the Preferences composition tranche on the real Windows checkout at 348/348 tests in both canonical and plain discovery, with one expected non-Windows skip.
+
+### Component Layout Profiles
+
+- Added backend-neutral `ComponentLayoutProfile` support so reusable controls can select named layout defaults instead of repeating concrete width constants in view code.
+- Made the active component profile a renderer-level policy selected once by the application composition root; the framework profile still provides safe `AUTO` fallbacks when a named slot is absent.
+- Preserved the existing property precedence for each component: profile/framework default -> component theme -> explicit instance override.
+- Added SalixTorrent's desktop component profile in `app/engine/ui_component_profile.py`, centralizing the exact Preferences and seeding-goal control metrics that were previously scattered across `settings_view.py` and `download_view.py`.
+- Added profile-owned aligned-grid column metrics so `DurationEditor` can inherit Days/Hours/Minutes input, grid, and column dimensions without embedding view-specific numbers.
+- Kept `LabeledComboField`, `LabeledNumericField`, `NumericUnitField`, direct primitive controls, and `DurationEditor` compatible with explicit width overrides for exceptional one-off layouts.
+- Removed direct component-width constants from the migrated Preferences and seeding-goal view construction paths while preserving the existing live layout.
+- Added six headless regressions for named profile defaults, safe fallback, theme/instance precedence, numeric-unit profile slots, duration grid metrics, and the rule that migrated view dimensions are profile-owned.
+- Regenerated deterministic localization extraction metadata after line movement; canonical UI/Help/Glossary strings remain unchanged.
 
 
 ## v0.4.0 - 2026-09-05

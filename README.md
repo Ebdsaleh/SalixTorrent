@@ -315,7 +315,7 @@ python -m unittest tests.protocol.test_v2_peer_wire -v
 python -m unittest discover -s tests\localization -t . -v
 ```
 
-The current pushed real Windows development baseline is **343 / 343 tests passing**, with one expected non-Windows shell-behavior skip. Both canonical `tests/` discovery and plain repository-root discovery produce the same result. The in-progress Preferences composition tranche adds five headless component regressions, so its expected Windows total is 348 after application.
+The current pushed real Windows development baseline is **348 / 348 tests passing**, with one expected non-Windows shell-behavior skip. Both canonical `tests/` discovery and plain repository-root discovery produce the same result. The in-progress component-profile tranche adds six headless component regressions, so its expected Windows total is 354 after application.
 
 The release-critical regression coverage includes strict BEP-52 v2 identity/file-tree/piece-layer/Merkle validation, MSE/RC4 interoperability, rarest-first/endgame scheduling, bounded request pipelines, asynchronous disk backpressure/caching, source binding, encryption fallback rules, multi-torrent port mappings, finite/permanent mapping-lease handling, structured UPnP/NAT-PMP diagnostics, source-severity accounting, Interface Lock, real inbound seeding uploads, IPv6 peer TCP, BEP-7/BEP-15 tracker peers, BEP-11 IPv6 PEX, BEP-32 DHT behavior, BEP-48 HTTP scrape batching, BEP-15 UDP scrape batching, scrape/announce telemetry isolation, Windows Proactor reset handling, application/session persistence, offline localization, responsive content-bounds geometry, framework property-cascade fallback/provenance, per-page documentation layout overrides, and semantic documentation typography/media sizing.
 
@@ -323,7 +323,7 @@ The release-critical regression coverage includes strict BEP-52 v2 identity/file
 
 v0.4.0 is the current release checkpoint. Phases 1-11 remain complete, including the native Windows standalone/portable/installer architecture and the cross-platform desktop/tray abstraction. Phase 12 provides the offline-first localization framework, semantic Help/Glossary services, provider-neutral translation tooling, optional SalixORM-backed development translation memory, backend-neutral application/session persistence, and the tracked regression suite. The v0.4.0 transfer-lifecycle milestone adds durable per-torrent seeding goals and automatic-stop policy. Linux/BSD/macOS native desktop behavior and full target-locale population/review remain active hardening work.
 
-Post-v0.4.0 development has begun the reusable GUI component layer intended for later RAD/framework extraction. The first tranche introduced backend-neutral primitive controls, semantic `AUTO`/`FILL` sizing, the generic one-row `ControlRow` container, aligned `ControlGrid`/`ControlColumn` composition, and reusable labeled-field/duration composites; that tranche is committed/pushed and Windows-validated at 343/343 with visual parity. The next composition tranche adds `TextInput`, a generic `LabeledField` with zero-or-more trailing/accessory components, and `NumericUnitField`, then migrates Preferences value controls onto those same framework-owned primitives while preserving existing item-id compatibility.
+Post-v0.4.0 development is building the reusable GUI component layer intended for later RAD/framework extraction. The first tranche introduced backend-neutral primitives, semantic `AUTO`/`FILL` sizing, `ControlRow`/`ControlGrid`/`ControlColumn`, and reusable labeled-field/duration composites. The second tranche added `TextInput`, generic `LabeledField` accessory composition, and `NumericUnitField`, then migrated Preferences value controls onto the framework layer. Both tranches are committed/pushed and Windows-validated, with the current baseline at 348/348 and visual parity confirmed. The current profile tranche moves concrete component dimensions out of views into a renderer-selected `ComponentLayoutProfile`, while preserving explicit per-instance overrides for exceptional layouts.
 
 The component layer deliberately reuses the existing property-cascade rule:
 
@@ -331,7 +331,7 @@ The component layer deliberately reuses the existing property-cascade rule:
 framework default -> active theme -> explicit instance override
 ```
 
-Width, height and row spacing resolve independently, preserving safe framework defaults while allowing sparse themes and per-instance overrides. Generic field composition now follows `label -> primary control -> 0..n accessories`, which covers patterns such as `Network interface / VPN + ComboBox + Refresh`, `Active download slots + NumericStepper + 0 = Unlimited`, and `Download + NumericStepper + unit ComboBox` without creating one-off framework classes for every row shape. Dear PyGui remains the current renderer, but its bridge is kept behind the component contract so the component model can be extracted without making application views own backend-specific construction details.
+Width, height and row spacing resolve independently. Named profile slots now provide the framework/application default layer, sparse component themes can override those defaults, and explicit instance layout remains the final override. Generic field composition follows `label -> primary control -> 0..n accessories`, which covers patterns such as `Network interface / VPN + ComboBox + Refresh`, `Active download slots + NumericStepper + 0 = Unlimited`, and `Download + NumericStepper + unit ComboBox` without creating one-off framework classes for every row shape. Dear PyGui remains the current renderer, but its bridge is kept behind the component contract and carries the active profile selected by the application composition root.
 
 ## Project structure
 
@@ -406,6 +406,7 @@ SalixTorrent/
 │   │   │   ├── controls.py
 │   │   │   ├── fields.py
 │   │   │   ├── layout.py
+│   │   │   ├── profile.py
 │   │   │   └── renderer.py
 │   │   ├── documentation/
 │   │   │   ├── layout.py
@@ -421,6 +422,7 @@ SalixTorrent/
 │   │   ├── shell_integration.py
 │   │   ├── scene_manager.py
 │   │   ├── texture_manager.py
+│   │   ├── ui_component_profile.py
 │   │   └── ui_typography.py
 │   ├── logic/
 │   │   ├── async_manager.py

@@ -13,6 +13,7 @@ from app.engine.components.layout import (
     backend_dimension,
     resolve_control_layout,
 )
+from app.engine.components.profile import FRAMEWORK_COMPONENT_PROFILE
 from app.engine.components.renderer import ComponentRenderer, get_default_renderer
 
 
@@ -20,15 +21,18 @@ class Component(ABC):
     """Renderable framework component with resolved layout provenance."""
 
     layout_defaults = DEFAULT_CONTROL_LAYOUT
+    profile_key = "component"
 
     def __init__(
         self,
         *,
         theme: ControlLayoutTheme | None = None,
         layout: ControlLayout | None = None,
+        profile_key: str | None = None,
     ):
         self.theme = theme or ControlLayoutTheme()
         self.layout = layout or ControlLayout()
+        self.profile_key = str(profile_key).strip() if profile_key else self.profile_key
         self.item: object | None = None
         self.resolved_layout: ResolvedControlLayout | None = None
         self._renderer: ComponentRenderer | None = None
@@ -36,7 +40,19 @@ class Component(ABC):
     def _resolve_layout(
         self,
         defaults: ControlLayoutDefaults | None = None,
+        *,
+        renderer: ComponentRenderer | None = None,
     ) -> ResolvedControlLayout:
+        if defaults is None:
+            active_renderer = renderer or self._renderer
+            profile = getattr(active_renderer, "component_profile", None)
+            if profile is None:
+                profile = FRAMEWORK_COMPONENT_PROFILE
+            defaults = profile.layout_for(
+                self.profile_key,
+                fallback_key=getattr(self.__class__, "profile_key", "component"),
+                fallback=self.layout_defaults,
+            )
         resolved = resolve_control_layout(
             theme=self.theme,
             override=self.layout,

@@ -12,14 +12,17 @@ from app.engine.components.renderer import ComponentRenderer, get_default_render
 class ControlRow(Component):
     """Arbitrary components constrained to one horizontal layout row."""
 
+    profile_key = "control_row"
+
     def __init__(
         self,
         children: Iterable[Component] = (),
         *,
         theme: ControlLayoutTheme | None = None,
         layout: ControlLayout | None = None,
+        profile_key: str | None = None,
     ):
-        super().__init__(theme=theme, layout=layout)
+        super().__init__(theme=theme, layout=layout, profile_key=profile_key)
         self.children = list(children)
 
     def add(self, component: Component) -> Component:
@@ -28,7 +31,7 @@ class ControlRow(Component):
 
     def build(self, *, renderer=None, parent=None) -> object:
         renderer = renderer or get_default_renderer()
-        resolved = self._resolve_layout()
+        resolved = self._resolve_layout(renderer=renderer)
         kwargs = self._layout_kwargs(resolved)
         if resolved.spacing is not None:
             kwargs["horizontal_spacing"] = resolved.spacing
@@ -44,14 +47,17 @@ class ControlRow(Component):
 class ControlColumn(Component):
     """Vertical composition container for arbitrary framework components."""
 
+    profile_key = "control_column"
+
     def __init__(
         self,
         children: Iterable[Component] = (),
         *,
         theme: ControlLayoutTheme | None = None,
         layout: ControlLayout | None = None,
+        profile_key: str | None = None,
     ):
-        super().__init__(theme=theme, layout=layout)
+        super().__init__(theme=theme, layout=layout, profile_key=profile_key)
         self.children = list(children)
 
     def add(self, component: Component) -> Component:
@@ -60,7 +66,7 @@ class ControlColumn(Component):
 
     def build(self, *, renderer=None, parent=None) -> object:
         renderer = renderer or get_default_renderer()
-        resolved = self._resolve_layout()
+        resolved = self._resolve_layout(renderer=renderer)
         kwargs = self._layout_kwargs(resolved)
         if resolved.spacing is not None:
             # Dear PyGui's vertical group does not expose a separate vertical
@@ -79,17 +85,22 @@ class ControlColumn(Component):
 class ControlGrid(Component):
     """Borderless aligned grid for repeated form rows."""
 
+    profile_key = "control_grid"
+
     def __init__(
         self,
         rows: Sequence[Sequence[Component]],
         *,
         column_widths: Sequence[int] | None = None,
+        column_profile_key: str | None = None,
         theme: ControlLayoutTheme | None = None,
         layout: ControlLayout | None = None,
+        profile_key: str | None = None,
     ):
-        super().__init__(theme=theme, layout=layout)
+        super().__init__(theme=theme, layout=layout, profile_key=profile_key)
         self.rows = [list(row) for row in rows]
         self.column_widths = tuple(int(value) for value in (column_widths or ()))
+        self.column_profile_key = str(column_profile_key).strip() if column_profile_key else None
         self._validate_rows()
 
     def _validate_rows(self) -> None:
@@ -107,7 +118,7 @@ class ControlGrid(Component):
 
     def build(self, *, renderer=None, parent=None) -> object:
         renderer = renderer or get_default_renderer()
-        resolved = self._resolve_layout()
+        resolved = self._resolve_layout(renderer=renderer)
         kwargs = self._layout_kwargs(resolved)
         kwargs.update(
             header_row=False,
@@ -119,13 +130,20 @@ class ControlGrid(Component):
         )
         self._with_parent(kwargs, parent)
 
+        profile = getattr(renderer, "component_profile", None)
+        resolved_columns = self.column_widths
+        if not resolved_columns and profile is not None and self.column_profile_key:
+            resolved_columns = profile.columns_for(self.column_profile_key)
+        column_count = len(self.rows[0]) if self.rows else len(resolved_columns)
+        if resolved_columns and len(resolved_columns) != column_count:
+            raise ValueError("profile column widths must match the number of grid columns")
+
         with renderer.container("grid", **kwargs) as item:
             self._bind(renderer, item)
-            column_count = len(self.rows[0]) if self.rows else len(self.column_widths)
             for index in range(column_count):
                 column_kwargs = {"width_fixed": True}
-                if self.column_widths:
-                    column_kwargs["init_width_or_weight"] = self.column_widths[index]
+                if resolved_columns:
+                    column_kwargs["init_width_or_weight"] = resolved_columns[index]
                 renderer.create("grid_column", **column_kwargs)
 
             for row in self.rows:
