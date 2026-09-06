@@ -47,6 +47,7 @@ class RecordingRenderer:
         self.values = {}
         self.configured = {}
         self.tooltips = []
+        self.centered = []
 
     def _new_item(self, prefix: str) -> str:
         return f"{prefix}:{len(self.created) + len(self.containers) + 1}"
@@ -80,6 +81,9 @@ class RecordingRenderer:
             any(entry[1] == item for entry in self.created)
             or any(entry[1] == item for entry in self.containers)
         )
+
+    def center(self, item, *, fallback_size=None):
+        self.centered.append((item, fallback_size))
 
     def attach_tooltip(self, item, text, *, wrap=450):
         record = (item, str(text), int(wrap))
@@ -785,6 +789,107 @@ class GuiComponentFoundationTests(unittest.TestCase):
         self.assertIn("self.status_component.set_text", source)
         self.assertIn("self.start_seeding_component.set_visible", source)
 
+
+    def test_progress_bar_overlay_configures_through_renderer(self):
+        renderer = RecordingRenderer()
+        progress = ProgressBar(default_value=0.0, overlay="Idle")
+        item = progress.build(renderer=renderer)
+
+        progress.set_overlay("Metadata 50%")
+
+        self.assertEqual(progress.overlay, "Metadata 50%")
+        self.assertEqual(renderer.configured[item]["overlay"], "Metadata 50%")
+
+    def test_dialog_supports_minimum_size_and_backend_neutral_centering(self):
+        profile = ComponentLayoutProfile(
+            name="dialog-center",
+            parent=FRAMEWORK_COMPONENT_PROFILE,
+            layouts={
+                "demo.centered": ControlLayoutDefaults(width=680, height=285),
+            },
+        )
+        renderer = RecordingRenderer(profile)
+        dialog = Dialog(
+            "Open Magnet Link",
+            modal=True,
+            minimum_size=(560, 250),
+            profile_key="demo.centered",
+        )
+
+        with dialog.context(renderer=renderer):
+            Label("Magnet").build(renderer=renderer)
+        dialog.center()
+
+        self.assertEqual(renderer.containers[0][2]["min_size"], [560, 250])
+        self.assertEqual(renderer.centered, [(dialog.require_item(), (680, 285))])
+
+    def test_magnet_dialog_structure_is_component_owned(self):
+        source = (PROJECT_ROOT / "app" / "views" / "download_view.py").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("self.magnet_dialog = Dialog(", source)
+        self.assertIn('profile_key="download.magnet.dialog"', source)
+        self.assertIn("self.magnet_input_component = TextInput(", source)
+        self.assertIn("self.magnet_progress_component = ProgressBar(", source)
+        self.assertIn("self.magnet_action_row = ControlRow()", source)
+        self.assertNotIn("dpg.add_input_text(\n                multiline=True,\n                height=70", source)
+
+    def test_magnet_runtime_state_uses_component_contract(self):
+        source = (PROJECT_ROOT / "app" / "views" / "download_view.py").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("self.magnet_progress_component.set_overlay", source)
+        self.assertIn("self.magnet_input_component.get_value", source)
+        self.assertIn("self.magnet_add_component.set_enabled", source)
+        self.assertIn("self.magnet_dialog.center()", source)
+        for token in (
+            "dpg.set_value(self.magnet_progress",
+            "dpg.configure_item(self.magnet_progress",
+            "dpg.configure_item(self.magnet_add_button",
+            "dpg.configure_item(self.magnet_cancel_button",
+            "dpg.show_item(self.magnet_modal)",
+            "dpg.hide_item(self.magnet_modal)",
+        ):
+            self.assertNotIn(token, source)
+
+    def test_transfer_confirmation_dialogs_are_component_owned(self):
+        source = (PROJECT_ROOT / "app" / "views" / "download_view.py").read_text(
+            encoding="utf-8"
+        )
+
+        for name in (
+            "remove_torrent_dialog",
+            "remove_notice_dialog",
+            "recheck_dialog",
+            "completion_notice_dialog",
+        ):
+            self.assertIn(f"self.{name} = Dialog(", source)
+        self.assertIn("self.remove_torrent_dialog.show_centered()", source)
+        self.assertIn("self.completion_notice_title_component.set_text", source)
+        self.assertIn("self.recheck_title_component.set_text", source)
+
+    def test_transfer_dialog_dimensions_are_profile_owned(self):
+        source = (PROJECT_ROOT / "app" / "views" / "download_view.py").read_text(
+            encoding="utf-8"
+        )
+        profile_source = (PROJECT_ROOT / "app" / "engine" / "ui_component_profile.py").read_text(
+            encoding="utf-8"
+        )
+
+        for token in (
+            'profile_key="download.magnet.dialog"',
+            'profile_key="download.remove.dialog"',
+            'profile_key="download.removal_notice.dialog"',
+            'profile_key="download.recheck.dialog"',
+            'profile_key="download.completion_notice.dialog"',
+        ):
+            self.assertIn(token, source)
+        self.assertIn('"download.magnet.dialog": ControlLayoutDefaults(width=680, height=285)', profile_source)
+        self.assertIn('"download.remove.dialog": ControlLayoutDefaults(width=520, height=230)', profile_source)
+        self.assertIn('"download.recheck.dialog": ControlLayoutDefaults(width=560, height=190)', profile_source)
+        self.assertIn('"download.completion_notice.dialog": ControlLayoutDefaults(width=480, height=150)', profile_source)
 
 
 if __name__ == "__main__":

@@ -31,7 +31,9 @@ from app.logic.torrent_manager import TorrentManager
 from app.logic.transfer_add import TransferAddRequest
 from app.engine.desktop_integration import DesktopIntegration
 from app.engine.components import (
+    Button,
     ComboBox,
+    ControlLayout,
     ControlRow,
     Dialog,
     DurationEditor,
@@ -40,7 +42,10 @@ from app.engine.components import (
     LabeledNumericField,
     NumericKind,
     NumericStepper,
+    ProgressBar,
     Separator,
+    Spacer,
+    TextInput,
 )
 from app.engine.responsive_layout import DialogMetrics, ResponsiveLayout, clamp, fill_height, split_widths
 from app.views.peer_view import PeerView
@@ -49,6 +54,7 @@ from app.views.file_view import FileView
 from app.views.source_view import SourceView
 from app.views.speed_view import SpeedView
 from app.views.help_terms import add_help_tooltip, add_text_tooltip
+from app.engine.ui_component_attachments import help_tooltip, text_tooltip
 from app.views.transfer_rate import (
     TRANSFER_RATE_UNITS,
     format_transfer_rate,
@@ -508,135 +514,157 @@ class DownloadView:
                 add_text_tooltip(sources_tab, tr('view.download_view.sources_trackers_dht_pex_and_local_peer', "Sources\n\nTrackers, DHT, PEX and Local Peer Discovery with live status and discovery diagnostics."))
                 add_text_tooltip(speed_tab, tr('view.download_view.speed_rolling_download_upload_history_recent_averages', "Speed\n\nRolling download/upload history, recent averages, peaks and transfer-limit reference lines."))
 
-        with dpg.window(
-            label=tr('view.download_view.open_magnet_link', "Open Magnet Link"),
+        self.magnet_dialog = Dialog(
+            tr('view.download_view.open_magnet_link', "Open Magnet Link"),
             modal=True,
             show=False,
-            width=680,
-            height=285,
-            min_size=[560, 250],
-        ) as self.magnet_modal:
-            dpg.add_text(tr('view.download_view.magnet_link', "MAGNET LINK"), color=(0, 255, 128))
-            self.magnet_intro = dpg.add_text(
+            minimum_size=(560, 250),
+            profile_key="download.magnet.dialog",
+        )
+        with self.magnet_dialog.context() as self.magnet_modal:
+            self.magnet_heading_component = Label(
+                tr('view.download_view.magnet_link', "MAGNET LINK"),
+                color=(0, 255, 128),
+            )
+            self.magnet_heading = self.magnet_heading_component.build()
+            self.magnet_intro_component = Label(
                 tr('view.download_view.paste_a_bittorrent_v1_magnet_link_salixtorrent', "Paste a BitTorrent v1 magnet link. SalixTorrent will discover peers "
                 "through its trackers, DHT and LAN, then retrieve BEP-9 metadata."),
                 color=(160, 160, 165),
                 wrap=630,
             )
-            dpg.add_spacer(height=5)
-            self.magnet_input = dpg.add_input_text(
+            self.magnet_intro = self.magnet_intro_component.build()
+            Spacer(layout=ControlLayout(height=5)).build()
+            self.magnet_input_component = TextInput(
                 multiline=True,
-                height=70,
-                width=-1,
                 hint=tr('view.download_view.magnet_xt_urn_btih', "magnet:?xt=urn:btih:..."),
-            )
-            add_help_tooltip(self.magnet_input, "MAGNET_LINK")
-            with dpg.group(horizontal=True):
-                self.magnet_add_button = dpg.add_button(
-                    label=tr('view.download_view.add_magnet', " Add Magnet "),
+                profile_key="download.magnet.input",
+            ).attach(help_tooltip("MAGNET_LINK"))
+            self.magnet_input = self.magnet_input_component.build()
+            self.magnet_action_row = ControlRow()
+            with self.magnet_action_row.context():
+                self.magnet_add_component = Button(
+                    tr('view.download_view.add_magnet', " Add Magnet "),
                     callback=self._submit_magnet,
-                )
-                add_help_tooltip(self.magnet_add_button, "OPEN_MAGNET")
-                paste_magnet_button = dpg.add_button(label=tr('view.download_view.paste', " Paste "), callback=self._paste_magnet)
-                add_text_tooltip(paste_magnet_button, tr('view.download_view.paste_magnet_link_copies_the_current_clipboard', "Paste magnet link\n\nCopies the current clipboard text into the magnet field. SalixTorrent does not begin network activity until Add Magnet is pressed."))
-                self.magnet_cancel_button = dpg.add_button(
-                    label=tr('view.download_view.cancel_lookup', " Cancel Lookup "),
+                ).attach(help_tooltip("OPEN_MAGNET"))
+                self.magnet_add_button = self.magnet_add_component.build()
+                self.magnet_paste_component = Button(
+                    tr('view.download_view.paste', " Paste "),
+                    callback=self._paste_magnet,
+                ).attach(text_tooltip(tr('view.download_view.paste_magnet_link_copies_the_current_clipboard', "Paste magnet link\n\nCopies the current clipboard text into the magnet field. SalixTorrent does not begin network activity until Add Magnet is pressed.")))
+                self.magnet_paste_button = self.magnet_paste_component.build()
+                self.magnet_cancel_component = Button(
+                    tr('view.download_view.cancel_lookup', " Cancel Lookup "),
                     enabled=False,
                     callback=self._cancel_magnet,
-                )
-                add_help_tooltip(self.magnet_cancel_button, "BEP9")
-                dpg.add_button(
-                    label=tr('view.download_view.close', " Close "),
+                ).attach(help_tooltip("BEP9"))
+                self.magnet_cancel_button = self.magnet_cancel_component.build()
+                self.magnet_close_component = Button(
+                    tr('view.download_view.close', " Close "),
                     callback=self._close_magnet_dialog,
                 )
-            self.magnet_progress = dpg.add_progress_bar(
+                self.magnet_close_button = self.magnet_close_component.build()
+            self.magnet_progress_component = ProgressBar(
                 default_value=0.0,
-                width=-1,
                 overlay=tr('view.download_view.idle', "Idle"),
-            )
-            add_help_tooltip(self.magnet_progress, "BEP9")
-            self.magnet_status_text = dpg.add_text(
+                profile_key="download.magnet.progress",
+            ).attach(help_tooltip("BEP9"))
+            self.magnet_progress = self.magnet_progress_component.build()
+            self.magnet_status_component = Label(
                 tr('view.download_view.paste_a_magnet_link_to_begin', "Paste a magnet link to begin."),
                 wrap=630,
-            )
-            add_help_tooltip(self.magnet_status_text, "BEP9")
+            ).attach(help_tooltip("BEP9"))
+            self.magnet_status_text = self.magnet_status_component.build()
 
         # Shared confirmation dialog for destructive queue actions.
-        with dpg.window(
-            label=tr('view.download_view.remove_torrent', "Remove Torrent"),
+        self.remove_torrent_dialog = Dialog(
+            tr('view.download_view.remove_torrent', "Remove Torrent"),
             modal=True,
             show=False,
             no_resize=True,
-            width=520,
-            height=230,
-        ) as self.remove_torrent_modal:
-            self.remove_torrent_title = dpg.add_text(
+            profile_key="download.remove.dialog",
+        )
+        with self.remove_torrent_dialog.context() as self.remove_torrent_modal:
+            self.remove_torrent_title_component = Label(
                 tr('view.download_view.remove_torrent_e028c702', "Remove torrent?"),
                 color=(255, 200, 100),
             )
-            dpg.add_spacer(height=4)
-            self.remove_torrent_message = dpg.add_text(
-                "",
-                wrap=480,
-            )
-            dpg.add_spacer(height=8)
-            dpg.add_separator()
-            dpg.add_spacer(height=8)
-            with dpg.group(horizontal=True):
-                remove_only_button = dpg.add_button(
-                    label=tr('view.download_view.remove_from_salixtorrent', " Remove from SalixTorrent "),
+            self.remove_torrent_title = self.remove_torrent_title_component.build()
+            Spacer(layout=ControlLayout(height=4)).build()
+            self.remove_torrent_message_component = Label("", wrap=480)
+            self.remove_torrent_message = self.remove_torrent_message_component.build()
+            Spacer(layout=ControlLayout(height=8)).build()
+            Separator().build()
+            Spacer(layout=ControlLayout(height=8)).build()
+            self.remove_torrent_action_row = ControlRow()
+            with self.remove_torrent_action_row.context():
+                self.remove_only_component = Button(
+                    tr('view.download_view.remove_from_salixtorrent', " Remove from SalixTorrent "),
                     callback=lambda: self._confirm_remove_torrent(False),
-                )
-                add_help_tooltip(remove_only_button, "REMOVE_TORRENT")
-                remove_delete_button = dpg.add_button(
-                    label=tr('view.download_view.remove_delete_data', " Remove + Delete Data "),
+                ).attach(help_tooltip("REMOVE_TORRENT"))
+                self.remove_only_button = self.remove_only_component.build()
+                self.remove_delete_component = Button(
+                    tr('view.download_view.remove_delete_data', " Remove + Delete Data "),
                     callback=lambda: self._confirm_remove_torrent(True),
-                )
-                add_help_tooltip(remove_delete_button, "DELETE_DATA")
-                cancel_remove_button = dpg.add_button(
-                    label=tr('view.download_view.cancel', " Cancel "),
-                    callback=lambda: dpg.hide_item(self.remove_torrent_modal),
-                )
-                add_text_tooltip(cancel_remove_button, tr('view.download_view.cancel_removal_closes_this_confirmation_window_without', "Cancel removal\n\nCloses this confirmation window without changing the torrent, payload, resume data or queue."))
+                ).attach(help_tooltip("DELETE_DATA"))
+                self.remove_delete_button = self.remove_delete_component.build()
+                self.cancel_remove_component = Button(
+                    tr('view.download_view.cancel', " Cancel "),
+                    callback=lambda: self.remove_torrent_dialog.set_visible(False),
+                ).attach(text_tooltip(tr('view.download_view.cancel_removal_closes_this_confirmation_window_without', "Cancel removal\n\nCloses this confirmation window without changing the torrent, payload, resume data or queue.")))
+                self.cancel_remove_button = self.cancel_remove_component.build()
 
-        with dpg.window(
-            label=tr('view.download_view.removal_notice', "Removal Notice"),
+        self.remove_notice_dialog = Dialog(
+            tr('view.download_view.removal_notice', "Removal Notice"),
             modal=True,
             show=False,
             no_resize=True,
-            width=520,
-            height=170,
-        ) as self.remove_notice_modal:
-            self.remove_notice_text = dpg.add_text("", wrap=480)
-            dpg.add_spacer(height=10)
-            dpg.add_button(
-                label=tr('view.download_view.ok', " OK "),
-                callback=lambda: dpg.hide_item(self.remove_notice_modal),
+            profile_key="download.removal_notice.dialog",
+        )
+        with self.remove_notice_dialog.context() as self.remove_notice_modal:
+            self.remove_notice_text_component = Label("", wrap=480)
+            self.remove_notice_text = self.remove_notice_text_component.build()
+            Spacer(layout=ControlLayout(height=10)).build()
+            self.remove_notice_ok_component = Button(
+                tr('view.download_view.ok', " OK "),
+                callback=lambda: self.remove_notice_dialog.set_visible(False),
             )
+            self.remove_notice_ok_button = self.remove_notice_ok_component.build()
 
-        with dpg.window(
-            label=tr('view.download_view.force_recheck', "Force Recheck"),
+        self.recheck_dialog = Dialog(
+            tr('view.download_view.force_recheck', "Force Recheck"),
             modal=True,
             show=False,
             no_resize=True,
-            width=560,
-            height=190,
-        ) as self.recheck_modal:
-            self.recheck_title = dpg.add_text(tr('view.download_view.force_recheck_8cf6d61e', "Force recheck?"), color=(255, 200, 100))
-            add_help_tooltip(self.recheck_title, "FORCE_RECHECK")
-            dpg.add_spacer(height=4)
-            dpg.add_text(
+            profile_key="download.recheck.dialog",
+        )
+        with self.recheck_dialog.context() as self.recheck_modal:
+            self.recheck_title_component = Label(
+                tr('view.download_view.force_recheck_8cf6d61e', "Force recheck?"),
+                color=(255, 200, 100),
+            ).attach(help_tooltip("FORCE_RECHECK"))
+            self.recheck_title = self.recheck_title_component.build()
+            Spacer(layout=ControlLayout(height=4)).build()
+            self.recheck_explanation_component = Label(
                 tr('view.download_view.this_discards_salixtorrent_s_fast_resume_trust', "This discards SalixTorrent's fast-resume trust and SHA-1 checks the "
                 "existing payload again. No downloaded data is deleted. An active "
                 "torrent will resume automatically after a successful recheck."),
                 wrap=520,
             )
-            dpg.add_spacer(height=10)
-            with dpg.group(horizontal=True):
-                force_recheck_button = dpg.add_button(label=tr('view.download_view.force_recheck_809b7185', " Force Recheck "), callback=self._confirm_force_recheck)
-                add_help_tooltip(force_recheck_button, "FORCE_RECHECK")
-                cancel_recheck_button = dpg.add_button(label=tr('view.download_view.cancel', " Cancel "), callback=lambda: dpg.hide_item(self.recheck_modal))
-                add_text_tooltip(cancel_recheck_button, tr('view.download_view.cancel_recheck_closes_this_confirmation_window_without', "Cancel recheck\n\nCloses this confirmation window without invalidating fast-resume state or starting a verification pass."))
+            self.recheck_explanation = self.recheck_explanation_component.build()
+            Spacer(layout=ControlLayout(height=10)).build()
+            self.recheck_action_row = ControlRow()
+            with self.recheck_action_row.context():
+                self.force_recheck_component = Button(
+                    tr('view.download_view.force_recheck_809b7185', " Force Recheck "),
+                    callback=self._confirm_force_recheck,
+                ).attach(help_tooltip("FORCE_RECHECK"))
+                self.force_recheck_button = self.force_recheck_component.build()
+                self.cancel_recheck_component = Button(
+                    tr('view.download_view.cancel', " Cancel "),
+                    callback=lambda: self.recheck_dialog.set_visible(False),
+                ).attach(text_tooltip(tr('view.download_view.cancel_recheck_closes_this_confirmation_window_without', "Cancel recheck\n\nCloses this confirmation window without invalidating fast-resume state or starting a verification pass.")))
+                self.cancel_recheck_button = self.cancel_recheck_component.build()
 
         with dpg.window(
             label=tr('view.download_view.torrent_properties', "Torrent Properties"),
@@ -845,22 +873,33 @@ class DownloadView:
                     callback=lambda: dpg.hide_item(self.seeding_goal_modal),
                 )
 
-        with dpg.window(
-            label=tr('view.download_view.download_complete', "Download Complete"),
+        self.completion_notice_dialog = Dialog(
+            tr('view.download_view.download_complete', "Download Complete"),
             show=False,
             no_resize=True,
-            width=480,
-            height=150,
-        ) as self.completion_notice_modal:
-            self.completion_notice_title = dpg.add_text(
-                tr('view.download_view.download_completed', "Download completed"), color=(0, 255, 128)
+            profile_key="download.completion_notice.dialog",
+        )
+        with self.completion_notice_dialog.context() as self.completion_notice_modal:
+            self.completion_notice_title_component = Label(
+                tr('view.download_view.download_completed', "Download completed"),
+                color=(0, 255, 128),
             )
-            self.completion_notice_text = dpg.add_text("", wrap=440)
-            dpg.add_spacer(height=8)
-            with dpg.group(horizontal=True):
-                completion_folder_button = dpg.add_button(label=tr('view.download_view.open_folder', " Open Folder "), callback=self._completion_open_folder)
-                add_help_tooltip(completion_folder_button, "OPEN_FOLDER")
-                dpg.add_button(label=tr('view.download_view.dismiss', " Dismiss "), callback=lambda: dpg.hide_item(self.completion_notice_modal))
+            self.completion_notice_title = self.completion_notice_title_component.build()
+            self.completion_notice_text_component = Label("", wrap=440)
+            self.completion_notice_text = self.completion_notice_text_component.build()
+            Spacer(layout=ControlLayout(height=8)).build()
+            self.completion_notice_action_row = ControlRow()
+            with self.completion_notice_action_row.context():
+                self.completion_folder_component = Button(
+                    tr('view.download_view.open_folder', " Open Folder "),
+                    callback=self._completion_open_folder,
+                ).attach(help_tooltip("OPEN_FOLDER"))
+                self.completion_folder_button = self.completion_folder_component.build()
+                self.completion_dismiss_component = Button(
+                    tr('view.download_view.dismiss', " Dismiss "),
+                    callback=lambda: self.completion_notice_dialog.set_visible(False),
+                )
+                self.completion_dismiss_button = self.completion_dismiss_component.build()
 
         self._layout_root = parent_tag
         self.layout.watch_item(
@@ -1004,21 +1043,16 @@ class DownloadView:
 
     def _show_magnet_dialog(self):
         self._magnet_close_at = 0.0
-        dpg.set_value(self.magnet_progress, 0.0)
-        dpg.configure_item(self.magnet_progress, overlay=tr('view.download_view.idle', "Idle"))
-        dpg.set_value(self.magnet_status_text, tr('view.download_view.paste_a_magnet_link_to_begin', "Paste a magnet link to begin."))
-        dpg.configure_item(self.magnet_add_button, enabled=True)
-        dpg.configure_item(self.magnet_cancel_button, enabled=False)
-        dpg.show_item(self.magnet_modal)
+        self.magnet_progress_component.set_value(0.0)
+        self.magnet_progress_component.set_overlay(tr('view.download_view.idle', "Idle"))
+        self.magnet_status_component.set_text(
+            tr('view.download_view.paste_a_magnet_link_to_begin', "Paste a magnet link to begin.")
+        )
+        self.magnet_add_component.set_enabled(True)
+        self.magnet_cancel_component.set_enabled(False)
+        self.magnet_dialog.set_visible(True)
         self.layout.trigger(("download_view", "magnet"))
-        try:
-            width = 680
-            height = 285
-            x = max(0, (dpg.get_viewport_client_width() - width) // 2)
-            y = max(0, (dpg.get_viewport_client_height() - height) // 2)
-            dpg.set_item_pos(self.magnet_modal, [x, y])
-        except Exception:
-            pass
+        self.magnet_dialog.center()
 
     def _paste_magnet(self):
         try:
@@ -1026,44 +1060,47 @@ class DownloadView:
         except Exception:
             value = ""
         if value:
-            dpg.set_value(self.magnet_input, value.strip())
+            self.magnet_input_component.set_value(value.strip())
 
     def _submit_magnet(self):
-        magnet_uri = str(dpg.get_value(self.magnet_input) or "").strip()
+        magnet_uri = str(self.magnet_input_component.get_value() or "").strip()
         try:
             handle = self.manager.add_transfer(
                 TransferAddRequest(source=magnet_uri, start=True, persist=True)
             )
             info_hash = handle.info_hash
         except Exception as exc:
-            dpg.set_value(self.magnet_status_text, tr('view.download_view.error_value', 'Error: {exc}', exc=exc))
-            dpg.set_value(self.magnet_progress, 0.0)
-            dpg.configure_item(self.magnet_progress, overlay=tr('view.download_view.error', "Error"))
+            self.magnet_status_component.set_text(
+                tr('view.download_view.error_value', 'Error: {exc}', exc=exc)
+            )
+            self.magnet_progress_component.set_value(0.0)
+            self.magnet_progress_component.set_overlay(tr('view.download_view.error', "Error"))
             return
 
         self._magnet_info_hash = info_hash
         self._magnet_close_at = 0.0
-        dpg.configure_item(self.magnet_add_button, enabled=False)
-        dpg.configure_item(self.magnet_cancel_button, enabled=True)
-        dpg.set_value(self.magnet_progress, 0.01)
-        dpg.configure_item(self.magnet_progress, overlay=tr('view.download_view.starting', "Starting"))
-        dpg.set_value(
-            self.magnet_status_text,
-            tr('view.download_view.resolving_metadata_for_value', 'Resolving metadata for {value0}...', value0=info_hash[:12]),
+        self.magnet_add_component.set_enabled(False)
+        self.magnet_cancel_component.set_enabled(True)
+        self.magnet_progress_component.set_value(0.01)
+        self.magnet_progress_component.set_overlay(tr('view.download_view.starting', "Starting"))
+        self.magnet_status_component.set_text(
+            tr('view.download_view.resolving_metadata_for_value', 'Resolving metadata for {value0}...', value0=info_hash[:12])
         )
 
     def _cancel_magnet(self):
         if self._magnet_info_hash:
             self.manager.cancel_magnet(self._magnet_info_hash)
-        dpg.configure_item(self.magnet_cancel_button, enabled=False)
-        dpg.set_value(self.magnet_status_text, tr('view.download_view.cancelling_magnet_lookup', "Cancelling magnet lookup..."))
+        self.magnet_cancel_component.set_enabled(False)
+        self.magnet_status_component.set_text(
+            tr('view.download_view.cancelling_magnet_lookup', "Cancelling magnet lookup...")
+        )
 
     def _close_magnet_dialog(self):
         if self._magnet_info_hash:
             self.manager.cancel_magnet(self._magnet_info_hash)
         self._magnet_info_hash = ""
         self._magnet_close_at = 0.0
-        dpg.hide_item(self.magnet_modal)
+        self.magnet_dialog.set_visible(False)
 
     def _handle_magnet_event(self, msg: dict):
         event_type = str(msg.get("type") or "")
@@ -1075,24 +1112,23 @@ class DownloadView:
         stage = str(msg.get("stage") or "Magnet")
         message = str(msg.get("message") or "")
 
-        if hasattr(self, "magnet_progress") and dpg.does_item_exist(self.magnet_progress):
-            dpg.set_value(self.magnet_progress, progress)
-            dpg.configure_item(
-                self.magnet_progress,
-                overlay=f"{stage} {progress * 100:.0f}%" if 0.0 < progress < 1.0 else stage,
+        if hasattr(self, "magnet_progress_component") and self.magnet_progress_component.exists():
+            self.magnet_progress_component.set_value(progress)
+            self.magnet_progress_component.set_overlay(
+                f"{stage} {progress * 100:.0f}%" if 0.0 < progress < 1.0 else stage
             )
-            dpg.set_value(self.magnet_status_text, message or stage)
+            self.magnet_status_component.set_text(message or stage)
 
         if event_type == "MAGNET_READY":
-            dpg.configure_item(self.magnet_add_button, enabled=True)
-            dpg.configure_item(self.magnet_cancel_button, enabled=False)
+            self.magnet_add_component.set_enabled(True)
+            self.magnet_cancel_component.set_enabled(False)
             self._magnet_close_at = time.monotonic() + 1.25
             if info_hash:
                 self._removed_info_hashes.discard(info_hash)
                 self._select_torrent(info_hash)
         elif event_type in {"MAGNET_ERROR", "MAGNET_CANCELLED"}:
-            dpg.configure_item(self.magnet_add_button, enabled=True)
-            dpg.configure_item(self.magnet_cancel_button, enabled=False)
+            self.magnet_add_component.set_enabled(True)
+            self.magnet_cancel_component.set_enabled(False)
             self._magnet_close_at = 0.0
             if event_type == "MAGNET_CANCELLED":
                 self._magnet_info_hash = ""
@@ -1779,15 +1815,13 @@ class DownloadView:
             return
 
         self._completion_notice_info_hash = info_hash
-        dpg.set_value(
-            self.completion_notice_title,
-            tr('view.download_view.download_completed_value', 'Download completed - {torrent_name}', torrent_name=torrent_name),
+        self.completion_notice_title_component.set_text(
+            tr('view.download_view.download_completed_value', 'Download completed - {torrent_name}', torrent_name=torrent_name)
         )
-        dpg.set_value(
-            self.completion_notice_text,
-            tr('view.download_view.value_downloaded_value_you_can_open_the_payload', '{state}. Downloaded {downloaded}. You can open the payload folder now or dismiss this notice.', state=state, downloaded=downloaded),
+        self.completion_notice_text_component.set_text(
+            tr('view.download_view.value_downloaded_value_you_can_open_the_payload', '{state}. Downloaded {downloaded}. You can open the payload folder now or dismiss this notice.', state=state, downloaded=downloaded)
         )
-        dpg.show_item(self.completion_notice_modal)
+        self.completion_notice_dialog.set_visible(True)
 
     def _show_seeding_goal_notice(self, msg: dict):
         info_hash = str(msg.get("info_hash") or "")
@@ -1825,12 +1859,11 @@ class DownloadView:
         if not self.manager.completion_notifications_enabled():
             return
         self._completion_notice_info_hash = info_hash
-        dpg.set_value(
-            self.completion_notice_title,
-            tr('view.download_view.seeding_goal_reached', 'Seeding goal reached - {torrent_name}', torrent_name=torrent_name),
+        self.completion_notice_title_component.set_text(
+            tr('view.download_view.seeding_goal_reached', 'Seeding goal reached - {torrent_name}', torrent_name=torrent_name)
         )
-        dpg.set_value(self.completion_notice_text, body)
-        dpg.show_item(self.completion_notice_modal)
+        self.completion_notice_text_component.set_text(body)
+        self.completion_notice_dialog.set_visible(True)
 
     def _request_force_recheck(self, info_hash: str):
         if info_hash not in self.torrent_rows:
@@ -1838,16 +1871,15 @@ class DownloadView:
         self._select_torrent(info_hash)
         self._pending_recheck_info_hash = info_hash
         stats = self.latest_stats.get(info_hash, {})
-        dpg.set_value(
-            self.recheck_title,
-            tr('view.download_view.force_recheck_value', 'Force Recheck - {value0}', value0=stats.get('torrent_name', 'Torrent')),
+        self.recheck_title_component.set_text(
+            tr('view.download_view.force_recheck_value', 'Force Recheck - {value0}', value0=stats.get('torrent_name', 'Torrent'))
         )
-        dpg.show_item(self.recheck_modal)
+        self.recheck_dialog.set_visible(True)
 
     def _confirm_force_recheck(self):
         info_hash = self._pending_recheck_info_hash
         self._pending_recheck_info_hash = ""
-        dpg.hide_item(self.recheck_modal)
+        self.recheck_dialog.set_visible(False)
         if info_hash:
             self.manager.force_recheck(info_hash)
 
@@ -2375,9 +2407,8 @@ class DownloadView:
             dpg.hide_item(popup_id)
 
         name = self.latest_stats.get(info_hash, {}).get("torrent_name", "this torrent")
-        dpg.set_value(
-            self.remove_torrent_title,
-            tr('view.download_view.remove_value', 'Remove: {name}', name=name),
+        self.remove_torrent_title_component.set_text(
+            tr('view.download_view.remove_value', 'Remove: {name}', name=name)
         )
         stats = self.latest_stats.get(info_hash, {})
         if stats.get("seed_source_path"):
@@ -2389,22 +2420,13 @@ class DownloadView:
                 tr("view.download_view.remove_managed_data_explanation", "Remove from SalixTorrent removes the transfer from the queue but keeps downloaded data on disk.\n\nRemove + Delete Data permanently deletes the downloaded payload and its SalixTorrent resume metadata. Your original .torrent file is NOT deleted.")
             )
 
-        dpg.set_value(self.remove_torrent_message, removal_text)
-
-        dpg.show_item(self.remove_torrent_modal)
-        try:
-            width = 520
-            height = 230
-            x = max(0, (dpg.get_viewport_client_width() - width) // 2)
-            y = max(0, (dpg.get_viewport_client_height() - height) // 2)
-            dpg.set_item_pos(self.remove_torrent_modal, [x, y])
-        except Exception:
-            pass
+        self.remove_torrent_message_component.set_text(removal_text)
+        self.remove_torrent_dialog.show_centered()
 
     def _confirm_remove_torrent(self, delete_data: bool):
         info_hash = self._pending_remove_info_hash
         self._pending_remove_info_hash = ""
-        dpg.hide_item(self.remove_torrent_modal)
+        self.remove_torrent_dialog.set_visible(False)
 
         if not info_hash or info_hash not in self.torrent_rows:
             return
@@ -2665,13 +2687,10 @@ class DownloadView:
 
         cleanup_error = str(msg.get("cleanup_error") or "")
         if cleanup_error:
-            dpg.set_value(
-                self.remove_notice_text,
-                (
-                    tr('view.download_view.the_torrent_was_removed_from_salixtorrent_but_downloaded', 'The torrent was removed from SalixTorrent, but downloaded-data cleanup was not fully completed:\n\n{cleanup_error}', cleanup_error=cleanup_error)
-                ),
+            self.remove_notice_text_component.set_text(
+                tr('view.download_view.the_torrent_was_removed_from_salixtorrent_but_downloaded', 'The torrent was removed from SalixTorrent, but downloaded-data cleanup was not fully completed:\n\n{cleanup_error}', cleanup_error=cleanup_error)
             )
-            dpg.show_item(self.remove_notice_modal)
+            self.remove_notice_dialog.set_visible(True)
 
     @staticmethod
     def _format_limit(value: float, unit: str) -> str:
@@ -3180,8 +3199,8 @@ class DownloadView:
         if self._magnet_close_at and time.monotonic() >= self._magnet_close_at:
             self._magnet_close_at = 0.0
             self._magnet_info_hash = ""
-            if dpg.does_item_exist(self.magnet_modal):
-                dpg.hide_item(self.magnet_modal)
+            if self.magnet_dialog.exists():
+                self.magnet_dialog.set_visible(False)
 
         changed_rows = False
 

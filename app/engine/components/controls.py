@@ -276,6 +276,10 @@ class ProgressBar(ValueComponent):
         self._with_parent(kwargs, parent)
         return self._bind(renderer, renderer.create("progress_bar", **kwargs))
 
+    def set_overlay(self, overlay: str | None) -> None:
+        self.overlay = None if overlay is None else str(overlay)
+        self.configure(overlay=self.overlay)
+
 
 class CheckBox(ValueComponent):
     profile_key = "checkbox"

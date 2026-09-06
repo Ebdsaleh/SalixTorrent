@@ -4,6 +4,16 @@ Notable SalixTorrent changes are recorded here.
 
 ## Unreleased
 
+### GUI Component/RAD Extraction — Transfer Utility Dialogs
+
+- Added backend-neutral dialog minimum-size and viewport-centering behavior to the reusable `Dialog`/renderer contract instead of positioning ordinary dialogs with Dear PyGui viewport calls in view logic.
+- Added runtime `ProgressBar.set_overlay(...)` support so progress text updates remain behind the same component renderer boundary as progress values.
+- Migrated the complete Open Magnet dialog onto reusable `Dialog`, `ControlRow`, `TextInput`, `Button`, `ProgressBar`, `Label`, `Spacer` and application tooltip attachments while preserving BEP-9 lookup/cancel/auto-close semantics and responsive sizing.
+- Migrated the Remove Torrent, Removal Notice, Force Recheck and Download Complete utility dialogs onto the same reusable structural/control/profile boundaries while preserving their existing callbacks, destructive-action safeguards and notification behavior.
+- Centralized the established magnet/remove/recheck/completion dialog dimensions in the SalixTorrent component profile, including the magnet field/progress dimensions.
+- Proved the renderer-neutral runtime-state contract on a second independent workflow: magnet input, progress overlay/value, status, Add/Cancel enabled state and dialog visibility no longer use Dear PyGui state calls directly.
+- Added six component/dialog regressions, increasing the component suite from 40 to 46 and the expected real-Windows full-suite total from 374 to 380.
+
 ### GUI Component/RAD Extraction — Backend-Neutral Runtime State
 
 - Added renderer-neutral runtime configuration helpers on every component for existence checks, enabled state and visibility without exposing Dear PyGui calls to view logic.
@@ -11,7 +21,7 @@ Notable SalixTorrent changes are recorded here.
 - Migrated Create Torrent's complete runtime value/state path onto component objects: source/output/status/detail labels, progress, editable-control busy state, combo/text/checkbox reads, Cancel, and Start Seeding visibility/enabled transitions no longer call Dear PyGui directly.
 - Kept raw item IDs available only where existing `ResponsiveLayout` geometry operations still require them, preserving established resize behavior and compatibility boundaries.
 - Deliberately stopped short of an automatic observer/data-binding system: this tranche extracts only lifecycle behavior already proven by duplicated runtime state updates.
-- Added four runtime-state regressions, increasing the component suite from 36 to 40 and the expected real-Windows full-suite total from 370 to 374.
+- Added four runtime-state regressions, increasing the component suite from 36 to 40; real-Windows validation passed both full discovery paths at 374/374 with one expected non-Windows skip before the tranche was committed and pushed.
 
 ### GUI Component/RAD Extraction — Create Torrent Form and Tooltip Boundary
 

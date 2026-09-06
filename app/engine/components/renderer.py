@@ -41,6 +41,9 @@ class ComponentRenderer(Protocol):
     def exists(self, item: object) -> bool:
         ...
 
+    def center(self, item: object, *, fallback_size: tuple[int, int] | None = None) -> None:
+        ...
+
     def attach_tooltip(self, item: object, text: str, *, wrap: int = 450) -> object | None:
         ...
 
@@ -145,6 +148,32 @@ class DearPyGuiRenderer:
 
     def exists(self, item: object) -> bool:
         return bool(self._dpg().does_item_exist(item))
+
+    def center(self, item: object, *, fallback_size: tuple[int, int] | None = None) -> None:
+        """Center a rendered item within the current viewport client area."""
+
+        dpg = self._dpg()
+        fallback_width = fallback_height = 0
+        if fallback_size is not None:
+            fallback_width = max(0, int(fallback_size[0]))
+            fallback_height = max(0, int(fallback_size[1]))
+
+        try:
+            width, height = dpg.get_item_rect_size(item)
+            width = int(width or fallback_width)
+            height = int(height or fallback_height)
+        except Exception:
+            width, height = fallback_width, fallback_height
+
+        if width <= 0 or height <= 0:
+            return
+
+        try:
+            x = max(0, (int(dpg.get_viewport_client_width()) - width) // 2)
+            y = max(0, (int(dpg.get_viewport_client_height()) - height) // 2)
+            dpg.set_item_pos(item, [x, y])
+        except Exception:
+            return
 
     def attach_tooltip(self, item: object, text: str, *, wrap: int = 450) -> object | None:
         """Attach tooltip text without disturbing the backend container stack."""

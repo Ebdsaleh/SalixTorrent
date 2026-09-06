@@ -244,6 +244,7 @@ class Dialog(Component):
         no_resize: bool = False,
         no_move: bool = False,
         no_collapse: bool = False,
+        minimum_size: tuple[int, int] | None = None,
         theme: ControlLayoutTheme | None = None,
         layout: ControlLayout | None = None,
         profile_key: str | None = None,
@@ -256,6 +257,15 @@ class Dialog(Component):
         self.no_resize = bool(no_resize)
         self.no_move = bool(no_move)
         self.no_collapse = bool(no_collapse)
+        if minimum_size is None:
+            self.minimum_size = None
+        else:
+            if len(minimum_size) != 2:
+                raise ValueError("dialog minimum_size must contain width and height")
+            minimum_width, minimum_height = (int(value) for value in minimum_size)
+            if minimum_width <= 0 or minimum_height <= 0:
+                raise ValueError("dialog minimum_size values must be positive")
+            self.minimum_size = (minimum_width, minimum_height)
 
     def add(self, component: Component) -> Component:
         self.children.append(component)
@@ -273,6 +283,7 @@ class Dialog(Component):
             no_resize=self.no_resize,
             no_move=self.no_move,
             no_collapse=self.no_collapse,
+            min_size=list(self.minimum_size) if self.minimum_size else None,
         )
         self._with_parent(kwargs, parent)
 
@@ -286,3 +297,18 @@ class Dialog(Component):
             for child in self.children:
                 child.build(renderer=renderer)
         return self.require_item()
+
+    def center(self) -> None:
+        """Center the rendered dialog without exposing backend viewport APIs."""
+
+        renderer = self._renderer or get_default_renderer()
+        fallback_size = None
+        resolved = self.resolved_layout
+        if resolved is not None:
+            if isinstance(resolved.width, int) and isinstance(resolved.height, int):
+                fallback_size = (resolved.width, resolved.height)
+        renderer.center(self.require_item(), fallback_size=fallback_size)
+
+    def show_centered(self) -> None:
+        self.set_visible(True)
+        self.center()

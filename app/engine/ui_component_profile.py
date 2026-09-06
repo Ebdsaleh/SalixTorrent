@@ -52,6 +52,14 @@ SALIXTORRENT_COMPONENT_PROFILE = ComponentLayoutProfile(
         "create_torrent.comment": ControlLayoutDefaults(width=FILL),
         "create_torrent.trackers_input": ControlLayoutDefaults(width=FILL, height=105),
         "create_torrent.progress_bar": ControlLayoutDefaults(width=FILL, height=22),
+        # Transfer utility dialogs.
+        "download.magnet.dialog": ControlLayoutDefaults(width=680, height=285),
+        "download.magnet.input": ControlLayoutDefaults(width=FILL, height=70),
+        "download.magnet.progress": ControlLayoutDefaults(width=FILL),
+        "download.remove.dialog": ControlLayoutDefaults(width=520, height=230),
+        "download.removal_notice.dialog": ControlLayoutDefaults(width=520, height=170),
+        "download.recheck.dialog": ControlLayoutDefaults(width=560, height=190),
+        "download.completion_notice.dialog": ControlLayoutDefaults(width=480, height=150),
         # Torrent Properties / Configure targets.
         "configure_targets.dialog": ControlLayoutDefaults(width=620, height=365),
         "torrent_properties.seeding_goal": ControlLayoutDefaults(width=230),
