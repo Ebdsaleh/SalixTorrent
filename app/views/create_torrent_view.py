@@ -8,7 +8,6 @@ import threading
 import tkinter as tk
 from tkinter import filedialog
 
-import dearpygui.dearpygui as dpg
 
 from app.localization import canonical_choice, localized_choices, tr, tr_value
 
@@ -16,6 +15,7 @@ from app.engine.components import (
     Button,
     CheckBox,
     ComboBox,
+    ComponentGroup,
     ControlColumn,
     ControlRow,
     Label,
@@ -274,6 +274,18 @@ class CreateTorrentView:
                     ).attach(help_tooltip("START_SEEDING"))
                     self.start_seeding_button = self.start_seeding_component.build()
 
+        self.creation_editable_components = ComponentGroup(
+            self.select_file_component,
+            self.select_folder_component,
+            self.choose_output_component,
+            self.generation_component,
+            self.piece_size_component,
+            self.private_component,
+            self.comment_component,
+            self.trackers_component,
+            self.create_component,
+        )
+
         self._layout_root = parent_tag
         self.layout.watch_item(
             parent_tag,
@@ -305,20 +317,19 @@ class CreateTorrentView:
         self.source_path = os.path.abspath(path)
         self._created_source_path = ""
         self._created_torrent_path = ""
-        if hasattr(self, "start_seeding_button"):
-            dpg.configure_item(self.start_seeding_button, enabled=False, show=False)
-        dpg.set_value(self.source_text, self.source_path)
+        if hasattr(self, "start_seeding_component"):
+            self.start_seeding_component.set_enabled(False)
+            self.start_seeding_component.set_visible(False)
+        self.source_text_component.set_text(self.source_path)
 
         if os.path.isfile(self.source_path):
             size = os.path.getsize(self.source_path)
-            dpg.set_value(
-                self.source_summary,
+            self.source_summary_component.set_text(
                 tr('view.create_torrent_view.single_file_torrent_source_value_mib', 'Single-file torrent source - {value0:,.2f} MiB', value0=size / (1024 * 1024)),
             )
             default_output = f"{self.source_path}.torrent"
         else:
-            dpg.set_value(
-                self.source_summary,
+            self.source_summary_component.set_text(
                 tr('view.create_torrent_view.folder_selected_files_are_scanned_and_hashed', "Folder selected - files are scanned and hashed in the background when creation starts."),
             )
             default_output = os.path.join(
@@ -328,11 +339,11 @@ class CreateTorrentView:
 
         if not self._output_was_user_chosen:
             self.output_path = default_output
-            dpg.set_value(self.output_text, self.output_path)
+            self.output_text_component.set_text(self.output_path)
 
-        dpg.set_value(self.status_text, tr('view.create_torrent_view.ready', "Ready"))
-        dpg.set_value(self.detail_text, "")
-        dpg.set_value(self.progress_bar, 0.0)
+        self.status_component.set_text(tr('view.create_torrent_view.ready', "Ready"))
+        self.detail_component.set_text("")
+        self.progress_component.set_value(0.0)
 
     def _select_file_source(self):
         root = self._native_root()
@@ -377,46 +388,34 @@ class CreateTorrentView:
                 path += ".torrent"
             self.output_path = os.path.abspath(path)
             self._output_was_user_chosen = True
-            dpg.set_value(self.output_text, self.output_path)
+            self.output_text_component.set_text(self.output_path)
 
     def _trackers(self):
-        raw = dpg.get_value(self.trackers_input) or ""
+        raw = self.trackers_component.get_value() or ""
         return raw.splitlines()
 
 
     def _set_creation_controls_busy(self, busy: bool):
-        enabled = not busy
-        for item in (
-            self.select_file_button,
-            self.select_folder_button,
-            self.choose_output_button,
-            self.generation_combo,
-            self.piece_size_combo,
-            self.private_checkbox,
-            self.comment_input,
-            self.trackers_input,
-        ):
-            dpg.configure_item(item, enabled=enabled)
-        dpg.configure_item(self.create_button, enabled=enabled)
-        dpg.configure_item(self.cancel_button, enabled=busy)
+        self.creation_editable_components.set_enabled(not busy)
+        self.cancel_component.set_enabled(busy)
 
     def _start_creation(self):
         if self._worker and self._worker.is_alive():
             return
 
         if not self.source_path or not os.path.exists(self.source_path):
-            dpg.set_value(self.status_text, tr('view.create_torrent_view.select_a_valid_source_first', "Select a valid source first."))
+            self.status_component.set_text(tr('view.create_torrent_view.select_a_valid_source_first', "Select a valid source first."))
             return
 
         if not self.output_path:
-            dpg.set_value(self.status_text, tr('view.create_torrent_view.choose_where_to_save_the_torrent_file', "Choose where to save the .torrent file."))
+            self.status_component.set_text(tr('view.create_torrent_view.choose_where_to_save_the_torrent_file', "Choose where to save the .torrent file."))
             return
 
-        generation = canonical_choice(dpg.get_value(self.generation_combo), TORRENT_GENERATIONS, TORRENT_GENERATION_HYBRID)
-        piece_label = canonical_choice(dpg.get_value(self.piece_size_combo), tuple(self.PIECE_SIZE_OPTIONS), "Auto")
+        generation = canonical_choice(self.generation_component.get_value(), TORRENT_GENERATIONS, TORRENT_GENERATION_HYBRID)
+        piece_label = canonical_choice(self.piece_size_component.get_value(), tuple(self.PIECE_SIZE_OPTIONS), "Auto")
         piece_length = self.PIECE_SIZE_OPTIONS.get(piece_label)
-        comment = dpg.get_value(self.comment_input) or ""
-        private = bool(dpg.get_value(self.private_checkbox))
+        comment = self.comment_component.get_value() or ""
+        private = bool(self.private_component.get_value())
         trackers = self._trackers()
 
         source_path = self.source_path
@@ -424,11 +423,12 @@ class CreateTorrentView:
         self._cancel_event = threading.Event()
         self._created_source_path = ""
         self._created_torrent_path = ""
-        dpg.configure_item(self.start_seeding_button, enabled=False, show=False)
+        self.start_seeding_component.set_enabled(False)
+        self.start_seeding_component.set_visible(False)
         self._set_creation_controls_busy(True)
-        dpg.set_value(self.progress_bar, 0.0)
-        dpg.set_value(self.status_text, tr('view.create_torrent_view.starting', "Starting..."))
-        dpg.set_value(self.detail_text, "")
+        self.progress_component.set_value(0.0)
+        self.status_component.set_text(tr('view.create_torrent_view.starting', "Starting..."))
+        self.detail_component.set_text("")
 
         def on_progress(progress: TorrentCreationProgress):
             self._events.put(("progress", progress))
@@ -472,31 +472,29 @@ class CreateTorrentView:
             self.manager.set_selected_torrent(info_hash)
             self.manager.start_torrent(info_hash)
 
-            dpg.set_value(
-                self.status_text,
+            self.status_component.set_text(
                 tr('view.create_torrent_view.added_to_active_transfers_verifying_source_for', "Added to Active Transfers - verifying source for seeding"),
             )
-            dpg.set_value(
-                self.detail_text,
+            self.detail_component.set_text(
                 (
                     tr('view.create_torrent_view.source_is_seeded_in_place_no_copy_to', 'Source is seeded in place (no copy to downloads):\n{created_source_path}', created_source_path=self._created_source_path)
                 ),
             )
-            dpg.configure_item(self.start_seeding_button, enabled=False)
+            self.start_seeding_component.set_enabled(False)
 
             # Switch to the transfer queue so Checking -> Seeding is visible.
             from app.engine.gui_engine import GuiEngine
             GuiEngine.get_instance().switch_scene("DownloadView")
 
         except Exception as exc:
-            dpg.set_value(self.status_text, tr('view.create_torrent_view.could_not_start_seeding', "Could not start seeding"))
-            dpg.set_value(self.detail_text, str(exc))
+            self.status_component.set_text(tr('view.create_torrent_view.could_not_start_seeding', "Could not start seeding"))
+            self.detail_component.set_text(str(exc))
 
     def _cancel_creation(self):
         if self._cancel_event:
             self._cancel_event.set()
-            dpg.set_value(self.status_text, tr('view.create_torrent_view.cancelling', "Cancelling..."))
-            dpg.configure_item(self.cancel_button, enabled=False)
+            self.status_component.set_text(tr('view.create_torrent_view.cancelling', "Cancelling..."))
+            self.cancel_component.set_enabled(False)
 
     @staticmethod
     def _piece_size_text(piece_length: int) -> str:
@@ -505,24 +503,22 @@ class CreateTorrentView:
         return f"{piece_length / 1024:g} KiB"
 
     def _handle_progress(self, progress: TorrentCreationProgress):
-        dpg.set_value(self.progress_bar, progress.fraction)
+        self.progress_component.set_value(progress.fraction)
 
         if progress.phase == "Hashing":
-            dpg.set_value(
-                self.status_text,
+            self.status_component.set_text(
                 tr('view.create_torrent_view.hashing_value', 'Hashing {value0:.1f}%', value0=progress.fraction * 100),
             )
             mib_done = progress.bytes_hashed / (1024 * 1024)
             mib_total = progress.total_bytes / (1024 * 1024)
             current = tr("view.create_torrent_view.current_file_suffix", " - {file}", file=progress.current_file) if progress.current_file else ""
-            dpg.set_value(
-                self.detail_text,
+            self.detail_component.set_text(
                 (
                     tr('view.create_torrent_view.value_value_mib_hashed_value_pieces_value', '{mib_done:,.1f} / {mib_total:,.1f} MiB hashed | {pieces_hashed:,} pieces{current}', mib_done=mib_done, mib_total=mib_total, pieces_hashed=progress.pieces_hashed, current=current)
                 ),
             )
         else:
-            dpg.set_value(self.status_text, tr_value(progress.phase))
+            self.status_component.set_text(tr_value(progress.phase))
 
     def update(self, delta_time: float):
         del delta_time
@@ -541,36 +537,32 @@ class CreateTorrentView:
                 self.output_path = result.output_path
                 self._created_source_path = os.path.abspath(self.source_path)
                 self._created_torrent_path = os.path.abspath(result.output_path)
-                dpg.set_value(self.output_text, result.output_path)
-                dpg.set_value(self.progress_bar, 1.0)
-                dpg.set_value(self.status_text, tr('view.create_torrent_view.torrent_created_successfully', "Torrent created successfully"))
+                self.output_text_component.set_text(result.output_path)
+                self.progress_component.set_value(1.0)
+                self.status_component.set_text(tr('view.create_torrent_view.torrent_created_successfully', "Torrent created successfully"))
                 mode = tr_value("folder / multi-file" if result.is_multi_file else "single-file")
                 skipped = (
                     tr("view.create_torrent_view.symlinks_skipped_suffix", " | {count} symlink(s) skipped", count=result.skipped_symlinks)
                     if result.skipped_symlinks
                     else ""
                 )
-                dpg.set_value(
-                    self.detail_text,
+                self.detail_component.set_text(
                     (
                         tr('view.create_torrent_view.value_value_value_file_s_value_mib_value', '{torrent_name} | {mode} | {file_count:,} file(s) | {value3:,.2f} MiB | {piece_count:,} pieces @ {value5} | {generation} | Info Hash: {info_hash}{skipped}\nSaved: {output_path}', torrent_name=result.torrent_name, mode=mode, file_count=result.file_count, value3=result.total_bytes / (1024 * 1024), piece_count=result.piece_count, value5=self._piece_size_text(result.piece_length), generation=result.generation, info_hash=result.info_hash, skipped=skipped, output_path=result.output_path)
                     ),
                 )
                 self._set_creation_controls_busy(False)
-                dpg.configure_item(
-                    self.start_seeding_button,
-                    enabled=True,
-                    show=True,
-                )
+                self.start_seeding_component.set_enabled(True)
+                self.start_seeding_component.set_visible(True)
 
             elif event_type == "cancelled":
-                dpg.set_value(self.status_text, tr('view.create_torrent_view.creation_cancelled', "Creation cancelled"))
-                dpg.set_value(self.detail_text, tr('view.create_torrent_view.no_torrent_file_was_replaced', "No .torrent file was replaced."))
+                self.status_component.set_text(tr('view.create_torrent_view.creation_cancelled', "Creation cancelled"))
+                self.detail_component.set_text(tr('view.create_torrent_view.no_torrent_file_was_replaced', "No .torrent file was replaced."))
                 self._set_creation_controls_busy(False)
 
             elif event_type == "error":
-                dpg.set_value(self.status_text, tr('view.create_torrent_view.creation_failed', "Creation failed"))
-                dpg.set_value(self.detail_text, str(payload))
+                self.status_component.set_text(tr('view.create_torrent_view.creation_failed', "Creation failed"))
+                self.detail_component.set_text(str(payload))
                 self._set_creation_controls_busy(False)
 
 

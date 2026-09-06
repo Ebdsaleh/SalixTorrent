@@ -2,8 +2,8 @@
 
 **Current application version string:** `0.4.0`
 **Roadmap status:** active development planning
-**Current implementation checkpoint:** post-v0.4.0 reusable GUI components — structural tranche accepted for commit; Create Torrent form/tooltip tranche implemented
-**Current real Windows regression baseline:** 354 / 354 at the last pushed GUI checkpoint, with one expected non-Windows skip; structural tranche targets 362 and the Create Torrent form/tooltip tranche targets 370
+**Current implementation checkpoint:** post-v0.4.0 reusable GUI/RAD extraction — Create Torrent form/tooltip tranche validated; runtime-state tranche implemented
+**Current real Windows regression baseline:** 370 / 370 through the validated Create Torrent form/tooltip tranche, with one expected non-Windows skip; runtime-state tranche targets 374
 
 This roadmap records intended engineering direction rather than promising dates or release numbers. Changes should remain incremental, testable, reviewable, and compatible with SalixTorrent's existing protocol, persistence, packaging, localization, and cross-platform boundaries.
 
@@ -594,7 +594,7 @@ Third tranche — component layout profiles — complete/pushed (`f5e30e30012958
 - [x] run both full Windows discovery commands at 354/354 with one expected skip;
 - [x] visually confirm Preferences, Torrent Properties and `Configure targets...` retain their established dimensions.
 
-Fourth tranche — structural composition and attachment boundary:
+Fourth tranche — structural composition and attachment boundary — complete/pushed (`61d9d8424eecfbf3201d529d824fc68a85f079d5`):
 
 - [x] add a backend-neutral `Separator` primitive;
 - [x] add reusable `SectionPanel` and `Dialog` structural containers;
@@ -606,11 +606,12 @@ Fourth tranche — structural composition and attachment boundary:
 - [x] migrate `Configure targets...` onto the reusable dialog boundary and profile-owned dialog dimensions;
 - [x] add eight structural/attachment regressions (28 component tests total);
 - [x] regenerate deterministic localization extraction metadata with no canonical string changes;
-- [ ] run focused Windows component/localization validation;
-- [ ] run both full Windows discovery commands and account for the expected 354 -> 362 test-count increase;
-- [ ] visually confirm Preferences and `Configure targets...` retain their established structure and behavior.
+- [x] run focused Windows component/localization validation;
+- [x] run both full Windows discovery commands at 362/362 with one expected skip;
+- [x] visually confirm Preferences and `Configure targets...` retain their established structure and behavior;
+- [x] commit/push as `61d9d8424eecfbf3201d529d824fc68a85f079d5` (`Add reusable structural GUI composition`).
 
-Fifth tranche — Create Torrent form composition and tooltip renderer boundary:
+Fifth tranche — Create Torrent form composition and tooltip renderer boundary — Windows-validated/committed (`e11e05e`; push verification pending):
 
 - [x] add a backend-neutral `Tooltip` attachment that delegates backend tooltip creation through `ComponentRenderer`;
 - [x] centralize Dear PyGui tooltip creation/failure isolation in the renderer while preserving existing Help helper compatibility;
@@ -623,8 +624,23 @@ Fifth tranche — Create Torrent form composition and tooltip renderer boundary:
 - [x] add eight form/tooltip regressions (36 component tests total);
 - [x] regenerate deterministic localization extraction metadata with no canonical string changes;
 - [x] source-side component and focused localization/documentation validation;
-- [ ] run both real-Windows full discovery commands and account for the expected 362 -> 370 test-count increase;
-- [ ] visually/behaviorally smoke source selection, output selection, generation/piece-size/private/comment controls, tracker editor, progress controls, cancellation and Start Seeding visibility.
+- [x] run both real-Windows full discovery commands at 370/370 with one expected skip;
+- [x] complete the real-Windows Create Torrent behavior/tooltips smoke before commit;
+- [x] commit as `e11e05e` (`Migrate Create Torrent to reusable GUI components`); remote push verification is the immediate Git follow-up.
+
+Sixth tranche — backend-neutral runtime state lifecycle — implementation complete:
+
+- [x] add generic component `configure`, `exists`, `set_enabled` and `set_visible` helpers;
+- [x] add `ComponentGroup` for coordinated runtime state transitions across already-built controls;
+- [x] keep the contract renderer-neutral and avoid introducing an automatic observer/data-binding framework prematurely;
+- [x] migrate Create Torrent runtime reads and updates from direct Dear PyGui calls to component objects;
+- [x] preserve raw backend item IDs for `ResponsiveLayout` geometry compatibility only;
+- [x] remove the direct Dear PyGui import from `create_torrent_view.py`;
+- [x] add four runtime-state regressions (40 component tests total);
+- [x] regenerate deterministic localization extraction metadata with no canonical string changes;
+- [x] source-side component and focused localization/documentation validation;
+- [ ] run both real-Windows full discovery commands and account for the expected 370 -> 374 test-count increase;
+- [ ] smoke Create Torrent source/output selection, busy/cancel transitions, progress/status updates and Start Seeding show/enable transitions.
 
 ## Priority B — user-facing durability
 
@@ -734,7 +750,9 @@ The third tranche introduces renderer-selected `ComponentLayoutProfile` policy. 
 
 The fourth tranche extends the reusable layer upward into structural composition without wrapping complex tables or telemetry views cosmetically. `SectionPanel` owns child-window/panel sizing, heading and separator structure; `Dialog` owns window/dialog construction and semantic profile sizing; `ControlRow` and `ControlColumn` support context-managed incremental migration where existing view logic still needs imperative construction. Preferences now uses those structural boundaries instead of direct Dear PyGui groups/child windows, and `Configure targets...` uses the reusable dialog boundary. The same tranche adds a generic post-build attachment hook so future tooltip/accessibility metadata can attach to components without embedding SalixTorrent-specific Help semantics in the framework.
 
-The fifth tranche proves those contracts on a complete ordinary form. Create Torrent now uses framework-owned rows, panels, value controls and profile dimensions throughout its construction path, including a reusable `ProgressBar`. Generic `Tooltip` attachments call the active renderer rather than Dear PyGui directly, while a SalixTorrent adapter converts glossary/help terms into tooltip text. Existing raw item IDs remain available to background creation callbacks and ResponsiveLayout, so the architectural migration does not rewrite torrent-creation behavior.
+The fifth tranche proves those contracts on a complete ordinary form. Create Torrent now uses framework-owned rows, panels, value controls and profile dimensions throughout its construction path, including a reusable `ProgressBar`. Generic `Tooltip` attachments call the active renderer rather than Dear PyGui directly, while a SalixTorrent adapter converts glossary/help terms into tooltip text.
+
+The sixth tranche separates runtime component state from Dear PyGui as well. Generic components can now configure their rendered item, query existence, toggle enabled/visible state, and coordinate those transitions through `ComponentGroup`. Create Torrent uses component value/state APIs for its entire runtime workflow, while raw backend IDs remain only where the established `ResponsiveLayout` geometry service still requires them. This is intentionally a small lifecycle contract derived from proven duplication, not an automatic observer/data-binding subsystem.
 
 Names such as `components`, `SectionPanel`, `Dialog`, and profile identifiers remain working extraction names. Final RAD-framework naming and public API terminology are deliberately deferred until the full reusable boundary has been extracted and proven.
 
@@ -747,7 +765,8 @@ Reusable GUI component foundation
 Candidate follow-up work after the Create Torrent form tranche validates:
 
 - migrate only additional ordinary dialogs/forms where the current structural and attachment contracts remove real duplication;
-- evaluate a backend-neutral state/binding lifecycle contract using duplicated value-enable/show/update patterns from already migrated forms rather than designing it speculatively;
+- extend the now-proven runtime state lifecycle to another ordinary form/dialog only where it removes real duplicated backend calls;
+- evaluate automatic binding/observer metadata only after at least two migrated runtime workflows demonstrate the same synchronization contract;
 - continue using application-owned adapters for Help/Glossary/accessibility semantics while keeping generic attachments product-neutral;
 - continue separating component model/state from the Dear PyGui renderer where that improves future RAD extraction;
 - avoid converting complex tables/graphs merely for cosmetic uniformity;
@@ -831,6 +850,6 @@ process restart restored 2 torrents
 first GUI frame displayed persisted queue order
 ```
 
-The v0.4.0 release baseline remains 334/334 tests with one expected non-Windows skip. The first GUI-component tranche is committed/pushed at `66b46fa7070128f13bc87fbe4f9556a86049e895` and passed 343/343 on the real Windows checkout. The second Preferences-composition tranche is committed/pushed at `139931246280818694de1920b4b49c4e5cf734ca` and passed 348/348. The third component-profile tranche is committed/pushed at `f5e30e30012958429240bcf2646ac9a09d348de5` and advances the authoritative real-Windows development baseline to 354/354 with one expected skip. The fourth structural tranche adds eight headless regressions, bringing component coverage to 28/28 and the expected real-Windows discoverable total to 362 after application. Focused documentation/localization tests pass 34/34 source-side and deterministic localization extraction is current; the 362 Windows/full visual gate remains pending.
+The v0.4.0 release baseline remains 334/334 tests with one expected non-Windows skip. The first GUI-component tranche is committed/pushed at `66b46fa7070128f13bc87fbe4f9556a86049e895` and passed 343/343 on the real Windows checkout. The second Preferences-composition tranche is committed/pushed at `139931246280818694de1920b4b49c4e5cf734ca` and passed 348/348. The third component-profile tranche is committed/pushed at `f5e30e30012958429240bcf2646ac9a09d348de5` and passed 354/354. The fourth structural tranche is committed/pushed at `61d9d8424eecfbf3201d529d824fc68a85f079d5` and passed 362/362. The Create Torrent form/tooltip tranche is committed locally as `e11e05e` and passed 370/370 on the real Windows checkout. The runtime-state tranche adds four component regressions for an expected 374-test Windows gate. Focused documentation/localization remains green and deterministic localization extraction remains current.
 
 The v0.4.0 live GUI smoke covers per-torrent editing, additive Days/Hours/Minutes quick controls, explicit bulk Preferences application, persistence, in-app/native notifications, instanced time-based automatic stop, Days/Hours/Minutes exact editors, stacked compact duration controls, and the widened Preferences ratio field. Ratio-threshold behavior remains covered by deterministic regressions without requiring a second live peer. Future changes must preserve the applicable baseline or account explicitly for every intentional test-count change.

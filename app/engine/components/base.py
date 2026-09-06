@@ -112,6 +112,30 @@ class Component(ABC):
             raise RuntimeError(f"{self.__class__.__name__} has not been built")
         return self.item
 
+    def exists(self) -> bool:
+        """Return whether the rendered backend item still exists."""
+
+        if self.item is None:
+            return False
+        renderer = self._renderer or get_default_renderer()
+        return bool(renderer.exists(self.item))
+
+    def configure(self, **kwargs) -> None:
+        """Configure the rendered item through the active renderer."""
+
+        renderer = self._renderer or get_default_renderer()
+        renderer.configure(self.require_item(), **kwargs)
+
+    def set_enabled(self, enabled: bool) -> None:
+        """Set interactive enabled state without exposing backend APIs."""
+
+        self.configure(enabled=bool(enabled))
+
+    def set_visible(self, visible: bool) -> None:
+        """Set visibility without exposing backend-specific ``show`` calls."""
+
+        self.configure(show=bool(visible))
+
     @abstractmethod
     def build(
         self,
@@ -132,7 +156,3 @@ class ValueComponent(Component):
     def set_value(self, value) -> None:
         renderer = self._renderer or get_default_renderer()
         renderer.set_value(self.require_item(), value)
-
-    def configure(self, **kwargs) -> None:
-        renderer = self._renderer or get_default_renderer()
-        renderer.configure(self.require_item(), **kwargs)

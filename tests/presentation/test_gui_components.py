@@ -10,6 +10,7 @@ from app.engine.components import (
     FILL,
     FRAMEWORK_COMPONENT_PROFILE,
     Button,
+    ComponentGroup,
     ComponentLayoutProfile,
     ComboBox,
     ControlColumn,
@@ -75,7 +76,10 @@ class RecordingRenderer:
         self.configured.setdefault(item, {}).update(kwargs)
 
     def exists(self, item):
-        return item in self.values or any(entry[1] == item for entry in self.containers)
+        return (
+            any(entry[1] == item for entry in self.created)
+            or any(entry[1] == item for entry in self.containers)
+        )
 
     def attach_tooltip(self, item, text, *, wrap=450):
         record = (item, str(text), int(wrap))
@@ -97,6 +101,7 @@ class GuiComponentFoundationTests(unittest.TestCase):
             "fields.py",
             "layout.py",
             "profile.py",
+            "state.py",
         )
         for name in model_files:
             tree = ast.parse(
@@ -725,6 +730,61 @@ class GuiComponentFoundationTests(unittest.TestCase):
         self.assertNotIn("import dearpygui", help_source)
         self.assertIn("get_default_renderer().attach_tooltip", help_source)
         self.assertIn("dpg.add_tooltip(parent=item)", renderer_source)
+
+    def test_component_runtime_state_helpers_use_renderer_configuration(self):
+        renderer = RecordingRenderer()
+        button = Button("Run", enabled=True, show=True)
+        item = button.build(renderer=renderer)
+
+        self.assertTrue(button.exists())
+        button.set_enabled(False)
+        button.set_visible(False)
+        button.configure(label="Retry")
+
+        self.assertEqual(
+            renderer.configured[item],
+            {"enabled": False, "show": False, "label": "Retry"},
+        )
+
+    def test_component_group_applies_shared_runtime_state(self):
+        renderer = RecordingRenderer()
+        first = Button("First")
+        second = ComboBox(("A", "B"), default_value="A")
+        first.build(renderer=renderer)
+        second.build(renderer=renderer)
+        group = ComponentGroup(first, second)
+
+        group.set_enabled(False)
+        group.set_visible(True)
+
+        self.assertEqual(len(group), 2)
+        for component in group:
+            configured = renderer.configured[component.require_item()]
+            self.assertFalse(configured["enabled"])
+            self.assertTrue(configured["show"])
+
+    def test_component_group_accepts_iterables_and_rejects_non_components(self):
+        first = Button("First")
+        second = Button("Second")
+        group = ComponentGroup((first, second))
+
+        self.assertEqual(tuple(group), (first, second))
+        with self.assertRaises(TypeError):
+            ComponentGroup(first, object())
+
+    def test_create_torrent_runtime_state_uses_components_not_dearpygui(self):
+        source = (PROJECT_ROOT / "app" / "views" / "create_torrent_view.py").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertNotIn("import dearpygui", source)
+        self.assertNotIn("dpg.", source)
+        self.assertIn("ComponentGroup(", source)
+        self.assertIn("self.creation_editable_components.set_enabled", source)
+        self.assertIn("self.progress_component.set_value", source)
+        self.assertIn("self.status_component.set_text", source)
+        self.assertIn("self.start_seeding_component.set_visible", source)
+
 
 
 if __name__ == "__main__":

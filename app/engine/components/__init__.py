@@ -41,6 +41,7 @@ from app.engine.components.fields import (
     LabeledNumericField,
     NumericUnitField,
 )
+from app.engine.components.state import ComponentGroup
 from app.engine.components.renderer import (
     ComponentRenderer,
     DearPyGuiRenderer,
@@ -54,6 +55,7 @@ __all__ = [
     "Button",
     "CheckBox",
     "ComboBox",
+    "ComponentGroup",
     "ComponentLayoutProfile",
     "ComponentRenderer",
     "ControlColumn",

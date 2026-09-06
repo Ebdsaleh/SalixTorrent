@@ -4,6 +4,15 @@ Notable SalixTorrent changes are recorded here.
 
 ## Unreleased
 
+### GUI Component/RAD Extraction — Backend-Neutral Runtime State
+
+- Added renderer-neutral runtime configuration helpers on every component for existence checks, enabled state and visibility without exposing Dear PyGui calls to view logic.
+- Added `ComponentGroup` for coordinated state transitions across related controls without creating product-specific form classes.
+- Migrated Create Torrent's complete runtime value/state path onto component objects: source/output/status/detail labels, progress, editable-control busy state, combo/text/checkbox reads, Cancel, and Start Seeding visibility/enabled transitions no longer call Dear PyGui directly.
+- Kept raw item IDs available only where existing `ResponsiveLayout` geometry operations still require them, preserving established resize behavior and compatibility boundaries.
+- Deliberately stopped short of an automatic observer/data-binding system: this tranche extracts only lifecycle behavior already proven by duplicated runtime state updates.
+- Added four runtime-state regressions, increasing the component suite from 36 to 40 and the expected real-Windows full-suite total from 370 to 374.
+
 ### GUI Component/RAD Extraction — Create Torrent Form and Tooltip Boundary
 
 - Added a backend-neutral `Tooltip` component attachment and moved Dear PyGui tooltip creation/failure isolation behind the reusable component renderer contract.
