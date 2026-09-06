@@ -109,7 +109,7 @@ class FrameworkPackagingTests(unittest.TestCase):
                 check=False,
             )
             self.assertEqual(0, result.returncode, result.stderr or result.stdout)
-            self.assertGreaterEqual(int(result.stdout.strip()), 18)
+            self.assertGreaterEqual(int(result.stdout.strip()), 19)
 
     def test_relocated_framework_contracts_are_usable_without_application_package(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -125,6 +125,7 @@ class FrameworkPackagingTests(unittest.TestCase):
                 from portable_framework.documentation import DocPage, DocumentationTheme
                 from portable_framework.geometry import ContentMetrics, content_bounds
                 from portable_framework.property_cascade import PropertySource, resolve_property
+                from portable_framework.responsive import LayoutCoordinator
 
                 button = Button("Run")
                 profile = ComponentLayoutProfile("probe")
@@ -136,11 +137,27 @@ class FrameworkPackagingTests(unittest.TestCase):
                     validator=lambda value: isinstance(value, str),
                 )
 
+                class Host:
+                    def install_viewport_resize(self, callback):
+                        return True
+                    def watch_item_resize(self, item, callback):
+                        return None
+                    def unwatch_item_resize(self, watch):
+                        return None
+                    def item_size(self, item):
+                        return (400, 300)
+                    def configure(self, item, **kwargs):
+                        return True
+
+                coordinator = LayoutCoordinator(Host())
+
                 assert button.label == "Run"
                 assert profile.name == "probe"
                 assert page.title == "Portable"
                 assert theme is not None
                 assert bounds.width == 700
+                assert coordinator.item_size("panel") == (400, 300)
+                assert coordinator.width("panel", 320) is True
                 assert resolved.value == "fallback"
                 assert resolved.source is PropertySource.DEFAULT
                 assert not any(name == "app" or name.startswith("app.") for name in sys.modules)

@@ -852,7 +852,11 @@ The tenth tranche begins the first physical extraction without freezing final fr
 
 The eleventh tranche proves that physical boundary with a second independent reusable subsystem. Pure alignment/content/split/fill/dialog geometry moves to `app.framework.geometry`, while the Dear PyGui `ResponsiveLayout` dispatcher remains an engine adapter. Semantic documentation model/layout/typography contracts move to `app.framework.documentation`; the concrete `DocumentationRenderer` deliberately remains in the engine because it owns Dear PyGui, resource paths, application typography, media and resize callbacks. Compatibility facades preserve the former engine documentation import paths during extraction. It is pushed/Windows-validated at 403/403 under `1f70669678b3621718467b60e2fcb94aa8e77642`.
 
-The twelfth tranche proves package relocation ergonomics before any external repository split. All dependencies inside `app/framework/` now use package-relative imports, so the framework tree does not hard-code SalixTorrent's `app.framework` namespace internally. A packaging regression copies that directory to a temporary package named `portable_framework`, imports every module under Python isolated mode, and confirms that neither SalixTorrent's `app` package nor Dear PyGui is loaded. A second probe exercises representative component, documentation, geometry and property-cascade contracts from the renamed package, while a source audit restricts absolute framework dependencies to the Python standard library. The provisional framework root intentionally does not publish a version or wildcard public surface yet. Dear PyGui resize callback/handler ownership remains in the engine adapter because no second backend has proven that state reusable.
+The twelfth tranche proves package relocation ergonomics before any external repository split. All dependencies inside `app/framework/` now use package-relative imports, so the framework tree does not hard-code SalixTorrent's `app.framework` namespace internally. A packaging regression copies that directory to a temporary package named `portable_framework`, imports every module under Python isolated mode, and confirms that neither SalixTorrent's `app` package nor Dear PyGui is loaded. A second probe exercises representative component, documentation, geometry and property-cascade contracts from the renamed package, while a source audit restricts absolute framework dependencies to the Python standard library. The provisional framework root intentionally does not publish a version or wildcard public surface yet. It is pushed/Windows-validated at 408/408 under `cb019feb16362534367af168aa39706cc4808824`; live Active Transfers smoke also confirmed the Speed graph updating while a selected torrent was seeding with connected peers.
+
+The thirteenth tranche proves the remaining responsive-layout boundary instead of moving Dear PyGui state wholesale. `app.framework.responsive` introduces the backend-neutral `LayoutHost` contract plus `LayoutCoordinator`, which owns keyed viewport/item callbacks, explicit refresh/trigger behavior, item-watch replacement, safe callback dispatch, item-size normalization, and memoized width/height/size/wrap/indent/dialog geometry. `app.engine.layout_hosts.dearpygui` owns the concrete viewport callback adaptation, item-handler registry lifecycle, item rectangle reads, existence checks, and `configure_item(...)` calls. `app.engine.responsive_layout.ResponsiveLayout` remains the SalixTorrent singleton/composition facade so existing views do not change API. The isolated package-relocation probe now exercises this coordinator too. Seven net responsive-layout regressions advance the expected real-Windows suite from 408 to 415.
+
+This tranche is intended to close the **v0.5.0 reusable GUI component foundation feature scope**. If its Windows/full-suite and live GUI gates pass, do not invent another extraction tranche merely to delay release: prepare a separate v0.5.0 release commit, bump `APP_VERSION`, freeze release-facing documentation, build the Windows GUI/CLI/portable/installer artifacts, verify the frozen CLI version, push the release commit, and only then create/push the annotated `v0.5.0` tag. Final external framework repository/name/API extraction remains a later project boundary and is not required to ship SalixTorrent v0.5.0.
 
 Names such as `components`, `SectionPanel`, `Dialog`, and profile identifiers remain working extraction names. Final RAD-framework naming and public API terminology are deliberately deferred until the full reusable boundary has been extracted and proven.
 
@@ -862,16 +866,16 @@ Names such as `components`, `SectionPanel`, `Dialog`, and profile identifiers re
 Reusable GUI component foundation
 ```
 
-Candidate follow-up work after the package-relocation boundary validates:
+Release path after the responsive-coordination tranche validates:
 
-- inspect whether a small backend-neutral resize/callback coordination contract is genuinely shared before moving any remaining `ResponsiveLayout` state out of the Dear PyGui adapter;
-- prove the explicit binding or event contract on another ordinary persisted/editable surface only when it removes real duplication;
-- migrate only additional ordinary dialogs/forms where the current contracts remove real application code rather than creating cosmetic wrappers;
-- define the eventual host/backend adapter packaging boundary before an external repository split, while keeping the current package name and public API provisional;
-- keep application services such as clipboard, native file dialogs, networking and backend-specific resize handlers outside component ownership unless a broader reusable contract is proven;
-- continue using application-owned adapters for Help/Glossary/accessibility semantics while keeping generic attachments product-neutral;
-- avoid converting complex tables/graphs merely for cosmetic uniformity;
-- postpone the final framework naming/API pass until the full RAD extraction boundary is visible.
+- create a dedicated v0.5.0 release-preparation commit rather than another feature/extraction tranche;
+- bump the application version only in that release-preparation change and update release-facing README/changelog/roadmap state;
+- rerun the complete Windows regression suite and explicit framework/component/documentation gates;
+- rebuild standalone GUI and CLI artifacts, the portable ZIP, and the Inno Setup installer;
+- verify the frozen CLI reports `SalixTorrent 0.5.0`;
+- push the release-preparation commit before creating the annotated `v0.5.0` tag;
+- keep external framework repository naming/public API work for a later deliberate boundary rather than making it a prerequisite for this SalixTorrent release;
+- continue avoiding cosmetic conversion of complex transfer tables/graphs and keep clipboard/native dialogs/networking/application services outside the generic component framework.
 
 ## Later network release
 
@@ -915,13 +919,20 @@ application settings persistence: 12 / 12 OK
 session persistence: 34 / 34 OK
 semantic-documentation + localization-UI focus: 17 / 17 OK
 
-Full canonical discovery:
-392 / 392 OK
+Full canonical discovery (current pushed tranche 12):
+408 / 408 OK
 1 expected non-Windows skip
 
-Plain repository-root discovery:
-392 / 392 OK
+Plain repository-root discovery (current pushed tranche 12):
+408 / 408 OK
 1 expected non-Windows skip
+
+Tranche 13 prepared target:
+415 tests total
+14 / 14 responsive-layout tests
+5 / 5 framework packaging/relocation tests
+63 / 63 component tests
+40 / 40 focused documentation/localization tests
 
 Localization:
 canonical catalog: 1337 entries
@@ -951,6 +962,6 @@ process restart restored 2 torrents
 first GUI frame displayed persisted queue order
 ```
 
-The v0.4.0 release baseline remains 334/334 tests with one expected non-Windows skip. The first GUI-component tranche is committed/pushed at `66b46fa7070128f13bc87fbe4f9556a86049e895` and passed 343/343 on the real Windows checkout. The second Preferences-composition tranche is committed/pushed at `139931246280818694de1920b4b49c4e5cf734ca` and passed 348/348. The third component-profile tranche is committed/pushed at `f5e30e30012958429240bcf2646ac9a09d348de5` and passed 354/354. The fourth structural tranche is committed/pushed at `61d9d8424eecfbf3201d529d824fc68a85f079d5` and passed 362/362. The Create Torrent form/tooltip tranche is committed/pushed at `e11e05eb50238d540e798cbb689476afc302d939` and passed 370/370 on the real Windows checkout. The runtime-state tranche is committed/pushed at `30fee9f65ba08f1563f8a0a0f1b43d34eb046297` and passed 374/374. The transfer-dialog tranche is committed/pushed at `3ee3982687810f709ab0a34312e8e8b73d47324e` and passed 380/380. The explicit Preferences-binding tranche is committed/pushed at `665faab` and passed 385/385. The renderer-neutral event/disposal tranche is committed/pushed at `447c6296c37c288384345bebef220ac1e2901c22` and passed 392/392. The first physical framework-boundary tranche is committed/pushed at `bfc0e7a4fd5a49234425980c4dd5ce04f6f5a10f` and passed 397/397 on Windows. The documentation/geometry extraction tranche adds six regressions for an expected 403-test Windows gate; focused documentation/localization is 40/40 source-side and deterministic localization extraction remains current.
+The v0.4.0 release baseline remains 334/334 tests with one expected non-Windows skip. The first GUI-component tranche is committed/pushed at `66b46fa7070128f13bc87fbe4f9556a86049e895` and passed 343/343 on the real Windows checkout. The second Preferences-composition tranche is committed/pushed at `139931246280818694de1920b4b49c4e5cf734ca` and passed 348/348. The third component-profile tranche is committed/pushed at `f5e30e30012958429240bcf2646ac9a09d348de5` and passed 354/354. The fourth structural tranche is committed/pushed at `61d9d8424eecfbf3201d529d824fc68a85f079d5` and passed 362/362. The Create Torrent form/tooltip tranche is committed/pushed at `e11e05eb50238d540e798cbb689476afc302d939` and passed 370/370 on the real Windows checkout. The runtime-state tranche is committed/pushed at `30fee9f65ba08f1563f8a0a0f1b43d34eb046297` and passed 374/374. The transfer-dialog tranche is committed/pushed at `3ee3982687810f709ab0a34312e8e8b73d47324e` and passed 380/380. The explicit Preferences-binding tranche is committed/pushed at `665faab` and passed 385/385. The renderer-neutral event/disposal tranche is committed/pushed at `447c6296c37c288384345bebef220ac1e2901c22` and passed 392/392. The first physical framework-boundary tranche is committed/pushed at `bfc0e7a4fd5a49234425980c4dd5ce04f6f5a10f` and passed 397/397 on Windows. The documentation/geometry tranche is committed/pushed at `1f70669678b3621718467b60e2fcb94aa8e77642` and passed 403/403. The package-relocation tranche is committed/pushed at `cb019feb16362534367af168aa39706cc4808824` and passed 408/408. The prepared responsive-coordination tranche adds seven regressions for an expected 415-test Windows gate while keeping the 63 component and 40 focused documentation/localization gates unchanged.
 
 The v0.4.0 live GUI smoke covers per-torrent editing, additive Days/Hours/Minutes quick controls, explicit bulk Preferences application, persistence, in-app/native notifications, instanced time-based automatic stop, Days/Hours/Minutes exact editors, stacked compact duration controls, and the widened Preferences ratio field. Ratio-threshold behavior remains covered by deterministic regressions without requiring a second live peer. Future changes must preserve the applicable baseline or account explicitly for every intentional test-count change.

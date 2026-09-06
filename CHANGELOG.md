@@ -4,6 +4,16 @@ Notable SalixTorrent changes are recorded here.
 
 ## Unreleased
 
+### GUI/RAD Extraction — Backend-Neutral Responsive Coordination
+
+- Added a reusable `LayoutHost` protocol and `LayoutCoordinator` under `app/framework/responsive.py`, separating keyed callback coordination, explicit refresh/trigger behavior, item-watch replacement, and memoized geometry application from any concrete GUI toolkit.
+- Added the concrete `DearPyGuiLayoutHost` under `app/engine/layout_hosts/`; it exclusively owns Dear PyGui viewport callback adaptation, item-handler registries, item-size reads, existence checks, and `configure_item(...)` writes.
+- Reduced `app/engine/responsive_layout.py` to the SalixTorrent singleton/composition surface over the framework coordinator plus Dear PyGui host, while preserving existing view/documentation call sites and framework-geometry compatibility exports.
+- Kept native clipboard/file-dialog/network services, transfer tables/graphs, scene ownership, and Dear PyGui handler objects outside the reusable framework.
+- Extended responsive-layout regression coverage from 7 to 14 tests and extended the isolated framework relocation probe to construct/use the responsive coordinator after package rename. The expected full real-Windows suite advances from 408 to 415 tests.
+- The completed component/documentation/geometry/relocation/responsive boundaries now satisfy the planned v0.5.0 reusable-GUI-foundation feature scope. After this tranche passes its Windows/live smoke gate, the next step is a dedicated v0.5.0 release-preparation commit and full build/install/frozen-version gate rather than another feature tranche.
+- No user-facing strings, transfer/network behavior, persistence schema, SalixORM integration, or application version changed.
+
 ### GUI/RAD Extraction — Framework Package Relocation Readiness
 
 - Converted every intra-framework dependency under `app/framework/` to package-relative imports so the reusable tree no longer hard-codes the SalixTorrent `app.framework` namespace internally.
