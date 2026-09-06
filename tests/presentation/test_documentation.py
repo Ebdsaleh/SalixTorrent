@@ -1,14 +1,14 @@
 import unittest
 from unittest import mock
 
-from app.engine.documentation.layout import (
+from app.framework.documentation.layout import (
     DEFAULT_DOCUMENTATION_LAYOUT,
     DocLayout,
     DocumentationLayoutTheme,
     documentation_bounds,
     resolve_documentation_layout,
 )
-from app.engine.documentation.model import (
+from app.framework.documentation.model import (
     DocMediaKind,
     DocPage,
     DocParagraph,
@@ -16,17 +16,17 @@ from app.engine.documentation.model import (
     DocSection,
 )
 from app.engine.documentation.renderer import DocumentationRenderer
-from app.engine.documentation.typography import (
+from app.framework.documentation.typography import (
     documentation_scale_from_label,
     documentation_scale_label,
     icon_marker,
     normalise_documentation_scale,
     role_font_size,
 )
-from app.engine.documentation.model import DocIconKind
+from app.framework.documentation.model import DocIconKind
 from app.framework.property_cascade import PropertySource, UNSET, resolve_property
 from app.logic.torrent_manager import TorrentManager
-from app.engine.responsive_layout import (
+from app.framework.geometry import (
     ContentMetrics,
     HorizontalAlign,
     aligned_offset,
@@ -240,6 +240,95 @@ class DocumentationSubsystemTests(unittest.TestCase):
         self.assertEqual(page.title, "Example")
         self.assertEqual(page.sections[0].blocks[0].text, "Body")
         self.assertEqual(DocMediaKind.VIDEO.value, "video")
+
+
+    def test_framework_documentation_boundary_is_product_and_backend_neutral(self):
+        import ast
+        from pathlib import Path
+
+        project_root = Path(__file__).resolve().parents[2]
+        framework_dir = project_root / "app" / "framework"
+        candidate_files = (
+            framework_dir / "geometry.py",
+            *(framework_dir / "documentation").glob("*.py"),
+        )
+        forbidden_prefixes = (
+            "app.engine",
+            "app.views",
+            "app.logic",
+            "app.localization",
+            "dearpygui",
+        )
+
+        for path in candidate_files:
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+            imports = []
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    imports.extend(alias.name for alias in node.names)
+                elif isinstance(node, ast.ImportFrom) and node.module:
+                    imports.append(node.module)
+            self.assertFalse(
+                any(module.startswith(forbidden_prefixes) for module in imports),
+                str(path.relative_to(project_root)),
+            )
+
+    def test_framework_documentation_exports_do_not_claim_concrete_renderer_ownership(self):
+        import app.framework.documentation as framework_docs
+
+        self.assertFalse(hasattr(framework_docs, "DocumentationRenderer"))
+        self.assertTrue(hasattr(framework_docs, "DocPage"))
+        self.assertTrue(hasattr(framework_docs, "DocumentationTheme"))
+
+    def test_legacy_documentation_modules_are_compatibility_facades(self):
+        from app.engine.documentation.layout import DocLayout as LegacyDocLayout
+        from app.engine.documentation.model import DocPage as LegacyDocPage
+        from app.engine.documentation.typography import DocumentationTheme as LegacyTheme
+        from app.framework.documentation import DocLayout, DocPage, DocumentationTheme
+
+        self.assertIs(LegacyDocLayout, DocLayout)
+        self.assertIs(LegacyDocPage, DocPage)
+        self.assertIs(LegacyTheme, DocumentationTheme)
+
+    def test_concrete_documentation_renderer_remains_engine_backend_adapter(self):
+        from pathlib import Path
+
+        project_root = Path(__file__).resolve().parents[2]
+        source = (
+            project_root / "app" / "engine" / "documentation" / "renderer.py"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("import dearpygui.dearpygui as dpg", source)
+        self.assertIn("from app.engine.runtime_paths import resource_path", source)
+        self.assertIn("from app.engine.ui_typography import UiTypography", source)
+        self.assertIn("from app.framework.documentation", source)
+
+    def test_responsive_layout_reexports_framework_geometry_identity(self):
+        from app.engine.responsive_layout import (
+            ContentBounds as LegacyContentBounds,
+            HorizontalAlign as LegacyHorizontalAlign,
+        )
+        from app.framework.geometry import ContentBounds, HorizontalAlign
+
+        self.assertIs(LegacyContentBounds, ContentBounds)
+        self.assertIs(LegacyHorizontalAlign, HorizontalAlign)
+
+    def test_application_surfaces_use_framework_documentation_contracts(self):
+        from pathlib import Path
+
+        project_root = Path(__file__).resolve().parents[2]
+        help_source = (project_root / "app" / "views" / "help_topics_view.py").read_text(
+            encoding="utf-8"
+        )
+        settings_source = (project_root / "app" / "views" / "settings_view.py").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("from app.framework.documentation import (", help_source)
+        self.assertIn("from app.engine.documentation.renderer import DocumentationRenderer", help_source)
+        self.assertNotIn("from app.engine.documentation import (", help_source)
+        self.assertIn("from app.framework.documentation import (", settings_source)
+
 
 
 if __name__ == "__main__":

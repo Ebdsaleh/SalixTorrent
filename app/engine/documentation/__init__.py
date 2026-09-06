@@ -1,73 +1,7 @@
-"""Reusable semantic documentation subsystem for Dear PyGui applications."""
+"""Compatibility facade plus SalixTorrent's concrete documentation renderer."""
 
-from .layout import (
-    DEFAULT_DOCUMENTATION_LAYOUT,
-    DocLayout,
-    DocumentationBounds,
-    DocumentationLayoutDefaults,
-    DocumentationLayoutTheme,
-    ResolvedDocumentationLayout,
-    documentation_bounds,
-    resolve_documentation_layout,
-)
-from .model import (
-    DocBlock,
-    DocCallout,
-    DocCalloutKind,
-    DocCodeBlock,
-    DocIconKind,
-    DocIconLine,
-    DocLink,
-    DocLinks,
-    DocMedia,
-    DocMediaKind,
-    DocPage,
-    DocParagraph,
-    DocRole,
-    DocSection,
-)
+from app.framework.documentation import *  # noqa: F401,F403
+from app.framework.documentation import __all__ as _framework_all
 from .renderer import DocumentationRenderer
-from .typography import (
-    DEFAULT_DOCUMENTATION_SCALE,
-    DOCUMENTATION_SCALE_LABELS,
-    DOCUMENTATION_SCALES,
-    DocumentationTheme,
-    documentation_scale_from_label,
-    documentation_scale_label,
-    normalise_documentation_scale,
-    role_font_size,
-)
 
-__all__ = [
-    "DEFAULT_DOCUMENTATION_LAYOUT",
-    "DocLayout",
-    "DocumentationBounds",
-    "DocumentationLayoutDefaults",
-    "DocumentationLayoutTheme",
-    "ResolvedDocumentationLayout",
-    "documentation_bounds",
-    "resolve_documentation_layout",
-    "DocBlock",
-    "DocCallout",
-    "DocCalloutKind",
-    "DocCodeBlock",
-    "DocIconKind",
-    "DocIconLine",
-    "DocLink",
-    "DocLinks",
-    "DocMedia",
-    "DocMediaKind",
-    "DocPage",
-    "DocParagraph",
-    "DocRole",
-    "DocSection",
-    "DocumentationRenderer",
-    "DocumentationTheme",
-    "DEFAULT_DOCUMENTATION_SCALE",
-    "DOCUMENTATION_SCALE_LABELS",
-    "DOCUMENTATION_SCALES",
-    "documentation_scale_from_label",
-    "documentation_scale_label",
-    "normalise_documentation_scale",
-    "role_font_size",
-]
+__all__ = [*_framework_all, "DocumentationRenderer"]

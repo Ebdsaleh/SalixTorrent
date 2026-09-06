@@ -4,6 +4,17 @@ Notable SalixTorrent changes are recorded here.
 
 ## Unreleased
 
+### GUI/RAD Extraction — Framework Documentation and Geometry Boundary
+
+- Extracted backend-neutral geometry primitives (`ContentBounds`, alignment enums, content metrics, clamps/splits/fill helpers, and dialog metrics) into `app/framework/geometry.py`; the Dear PyGui resize dispatcher remains in `app/engine/responsive_layout.py` and re-exports the pure contracts for compatibility.
+- Moved the semantic documentation model, sparse layout policy/cascade, and typography/theme contracts into `app/framework/documentation/` as a second independent reusable subsystem.
+- Kept the concrete `DocumentationRenderer` in `app/engine/documentation/renderer.py` because it legitimately owns Dear PyGui, SalixTorrent runtime-resource lookup, application typography, media caching, and responsive callback integration.
+- Converted the former engine documentation model/layout/typography modules into compatibility facades and migrated application surfaces/tests onto the framework-facing contracts without a breaking public rename.
+- Extended source-level extraction coverage so framework documentation/geometry modules reject imports from SalixTorrent engine/view/logic/localization layers and Dear PyGui.
+- Added six documentation/framework-boundary regressions; the focused documentation/localization gate increases from 34 to 40 while the component suite remains 63. The expected real-Windows full-suite total advances from 397 to 403.
+- Regenerated deterministic localization extraction metadata after source relocation with canonical UI/Help/Glossary wording unchanged at 1,337 entries.
+- No transfer/network behavior, settings/session schema, SalixORM integration, user-facing documentation prose, or final framework naming/API decision changed.
+
 ### GUI Component/RAD Extraction — First Physical Framework Boundary
 
 - Moved the reusable property-cascade and GUI component implementations into the provisional internal `app/framework/` boundary, while retaining `app/engine/components/` and `app/engine/property_cascade.py` as compatibility facades during extraction.

@@ -1,0 +1,76 @@
+"""Backend-neutral semantic documentation contracts.
+
+Concrete renderers belong to application/backend adapter layers.
+"""
+
+from .layout import (
+    DEFAULT_DOCUMENTATION_LAYOUT,
+    DocLayout,
+    DocumentationBounds,
+    DocumentationLayoutDefaults,
+    DocumentationLayoutTheme,
+    ResolvedDocumentationLayout,
+    documentation_bounds,
+    resolve_documentation_layout,
+)
+from .model import (
+    DocBlock,
+    DocCallout,
+    DocCalloutKind,
+    DocCodeBlock,
+    DocIconKind,
+    DocIconLine,
+    DocLink,
+    DocLinks,
+    DocMedia,
+    DocMediaKind,
+    DocPage,
+    DocParagraph,
+    DocRole,
+    DocSection,
+)
+from .typography import (
+    DEFAULT_DOCUMENTATION_SCALE,
+    DOCUMENTATION_SCALE_LABELS,
+    DOCUMENTATION_SCALES,
+    DocumentationTheme,
+    documentation_scale_from_label,
+    documentation_scale_label,
+    icon_marker,
+    normalise_documentation_scale,
+    role_font_size,
+)
+
+__all__ = [
+    "DEFAULT_DOCUMENTATION_LAYOUT",
+    "DocLayout",
+    "DocumentationBounds",
+    "DocumentationLayoutDefaults",
+    "DocumentationLayoutTheme",
+    "ResolvedDocumentationLayout",
+    "documentation_bounds",
+    "resolve_documentation_layout",
+    "DocBlock",
+    "DocCallout",
+    "DocCalloutKind",
+    "DocCodeBlock",
+    "DocIconKind",
+    "DocIconLine",
+    "DocLink",
+    "DocLinks",
+    "DocMedia",
+    "DocMediaKind",
+    "DocPage",
+    "DocParagraph",
+    "DocRole",
+    "DocSection",
+    "DocumentationTheme",
+    "DEFAULT_DOCUMENTATION_SCALE",
+    "DOCUMENTATION_SCALE_LABELS",
+    "DOCUMENTATION_SCALES",
+    "documentation_scale_from_label",
+    "documentation_scale_label",
+    "icon_marker",
+    "normalise_documentation_scale",
+    "role_font_size",
+]

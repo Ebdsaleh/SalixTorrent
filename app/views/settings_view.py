@@ -28,13 +28,14 @@ from app.framework.components import (
     TextInput,
     ValueBinding,
 )
-from app.engine.documentation import (
+from app.framework.documentation import (
     DOCUMENTATION_SCALE_LABELS,
     DOCUMENTATION_SCALES,
     documentation_scale_from_label,
     documentation_scale_label,
 )
-from app.engine.responsive_layout import ResponsiveLayout, clamp, split_widths
+from app.engine.responsive_layout import ResponsiveLayout
+from app.framework.geometry import clamp, split_widths
 from app.engine.ui_typography import (
     UI_FONT_LABELS,
     UI_FONT_SIZES,

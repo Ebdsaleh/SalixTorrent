@@ -48,7 +48,8 @@ from app.framework.components import (
     Spacer,
     TextInput,
 )
-from app.engine.responsive_layout import DialogMetrics, ResponsiveLayout, clamp, fill_height, split_widths
+from app.engine.responsive_layout import ResponsiveLayout
+from app.framework.geometry import DialogMetrics, clamp, fill_height, split_widths
 from app.views.peer_view import PeerView
 from app.views.piece_view import PieceView
 from app.views.file_view import FileView

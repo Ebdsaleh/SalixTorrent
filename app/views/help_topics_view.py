@@ -6,7 +6,7 @@ from typing import Dict, Iterable, List, Tuple
 
 import dearpygui.dearpygui as dpg
 
-from app.engine.documentation import (
+from app.framework.documentation import (
     DOCUMENTATION_SCALE_LABELS,
     DOCUMENTATION_SCALES,
     DocLink,
@@ -16,12 +16,13 @@ from app.engine.documentation import (
     DocRole,
     DocSection,
     DocumentationLayoutTheme,
-    DocumentationRenderer,
     documentation_scale_from_label,
     documentation_scale_label,
     role_font_size,
 )
-from app.engine.responsive_layout import ResponsiveLayout, clamp, split_widths
+from app.engine.documentation.renderer import DocumentationRenderer
+from app.engine.responsive_layout import ResponsiveLayout
+from app.framework.geometry import clamp, split_widths
 from app.engine.ui_typography import UiTypography
 from app.logic.torrent_manager import TorrentManager
 from app.localization import tr

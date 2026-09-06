@@ -696,7 +696,7 @@ Ninth tranche — renderer-neutral events and explicit disposal ownership — co
 - [x] smoke Create Torrent, Preferences, Open Magnet, remove/recheck/completion dialog button actions and ordinary close/cancel paths;
 - [x] commit/push as `447c6296c37c288384345bebef220ac1e2901c22` (`Add renderer-neutral component events and disposal`).
 
-Tenth tranche — first physical framework boundary — implementation complete:
+Tenth tranche — first physical framework boundary — complete/pushed (`bfc0e7a4fd5a49234425980c4dd5ce04f6f5a10f`):
 
 - [x] create a provisional internal `app/framework/` namespace without choosing the eventual external framework name;
 - [x] move the reusable property cascade and component implementations into that physical boundary;
@@ -709,9 +709,26 @@ Tenth tranche — first physical framework boundary — implementation complete:
 - [x] preserve explicit bindings/events/disposal and avoid observers, automatic lifecycle management, or cosmetic table/graph wrapping;
 - [x] add five net component regressions (63 component tests total);
 - [x] preserve canonical UI/Help/Glossary wording and application/session persistence schemas;
-- [ ] run focused real-Windows component/documentation/localization validation;
-- [ ] run both real-Windows full discovery commands and account for the expected 392 -> 397 test-count increase;
-- [ ] smoke startup plus Create Torrent, Preferences, Open Magnet, utility-dialog actions, Help/Glossary tooltips and ordinary shutdown.
+- [x] run focused real-Windows component/documentation/localization validation;
+- [x] run both real-Windows full discovery commands at 397/397 with one expected skip;
+- [x] smoke startup plus Create Torrent, Preferences, Open Magnet, utility-dialog actions, Help/Glossary tooltips and ordinary shutdown;
+- [x] commit/push as `bfc0e7a4fd5a49234425980c4dd5ce04f6f5a10f` (`Extract reusable GUI framework boundary`).
+
+Eleventh tranche — framework documentation and pure geometry boundary — implementation complete:
+
+- [x] extract pure geometry contracts from the Dear PyGui `ResponsiveLayout` dispatcher into `app/framework/geometry.py`;
+- [x] keep `app.engine.responsive_layout` as the concrete resize/event adapter and compatibility re-export boundary;
+- [x] move semantic documentation model, layout policy/cascade and typography/theme contracts into `app/framework/documentation/`;
+- [x] retain the concrete Dear PyGui `DocumentationRenderer` under `app/engine/documentation/renderer.py`;
+- [x] keep runtime-resource lookup, media cache, SalixTorrent `UiTypography`, resize watching and Dear PyGui ownership outside the reusable documentation contracts;
+- [x] retain engine documentation model/layout/typography paths as compatibility facades during extraction;
+- [x] migrate Help/Preferences and presentation tests onto framework-facing documentation/geometry imports where they consume reusable contracts;
+- [x] extend extraction audits to reject product/backend dependencies from framework documentation/geometry modules;
+- [x] add six documentation/framework-boundary regressions (23 documentation tests; 40 focused documentation/localization tests);
+- [x] regenerate deterministic localization extraction metadata with canonical wording unchanged at 1,337 entries;
+- [x] source-side component, responsive-layout and focused documentation/localization validation;
+- [ ] run both real-Windows full discovery commands and account for the expected 397 -> 403 test-count increase;
+- [ ] smoke Help Topics/Glossary at normal/maximized/resized layouts, documentation scale changes, Preferences documentation-scale persistence, and ordinary GUI shutdown.
 
 ## Priority B — user-facing durability
 
@@ -831,7 +848,9 @@ The eighth tranche adds the minimal explicit synchronization contract justified 
 
 The ninth tranche formalizes the two renderer-adjacent boundaries exposed by that extraction. Reusable controls now emit immutable `ComponentEvent` objects with semantic `ACTIVATE`/`CHANGE` types and explicit application `event_data`; backend callback tuple conventions stay inside `ComponentRenderer`. Existing command-style view actions are adapted deliberately through `action_callback(...)` rather than relying on renderer argument quirks. In parallel, rendered lifetime gains explicit renderer-owned `destroy(...)` and idempotent `Component.dispose()` semantics, with stale backend handles rejected before state/value operations. No observer system, automatic teardown manager, or application-service ownership is introduced. It is pushed/Windows-validated at 392/392 under `447c6296c37c288384345bebef220ac1e2901c22`.
 
-The tenth tranche begins the first physical extraction without freezing final framework naming. Reusable property-cascade and component implementations move under the provisional internal `app.framework` boundary, while the old engine paths remain temporary compatibility facades. Dear PyGui becomes a concrete engine/backend adapter rather than part of the framework core, and `GuiEngine` explicitly installs/clears that renderer at the composition root. A source audit enforces that framework-candidate modules do not import SalixTorrent engine/view/logic/localization layers or Dear PyGui.
+The tenth tranche begins the first physical extraction without freezing final framework naming. Reusable property-cascade and component implementations move under the provisional internal `app.framework` boundary, while the old engine paths remain temporary compatibility facades. Dear PyGui becomes a concrete engine/backend adapter rather than part of the framework core, and `GuiEngine` explicitly installs/clears that renderer at the composition root. A source audit enforces that framework-candidate modules do not import SalixTorrent engine/view/logic/localization layers or Dear PyGui. It is pushed/Windows-validated at 397/397 under `bfc0e7a4fd5a49234425980c4dd5ce04f6f5a10f`.
+
+The eleventh tranche proves that physical boundary with a second independent reusable subsystem. Pure alignment/content/split/fill/dialog geometry moves to `app.framework.geometry`, while the Dear PyGui `ResponsiveLayout` dispatcher remains an engine adapter. Semantic documentation model/layout/typography contracts move to `app.framework.documentation`; the concrete `DocumentationRenderer` deliberately remains in the engine because it owns Dear PyGui, resource paths, application typography, media and resize callbacks. Compatibility facades preserve the former engine documentation import paths during extraction.
 
 Names such as `components`, `SectionPanel`, `Dialog`, and profile identifiers remain working extraction names. Final RAD-framework naming and public API terminology are deliberately deferred until the full reusable boundary has been extracted and proven.
 
@@ -841,10 +860,10 @@ Names such as `components`, `SectionPanel`, `Dialog`, and profile identifiers re
 Reusable GUI component foundation
 ```
 
-Candidate follow-up work after the first physical framework-boundary tranche validates:
+Candidate follow-up work after the documentation/geometry boundary validates:
 
-- prove the provisional `app.framework` boundary through another independent application surface before any external repository/package split;
-- decide whether application-neutral documentation primitives should join the same physical boundary or remain a later extraction;
+- prove framework packaging/import ergonomics and dependency direction before any external repository/package split;
+- inspect whether the remaining backend-neutral pieces of responsive layout belong under the same framework namespace without dragging Dear PyGui callback ownership across the boundary;
 - prove the explicit binding or event contract on another ordinary persisted/editable surface only when it removes real duplication;
 - migrate only additional ordinary dialogs/forms where the current contracts remove real application code rather than creating cosmetic wrappers;
 - keep application services such as clipboard, native file dialogs, networking and responsive geometry outside component ownership unless a broader reusable contract is proven;
@@ -930,6 +949,6 @@ process restart restored 2 torrents
 first GUI frame displayed persisted queue order
 ```
 
-The v0.4.0 release baseline remains 334/334 tests with one expected non-Windows skip. The first GUI-component tranche is committed/pushed at `66b46fa7070128f13bc87fbe4f9556a86049e895` and passed 343/343 on the real Windows checkout. The second Preferences-composition tranche is committed/pushed at `139931246280818694de1920b4b49c4e5cf734ca` and passed 348/348. The third component-profile tranche is committed/pushed at `f5e30e30012958429240bcf2646ac9a09d348de5` and passed 354/354. The fourth structural tranche is committed/pushed at `61d9d8424eecfbf3201d529d824fc68a85f079d5` and passed 362/362. The Create Torrent form/tooltip tranche is committed/pushed at `e11e05eb50238d540e798cbb689476afc302d939` and passed 370/370 on the real Windows checkout. The runtime-state tranche is committed/pushed at `30fee9f65ba08f1563f8a0a0f1b43d34eb046297` and passed 374/374. The transfer-dialog tranche is committed/pushed at `3ee3982687810f709ab0a34312e8e8b73d47324e` and passed 380/380. The explicit Preferences-binding tranche is committed/pushed at `665faab` and passed 385/385. The renderer-neutral event/disposal tranche is committed/pushed at `447c6296c37c288384345bebef220ac1e2901c22` and passed 392/392. The first physical framework-boundary tranche adds five net component regressions for an expected 397-test Windows gate. Focused documentation/localization remains green and deterministic localization extraction remains current.
+The v0.4.0 release baseline remains 334/334 tests with one expected non-Windows skip. The first GUI-component tranche is committed/pushed at `66b46fa7070128f13bc87fbe4f9556a86049e895` and passed 343/343 on the real Windows checkout. The second Preferences-composition tranche is committed/pushed at `139931246280818694de1920b4b49c4e5cf734ca` and passed 348/348. The third component-profile tranche is committed/pushed at `f5e30e30012958429240bcf2646ac9a09d348de5` and passed 354/354. The fourth structural tranche is committed/pushed at `61d9d8424eecfbf3201d529d824fc68a85f079d5` and passed 362/362. The Create Torrent form/tooltip tranche is committed/pushed at `e11e05eb50238d540e798cbb689476afc302d939` and passed 370/370 on the real Windows checkout. The runtime-state tranche is committed/pushed at `30fee9f65ba08f1563f8a0a0f1b43d34eb046297` and passed 374/374. The transfer-dialog tranche is committed/pushed at `3ee3982687810f709ab0a34312e8e8b73d47324e` and passed 380/380. The explicit Preferences-binding tranche is committed/pushed at `665faab` and passed 385/385. The renderer-neutral event/disposal tranche is committed/pushed at `447c6296c37c288384345bebef220ac1e2901c22` and passed 392/392. The first physical framework-boundary tranche is committed/pushed at `bfc0e7a4fd5a49234425980c4dd5ce04f6f5a10f` and passed 397/397 on Windows. The documentation/geometry extraction tranche adds six regressions for an expected 403-test Windows gate; focused documentation/localization is 40/40 source-side and deterministic localization extraction remains current.
 
 The v0.4.0 live GUI smoke covers per-torrent editing, additive Days/Hours/Minutes quick controls, explicit bulk Preferences application, persistence, in-app/native notifications, instanced time-based automatic stop, Days/Hours/Minutes exact editors, stacked compact duration controls, and the widened Preferences ratio field. Ratio-threshold behavior remains covered by deterministic regressions without requiring a second live peer. Future changes must preserve the applicable baseline or account explicitly for every intentional test-count change.

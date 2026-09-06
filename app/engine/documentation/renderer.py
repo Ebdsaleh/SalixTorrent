@@ -12,20 +12,17 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - renderer is GUI-only
     dpg = None  # type: ignore[assignment]
 
-from app.engine.responsive_layout import (
-    HorizontalAlign,
-    ResponsiveLayout,
-    aligned_offset,
-)
+from app.engine.responsive_layout import ResponsiveLayout
+from app.framework.geometry import HorizontalAlign, aligned_offset
 from app.engine.ui_typography import UiTypography
 
-from .layout import (
+from app.framework.documentation.layout import (
     DocLayout,
     DocumentationLayoutTheme,
     documentation_bounds,
     resolve_documentation_layout,
 )
-from .model import (
+from app.framework.documentation.model import (
     DocBlock,
     DocCallout,
     DocCodeBlock,
@@ -38,7 +35,7 @@ from .model import (
     DocParagraph,
     DocRole,
 )
-from .typography import (
+from app.framework.documentation.typography import (
     DocumentationTheme,
     icon_marker,
     normalise_documentation_scale,

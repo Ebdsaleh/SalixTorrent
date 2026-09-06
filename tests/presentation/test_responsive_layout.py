@@ -1,10 +1,10 @@
 import inspect
 import unittest
 
-from app.engine.responsive_layout import (
+from app.engine.responsive_layout import ResponsiveLayout
+from app.framework.geometry import (
     ContentMetrics,
     HorizontalAlign,
-    ResponsiveLayout,
     aligned_offset,
     clamp,
     content_bounds,

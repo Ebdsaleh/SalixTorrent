@@ -15,7 +15,8 @@ import dearpygui.dearpygui as dpg
 
 from app.logic.network_binding import format_endpoint
 from app.localization import localization_manager, tr
-from app.engine.responsive_layout import DialogMetrics, ResponsiveLayout
+from app.engine.responsive_layout import ResponsiveLayout
+from app.framework.geometry import DialogMetrics
 from app.engine.runtime_paths import runtime_snapshot
 from app.engine.shell_integration import ShellIntegration
 from app.logic.torrent_manager import TorrentManager

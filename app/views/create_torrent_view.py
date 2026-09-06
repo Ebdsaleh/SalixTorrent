@@ -25,7 +25,8 @@ from app.framework.components import (
     Spacer,
     TextInput,
 )
-from app.engine.responsive_layout import ResponsiveLayout, clamp
+from app.engine.responsive_layout import ResponsiveLayout
+from app.framework.geometry import clamp
 from app.engine.ui_component_attachments import help_tooltip, text_tooltip
 from app.logic.torrent_creator import (
     TORRENT_GENERATION_HYBRID,
