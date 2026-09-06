@@ -12,6 +12,7 @@ from tkinter import filedialog
 from app.localization import canonical_choice, localized_choices, tr, tr_value
 
 from app.engine.components import (
+    action_callback,
     Button,
     CheckBox,
     ComboBox,
@@ -98,13 +99,13 @@ class CreateTorrentView:
                 with self.source_action_row.context():
                     self.select_file_component = Button(
                         tr('view.create_torrent_view.select_file_archive', " Select File / Archive "),
-                        callback=self._select_file_source,
+                        callback=action_callback(self._select_file_source),
                     ).attach(help_tooltip("TORRENT_SOURCE_FILE"))
                     self.select_file_button = self.select_file_component.build()
 
                     self.select_folder_component = Button(
                         tr('view.create_torrent_view.select_folder', " Select Folder "),
-                        callback=self._select_folder_source,
+                        callback=action_callback(self._select_folder_source),
                     ).attach(help_tooltip("TORRENT_SOURCE_FOLDER"))
                     self.select_folder_button = self.select_folder_component.build()
 
@@ -146,7 +147,7 @@ class CreateTorrentView:
                 with self.output_action_row.context():
                     self.choose_output_component = Button(
                         tr('view.create_torrent_view.choose_save_location', " Choose Save Location "),
-                        callback=self._choose_output,
+                        callback=action_callback(self._choose_output),
                     ).attach(help_tooltip("TORRENT_OUTPUT"))
                     self.choose_output_button = self.choose_output_component.build()
 
@@ -250,13 +251,13 @@ class CreateTorrentView:
                 with self.creation_action_row.context():
                     self.create_component = Button(
                         tr('view.create_torrent_view.create_torrent_da3ef520', " Create Torrent "),
-                        callback=self._start_creation,
+                        callback=action_callback(self._start_creation),
                     ).attach(help_tooltip("CREATE_TORRENT"))
                     self.create_button = self.create_component.build()
 
                     self.cancel_component = Button(
                         tr('view.create_torrent_view.cancel', " Cancel "),
-                        callback=self._cancel_creation,
+                        callback=action_callback(self._cancel_creation),
                         enabled=False,
                     ).attach(text_tooltip(
                         tr(
@@ -268,7 +269,7 @@ class CreateTorrentView:
 
                     self.start_seeding_component = Button(
                         tr('view.create_torrent_view.start_seeding', " Start Seeding "),
-                        callback=self._start_seeding_created_torrent,
+                        callback=action_callback(self._start_seeding_created_torrent),
                         enabled=False,
                         show=False,
                     ).attach(help_tooltip("START_SEEDING"))

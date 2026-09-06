@@ -31,6 +31,7 @@ from app.logic.torrent_manager import TorrentManager
 from app.logic.transfer_add import TransferAddRequest
 from app.engine.desktop_integration import DesktopIntegration
 from app.engine.components import (
+    action_callback,
     Button,
     ComboBox,
     ControlLayout,
@@ -545,23 +546,23 @@ class DownloadView:
             with self.magnet_action_row.context():
                 self.magnet_add_component = Button(
                     tr('view.download_view.add_magnet', " Add Magnet "),
-                    callback=self._submit_magnet,
+                    callback=action_callback(self._submit_magnet),
                 ).attach(help_tooltip("OPEN_MAGNET"))
                 self.magnet_add_button = self.magnet_add_component.build()
                 self.magnet_paste_component = Button(
                     tr('view.download_view.paste', " Paste "),
-                    callback=self._paste_magnet,
+                    callback=action_callback(self._paste_magnet),
                 ).attach(text_tooltip(tr('view.download_view.paste_magnet_link_copies_the_current_clipboard', "Paste magnet link\n\nCopies the current clipboard text into the magnet field. SalixTorrent does not begin network activity until Add Magnet is pressed.")))
                 self.magnet_paste_button = self.magnet_paste_component.build()
                 self.magnet_cancel_component = Button(
                     tr('view.download_view.cancel_lookup', " Cancel Lookup "),
                     enabled=False,
-                    callback=self._cancel_magnet,
+                    callback=action_callback(self._cancel_magnet),
                 ).attach(help_tooltip("BEP9"))
                 self.magnet_cancel_button = self.magnet_cancel_component.build()
                 self.magnet_close_component = Button(
                     tr('view.download_view.close', " Close "),
-                    callback=self._close_magnet_dialog,
+                    callback=action_callback(self._close_magnet_dialog),
                 )
                 self.magnet_close_button = self.magnet_close_component.build()
             self.magnet_progress_component = ProgressBar(
@@ -600,17 +601,17 @@ class DownloadView:
             with self.remove_torrent_action_row.context():
                 self.remove_only_component = Button(
                     tr('view.download_view.remove_from_salixtorrent', " Remove from SalixTorrent "),
-                    callback=lambda: self._confirm_remove_torrent(False),
+                    callback=action_callback(lambda: self._confirm_remove_torrent(False)),
                 ).attach(help_tooltip("REMOVE_TORRENT"))
                 self.remove_only_button = self.remove_only_component.build()
                 self.remove_delete_component = Button(
                     tr('view.download_view.remove_delete_data', " Remove + Delete Data "),
-                    callback=lambda: self._confirm_remove_torrent(True),
+                    callback=action_callback(lambda: self._confirm_remove_torrent(True)),
                 ).attach(help_tooltip("DELETE_DATA"))
                 self.remove_delete_button = self.remove_delete_component.build()
                 self.cancel_remove_component = Button(
                     tr('view.download_view.cancel', " Cancel "),
-                    callback=lambda: self.remove_torrent_dialog.set_visible(False),
+                    callback=action_callback(lambda: self.remove_torrent_dialog.set_visible(False)),
                 ).attach(text_tooltip(tr('view.download_view.cancel_removal_closes_this_confirmation_window_without', "Cancel removal\n\nCloses this confirmation window without changing the torrent, payload, resume data or queue.")))
                 self.cancel_remove_button = self.cancel_remove_component.build()
 
@@ -627,7 +628,7 @@ class DownloadView:
             Spacer(layout=ControlLayout(height=10)).build()
             self.remove_notice_ok_component = Button(
                 tr('view.download_view.ok', " OK "),
-                callback=lambda: self.remove_notice_dialog.set_visible(False),
+                callback=action_callback(lambda: self.remove_notice_dialog.set_visible(False)),
             )
             self.remove_notice_ok_button = self.remove_notice_ok_component.build()
 
@@ -657,12 +658,12 @@ class DownloadView:
             with self.recheck_action_row.context():
                 self.force_recheck_component = Button(
                     tr('view.download_view.force_recheck_809b7185', " Force Recheck "),
-                    callback=self._confirm_force_recheck,
+                    callback=action_callback(self._confirm_force_recheck),
                 ).attach(help_tooltip("FORCE_RECHECK"))
                 self.force_recheck_button = self.force_recheck_component.build()
                 self.cancel_recheck_component = Button(
                     tr('view.download_view.cancel', " Cancel "),
-                    callback=lambda: self.recheck_dialog.set_visible(False),
+                    callback=action_callback(lambda: self.recheck_dialog.set_visible(False)),
                 ).attach(text_tooltip(tr('view.download_view.cancel_recheck_closes_this_confirmation_window_without', "Cancel recheck\n\nCloses this confirmation window without invalidating fast-resume state or starting a verification pass.")))
                 self.cancel_recheck_button = self.cancel_recheck_component.build()
 
@@ -892,12 +893,12 @@ class DownloadView:
             with self.completion_notice_action_row.context():
                 self.completion_folder_component = Button(
                     tr('view.download_view.open_folder', " Open Folder "),
-                    callback=self._completion_open_folder,
+                    callback=action_callback(self._completion_open_folder),
                 ).attach(help_tooltip("OPEN_FOLDER"))
                 self.completion_folder_button = self.completion_folder_component.build()
                 self.completion_dismiss_component = Button(
                     tr('view.download_view.dismiss', " Dismiss "),
-                    callback=lambda: self.completion_notice_dialog.set_visible(False),
+                    callback=action_callback(lambda: self.completion_notice_dialog.set_visible(False)),
                 )
                 self.completion_dismiss_button = self.completion_dismiss_component.build()
 

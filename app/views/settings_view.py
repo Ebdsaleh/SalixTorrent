@@ -7,6 +7,7 @@ from tkinter import filedialog
 
 from app.engine.desktop_integration import DesktopIntegration
 from app.engine.components import (
+    action_callback,
     BindingSet,
     Button,
     CheckBox,
@@ -126,7 +127,7 @@ class SettingsView:
                     accessories=(
                         Button(
                             tr("settings.choose_folder", " Choose Folder "),
-                            callback=self._choose_download_dir,
+                            callback=action_callback(self._choose_download_dir),
                         ),
                     ),
                 )
@@ -276,7 +277,7 @@ class SettingsView:
                     Spacer(layout=ControlLayout(height=6)).build()
                     self.refresh_connectivity_control = Button(
                         tr('view.settings_view.refresh_remap_now', " Refresh / Remap Now "),
-                        callback=self._refresh_connectivity,
+                        callback=action_callback(self._refresh_connectivity),
                     )
                     refresh_connectivity_button = self.refresh_connectivity_control.build()
                     add_help_tooltip(refresh_connectivity_button, "PORT_MAPPING")
@@ -320,7 +321,7 @@ class SettingsView:
                     accessories=(
                         Button(
                             tr('view.settings_view.refresh_interfaces', " Refresh Interfaces "),
-                            callback=self._refresh_network_interfaces,
+                            callback=action_callback(self._refresh_network_interfaces),
                         ),
                     ),
                 )
@@ -720,10 +721,10 @@ class SettingsView:
             Spacer(layout=ControlLayout(height=10)).build()
             self.preference_actions_row = ControlRow(
                 (
-                    Button(tr("settings.save", " Save Preferences "), callback=self._save),
+                    Button(tr("settings.save", " Save Preferences "), callback=action_callback(self._save)),
                     Button(
                         tr("settings.restore_defaults", " Restore Defaults "),
-                        callback=self._restore_defaults,
+                        callback=action_callback(self._restore_defaults),
                     ),
                     Label("", color=(0, 255, 128)),
                 )

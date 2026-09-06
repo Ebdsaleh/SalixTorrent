@@ -12,6 +12,8 @@ from app.engine.components import (
     FRAMEWORK_COMPONENT_PROFILE,
     Button,
     CheckBox,
+    ComponentEvent,
+    ComponentEventType,
     ComponentGroup,
     ComponentLayoutProfile,
     ComboBox,
@@ -36,6 +38,7 @@ from app.engine.components import (
     TextInput,
     Tooltip,
     ValueBinding,
+    action_callback,
     resolve_control_layout,
 )
 from app.engine.components.layout import backend_dimension
@@ -51,6 +54,8 @@ class RecordingRenderer:
         self.configured = {}
         self.tooltips = []
         self.centered = []
+        self.destroyed = []
+        self.event_bindings = []
 
     def _new_item(self, prefix: str) -> str:
         return f"{prefix}:{len(self.created) + len(self.containers) + 1}"
@@ -80,10 +85,36 @@ class RecordingRenderer:
         self.configured.setdefault(item, {}).update(kwargs)
 
     def exists(self, item):
+        if item in self.destroyed:
+            return False
         return (
             any(entry[1] == item for entry in self.created)
             or any(entry[1] == item for entry in self.containers)
         )
+
+    def destroy(self, item):
+        if self.exists(item):
+            self.destroyed.append(item)
+
+    def event_callback(self, source, event_type, callback, *, data=None):
+        if callback is None:
+            return None
+        if not callable(callback):
+            raise TypeError("component event callback must be callable")
+        event_type = ComponentEventType(event_type)
+
+        def dispatch(value=None):
+            return callback(
+                ComponentEvent(
+                    source=source,
+                    event_type=event_type,
+                    value=value,
+                    data=data,
+                )
+            )
+
+        self.event_bindings.append((source, event_type, callback, data, dispatch))
+        return dispatch
 
     def center(self, item, *, fallback_size=None):
         self.centered.append((item, fallback_size))
@@ -104,6 +135,7 @@ class GuiComponentFoundationTests(unittest.TestCase):
             "attachments.py",
             "base.py",
             "bindings.py",
+            "events.py",
             "containers.py",
             "controls.py",
             "fields.py",
@@ -129,6 +161,155 @@ class GuiComponentFoundationTests(unittest.TestCase):
 
         renderer_source = (component_dir / "renderer.py").read_text(encoding="utf-8")
         self.assertIn("import dearpygui.dearpygui as dpg", renderer_source)
+
+    def test_component_events_normalize_activation_value_and_explicit_data(self):
+        renderer = RecordingRenderer()
+        received = []
+        metadata = {"operation": "save"}
+        button = Button(
+            "Save",
+            callback=received.append,
+            event_data=metadata,
+        )
+
+        button.build(renderer=renderer)
+        _, _, kwargs = renderer.created[-1]
+        self.assertNotIn("user_data", kwargs)
+        kwargs["callback"]("backend-value")
+
+        self.assertEqual(len(received), 1)
+        event = received[0]
+        self.assertIs(event.source, button)
+        self.assertIs(event.event_type, ComponentEventType.ACTIVATE)
+        self.assertEqual(event.value, "backend-value")
+        self.assertIs(event.data, metadata)
+
+    def test_value_control_events_use_change_semantics(self):
+        renderer = RecordingRenderer()
+        received = []
+        control = ComboBox(
+            ("A", "B"),
+            default_value="A",
+            callback=received.append,
+        )
+
+        control.build(renderer=renderer)
+        renderer.created[-1][2]["callback"]("B")
+
+        self.assertEqual(len(received), 1)
+        self.assertIs(received[0].source, control)
+        self.assertIs(received[0].event_type, ComponentEventType.CHANGE)
+        self.assertEqual(received[0].value, "B")
+
+    def test_action_callback_adapts_no_argument_commands_explicitly(self):
+        calls = []
+
+        def command():
+            calls.append("called")
+            return "result"
+
+        callback = action_callback(command)
+        result = callback(
+            ComponentEvent(
+                source=object(),
+                event_type=ComponentEventType.ACTIVATE,
+                value="ignored",
+            )
+        )
+
+        self.assertEqual(calls, ["called"])
+        self.assertEqual(result, "result")
+        self.assertEqual(callback.__name__, command.__name__)
+
+    def test_component_dispose_is_renderer_owned_and_idempotent(self):
+        renderer = RecordingRenderer()
+        label = Label("Disposable")
+        item = label.build(renderer=renderer)
+
+        self.assertTrue(label.exists())
+        self.assertTrue(label.dispose())
+        self.assertEqual(renderer.destroyed, [item])
+        self.assertFalse(label.exists())
+        self.assertIsNone(label.item)
+        self.assertFalse(label.dispose())
+        self.assertEqual(renderer.destroyed, [item])
+
+    def test_stale_rendered_items_are_rejected_and_can_be_rebuilt(self):
+        renderer = RecordingRenderer()
+        label = Label("Rebuildable")
+        first_item = label.build(renderer=renderer)
+        renderer.destroy(first_item)
+
+        self.assertFalse(label.exists())
+        with self.assertRaisesRegex(RuntimeError, "rendered item no longer exists"):
+            label.require_item()
+
+        second_item = label.build(renderer=renderer)
+        self.assertNotEqual(first_item, second_item)
+        self.assertTrue(label.exists())
+        self.assertEqual(label.require_item(), second_item)
+
+    def test_composite_fields_forward_renderer_neutral_event_metadata(self):
+        renderer = RecordingRenderer()
+        received = []
+        field = LabeledComboField(
+            "Mode",
+            ("A", "B"),
+            default_value="A",
+            callback=received.append,
+            event_data="mode-choice",
+        )
+
+        field.build(renderer=renderer)
+        combo_record = next(entry for entry in renderer.created if entry[0] == "combo_box")
+        combo_record[2]["callback"]("B")
+
+        self.assertEqual(len(received), 1)
+        self.assertIs(received[0].source, field.control)
+        self.assertIs(received[0].event_type, ComponentEventType.CHANGE)
+        self.assertEqual(received[0].value, "B")
+        self.assertEqual(received[0].data, "mode-choice")
+
+    def test_componentized_no_argument_view_actions_use_explicit_event_adapter(self):
+        import ast
+
+        expected = {
+            "app/views/create_torrent_view.py": {
+                "self._select_file_source",
+                "self._select_folder_source",
+                "self._choose_output",
+                "self._start_creation",
+                "self._cancel_creation",
+                "self._start_seeding_created_torrent",
+            },
+            "app/views/settings_view.py": {
+                "self._choose_download_dir",
+                "self._refresh_connectivity",
+                "self._refresh_network_interfaces",
+                "self._save",
+                "self._restore_defaults",
+            },
+            "app/views/download_view.py": {
+                "self._submit_magnet",
+                "self._paste_magnet",
+                "self._cancel_magnet",
+                "self._close_magnet_dialog",
+                "self._confirm_force_recheck",
+                "self._completion_open_folder",
+            },
+        }
+
+        for relative_path, expected_actions in expected.items():
+            tree = ast.parse((PROJECT_ROOT / relative_path).read_text(encoding="utf-8"))
+            adapted_actions = set()
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call):
+                    continue
+                if not isinstance(node.func, ast.Name) or node.func.id != "action_callback":
+                    continue
+                if node.args:
+                    adapted_actions.add(ast.unparse(node.args[0]))
+            self.assertTrue(expected_actions.issubset(adapted_actions), relative_path)
 
     def test_component_layout_uses_default_theme_instance_precedence(self):
         resolved = resolve_control_layout(

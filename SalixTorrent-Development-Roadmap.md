@@ -2,8 +2,8 @@
 
 **Current application version string:** `0.4.0`
 **Roadmap status:** active development planning
-**Current implementation checkpoint:** post-v0.4.0 reusable GUI/RAD extraction — transfer-dialog tranche pushed/validated; explicit Preferences-binding tranche implemented
-**Current real Windows regression baseline:** 380 / 380 through the pushed transfer-dialog tranche, with one expected non-Windows skip; explicit Preferences-binding tranche targets 385
+**Current implementation checkpoint:** post-v0.4.0 reusable GUI/RAD extraction — explicit Preferences-binding tranche pushed/validated; renderer-neutral event/disposal tranche implemented
+**Current real Windows regression baseline:** 385 / 385 through the pushed explicit Preferences-binding tranche, with one expected non-Windows skip; renderer-neutral event/disposal tranche targets 392
 
 This roadmap records intended engineering direction rather than promising dates or release numbers. Changes should remain incremental, testable, reviewable, and compatible with SalixTorrent's existing protocol, persistence, packaging, localization, and cross-platform boundaries.
 
@@ -660,7 +660,7 @@ Seventh tranche — transfer utility dialogs and second runtime-state proof — 
 - [x] smoke Open Magnet add/cancel/auto-close plus remove/recheck/completion utility-dialog behavior;
 - [x] commit/push as `3ee3982687810f709ab0a34312e8e8b73d47324e` (`Migrate transfer dialogs to reusable GUI components`).
 
-Eighth tranche — explicit synchronous value binding and Preferences runtime migration — implementation complete:
+Eighth tranche — explicit synchronous value binding and Preferences runtime migration — complete/pushed (`665faab`):
 
 - [x] add backend-neutral `ValueBinding` and `BindingSet` contracts for named value synchronization;
 - [x] support explicit read/write transforms and per-binding defaults without implicit observers or background mutation;
@@ -674,8 +674,26 @@ Eighth tranche — explicit synchronous value binding and Preferences runtime mi
 - [x] add five binding/runtime regressions (51 component tests total);
 - [x] regenerate deterministic localization extraction metadata with no canonical string changes;
 - [x] source-side component and focused localization/documentation validation;
-- [ ] run both real-Windows full discovery commands and account for the expected 380 -> 385 test-count increase;
-- [ ] smoke Preferences load/save/restore, interface refresh, connectivity status, folder chooser, limits, desktop toggles and seeding defaults.
+- [x] run both real-Windows full discovery commands at 385/385 with one expected skip;
+- [x] smoke Preferences load/save/restore, interface refresh, connectivity status, folder chooser, limits, desktop toggles and seeding defaults;
+- [x] commit/push as `665faab` (`Add explicit component value bindings`).
+
+Ninth tranche — renderer-neutral events and explicit disposal ownership — implementation complete:
+
+- [x] add immutable `ComponentEvent` metadata with semantic `ACTIVATE` and `CHANGE` event types;
+- [x] keep backend callback arguments inside the renderer bridge instead of exposing Dear PyGui sender/app-data/user-data conventions to reusable controls;
+- [x] replace reusable-control `user_data` with explicit backend-neutral `event_data`;
+- [x] add `action_callback(...)` for deliberate adaptation of existing no-argument application actions;
+- [x] propagate event metadata through labeled/composite value fields without adding observer/reactive behavior;
+- [x] add renderer-owned `destroy(...)` and explicit idempotent `Component.dispose()` lifecycle ownership;
+- [x] reject stale rendered handles through `require_item()` while allowing an explicitly rebuilt component to bind a fresh item;
+- [x] migrate callbacks for Create Torrent, Preferences and the already-componentized transfer utility dialogs through the event adapter;
+- [x] leave queue tables, context menus, high-frequency telemetry, native dialogs, networking services and responsive geometry at their existing application/backend boundaries;
+- [x] add seven event/lifecycle regressions (58 component tests total);
+- [x] regenerate deterministic localization extraction metadata with no canonical string changes;
+- [x] source-side component and focused localization/documentation validation;
+- [ ] run both real-Windows full discovery commands and account for the expected 385 -> 392 test-count increase;
+- [ ] smoke Create Torrent, Preferences, Open Magnet, remove/recheck/completion dialog button actions and ordinary close/cancel paths.
 
 ## Priority B — user-facing durability
 
@@ -791,7 +809,9 @@ The sixth tranche separates runtime component state from Dear PyGui as well. Gen
 
 The seventh tranche proves that lifecycle on a second independent workflow and broadens ordinary dialog reuse. Open Magnet now uses component-owned input/progress/status/button state, including progress overlay updates and dialog visibility, while `Dialog` itself can express minimum size and delegate viewport centering through the renderer. Remove Torrent, Removal Notice, Force Recheck and Download Complete use the same reusable dialog/control/profile boundary, leaving tables, row popups and high-frequency telemetry deliberately untouched. It is committed/pushed and Windows-validated at 380/380.
 
-The eighth tranche adds the minimal explicit synchronization contract justified by the duplicated form/settings code: `ValueBinding` maps one named application value to one `ValueComponent`, with explicit presentation/model transforms and defaults, while `BindingSet` collects or applies those bindings only when application code calls it. Preferences now uses that contract for ordinary persisted values and component APIs for status/connectivity updates, eliminating direct Dear PyGui usage from `settings_view.py`. This is still not an observer/reactive system: native dialogs, networking services, responsive geometry, and multi-control duration composition remain explicit application responsibilities.
+The eighth tranche adds the minimal explicit synchronization contract justified by the duplicated form/settings code: `ValueBinding` maps one named application value to one `ValueComponent`, with explicit presentation/model transforms and defaults, while `BindingSet` collects or applies those bindings only when application code calls it. Preferences now uses that contract for ordinary persisted values and component APIs for status/connectivity updates, eliminating direct Dear PyGui usage from `settings_view.py`. This remains intentionally synchronous rather than observer/reactive, and is pushed/Windows-validated at 385/385.
+
+The ninth tranche formalizes the two renderer-adjacent boundaries exposed by that extraction. Reusable controls now emit immutable `ComponentEvent` objects with semantic `ACTIVATE`/`CHANGE` types and explicit application `event_data`; backend callback tuple conventions stay inside `ComponentRenderer`. Existing command-style view actions are adapted deliberately through `action_callback(...)` rather than relying on renderer argument quirks. In parallel, rendered lifetime gains explicit renderer-owned `destroy(...)` and idempotent `Component.dispose()` semantics, with stale backend handles rejected before state/value operations. No observer system, automatic teardown manager, or application-service ownership is introduced.
 
 Names such as `components`, `SectionPanel`, `Dialog`, and profile identifiers remain working extraction names. Final RAD-framework naming and public API terminology are deliberately deferred until the full reusable boundary has been extracted and proven.
 
@@ -801,14 +821,13 @@ Names such as `components`, `SectionPanel`, `Dialog`, and profile identifiers re
 Reusable GUI component foundation
 ```
 
-Candidate follow-up work after the explicit binding tranche validates:
+Candidate follow-up work after the event/disposal tranche validates:
 
-- prove the explicit binding contract on another ordinary persisted/editable surface only if it removes real duplication;
-- evaluate component lifecycle/disposal ownership and renderer-neutral event/callback metadata before attempting physical framework extraction;
-- migrate only additional ordinary dialogs/forms where the current structural, attachment, runtime-state and explicit-binding contracts remove real duplication;
-- keep application services such as clipboard, native file dialogs and responsive geometry outside value-component binding unless a broader reusable contract is proven;
+- decide whether the now-proven construction, layout, attachment, runtime-state, explicit-binding, event and disposal contracts are sufficient for a first physical framework extraction boundary;
+- prove the explicit binding or event contract on another ordinary persisted/editable surface only when it removes real duplication;
+- migrate only additional ordinary dialogs/forms where the current contracts remove real application code rather than creating cosmetic wrappers;
+- keep application services such as clipboard, native file dialogs, networking and responsive geometry outside component ownership unless a broader reusable contract is proven;
 - continue using application-owned adapters for Help/Glossary/accessibility semantics while keeping generic attachments product-neutral;
-- continue separating component model/state from the Dear PyGui renderer where that improves future RAD extraction;
 - avoid converting complex tables/graphs merely for cosmetic uniformity;
 - postpone the final framework naming/API pass until the full RAD extraction boundary is visible.
 
@@ -890,6 +909,6 @@ process restart restored 2 torrents
 first GUI frame displayed persisted queue order
 ```
 
-The v0.4.0 release baseline remains 334/334 tests with one expected non-Windows skip. The first GUI-component tranche is committed/pushed at `66b46fa7070128f13bc87fbe4f9556a86049e895` and passed 343/343 on the real Windows checkout. The second Preferences-composition tranche is committed/pushed at `139931246280818694de1920b4b49c4e5cf734ca` and passed 348/348. The third component-profile tranche is committed/pushed at `f5e30e30012958429240bcf2646ac9a09d348de5` and passed 354/354. The fourth structural tranche is committed/pushed at `61d9d8424eecfbf3201d529d824fc68a85f079d5` and passed 362/362. The Create Torrent form/tooltip tranche is committed/pushed at `e11e05eb50238d540e798cbb689476afc302d939` and passed 370/370 on the real Windows checkout. The runtime-state tranche is committed/pushed at `30fee9f65ba08f1563f8a0a0f1b43d34eb046297` and passed 374/374. The transfer-dialog tranche is committed/pushed at `3ee3982687810f709ab0a34312e8e8b73d47324e` and passed 380/380. The explicit Preferences-binding tranche adds five component regressions for an expected 385-test Windows gate. Focused documentation/localization remains green and deterministic localization extraction remains current.
+The v0.4.0 release baseline remains 334/334 tests with one expected non-Windows skip. The first GUI-component tranche is committed/pushed at `66b46fa7070128f13bc87fbe4f9556a86049e895` and passed 343/343 on the real Windows checkout. The second Preferences-composition tranche is committed/pushed at `139931246280818694de1920b4b49c4e5cf734ca` and passed 348/348. The third component-profile tranche is committed/pushed at `f5e30e30012958429240bcf2646ac9a09d348de5` and passed 354/354. The fourth structural tranche is committed/pushed at `61d9d8424eecfbf3201d529d824fc68a85f079d5` and passed 362/362. The Create Torrent form/tooltip tranche is committed/pushed at `e11e05eb50238d540e798cbb689476afc302d939` and passed 370/370 on the real Windows checkout. The runtime-state tranche is committed/pushed at `30fee9f65ba08f1563f8a0a0f1b43d34eb046297` and passed 374/374. The transfer-dialog tranche is committed/pushed at `3ee3982687810f709ab0a34312e8e8b73d47324e` and passed 380/380. The explicit Preferences-binding tranche is committed/pushed at `665faab` and passed 385/385. The renderer-neutral event/disposal tranche adds seven component regressions for an expected 392-test Windows gate. Focused documentation/localization remains green and deterministic localization extraction remains current.
 
 The v0.4.0 live GUI smoke covers per-torrent editing, additive Days/Hours/Minutes quick controls, explicit bulk Preferences application, persistence, in-app/native notifications, instanced time-based automatic stop, Days/Hours/Minutes exact editors, stacked compact duration controls, and the widened Preferences ratio field. Ratio-threshold behavior remains covered by deterministic regressions without requiring a second live peer. Future changes must preserve the applicable baseline or account explicitly for every intentional test-count change.

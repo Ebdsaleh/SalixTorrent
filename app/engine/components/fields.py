@@ -62,6 +62,7 @@ class LabeledComboField(LabeledField):
         control_width: int | None = None,
         control_profile_key: str | None = None,
         callback=None,
+        event_data=None,
         theme: ControlLayoutTheme | None = None,
         layout: ControlLayout | None = None,
         profile_key: str | None = None,
@@ -71,6 +72,7 @@ class LabeledComboField(LabeledField):
             items,
             default_value=default_value,
             callback=callback,
+            event_data=event_data,
             layout=control_layout,
             profile_key=control_profile_key,
         )
@@ -100,6 +102,7 @@ class LabeledNumericField(LabeledField):
         control_width: int | None = None,
         control_profile_key: str | None = None,
         callback=None,
+        event_data=None,
         theme: ControlLayoutTheme | None = None,
         layout: ControlLayout | None = None,
         profile_key: str | None = None,
@@ -115,6 +118,7 @@ class LabeledNumericField(LabeledField):
             max_clamped=max_clamped,
             format=format,
             callback=callback,
+            event_data=event_data,
             layout=control_layout,
             profile_key=control_profile_key,
         )
@@ -155,7 +159,9 @@ class NumericUnitField(LabeledField):
         value_profile_key: str = "numeric_unit.value",
         unit_profile_key: str = "numeric_unit.unit",
         callback=None,
+        event_data=None,
         unit_callback=None,
+        unit_event_data=None,
         theme: ControlLayoutTheme | None = None,
         layout: ControlLayout | None = None,
         profile_key: str | None = None,
@@ -172,6 +178,7 @@ class NumericUnitField(LabeledField):
             max_clamped=max_clamped,
             format=format,
             callback=callback,
+            event_data=event_data,
             layout=value_layout,
             profile_key=value_profile_key,
         )
@@ -185,6 +192,7 @@ class NumericUnitField(LabeledField):
             units,
             default_value=default_unit,
             callback=unit_callback,
+            event_data=unit_event_data,
             layout=unit_layout,
             profile_key=unit_profile_key,
         )

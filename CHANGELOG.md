@@ -4,6 +4,17 @@ Notable SalixTorrent changes are recorded here.
 
 ## Unreleased
 
+### GUI Component/RAD Extraction — Renderer-Neutral Events and Explicit Disposal
+
+- Added immutable backend-neutral `ComponentEvent` metadata with semantic `ACTIVATE` and `CHANGE` event types so reusable controls no longer expose renderer callback tuple conventions.
+- Replaced reusable-control `user_data` with explicit `event_data`, keeping application metadata distinct from Dear PyGui sender/app-data/user-data arguments.
+- Added `action_callback(...)` for deliberate adaptation of existing no-argument application commands to the component-event contract.
+- Extended labeled/composite value fields to carry the same event metadata without introducing observers, subscriptions, background mutation, or automatic two-way state.
+- Added renderer-owned `destroy(...)` plus explicit idempotent `Component.dispose()` lifecycle semantics; stale rendered handles are rejected by `require_item()` and an explicitly rebuilt component can bind a fresh backend item.
+- Migrated Create Torrent, Preferences, Open Magnet, Remove Torrent, Removal Notice, Force Recheck and Download Complete component-button actions through the renderer-neutral event adapter while leaving complex queue/context-menu callbacks on their existing application boundary.
+- Regenerated deterministic localization extraction metadata with canonical UI/Help/Glossary wording unchanged.
+- Added seven event/lifecycle regressions, increasing the component suite from 51 to 58 and the expected real-Windows full-suite total from 385 to 392.
+
 ### GUI Component/RAD Extraction — Explicit Preference Bindings
 
 - Added backend-neutral `ValueBinding` and `BindingSet` contracts for explicit, synchronous component-to-model synchronization without observers, background mutation, or implicit two-way reactivity.
@@ -12,7 +23,7 @@ Notable SalixTorrent changes are recorded here.
 - Removed direct Dear PyGui usage from `settings_view.py`: Preferences status/connectivity text, network-interface refresh, file-path value access, save/restore synchronization, seeding-default reset, and ordinary control reads/writes now use component APIs.
 - Kept `ResponsiveLayout`, Tk/native folder selection, networking services, localization conversion, and seeding-duration composition as explicit application concerns rather than folding unrelated services into binding.
 - Preserved the established Preferences layout, Help/Glossary strings, settings schema, save/apply semantics, networking refresh behavior, and seeding-goal bulk-apply behavior.
-- Added five binding/runtime regressions, increasing the component suite from 46 to 51 and the expected real-Windows full-suite total from 380 to 385.
+- Added five binding/runtime regressions, increasing the component suite from 46 to 51; real-Windows validation passed both full discovery paths at 385/385 with one expected non-Windows skip before the tranche was committed and pushed.
 
 ### GUI Component/RAD Extraction — Transfer Utility Dialogs
 

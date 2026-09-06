@@ -96,7 +96,7 @@ class Component(ABC):
         if not callable(attachment):
             raise TypeError("component attachment must be callable")
         self._attachments.append(attachment)
-        if self.item is not None and self._renderer is not None:
+        if self.item is not None and self._renderer is not None and self.exists():
             attachment(self.item, self._renderer)
         return self
 
@@ -110,6 +110,11 @@ class Component(ABC):
     def require_item(self) -> object:
         if self.item is None:
             raise RuntimeError(f"{self.__class__.__name__} has not been built")
+        renderer = self._renderer or get_default_renderer()
+        if not renderer.exists(self.item):
+            raise RuntimeError(
+                f"{self.__class__.__name__} rendered item no longer exists; rebuild the component"
+            )
         return self.item
 
     def exists(self) -> bool:
@@ -119,6 +124,31 @@ class Component(ABC):
             return False
         renderer = self._renderer or get_default_renderer()
         return bool(renderer.exists(self.item))
+
+    def dispose(self) -> bool:
+        """Release this component's rendered root through its active renderer.
+
+        Disposal is explicit and idempotent.  A container's backend root owns
+        its backend descendants, so destroying that root may also invalidate
+        separately referenced child components.  Those wrappers then report
+        ``exists() == False`` and reject stale-handle access through
+        :meth:`require_item`.  Attachments remain registered so a later rebuild
+        can reapply them.
+        """
+
+        if self.item is None:
+            return False
+
+        renderer = self._renderer or get_default_renderer()
+        item = self.item
+        existed = bool(renderer.exists(item))
+        if existed:
+            renderer.destroy(item)
+
+        self.item = None
+        self._renderer = None
+        self.resolved_layout = None
+        return existed
 
     def configure(self, **kwargs) -> None:
         """Configure the rendered item through the active renderer."""

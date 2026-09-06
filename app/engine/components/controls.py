@@ -5,6 +5,7 @@ from __future__ import annotations
 from enum import Enum
 
 from app.engine.components.base import Component, ValueComponent
+from app.engine.components.events import ComponentEventType
 from app.engine.components.layout import ControlLayout, ControlLayoutTheme
 from app.engine.components.renderer import ComponentRenderer, get_default_renderer
 from app.engine.property_cascade import UNSET
@@ -57,7 +58,7 @@ class Button(Component):
         label: str,
         *,
         callback=None,
-        user_data=None,
+        event_data=None,
         enabled: bool = True,
         show: bool = True,
         theme: ControlLayoutTheme | None = None,
@@ -67,7 +68,7 @@ class Button(Component):
         super().__init__(theme=theme, layout=layout, profile_key=profile_key)
         self.label = str(label)
         self.callback = callback
-        self.user_data = user_data
+        self.event_data = event_data
         self.enabled = bool(enabled)
         self.show = bool(show)
 
@@ -77,8 +78,12 @@ class Button(Component):
         kwargs = self._layout_kwargs(resolved)
         kwargs.update(
             label=self.label,
-            callback=self.callback,
-            user_data=self.user_data,
+            callback=renderer.event_callback(
+                self,
+                ComponentEventType.ACTIVATE,
+                self.callback,
+                data=self.event_data,
+            ),
             enabled=self.enabled,
             show=self.show,
         )
@@ -95,7 +100,7 @@ class ComboBox(ValueComponent):
         *,
         default_value=None,
         callback=None,
-        user_data=None,
+        event_data=None,
         enabled: bool = True,
         show: bool = True,
         theme: ControlLayoutTheme | None = None,
@@ -106,7 +111,7 @@ class ComboBox(ValueComponent):
         self.items = tuple(items)
         self.default_value = default_value
         self.callback = callback
-        self.user_data = user_data
+        self.event_data = event_data
         self.enabled = bool(enabled)
         self.show = bool(show)
 
@@ -117,8 +122,12 @@ class ComboBox(ValueComponent):
         kwargs.update(
             items=list(self.items),
             default_value=self.default_value,
-            callback=self.callback,
-            user_data=self.user_data,
+            callback=renderer.event_callback(
+                self,
+                ComponentEventType.CHANGE,
+                self.callback,
+                data=self.event_data,
+            ),
             enabled=self.enabled,
             show=self.show,
         )
@@ -142,7 +151,7 @@ class TextInput(ValueComponent):
         multiline: bool = False,
         readonly: bool = False,
         callback=None,
-        user_data=None,
+        event_data=None,
         enabled: bool = True,
         show: bool = True,
         theme: ControlLayoutTheme | None = None,
@@ -156,7 +165,7 @@ class TextInput(ValueComponent):
         self.multiline = bool(multiline)
         self.readonly = bool(readonly)
         self.callback = callback
-        self.user_data = user_data
+        self.event_data = event_data
         self.enabled = bool(enabled)
         self.show = bool(show)
 
@@ -170,8 +179,12 @@ class TextInput(ValueComponent):
             hint=self.hint,
             multiline=self.multiline,
             readonly=self.readonly,
-            callback=self.callback,
-            user_data=self.user_data,
+            callback=renderer.event_callback(
+                self,
+                ComponentEventType.CHANGE,
+                self.callback,
+                data=self.event_data,
+            ),
             enabled=self.enabled,
             show=self.show,
         )
@@ -197,7 +210,7 @@ class NumericStepper(ValueComponent):
         step=UNSET,
         step_fast=UNSET,
         callback=None,
-        user_data=None,
+        event_data=None,
         enabled: bool = True,
         show: bool = True,
         theme: ControlLayoutTheme | None = None,
@@ -215,7 +228,7 @@ class NumericStepper(ValueComponent):
         self.step = step
         self.step_fast = step_fast
         self.callback = callback
-        self.user_data = user_data
+        self.event_data = event_data
         self.enabled = bool(enabled)
         self.show = bool(show)
 
@@ -230,8 +243,12 @@ class NumericStepper(ValueComponent):
             min_clamped=self.min_clamped,
             max_clamped=self.max_clamped,
             format=self.format,
-            callback=self.callback,
-            user_data=self.user_data,
+            callback=renderer.event_callback(
+                self,
+                ComponentEventType.CHANGE,
+                self.callback,
+                data=self.event_data,
+            ),
             enabled=self.enabled,
             show=self.show,
         )
@@ -290,7 +307,7 @@ class CheckBox(ValueComponent):
         *,
         default_value: bool = False,
         callback=None,
-        user_data=None,
+        event_data=None,
         enabled: bool = True,
         show: bool = True,
         theme: ControlLayoutTheme | None = None,
@@ -301,7 +318,7 @@ class CheckBox(ValueComponent):
         self.label = str(label)
         self.default_value = bool(default_value)
         self.callback = callback
-        self.user_data = user_data
+        self.event_data = event_data
         self.enabled = bool(enabled)
         self.show = bool(show)
 
@@ -312,8 +329,12 @@ class CheckBox(ValueComponent):
         kwargs.update(
             label=self.label,
             default_value=self.default_value,
-            callback=self.callback,
-            user_data=self.user_data,
+            callback=renderer.event_callback(
+                self,
+                ComponentEventType.CHANGE,
+                self.callback,
+                data=self.event_data,
+            ),
             enabled=self.enabled,
             show=self.show,
         )

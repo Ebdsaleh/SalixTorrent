@@ -9,8 +9,10 @@ headless-friendly.
 from __future__ import annotations
 
 from contextlib import contextmanager
-from typing import ContextManager, Iterator, Protocol, runtime_checkable
+from functools import wraps
+from typing import Callable, ContextManager, Iterator, Protocol, runtime_checkable
 
+from app.engine.components.events import ComponentEvent, ComponentEventType
 from app.engine.components.profile import ComponentLayoutProfile, FRAMEWORK_COMPONENT_PROFILE
 
 
@@ -39,6 +41,19 @@ class ComponentRenderer(Protocol):
         ...
 
     def exists(self, item: object) -> bool:
+        ...
+
+    def destroy(self, item: object) -> None:
+        ...
+
+    def event_callback(
+        self,
+        source: object,
+        event_type: ComponentEventType,
+        callback: Callable[[ComponentEvent], object] | None,
+        *,
+        data: object = None,
+    ) -> object | None:
         ...
 
     def center(self, item: object, *, fallback_size: tuple[int, int] | None = None) -> None:
@@ -148,6 +163,43 @@ class DearPyGuiRenderer:
 
     def exists(self, item: object) -> bool:
         return bool(self._dpg().does_item_exist(item))
+
+    def destroy(self, item: object) -> None:
+        """Destroy one rendered component root if it still exists."""
+
+        dpg = self._dpg()
+        if dpg.does_item_exist(item):
+            dpg.delete_item(item)
+
+    def event_callback(
+        self,
+        source: object,
+        event_type: ComponentEventType,
+        callback: Callable[[ComponentEvent], object] | None,
+        *,
+        data: object = None,
+    ) -> object | None:
+        """Adapt Dear PyGui callback arguments into a framework event."""
+
+        if callback is None:
+            return None
+        if not callable(callback):
+            raise TypeError("component event callback must be callable")
+
+        event_type = ComponentEventType(event_type)
+
+        @wraps(callback)
+        def dispatch(_sender=None, app_data=None, _user_data=None):
+            return callback(
+                ComponentEvent(
+                    source=source,
+                    event_type=event_type,
+                    value=app_data,
+                    data=data,
+                )
+            )
+
+        return dispatch
 
     def center(self, item: object, *, fallback_size: tuple[int, int] | None = None) -> None:
         """Center a rendered item within the current viewport client area."""
