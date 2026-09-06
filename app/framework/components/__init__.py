@@ -1,6 +1,6 @@
 """Reusable GUI component contracts inside the provisional framework boundary."""
 
-from app.framework.components.layout import (
+from .layout import (
     AUTO,
     FILL,
     ControlLayout,
@@ -10,13 +10,13 @@ from app.framework.components.layout import (
     ResolvedControlLayout,
     resolve_control_layout,
 )
-from app.framework.components.attachments import Tooltip
-from app.framework.components.events import ComponentEvent, ComponentEventType, action_callback
-from app.framework.components.profile import (
+from .attachments import Tooltip
+from .events import ComponentEvent, ComponentEventType, action_callback
+from .profile import (
     ComponentLayoutProfile,
     FRAMEWORK_COMPONENT_PROFILE,
 )
-from app.framework.components.controls import (
+from .controls import (
     Button,
     CheckBox,
     ComboBox,
@@ -28,23 +28,23 @@ from app.framework.components.controls import (
     Spacer,
     TextInput,
 )
-from app.framework.components.containers import (
+from .containers import (
     ControlColumn,
     ControlGrid,
     ControlRow,
     Dialog,
     SectionPanel,
 )
-from app.framework.components.fields import (
+from .fields import (
     DurationEditor,
     LabeledComboField,
     LabeledField,
     LabeledNumericField,
     NumericUnitField,
 )
-from app.framework.components.state import ComponentGroup
-from app.framework.components.bindings import BindingSet, ValueBinding
-from app.framework.components.renderer import (
+from .state import ComponentGroup
+from .bindings import BindingSet, ValueBinding
+from .renderer import (
     ComponentRenderer,
     clear_default_renderer,
     get_default_renderer,

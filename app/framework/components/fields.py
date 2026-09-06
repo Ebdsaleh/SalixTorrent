@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from app.framework.components.base import Component
-from app.framework.components.containers import ControlColumn, ControlGrid, ControlRow
-from app.framework.components.controls import ComboBox, Label, NumericKind, NumericStepper
-from app.framework.components.layout import ControlLayout, ControlLayoutTheme
-from app.framework.components.renderer import get_default_renderer
+from .base import Component
+from .containers import ControlColumn, ControlGrid, ControlRow
+from .controls import ComboBox, Label, NumericKind, NumericStepper
+from .layout import ControlLayout, ControlLayoutTheme
+from .renderer import get_default_renderer
 
 
 class LabeledField(Component):

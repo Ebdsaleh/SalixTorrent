@@ -15,7 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
-from app.framework.property_cascade import (
+from ..property_cascade import (
     UNSET,
     PropertySource,
     RejectedPropertyCandidate,

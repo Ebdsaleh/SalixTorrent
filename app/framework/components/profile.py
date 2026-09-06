@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Mapping, Sequence
 
-from app.framework.components.layout import DEFAULT_CONTROL_LAYOUT, ControlLayoutDefaults
+from .layout import DEFAULT_CONTROL_LAYOUT, ControlLayoutDefaults
 
 
 def _freeze_layouts(values: Mapping[str, ControlLayoutDefaults]) -> Mapping[str, ControlLayoutDefaults]:

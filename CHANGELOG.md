@@ -4,6 +4,16 @@ Notable SalixTorrent changes are recorded here.
 
 ## Unreleased
 
+### GUI/RAD Extraction — Framework Package Relocation Readiness
+
+- Converted every intra-framework dependency under `app/framework/` to package-relative imports so the reusable tree no longer hard-codes the SalixTorrent `app.framework` namespace internally.
+- Added an isolated packaging probe that copies the framework directory to a temporary package named `portable_framework`, imports every module under Python isolated mode, and verifies that neither SalixTorrent's `app` package nor Dear PyGui is loaded.
+- Added a second relocation probe that exercises representative component, documentation, geometry, and property-cascade contracts from the renamed package.
+- Added a standard-library-only dependency audit for the framework boundary and a guard that keeps the provisional root package from freezing a final package version or wildcard public API during extraction.
+- Kept Dear PyGui resize-dispatch ownership in `app/engine/responsive_layout.py`; no callback registry, backend state, or application service was moved merely for cosmetic symmetry.
+- Added five framework-packaging regressions. The focused component/documentation/responsive suites remain unchanged, while the expected full real-Windows suite advances from 403 to 408 tests.
+- No user-facing strings, transfer/network behavior, persistence schema, SalixORM integration, or application version changed.
+
 ### GUI/RAD Extraction — Framework Documentation and Geometry Boundary
 
 - Extracted backend-neutral geometry primitives (`ContentBounds`, alignment enums, content metrics, clamps/splits/fill helpers, and dialog metrics) into `app/framework/geometry.py`; the Dear PyGui resize dispatcher remains in `app/engine/responsive_layout.py` and re-exports the pure contracts for compatibility.

@@ -12,8 +12,8 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from typing import Any
 
-from app.framework.components.base import ValueComponent
-from app.framework.property_cascade import UNSET
+from .base import ValueComponent
+from ..property_cascade import UNSET
 
 
 def _identity(value):

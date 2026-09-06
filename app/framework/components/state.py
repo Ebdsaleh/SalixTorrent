@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Iterator
 
-from app.framework.components.base import Component
+from .base import Component
 
 
 class ComponentGroup:

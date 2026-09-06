@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.framework.components.renderer import ComponentRenderer
+from .renderer import ComponentRenderer
 
 
 @dataclass(frozen=True)

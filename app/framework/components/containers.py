@@ -5,10 +5,10 @@ from __future__ import annotations
 from collections.abc import Iterable, Sequence
 from contextlib import contextmanager
 
-from app.framework.components.base import Component
-from app.framework.components.controls import Label, Separator
-from app.framework.components.layout import ControlLayout, ControlLayoutTheme
-from app.framework.components.renderer import ComponentRenderer, get_default_renderer
+from .base import Component
+from .controls import Label, Separator
+from .layout import ControlLayout, ControlLayoutTheme
+from .renderer import ComponentRenderer, get_default_renderer
 
 
 class ControlRow(Component):

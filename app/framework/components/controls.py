@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from enum import Enum
 
-from app.framework.components.base import Component, ValueComponent
-from app.framework.components.events import ComponentEventType
-from app.framework.components.layout import ControlLayout, ControlLayoutTheme
-from app.framework.components.renderer import ComponentRenderer, get_default_renderer
-from app.framework.property_cascade import UNSET
+from .base import Component, ValueComponent
+from .events import ComponentEventType
+from .layout import ControlLayout, ControlLayoutTheme
+from .renderer import ComponentRenderer, get_default_renderer
+from ..property_cascade import UNSET
 
 
 class NumericKind(str, Enum):

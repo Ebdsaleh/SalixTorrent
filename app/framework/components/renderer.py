@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from typing import Callable, ContextManager, Protocol, runtime_checkable
 
-from app.framework.components.events import ComponentEvent, ComponentEventType
-from app.framework.components.profile import ComponentLayoutProfile
+from .events import ComponentEvent, ComponentEventType
+from .profile import ComponentLayoutProfile
 
 
 @runtime_checkable

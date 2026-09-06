@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 
-from app.framework.components.layout import (
+from .layout import (
     DEFAULT_CONTROL_LAYOUT,
     ControlLayout,
     ControlLayoutDefaults,
@@ -14,8 +14,8 @@ from app.framework.components.layout import (
     backend_dimension,
     resolve_control_layout,
 )
-from app.framework.components.profile import FRAMEWORK_COMPONENT_PROFILE
-from app.framework.components.renderer import ComponentRenderer, get_default_renderer
+from .profile import FRAMEWORK_COMPONENT_PROFILE
+from .renderer import ComponentRenderer, get_default_renderer
 
 
 class Component(ABC):

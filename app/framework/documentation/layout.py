@@ -11,14 +11,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.framework.property_cascade import (
+from ..property_cascade import (
     UNSET,
     PropertySource,
     RejectedPropertyCandidate,
     ResolvedProperty,
     resolve_property,
 )
-from app.framework.geometry import ContentBounds, HorizontalAlign, aligned_offset
+from ..geometry import ContentBounds, HorizontalAlign, aligned_offset
 
 
 @dataclass(frozen=True)

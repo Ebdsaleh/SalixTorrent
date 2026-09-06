@@ -850,7 +850,9 @@ The ninth tranche formalizes the two renderer-adjacent boundaries exposed by tha
 
 The tenth tranche begins the first physical extraction without freezing final framework naming. Reusable property-cascade and component implementations move under the provisional internal `app.framework` boundary, while the old engine paths remain temporary compatibility facades. Dear PyGui becomes a concrete engine/backend adapter rather than part of the framework core, and `GuiEngine` explicitly installs/clears that renderer at the composition root. A source audit enforces that framework-candidate modules do not import SalixTorrent engine/view/logic/localization layers or Dear PyGui. It is pushed/Windows-validated at 397/397 under `bfc0e7a4fd5a49234425980c4dd5ce04f6f5a10f`.
 
-The eleventh tranche proves that physical boundary with a second independent reusable subsystem. Pure alignment/content/split/fill/dialog geometry moves to `app.framework.geometry`, while the Dear PyGui `ResponsiveLayout` dispatcher remains an engine adapter. Semantic documentation model/layout/typography contracts move to `app.framework.documentation`; the concrete `DocumentationRenderer` deliberately remains in the engine because it owns Dear PyGui, resource paths, application typography, media and resize callbacks. Compatibility facades preserve the former engine documentation import paths during extraction.
+The eleventh tranche proves that physical boundary with a second independent reusable subsystem. Pure alignment/content/split/fill/dialog geometry moves to `app.framework.geometry`, while the Dear PyGui `ResponsiveLayout` dispatcher remains an engine adapter. Semantic documentation model/layout/typography contracts move to `app.framework.documentation`; the concrete `DocumentationRenderer` deliberately remains in the engine because it owns Dear PyGui, resource paths, application typography, media and resize callbacks. Compatibility facades preserve the former engine documentation import paths during extraction. It is pushed/Windows-validated at 403/403 under `1f70669678b3621718467b60e2fcb94aa8e77642`.
+
+The twelfth tranche proves package relocation ergonomics before any external repository split. All dependencies inside `app/framework/` now use package-relative imports, so the framework tree does not hard-code SalixTorrent's `app.framework` namespace internally. A packaging regression copies that directory to a temporary package named `portable_framework`, imports every module under Python isolated mode, and confirms that neither SalixTorrent's `app` package nor Dear PyGui is loaded. A second probe exercises representative component, documentation, geometry and property-cascade contracts from the renamed package, while a source audit restricts absolute framework dependencies to the Python standard library. The provisional framework root intentionally does not publish a version or wildcard public surface yet. Dear PyGui resize callback/handler ownership remains in the engine adapter because no second backend has proven that state reusable.
 
 Names such as `components`, `SectionPanel`, `Dialog`, and profile identifiers remain working extraction names. Final RAD-framework naming and public API terminology are deliberately deferred until the full reusable boundary has been extracted and proven.
 
@@ -860,13 +862,13 @@ Names such as `components`, `SectionPanel`, `Dialog`, and profile identifiers re
 Reusable GUI component foundation
 ```
 
-Candidate follow-up work after the documentation/geometry boundary validates:
+Candidate follow-up work after the package-relocation boundary validates:
 
-- prove framework packaging/import ergonomics and dependency direction before any external repository/package split;
-- inspect whether the remaining backend-neutral pieces of responsive layout belong under the same framework namespace without dragging Dear PyGui callback ownership across the boundary;
+- inspect whether a small backend-neutral resize/callback coordination contract is genuinely shared before moving any remaining `ResponsiveLayout` state out of the Dear PyGui adapter;
 - prove the explicit binding or event contract on another ordinary persisted/editable surface only when it removes real duplication;
 - migrate only additional ordinary dialogs/forms where the current contracts remove real application code rather than creating cosmetic wrappers;
-- keep application services such as clipboard, native file dialogs, networking and responsive geometry outside component ownership unless a broader reusable contract is proven;
+- define the eventual host/backend adapter packaging boundary before an external repository split, while keeping the current package name and public API provisional;
+- keep application services such as clipboard, native file dialogs, networking and backend-specific resize handlers outside component ownership unless a broader reusable contract is proven;
 - continue using application-owned adapters for Help/Glossary/accessibility semantics while keeping generic attachments product-neutral;
 - avoid converting complex tables/graphs merely for cosmetic uniformity;
 - postpone the final framework naming/API pass until the full RAD extraction boundary is visible.
