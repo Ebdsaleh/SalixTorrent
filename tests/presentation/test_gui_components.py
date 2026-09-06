@@ -12,11 +12,13 @@ from app.engine.components import (
     Button,
     ComponentLayoutProfile,
     ComboBox,
+    ControlColumn,
     ControlGrid,
     ControlLayout,
     ControlLayoutDefaults,
     ControlLayoutTheme,
     ControlRow,
+    Dialog,
     DurationEditor,
     Label,
     LabeledComboField,
@@ -25,6 +27,8 @@ from app.engine.components import (
     NumericKind,
     NumericStepper,
     NumericUnitField,
+    SectionPanel,
+    Separator,
     TextInput,
     resolve_control_layout,
 )
@@ -476,6 +480,141 @@ class GuiComponentFoundationTests(unittest.TestCase):
         self.assertEqual(len(grid_calls), 1)
         self.assertEqual(len(row_calls), 3)
         self.assertEqual(grid_calls[0][2]["width"], 280)
+
+
+    def test_component_attachment_runs_after_item_binding(self):
+        renderer = RecordingRenderer()
+        seen = []
+        control = Button("Save")
+        returned = control.attach(lambda item, active: seen.append((item, active)))
+
+        self.assertIs(returned, control)
+        item = control.build(renderer=renderer)
+
+        self.assertEqual(seen, [(item, renderer)])
+
+    def test_component_attachment_added_after_build_runs_immediately(self):
+        renderer = RecordingRenderer()
+        control = Label("Ready")
+        item = control.build(renderer=renderer)
+        seen = []
+
+        control.attach(lambda attached_item, active: seen.append((attached_item, active)))
+
+        self.assertEqual(seen, [(item, renderer)])
+
+    def test_control_row_and_column_contexts_support_incremental_content(self):
+        renderer = RecordingRenderer()
+        row = ControlRow()
+        column = ControlColumn()
+
+        with column.context(renderer=renderer):
+            with row.context(renderer=renderer):
+                renderer.create("label", text="imperative child")
+
+        self.assertEqual([entry[0] for entry in renderer.containers], ["column", "row"])
+        self.assertEqual(renderer.created[-1][0], "label")
+        self.assertEqual(renderer.created[-1][2]["text"], "imperative child")
+
+    def test_section_panel_owns_heading_separator_and_profile_dimensions(self):
+        profile = ComponentLayoutProfile(
+            name="panel-profile",
+            parent=FRAMEWORK_COMPONENT_PROFILE,
+            layouts={
+                "demo.panel": ControlLayoutDefaults(width=530, height=290),
+            },
+        )
+        renderer = RecordingRenderer(profile)
+        panel = SectionPanel(
+            "NETWORKING",
+            heading_color=(255, 200, 100),
+            profile_key="demo.panel",
+        )
+
+        with panel.context(renderer=renderer):
+            renderer.create("label", text="inside")
+
+        kind, item, kwargs = renderer.containers[0]
+        self.assertEqual(kind, "panel")
+        self.assertEqual(kwargs["width"], 530)
+        self.assertEqual(kwargs["height"], 290)
+        self.assertTrue(kwargs["border"])
+        self.assertEqual(panel.require_item(), item)
+        self.assertEqual(renderer.created[0][0], "label")
+        self.assertEqual(renderer.created[0][2]["text"], "NETWORKING")
+        self.assertEqual(renderer.created[1][0], "separator")
+
+    def test_section_panel_declarative_children_share_same_container(self):
+        renderer = RecordingRenderer()
+        panel = SectionPanel(
+            "QUEUE",
+            (Label("Active download slots"), Button("Apply Queue")),
+        )
+
+        panel.build(renderer=renderer)
+
+        self.assertEqual(renderer.containers[0][0], "panel")
+        self.assertEqual([entry[0] for entry in renderer.created], [
+            "label", "separator", "label", "button"
+        ])
+
+    def test_dialog_uses_profile_size_without_backend_sizing_literals(self):
+        profile = ComponentLayoutProfile(
+            name="dialog-profile",
+            parent=FRAMEWORK_COMPONENT_PROFILE,
+            layouts={
+                "demo.dialog": ControlLayoutDefaults(width=620, height=365),
+            },
+        )
+        renderer = RecordingRenderer(profile)
+        dialog = Dialog(
+            "Seeding Goal for Torrent",
+            modal=True,
+            show=False,
+            no_resize=True,
+            profile_key="demo.dialog",
+        )
+
+        with dialog.context(renderer=renderer):
+            Separator().build(renderer=renderer)
+
+        kind, _, kwargs = renderer.containers[0]
+        self.assertEqual(kind, "dialog")
+        self.assertEqual(kwargs["width"], 620)
+        self.assertEqual(kwargs["height"], 365)
+        self.assertTrue(kwargs["modal"])
+        self.assertFalse(kwargs["show"])
+        self.assertTrue(kwargs["no_resize"])
+
+    def test_settings_structural_regions_are_component_owned(self):
+        source = (PROJECT_ROOT / "app" / "views" / "settings_view.py").read_text(
+            encoding="utf-8"
+        )
+        profile_source = (PROJECT_ROOT / "app" / "engine" / "ui_component_profile.py").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("SectionPanel(", source)
+        self.assertIn("ControlColumn()", source)
+        self.assertIn(".context(parent=parent_tag)", source)
+        self.assertNotIn("dpg.child_window", source)
+        self.assertNotIn("with dpg.group", source)
+        self.assertIn('"settings.networking_panel": ControlLayoutDefaults(width=530, height=290)', profile_source)
+        self.assertIn('"settings.desktop_panel": ControlLayoutDefaults(width=FILL, height=350)', profile_source)
+
+    def test_configure_targets_dialog_structure_is_component_owned(self):
+        source = (PROJECT_ROOT / "app" / "views" / "download_view.py").read_text(
+            encoding="utf-8"
+        )
+        profile_source = (PROJECT_ROOT / "app" / "engine" / "ui_component_profile.py").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("self.seeding_goal_dialog = Dialog(", source)
+        self.assertIn('profile_key="configure_targets.dialog"', source)
+        self.assertIn("self.seeding_goal_dialog_separator = Separator()", source)
+        self.assertNotIn("width=620,\n            height=365", source)
+        self.assertIn('"configure_targets.dialog": ControlLayoutDefaults(width=620, height=365)', profile_source)
 
 
 if __name__ == "__main__":

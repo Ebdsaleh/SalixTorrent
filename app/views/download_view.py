@@ -33,12 +33,14 @@ from app.engine.desktop_integration import DesktopIntegration
 from app.engine.components import (
     ComboBox,
     ControlRow,
+    Dialog,
     DurationEditor,
     Label,
     LabeledComboField,
     LabeledNumericField,
     NumericKind,
     NumericStepper,
+    Separator,
 )
 from app.engine.responsive_layout import DialogMetrics, ResponsiveLayout, clamp, fill_height, split_widths
 from app.views.peer_view import PeerView
@@ -759,21 +761,22 @@ class DownloadView:
                 add_help_tooltip(properties_folder_button, "OPEN_FOLDER")
                 dpg.add_button(label=tr('view.download_view.close', " Close "), callback=lambda: dpg.hide_item(self.properties_modal))
 
-        with dpg.window(
-            label=tr('view.download_view.seeding_goal_for_torrent', "Seeding Goal for Torrent"),
+        self.seeding_goal_dialog = Dialog(
+            tr('view.download_view.seeding_goal_for_torrent', "Seeding Goal for Torrent"),
             modal=True,
             show=False,
             no_resize=True,
-            width=620,
-            height=365,
-        ) as self.seeding_goal_modal:
+            profile_key="configure_targets.dialog",
+        )
+        with self.seeding_goal_dialog.context() as self.seeding_goal_modal:
             self.seeding_goal_modal_title = dpg.add_text(
                 tr('view.download_view.seeding_goal_for_torrent', "Seeding Goal for Torrent"),
                 color=(255, 190, 100),
             )
             add_help_tooltip(self.seeding_goal_modal_title, "SEEDING_GOAL")
             self.seeding_goal_modal_current = dpg.add_text("", wrap=570)
-            dpg.add_separator()
+            self.seeding_goal_dialog_separator = Separator()
+            self.seeding_goal_dialog_separator.build()
             self.seeding_goal_mode_field = LabeledComboField(
                 tr('view.download_view.goal_mode', "Goal mode"),
                 localized_choices(SEEDING_GOAL_MODES),

@@ -281,6 +281,19 @@ class CheckBox(ValueComponent):
         return self._bind(renderer, renderer.create("checkbox", **kwargs))
 
 
+class Separator(Component):
+    """Backend-neutral visual separator used by structural composites."""
+
+    profile_key = "separator"
+
+    def build(self, *, renderer=None, parent=None) -> object:
+        renderer = renderer or get_default_renderer()
+        self._resolve_layout(renderer=renderer)
+        kwargs = {}
+        self._with_parent(kwargs, parent)
+        return self._bind(renderer, renderer.create("separator", **kwargs))
+
+
 class Spacer(Component):
     profile_key = "spacer"
     def build(self, *, renderer=None, parent=None) -> object:

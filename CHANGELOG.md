@@ -38,6 +38,18 @@ Notable SalixTorrent changes are recorded here.
 - Removed direct component-width constants from the migrated Preferences and seeding-goal view construction paths while preserving the existing live layout.
 - Added six headless regressions for named profile defaults, safe fallback, theme/instance precedence, numeric-unit profile slots, duration grid metrics, and the rule that migrated view dimensions are profile-owned.
 - Regenerated deterministic localization extraction metadata after line movement; canonical UI/Help/Glossary strings remain unchanged.
+- Validated the component-profile tranche on the real Windows checkout at 354/354 tests in both canonical and plain discovery, with one expected non-Windows skip; visual smoke confirmed Preferences, Torrent Properties, and `Configure targets...` retained their established layout.
+
+### Structural Component Composition
+
+- Added backend-neutral `Separator`, `SectionPanel`, and `Dialog` structural components and extended `ControlRow` / `ControlColumn` with context-managed construction for incremental migration of proven imperative views.
+- Added generic component post-build attachment hooks so product-specific tooltip, accessibility, diagnostics, or metadata behavior can attach without moving those semantics into the reusable component model.
+- Extended the Dear PyGui renderer bridge with separator, panel/child-window, and dialog/window rendering while keeping backend-specific construction outside the component model.
+- Migrated the Preferences structural tree away from direct Dear PyGui groups/child windows: the root, paired sections, panel headings/separators, and panel sizing now flow through reusable structural components and the application component profile.
+- Moved the eight established Preferences panel dimensions into `ui_component_profile.py`, preserving responsive width updates while centralizing initial structural metrics.
+- Migrated the focused `Configure targets...` seeding-goal window onto the reusable `Dialog` boundary and moved its 620x365 dimensions into the application profile without changing policy behavior or strings.
+- Added eight headless regressions for attachment timing, context-managed row/column composition, panel heading/separator ownership, declarative panel children, profile-owned dialog sizing, Preferences structural ownership, and the Configure-targets dialog boundary.
+- Regenerated deterministic localization extraction metadata after source movement; canonical UI/Help/Glossary strings remain unchanged at 1337 entries.
 
 
 ## v0.4.0 - 2026-09-05

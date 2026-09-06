@@ -89,6 +89,8 @@ class DearPyGuiRenderer:
             return dpg.add_checkbox(**kwargs)
         if kind == "spacer":
             return dpg.add_spacer(**kwargs)
+        if kind == "separator":
+            return dpg.add_separator(**kwargs)
         if kind == "grid_column":
             return dpg.add_table_column(**kwargs)
         raise ValueError(f"unsupported GUI component kind: {kind!r}")
@@ -115,6 +117,14 @@ class DearPyGuiRenderer:
             return
         if kind == "grid_row":
             with dpg.table_row(**kwargs) as item:
+                yield item
+            return
+        if kind == "panel":
+            with dpg.child_window(**kwargs) as item:
+                yield item
+            return
+        if kind == "dialog":
+            with dpg.window(**kwargs) as item:
                 yield item
             return
         raise ValueError(f"unsupported GUI component container: {kind!r}")

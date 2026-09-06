@@ -12,6 +12,7 @@ from app.engine.components import (
     Button,
     CheckBox,
     ComboBox,
+    ControlColumn,
     ControlRow,
     DurationEditor,
     Label,
@@ -21,6 +22,7 @@ from app.engine.components import (
     NumericKind,
     NumericStepper,
     NumericUnitField,
+    SectionPanel,
     TextInput,
 )
 from app.engine.documentation import (
@@ -87,7 +89,8 @@ class SettingsView:
         self._layout_root = None
 
     def build_view(self, parent_tag):
-        with dpg.group(parent=parent_tag):
+        self.preferences_root = ControlColumn()
+        with self.preferences_root.context(parent=parent_tag):
             preferences_heading = dpg.add_text(tr("settings.heading", "PREFERENCES"), color=(0, 255, 128))
             add_help_tooltip(preferences_heading, "PREFERENCES_VIEW")
             self.preferences_intro = dpg.add_text(
@@ -102,9 +105,12 @@ class SettingsView:
             add_help_tooltip(self.preferences_intro, "PREFERENCES_VIEW")
             dpg.add_spacer(height=6)
 
-            with dpg.child_window(height=112, width=-1, border=True) as self.downloads_panel:
-                dpg.add_text(tr('view.settings_view.downloads', "DOWNLOADS"), color=(100, 180, 255))
-                dpg.add_separator()
+            self.downloads_section = SectionPanel(
+                tr('view.settings_view.downloads', "DOWNLOADS"),
+                heading_color=(100, 180, 255),
+                profile_key="settings.downloads_panel",
+            )
+            with self.downloads_section.context() as self.downloads_panel:
                 self.download_directory_field = LabeledField(
                     tr("settings.default_download_directory", "Default download directory"),
                     TextInput(
@@ -126,10 +132,14 @@ class SettingsView:
                 add_help_tooltip(choose_download_dir_button, "DEFAULT_DOWNLOAD_DIR")
 
             dpg.add_spacer(height=7)
-            with dpg.group(horizontal=True):
-                with dpg.child_window(width=530, height=290, border=True) as self.networking_panel:
-                    dpg.add_text(tr('view.settings_view.networking', "NETWORKING"), color=(255, 200, 100))
-                    dpg.add_separator()
+            self.networking_pair = ControlRow()
+            with self.networking_pair.context():
+                self.networking_section = SectionPanel(
+                    tr('view.settings_view.networking', "NETWORKING"),
+                    heading_color=(255, 200, 100),
+                    profile_key="settings.networking_panel",
+                )
+                with self.networking_section.context() as self.networking_panel:
                     self.listen_port_field = LabeledField(
                         tr('view.settings_view.bittorrent_listen_port', "BitTorrent listen port"),
                         NumericStepper(
@@ -219,9 +229,12 @@ class SettingsView:
                     add_help_tooltip(self.enable_upnp_checkbox, "UPNP")
                     add_help_tooltip(self.enable_natpmp_checkbox, "NATPMP")
 
-                with dpg.child_window(width=-1, height=360, border=True) as self.connectivity_panel:
-                    dpg.add_text(tr('view.settings_view.incoming_connectivity', "INCOMING CONNECTIVITY"), color=(0, 255, 128))
-                    dpg.add_separator()
+                self.connectivity_section = SectionPanel(
+                    tr('view.settings_view.incoming_connectivity', "INCOMING CONNECTIVITY"),
+                    heading_color=(0, 255, 128),
+                    profile_key="settings.connectivity_panel",
+                )
+                with self.connectivity_section.context() as self.connectivity_panel:
                     self.connectivity_status = dpg.add_text(tr('view.settings_view.status_waiting', "Status: Waiting"))
                     add_help_tooltip(self.connectivity_status, "PORT_MAPPING")
                     self.connectivity_method = dpg.add_text(tr('view.settings_view.mapping', "Mapping: --"))
@@ -260,9 +273,12 @@ class SettingsView:
                     add_help_tooltip(self.connectivity_note, "PORT_MAPPING")
 
             dpg.add_spacer(height=7)
-            with dpg.child_window(height=238, width=-1, border=True) as self.privacy_panel:
-                dpg.add_text(tr('view.settings_view.privacy_transport', "PRIVACY / TRANSPORT"), color=(100, 220, 200))
-                dpg.add_separator()
+            self.privacy_section = SectionPanel(
+                tr('view.settings_view.privacy_transport', "PRIVACY / TRANSPORT"),
+                heading_color=(100, 220, 200),
+                profile_key="settings.privacy_panel",
+            )
+            with self.privacy_section.context() as self.privacy_panel:
                 self.peer_encryption_field = LabeledComboField(
                     tr('view.settings_view.peer_transport_encryption', "Peer transport encryption"),
                     localized_choices(PEER_ENCRYPTION_POLICIES),
@@ -320,10 +336,14 @@ class SettingsView:
                 add_help_tooltip(self.transport_note, "INTERFACE_LOCK")
 
             dpg.add_spacer(height=7)
-            with dpg.group(horizontal=True):
-                with dpg.child_window(width=530, height=225, border=True) as self.queue_preferences_panel:
-                    dpg.add_text(tr('view.settings_view.queue', "QUEUE"), color=(180, 160, 255))
-                    dpg.add_separator()
+            self.queue_bandwidth_pair = ControlRow()
+            with self.queue_bandwidth_pair.context():
+                self.queue_section = SectionPanel(
+                    tr('view.settings_view.queue', "QUEUE"),
+                    heading_color=(180, 160, 255),
+                    profile_key="settings.queue_panel",
+                )
+                with self.queue_section.context() as self.queue_preferences_panel:
                     self.active_slots_field = LabeledField(
                         tr('view.settings_view.active_download_slots', "Active download slots"),
                         NumericStepper(
@@ -365,9 +385,12 @@ class SettingsView:
                     self.auto_resume_checkbox = self.auto_resume_control.build()
                     add_help_tooltip(self.auto_resume_checkbox, "AUTO_RESUME")
 
-                with dpg.child_window(width=-1, height=225, border=True) as self.global_bandwidth_panel:
-                    dpg.add_text(tr('view.settings_view.global_bandwidth', "GLOBAL BANDWIDTH"), color=(255, 170, 100))
-                    dpg.add_separator()
+                self.global_bandwidth_section = SectionPanel(
+                    tr('view.settings_view.global_bandwidth', "GLOBAL BANDWIDTH"),
+                    heading_color=(255, 170, 100),
+                    profile_key="settings.global_bandwidth_panel",
+                )
+                with self.global_bandwidth_section.context() as self.global_bandwidth_panel:
                     global_bandwidth_note = dpg.add_text(
                         tr('view.settings_view.aggregate_limit_shared_by_every_active_torrent', "Aggregate limit shared by every active torrent. 0 = Unlimited."),
                         color=(150, 150, 150),
@@ -412,10 +435,14 @@ class SettingsView:
                     add_help_tooltip(self.global_upload_limit_unit, "GLOBAL_BANDWIDTH")
 
             dpg.add_spacer(height=7)
-            with dpg.group(horizontal=True):
-                with dpg.child_window(width=530, height=350, border=True) as self.new_defaults_panel:
-                    dpg.add_text(tr('view.settings_view.new_torrent_defaults', "NEW TORRENT DEFAULTS"), color=(100, 180, 255))
-                    dpg.add_separator()
+            self.defaults_desktop_pair = ControlRow()
+            with self.defaults_desktop_pair.context():
+                self.new_defaults_section = SectionPanel(
+                    tr('view.settings_view.new_torrent_defaults', "NEW TORRENT DEFAULTS"),
+                    heading_color=(100, 180, 255),
+                    profile_key="settings.new_defaults_panel",
+                )
+                with self.new_defaults_section.context() as self.new_defaults_panel:
                     new_torrent_defaults_note = dpg.add_text(tr('view.settings_view.per_torrent_limits_assigned_when_a_torrent', "Per-torrent limits assigned when a torrent is added."))
                     add_help_tooltip(new_torrent_defaults_note, "NEW_TORRENT_LIMITS")
                     self.default_download_limit_field = NumericUnitField(
@@ -545,9 +572,12 @@ class SettingsView:
                         self.apply_seeding_goal_existing_checkbox, "SEEDING_GOAL"
                     )
 
-                with dpg.child_window(width=-1, height=350, border=True) as self.desktop_panel:
-                    dpg.add_text(tr("settings.desktop.heading", "DESKTOP"), color=(0, 255, 128))
-                    dpg.add_separator()
+                self.desktop_section = SectionPanel(
+                    tr("settings.desktop.heading", "DESKTOP"),
+                    heading_color=(0, 255, 128),
+                    profile_key="settings.desktop_panel",
+                )
+                with self.desktop_section.context() as self.desktop_panel:
                     language_restart_note = tr(
                         "settings.language.restart_note",
                         "Language changes are applied after the interface is rebuilt. "

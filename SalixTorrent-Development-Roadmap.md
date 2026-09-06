@@ -2,7 +2,7 @@
 
 **Current application version string:** `0.4.0`
 **Roadmap status:** active development planning
-**Current implementation checkpoint:** post-v0.4.0 reusable GUI components — first two tranches committed/Windows-validated; component-profile tranche prepared
+**Current implementation checkpoint:** post-v0.4.0 reusable GUI components — three tranches committed/Windows-validated; structural-component tranche prepared
 **Current real Windows regression baseline:** 348 / 348 tests passing, with one expected non-Windows skip; next prepared tranche expects 354
 
 This roadmap records intended engineering direction rather than promising dates or release numbers. Changes should remain incremental, testable, reviewable, and compatible with SalixTorrent's existing protocol, persistence, packaging, localization, and cross-platform boundaries.
@@ -549,7 +549,7 @@ A relational database is not automatically the right format for every durable ar
 
 ## Priority A — immediate
 
-**Continue the reusable GUI component layer after the first two committed and Windows-validated tranches.**
+**Continue the reusable GUI component layer after three committed and Windows-validated tranches.**
 
 First tranche — complete/pushed (`66b46fa7070128f13bc87fbe4f9556a86049e895`):
 
@@ -579,7 +579,7 @@ Second tranche — Preferences composition expansion — complete/pushed (`13993
 - [x] both full Windows discovery commands at 348/348 with one expected skip;
 - [x] visual/behavior smoke across Preferences before commit.
 
-Third tranche — component layout profiles:
+Third tranche — component layout profiles — complete/pushed (`f5e30e30012958429240bcf2646ac9a09d348de5`):
 
 - [x] add backend-neutral `ComponentLayoutProfile` with named layout and aligned-grid column slots;
 - [x] keep a framework profile with safe `AUTO` fallbacks and established composite defaults;
@@ -590,9 +590,25 @@ Third tranche — component layout profiles:
 - [x] retain explicit width overrides in the generic APIs for exceptional one-off layouts;
 - [x] add six profile/layout regressions (20 component tests total);
 - [x] regenerate deterministic localization extraction metadata with no canonical string changes;
+- [x] run focused Windows component/localization validation;
+- [x] run both full Windows discovery commands at 354/354 with one expected skip;
+- [x] visually confirm Preferences, Torrent Properties and `Configure targets...` retain their established dimensions.
+
+Fourth tranche — structural composition and attachment boundary:
+
+- [x] add a backend-neutral `Separator` primitive;
+- [x] add reusable `SectionPanel` and `Dialog` structural containers;
+- [x] let `ControlRow` and `ControlColumn` expose context-managed incremental composition as well as declarative child builds;
+- [x] add generic post-build component attachment hooks without importing SalixTorrent Help semantics into the reusable layer;
+- [x] extend the Dear PyGui bridge with separator, panel/child-window and dialog/window rendering;
+- [x] move the eight Preferences panel dimensions into the application component profile;
+- [x] migrate Preferences root/pair/panel structure away from direct Dear PyGui group/child-window construction while retaining responsive item-id layout behavior;
+- [x] migrate `Configure targets...` onto the reusable dialog boundary and profile-owned dialog dimensions;
+- [x] add eight structural/attachment regressions (28 component tests total);
+- [x] regenerate deterministic localization extraction metadata with no canonical string changes;
 - [ ] run focused Windows component/localization validation;
-- [ ] run both full Windows discovery commands and account for the expected 348 -> 354 test-count increase;
-- [ ] visually confirm Preferences, Torrent Properties and `Configure targets...` retain their established dimensions.
+- [ ] run both full Windows discovery commands and account for the expected 354 -> 362 test-count increase;
+- [ ] visually confirm Preferences and `Configure targets...` retain their established structure and behavior.
 
 ## Priority B — user-facing durability
 
@@ -661,13 +677,16 @@ Primitive controls
     TextInput
     NumericStepper
     CheckBox
+    Separator
     Spacer
         |
         v
-Layout components
+Layout / structural composition
     ControlRow
     ControlColumn
     ControlGrid
+    SectionPanel
+    Dialog
         |
         v
 Field composition
@@ -677,6 +696,10 @@ Field composition
     LabeledNumericField
     NumericUnitField
     DurationEditor
+
+Cross-cutting component hooks
+    post-build attachments
+        -> application-owned tooltip/accessibility/diagnostic semantics
 ```
 
 `ControlRow` is the generic single-row-capacity composition primitive: it accepts an arbitrary number of child components and resolves width, height and horizontal spacing independently through the existing framework property cascade. `AUTO` and `FILL` are semantic framework sizes; Dear PyGui-specific values are translated only inside the renderer bridge.
@@ -689,7 +712,11 @@ The first live migration deliberately targeted the already-polished seeding-goal
 
 The second tranche broadens the same contract across Preferences. `LabeledField` provides the generic row shape for a label, one primary control and arbitrary trailing accessories; `NumericUnitField` is a convenience built on that contract rather than a parallel layout system. Preferences no longer constructs input/combo/checkbox value controls directly through Dear PyGui, while its surrounding panel/child-window structure remains intentionally application-specific. Existing raw item-id aliases are retained temporarily so persistence, refresh, tooltips and save/restore logic continue through their proven boundaries.
 
-The third tranche introduces renderer-selected `ComponentLayoutProfile` policy. Framework components select semantic profile slots for layout defaults; SalixTorrent's application profile centralizes the exact established Preferences and seeding-goal dimensions in one place. Missing slots fall back safely to framework `AUTO` sizing, sparse `ControlLayoutTheme` values remain the theme layer, and `ControlLayout` stays the explicit per-instance override. `DurationEditor` also resolves its aligned grid/input/column metrics from profile slots, so views no longer need to repeat those numbers.
+The third tranche introduces renderer-selected `ComponentLayoutProfile` policy. Framework components select semantic profile slots for layout defaults; SalixTorrent's application profile centralizes the exact established Preferences and seeding-goal dimensions in one place. Missing slots fall back safely to framework `AUTO` sizing, sparse `ControlLayoutTheme` values remain the theme layer, and `ControlLayout` stays the explicit per-instance override. `DurationEditor` also resolves its aligned grid/input/column metrics from profile slots, so views no longer need to repeat those numbers. The tranche is now committed/pushed and Windows-validated at 354/354 with visual parity confirmed.
+
+The fourth tranche extends the reusable layer upward into structural composition without wrapping complex tables or telemetry views cosmetically. `SectionPanel` owns child-window/panel sizing, heading and separator structure; `Dialog` owns window/dialog construction and semantic profile sizing; `ControlRow` and `ControlColumn` support context-managed incremental migration where existing view logic still needs imperative construction. Preferences now uses those structural boundaries instead of direct Dear PyGui groups/child windows, and `Configure targets...` uses the reusable dialog boundary. The same tranche adds a generic post-build attachment hook so future tooltip/accessibility metadata can attach to components without embedding SalixTorrent-specific Help semantics in the framework.
+
+Names such as `components`, `SectionPanel`, `Dialog`, and profile identifiers remain working extraction names. Final RAD-framework naming and public API terminology are deliberately deferred until the full reusable boundary has been extracted and proven.
 
 ### Possible v0.5.0 theme
 
@@ -697,12 +724,14 @@ The third tranche introduces renderer-selected `ComponentLayoutProfile` policy. 
 Reusable GUI component foundation
 ```
 
-Candidate follow-up work after the component-profile tranche validates:
+Candidate follow-up work after the structural tranche validates:
 
-- add generic component metadata/hooks for tooltip and accessibility attachment without moving SalixTorrent-specific Help semantics into the framework;
-- consider framework-owned panel/form-section composition only where it removes repeated layout contracts rather than wrapping every Dear PyGui container cosmetically;
+- use the attachment boundary to centralize tooltip/accessibility attachment where it removes repeated view glue while keeping Help semantics application-owned;
+- migrate additional ordinary dialogs/forms only where the structural contract is reusable and proven;
+- introduce backend-neutral state/binding or lifecycle metadata only after real duplicated view logic demonstrates the need;
 - continue separating component model/state from the Dear PyGui renderer where that improves future RAD extraction;
-- migrate additional ordinary forms incrementally, but avoid converting complex tables/graphs merely for cosmetic uniformity.
+- avoid converting complex tables/graphs merely for cosmetic uniformity;
+- postpone the final framework naming/API pass until the full RAD extraction boundary is visible.
 
 ## Later network release
 
@@ -782,6 +811,6 @@ process restart restored 2 torrents
 first GUI frame displayed persisted queue order
 ```
 
-The v0.4.0 release baseline remains 334/334 tests with one expected non-Windows skip. The first GUI-component tranche is committed/pushed at `66b46fa7070128f13bc87fbe4f9556a86049e895` and passed 343/343 on the real Windows checkout. The second Preferences-composition tranche is committed/pushed at `139931246280818694de1920b4b49c4e5cf734ca` and advances the authoritative real-Windows development baseline to 348/348 with one expected skip. The third component-profile tranche adds six headless regressions, bringing component coverage to 20/20 and the expected real-Windows discoverable total to 354 after application. Focused documentation/localization tests pass 34/34 source-side and deterministic localization extraction is current; the 354 Windows/full visual gate remains pending.
+The v0.4.0 release baseline remains 334/334 tests with one expected non-Windows skip. The first GUI-component tranche is committed/pushed at `66b46fa7070128f13bc87fbe4f9556a86049e895` and passed 343/343 on the real Windows checkout. The second Preferences-composition tranche is committed/pushed at `139931246280818694de1920b4b49c4e5cf734ca` and passed 348/348. The third component-profile tranche is committed/pushed at `f5e30e30012958429240bcf2646ac9a09d348de5` and advances the authoritative real-Windows development baseline to 354/354 with one expected skip. The fourth structural tranche adds eight headless regressions, bringing component coverage to 28/28 and the expected real-Windows discoverable total to 362 after application. Focused documentation/localization tests pass 34/34 source-side and deterministic localization extraction is current; the 362 Windows/full visual gate remains pending.
 
 The v0.4.0 live GUI smoke covers per-torrent editing, additive Days/Hours/Minutes quick controls, explicit bulk Preferences application, persistence, in-app/native notifications, instanced time-based automatic stop, Days/Hours/Minutes exact editors, stacked compact duration controls, and the widened Preferences ratio field. Ratio-threshold behavior remains covered by deterministic regressions without requiring a second live peer. Future changes must preserve the applicable baseline or account explicitly for every intentional test-count change.

@@ -21,10 +21,17 @@ from app.engine.components.controls import (
     Label,
     NumericKind,
     NumericStepper,
+    Separator,
     Spacer,
     TextInput,
 )
-from app.engine.components.containers import ControlColumn, ControlGrid, ControlRow
+from app.engine.components.containers import (
+    ControlColumn,
+    ControlGrid,
+    ControlRow,
+    Dialog,
+    SectionPanel,
+)
 from app.engine.components.fields import (
     DurationEditor,
     LabeledComboField,
@@ -53,6 +60,7 @@ __all__ = [
     "ControlLayoutDefaults",
     "ControlLayoutTheme",
     "ControlRow",
+    "Dialog",
     "DearPyGuiRenderer",
     "DimensionMode",
     "DurationEditor",
@@ -64,6 +72,8 @@ __all__ = [
     "NumericStepper",
     "NumericUnitField",
     "ResolvedControlLayout",
+    "SectionPanel",
+    "Separator",
     "Spacer",
     "TextInput",
     "get_default_renderer",

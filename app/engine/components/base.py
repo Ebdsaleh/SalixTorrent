@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 
 from app.engine.components.layout import (
     DEFAULT_CONTROL_LAYOUT,
@@ -36,6 +37,7 @@ class Component(ABC):
         self.item: object | None = None
         self.resolved_layout: ResolvedControlLayout | None = None
         self._renderer: ComponentRenderer | None = None
+        self._attachments: list[Callable[[object, ComponentRenderer], None]] = []
 
     def _resolve_layout(
         self,
@@ -78,9 +80,31 @@ class Component(ABC):
             kwargs["parent"] = parent
         return kwargs
 
+    def attach(
+        self,
+        attachment: Callable[[object, ComponentRenderer], None],
+    ) -> "Component":
+        """Attach backend-neutral post-build behavior to this component.
+
+        Attachments receive the created backend item and active renderer.  The
+        framework does not interpret their semantics; applications can use the
+        hook for tooltips, accessibility metadata, diagnostics, or other
+        renderer-adjacent behavior without teaching generic components about
+        product-specific concepts.
+        """
+
+        if not callable(attachment):
+            raise TypeError("component attachment must be callable")
+        self._attachments.append(attachment)
+        if self.item is not None and self._renderer is not None:
+            attachment(self.item, self._renderer)
+        return self
+
     def _bind(self, renderer: ComponentRenderer, item: object) -> object:
         self._renderer = renderer
         self.item = item
+        for attachment in tuple(self._attachments):
+            attachment(item, renderer)
         return item
 
     def require_item(self) -> object:
