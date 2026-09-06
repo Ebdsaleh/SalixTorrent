@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Iterable, Optional
 
-from app.engine.components.renderer import get_default_renderer
+from app.framework.components.renderer import get_default_renderer
 
 from app.localization.documents import canonical_glossary_entries, glossary_entry
 

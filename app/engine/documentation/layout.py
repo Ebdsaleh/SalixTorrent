@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.engine.property_cascade import (
+from app.framework.property_cascade import (
     UNSET,
     PropertySource,
     RejectedPropertyCandidate,

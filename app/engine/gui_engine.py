@@ -20,7 +20,8 @@ from app.engine.desktop_integration import (
 from app.engine.ui_typography import UiTypography
 from app.engine.responsive_layout import ResponsiveLayout
 from app.engine.runtime_paths import state_directory
-from app.engine.components import get_default_renderer
+from app.framework.components import clear_default_renderer, set_default_renderer
+from app.engine.component_renderers import DearPyGuiRenderer
 from app.engine.ui_component_profile import SALIXTORRENT_COMPONENT_PROFILE
 
 
@@ -103,7 +104,10 @@ class GuiEngine:
         # composition root. Reusable components remain backend/application neutral;
         # views refer only to semantic profile keys, while explicit per-instance
         # layout overrides remain available for exceptional cases.
-        get_default_renderer().set_component_profile(SALIXTORRENT_COMPONENT_PROFILE)
+        self.component_renderer = DearPyGuiRenderer(
+            component_profile=SALIXTORRENT_COMPONENT_PROFILE
+        )
+        set_default_renderer(self.component_renderer)
 
         if self._intercept_viewport_close:
             try:
@@ -311,6 +315,7 @@ class GuiEngine:
                     self._report_ui_exception("DearPyGui render", exc)
         finally:
             self.desktop.stop()
+            clear_default_renderer(self.component_renderer)
             dpg.destroy_context()
 
 

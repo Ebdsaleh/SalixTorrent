@@ -4,6 +4,17 @@ Notable SalixTorrent changes are recorded here.
 
 ## Unreleased
 
+### GUI Component/RAD Extraction — First Physical Framework Boundary
+
+- Moved the reusable property-cascade and GUI component implementations into the provisional internal `app/framework/` boundary, while retaining `app/engine/components/` and `app/engine/property_cascade.py` as compatibility facades during extraction.
+- Migrated SalixTorrent views, component profile/attachment adapters, documentation layout code, and component tests to import the reusable contracts from `app.framework` rather than the application engine namespace.
+- Split the concrete `DearPyGuiRenderer` into an application/backend adapter under `app/engine/component_renderers/`; the reusable renderer module now contains only the backend-neutral protocol and renderer-selection contract.
+- Replaced the hidden Dear PyGui default with explicit `set_default_renderer(...)` / `get_default_renderer()` / `clear_default_renderer(...)` composition-root ownership. `GuiEngine` now creates, installs, profiles, and clears SalixTorrent's Dear PyGui renderer explicitly.
+- Added an extraction-boundary regression that rejects product-layer, localization-layer, engine-layer, or Dear PyGui imports from the framework candidate modules, plus renderer-installation, backend-isolation, composition-root, and compatibility-facade coverage.
+- Kept all current component/RAD names provisional; this tranche creates an internal physical boundary without choosing the eventual external framework package/repository name.
+- No user-facing strings, settings/session schemas, transfer behavior, SalixORM integration, or complex queue/table/telemetry ownership changed.
+- Added five net component regressions, increasing the focused component suite from 58 to 63 and the expected full real-Windows suite from 392 to 397.
+
 ### GUI Component/RAD Extraction — Renderer-Neutral Events and Explicit Disposal
 
 - Added immutable backend-neutral `ComponentEvent` metadata with semantic `ACTIVATE` and `CHANGE` event types so reusable controls no longer expose renderer callback tuple conventions.

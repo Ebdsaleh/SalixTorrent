@@ -30,7 +30,7 @@ from app.logic.seeding_policy import (
 from app.logic.torrent_manager import TorrentManager
 from app.logic.transfer_add import TransferAddRequest
 from app.engine.desktop_integration import DesktopIntegration
-from app.engine.components import (
+from app.framework.components import (
     action_callback,
     Button,
     ComboBox,

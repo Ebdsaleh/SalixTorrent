@@ -11,7 +11,7 @@ from tkinter import filedialog
 
 from app.localization import canonical_choice, localized_choices, tr, tr_value
 
-from app.engine.components import (
+from app.framework.components import (
     action_callback,
     Button,
     CheckBox,

@@ -5,8 +5,8 @@ construction code.  A future theme can derive from the same framework profile
 and override these semantic slots without changing application behavior.
 """
 
-from app.engine.components.layout import FILL, ControlLayoutDefaults
-from app.engine.components.profile import ComponentLayoutProfile, FRAMEWORK_COMPONENT_PROFILE
+from app.framework.components.layout import FILL, ControlLayoutDefaults
+from app.framework.components.profile import ComponentLayoutProfile, FRAMEWORK_COMPONENT_PROFILE
 
 
 SALIXTORRENT_COMPONENT_PROFILE = ComponentLayoutProfile(

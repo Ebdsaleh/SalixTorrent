@@ -5,7 +5,7 @@ import unittest
 
 from tests.helpers import PROJECT_ROOT
 
-from app.engine.components import (
+from app.framework.components import (
     AUTO,
     BindingSet,
     FILL,
@@ -41,8 +41,8 @@ from app.engine.components import (
     action_callback,
     resolve_control_layout,
 )
-from app.engine.components.layout import backend_dimension
-from app.engine.property_cascade import PropertySource
+from app.framework.components.layout import backend_dimension
+from app.framework.property_cascade import PropertySource
 
 
 class RecordingRenderer:
@@ -59,6 +59,9 @@ class RecordingRenderer:
 
     def _new_item(self, prefix: str) -> str:
         return f"{prefix}:{len(self.created) + len(self.containers) + 1}"
+
+    def set_component_profile(self, profile):
+        self.component_profile = profile
 
     def create(self, kind: str, **kwargs):
         item = self._new_item(kind)
@@ -126,28 +129,22 @@ class RecordingRenderer:
 
 
 class GuiComponentFoundationTests(unittest.TestCase):
-    def test_component_model_keeps_dearpygui_imports_behind_renderer_bridge(self):
+    def test_component_framework_boundary_is_product_and_backend_neutral(self):
         import ast
 
-        component_dir = PROJECT_ROOT / "app" / "engine" / "components"
-        model_files = (
-            "__init__.py",
-            "attachments.py",
-            "base.py",
-            "bindings.py",
-            "events.py",
-            "containers.py",
-            "controls.py",
-            "fields.py",
-            "layout.py",
-            "profile.py",
-            "state.py",
+        framework_dir = PROJECT_ROOT / "app" / "framework"
+        component_dir = framework_dir / "components"
+        candidate_files = (framework_dir / "property_cascade.py", *component_dir.glob("*.py"))
+        forbidden_prefixes = (
+            "app.engine",
+            "app.views",
+            "app.logic",
+            "app.localization",
+            "dearpygui",
         )
-        for name in model_files:
-            tree = ast.parse(
-                (component_dir / name).read_text(encoding="utf-8"),
-                filename=name,
-            )
+
+        for path in candidate_files:
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
             imports = []
             for node in ast.walk(tree):
                 if isinstance(node, ast.Import):
@@ -155,12 +152,79 @@ class GuiComponentFoundationTests(unittest.TestCase):
                 elif isinstance(node, ast.ImportFrom) and node.module:
                     imports.append(node.module)
             self.assertFalse(
-                any(module.startswith("dearpygui") for module in imports),
-                name,
+                any(module.startswith(forbidden_prefixes) for module in imports),
+                str(path.relative_to(PROJECT_ROOT)),
             )
 
-        renderer_source = (component_dir / "renderer.py").read_text(encoding="utf-8")
-        self.assertIn("import dearpygui.dearpygui as dpg", renderer_source)
+    def test_dearpygui_renderer_is_isolated_from_framework_core(self):
+        framework_renderer = (
+            PROJECT_ROOT / "app" / "framework" / "components" / "renderer.py"
+        ).read_text(encoding="utf-8")
+        backend_renderer = (
+            PROJECT_ROOT / "app" / "engine" / "component_renderers" / "dearpygui.py"
+        ).read_text(encoding="utf-8")
+
+        self.assertNotIn("dearpygui", framework_renderer.lower())
+        self.assertNotIn("DearPyGuiRenderer", framework_renderer)
+        self.assertIn("import dearpygui.dearpygui as dpg", backend_renderer)
+        self.assertIn("class DearPyGuiRenderer", backend_renderer)
+
+    def test_default_renderer_requires_explicit_composition_root_installation(self):
+        from app.framework.components.renderer import (
+            clear_default_renderer,
+            get_default_renderer,
+            set_default_renderer,
+        )
+
+        previous = clear_default_renderer()
+        renderer = RecordingRenderer()
+        try:
+            with self.assertRaisesRegex(RuntimeError, "no default component renderer"):
+                get_default_renderer()
+
+            self.assertIs(set_default_renderer(renderer), renderer)
+            self.assertIs(get_default_renderer(), renderer)
+            self.assertIs(clear_default_renderer(renderer), renderer)
+            with self.assertRaisesRegex(RuntimeError, "no default component renderer"):
+                get_default_renderer()
+        finally:
+            clear_default_renderer()
+            if previous is not None:
+                set_default_renderer(previous)
+
+    def test_default_renderer_rejects_incomplete_backend_contract(self):
+        from app.framework.components.renderer import set_default_renderer
+
+        with self.assertRaisesRegex(TypeError, "missing"):
+            set_default_renderer(object())
+
+    def test_gui_engine_owns_renderer_installation_and_teardown(self):
+        source = (PROJECT_ROOT / "app" / "engine" / "gui_engine.py").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("DearPyGuiRenderer(", source)
+        self.assertIn("set_default_renderer(self.component_renderer)", source)
+        self.assertIn("clear_default_renderer(self.component_renderer)", source)
+        self.assertNotIn("get_default_renderer().set_component_profile", source)
+
+    def test_legacy_component_import_path_is_compatibility_only(self):
+        legacy_source = (
+            PROJECT_ROOT / "app" / "engine" / "components" / "__init__.py"
+        ).read_text(encoding="utf-8")
+        view_sources = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in (PROJECT_ROOT / "app" / "views").glob("*.py")
+        )
+
+        self.assertIn("from app.framework.components import *", legacy_source)
+        self.assertNotIn("from app.engine.components import", view_sources)
+
+        from app.engine.components import Button as LegacyButton
+        from app.engine.property_cascade import PropertySource as LegacyPropertySource
+
+        self.assertIs(LegacyButton, Button)
+        self.assertIs(LegacyPropertySource, PropertySource)
 
     def test_component_events_normalize_activation_value_and_explicit_data(self):
         renderer = RecordingRenderer()
@@ -912,9 +976,9 @@ class GuiComponentFoundationTests(unittest.TestCase):
         help_source = (PROJECT_ROOT / "app" / "views" / "help_terms.py").read_text(
             encoding="utf-8"
         )
-        renderer_source = (PROJECT_ROOT / "app" / "engine" / "components" / "renderer.py").read_text(
-            encoding="utf-8"
-        )
+        renderer_source = (
+            PROJECT_ROOT / "app" / "engine" / "component_renderers" / "dearpygui.py"
+        ).read_text(encoding="utf-8")
 
         self.assertNotIn("import dearpygui", help_source)
         self.assertIn("get_default_renderer().attach_tooltip", help_source)

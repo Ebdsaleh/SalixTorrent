@@ -24,7 +24,7 @@ from app.engine.documentation.typography import (
     role_font_size,
 )
 from app.engine.documentation.model import DocIconKind
-from app.engine.property_cascade import PropertySource, UNSET, resolve_property
+from app.framework.property_cascade import PropertySource, UNSET, resolve_property
 from app.logic.torrent_manager import TorrentManager
 from app.engine.responsive_layout import (
     ContentMetrics,

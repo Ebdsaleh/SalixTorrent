@@ -10,7 +10,7 @@ boundary and public API are complete.
 
 from __future__ import annotations
 
-from app.engine.components.attachments import Tooltip
+from app.framework.components.attachments import Tooltip
 from app.localization.documents import canonical_glossary_entries, glossary_entry
 
 

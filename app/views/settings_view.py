@@ -6,7 +6,7 @@ import tkinter as tk
 from tkinter import filedialog
 
 from app.engine.desktop_integration import DesktopIntegration
-from app.engine.components import (
+from app.framework.components import (
     action_callback,
     BindingSet,
     Button,
