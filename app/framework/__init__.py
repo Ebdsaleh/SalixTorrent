@@ -10,7 +10,9 @@ and renamed as one unit during extraction experiments. Backend-neutral
 responsive coordination consumes an injected host contract; native resize
 hooks remain in application/backend adapters. Backend-neutral rolling telemetry
 and realtime plot coordination follow the same rule: data/model contracts live
-here while concrete plotting remains adapter-owned. That portability is an
+here while concrete plotting remains adapter-owned. Keyed live-table and
+categorical state-grid models likewise keep identity/change semantics here while
+concrete widgets/canvases remain presentation-host responsibilities. That portability is an
 internal boundary guarantee only; it does not freeze a final package name,
 version, or public API.
 """

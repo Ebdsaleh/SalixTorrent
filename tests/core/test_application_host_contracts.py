@@ -43,6 +43,7 @@ class PresentationBackendTests(unittest.TestCase):
             "Sample",
             component_renderer=renderer,
             scene_host=scenes,
+            table_host=object(),
         )
         self.assertEqual(backend.name, "sample")
         self.assertEqual(
@@ -51,6 +52,7 @@ class PresentationBackendTests(unittest.TestCase):
                 {
                     PresentationCapability.COMPONENTS,
                     PresentationCapability.SCENES,
+                    PresentationCapability.LIVE_TABLES,
                 }
             ),
         )

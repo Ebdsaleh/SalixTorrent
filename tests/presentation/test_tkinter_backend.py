@@ -13,6 +13,8 @@ from app.engine.layout_hosts import TkinterLayoutHost
 from app.engine.plot_hosts import TkinterPlotHost
 from app.engine.presentation_backends import create_tkinter_backend
 from app.engine.scene_hosts import TkinterSceneHost
+from app.engine.state_grid_hosts import TkinterStateGridHost
+from app.engine.table_hosts import TkinterTableHost
 from app.framework.components import (
     Button,
     CheckBox,
@@ -29,6 +31,18 @@ from app.framework.components import (
     NumericStepper,
     ProgressBar,
     TextInput,
+)
+from app.framework.live_data import (
+    LiveTable,
+    StateGrid,
+    StateGridCell,
+    StateGridFrame,
+    StateGridHost,
+    TableCell,
+    TableColumnSpec,
+    TableFrame,
+    TableHost,
+    TableRow,
 )
 from app.framework.responsive import LayoutCoordinator, LayoutHost
 from app.framework.visualization import (
@@ -51,6 +65,8 @@ class TkinterSourceBoundaryTests(unittest.TestCase):
             PROJECT_ROOT / "app" / "engine" / "layout_hosts" / "tkinter.py",
             PROJECT_ROOT / "app" / "engine" / "plot_hosts" / "tkinter.py",
             PROJECT_ROOT / "app" / "engine" / "scene_hosts" / "tkinter.py",
+            PROJECT_ROOT / "app" / "engine" / "table_hosts" / "tkinter.py",
+            PROJECT_ROOT / "app" / "engine" / "state_grid_hosts" / "tkinter.py",
             PROJECT_ROOT / "app" / "engine" / "presentation_backends" / "tkinter.py",
             PROJECT_ROOT / "app" / "engine" / "application_hosts" / "tkinter.py",
         )
@@ -94,10 +110,14 @@ class TkinterBackendLiveTests(unittest.TestCase):
         layout_host = TkinterLayoutHost(self.renderer)
         scene_host = TkinterSceneHost(self.renderer)
         plot_host = TkinterPlotHost(self.renderer)
+        table_host = TkinterTableHost(self.renderer)
+        state_grid_host = TkinterStateGridHost(self.renderer)
         self.assertIsInstance(self.renderer, ComponentRenderer)
         self.assertIsInstance(layout_host, LayoutHost)
         self.assertIsInstance(scene_host, SceneHost)
         self.assertIsInstance(plot_host, PlotHost)
+        self.assertIsInstance(table_host, TableHost)
+        self.assertIsInstance(state_grid_host, StateGridHost)
 
     def test_backend_factory_exposes_common_capabilities(self):
         backend = create_tkinter_backend(self.root)
@@ -107,6 +127,8 @@ class TkinterBackendLiveTests(unittest.TestCase):
             PresentationCapability.RESPONSIVE_LAYOUT,
             PresentationCapability.SCENES,
             PresentationCapability.REALTIME_PLOTS,
+            PresentationCapability.LIVE_TABLES,
+            PresentationCapability.STATE_GRIDS,
         ):
             self.assertTrue(backend.supports(capability))
 
@@ -254,6 +276,61 @@ class TkinterBackendLiveTests(unittest.TestCase):
         graph.clear()
         graph.dispose()
         self.assertFalse(graph.exists())
+
+
+    def test_live_table_renders_updates_reorders_and_removes_rows(self):
+        parent = ControlColumn(layout=ControlLayout(width=FILL, height=180))
+        parent.build(renderer=self.renderer)
+        table = LiveTable(
+            TkinterTableHost(self.renderer),
+            (
+                TableColumnSpec("name", "Name", "stretch", 0.6),
+                TableColumnSpec("state", "State", "fixed", 90),
+            ),
+        )
+        binding = table.build(parent=parent.require_item(), height=140)
+        table.render(
+            TableFrame((
+                TableRow("a", (TableCell("Alpha"), TableCell("Ready"))),
+                TableRow("b", (TableCell("Beta"), TableCell("Busy"))),
+            ))
+        )
+        self.root.deiconify()
+        self.root.update_idletasks()
+        self.assertEqual(table.row_count, 2)
+        self.assertEqual(tuple(binding.table.item(item, "values") for item in binding.table.get_children()), (("Alpha", "Ready"), ("Beta", "Busy")))
+
+        table.render(
+            TableFrame((
+                TableRow("b", (TableCell("Beta"), TableCell("Idle"))),
+                TableRow("c", (TableCell("Gamma"), TableCell("Ready"))),
+            ))
+        )
+        self.root.update_idletasks()
+        self.assertEqual(table.row_count, 2)
+        self.assertEqual(tuple(binding.table.item(item, "values") for item in binding.table.get_children()), (("Beta", "Idle"), ("Gamma", "Ready")))
+        table.dispose()
+        self.assertFalse(table.exists())
+
+    def test_state_grid_renders_through_tkinter_canvas_host(self):
+        parent = ControlColumn(layout=ControlLayout(width=FILL, height=90))
+        parent.build(renderer=self.renderer)
+        grid = StateGrid(TkinterStateGridHost(self.renderer))
+        binding = grid.build(parent=parent.require_item(), height=70, minimum_columns=4, maximum_columns=8, minimum_cell_width=10)
+        grid.render(
+            StateGridFrame(
+                StateGridCell(str(index), (20 + index * 10, 120, 180))
+                for index in range(8)
+            )
+        )
+        self.root.deiconify()
+        self.root.update_idletasks()
+        self.assertGreater(len(binding.grid.canvas.find_all()), 0)
+        grid.clear()
+        self.root.update_idletasks()
+        self.assertEqual(len(binding.grid.canvas.find_all()), 0)
+        grid.dispose()
+        self.assertFalse(grid.exists())
 
     def test_blank_application_demo_runs_tkinter_backend_and_auto_closes(self):
         example = PROJECT_ROOT / "examples" / "ecosystem_blank_app.py"

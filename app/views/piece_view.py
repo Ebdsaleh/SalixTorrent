@@ -2,13 +2,23 @@
 
 from __future__ import annotations
 
-import math
-
 import dearpygui.dearpygui as dpg
 
+from app.engine.state_grid_hosts import DearPyGuiStateGridHost
+from app.engine.table_hosts import DearPyGuiTableHost
+from app.framework.live_data import (
+    LiveTable,
+    StateGrid,
+    StateGridCell,
+    StateGridFrame,
+    TableCell,
+    TableColumnSpec,
+    TableFrame,
+    TableRow,
+)
 from app.localization import tr
 
-from app.views.help_terms import add_help_tooltip, add_text_tooltip
+from app.views.help_terms import add_help_tooltip, add_text_tooltip, help_text
 
 
 class PieceView:
@@ -32,10 +42,11 @@ class PieceView:
         self.map_info_text = None
         self.map_drawlist = None
         self.table_id = None
-        self._row_ids = []
+        self.state_grid = None
+        self.live_table = None
 
     def build_view(self, parent_tag):
-        with dpg.child_window(parent=parent_tag, height=-1, border=True):
+        with dpg.child_window(parent=parent_tag, height=-1, border=True) as content:
             self.summary_text = dpg.add_text(
                 tr('view.piece_view.pieces_select_a_torrent_to_inspect_piece', "Pieces: select a torrent to inspect piece state"),
                 color=(100, 180, 255),
@@ -63,10 +74,9 @@ class PieceView:
             add_help_tooltip(self.map_info_text, "PIECE_MAP")
             dpg.add_separator()
 
-            self.map_drawlist = dpg.add_drawlist(
-                width=-1,
-                height=self.MAP_HEIGHT,
-            )
+            self.state_grid = StateGrid(DearPyGuiStateGridHost())
+            grid_binding = self.state_grid.build(parent=content, height=self.MAP_HEIGHT)
+            self.map_drawlist = grid_binding.grid
             add_help_tooltip(self.map_drawlist, "PIECE_MAP")
 
             dpg.add_separator()
@@ -76,52 +86,23 @@ class PieceView:
             )
             add_text_tooltip(details_heading, tr('view.piece_view.focused_piece_details_to_keep_the_interface', "Focused piece details\n\nTo keep the interface responsive on torrents with thousands of pieces, SalixTorrent shows active/requested pieces plus useful nearby incomplete context rather than continuously rendering every piece as a table row."))
 
-            with dpg.table(
-                header_row=True,
-                resizable=True,
-                policy=dpg.mvTable_SizingStretchProp,
-                borders_outerH=True,
-                borders_innerH=True,
-                borders_innerV=True,
-                scrollY=True,
-                height=-1,
-            ) as self.table_id:
-                piece_col = dpg.add_table_column(
-                    label=tr('view.piece_view.piece', "Piece"),
-                    width_fixed=True,
-                    init_width_or_weight=75,
-                )
-                size_col = dpg.add_table_column(
-                    label=tr('view.piece_view.size', "Size"),
-                    width_fixed=True,
-                    init_width_or_weight=85,
-                )
-                progress_col = dpg.add_table_column(
-                    label=tr('view.piece_view.progress', "Progress"),
-                    width_fixed=True,
-                    init_width_or_weight=90,
-                )
-                blocks_col = dpg.add_table_column(
-                    label=tr('view.piece_view.blocks', "Blocks"),
-                    width_stretch=True,
-                    init_width_or_weight=0.28,
-                )
-                availability_col = dpg.add_table_column(
-                    label=tr('view.piece_view.availability', "Availability"),
-                    width_fixed=True,
-                    init_width_or_weight=95,
-                )
-                state_col = dpg.add_table_column(
-                    label=tr('view.piece_view.state', "State"),
-                    width_fixed=True,
-                    init_width_or_weight=110,
-                )
-                add_help_tooltip(piece_col, "PIECE")
-                add_help_tooltip(size_col, "PIECE_SIZE")
-                add_text_tooltip(progress_col, tr('view.piece_view.piece_progress_how_much_of_this_piece', "Piece progress\n\nHow much of this piece's block payload has arrived. A piece at 100% is not trusted until its SHA-1 hash passes verification."))
-                add_help_tooltip(blocks_col, "BLOCK")
-                add_help_tooltip(availability_col, "PIECE_AVAILABILITY")
-                add_help_tooltip(state_col, "PIECE_STATE")
+            columns = (
+                TableColumnSpec("piece", tr('view.piece_view.piece', "Piece"), "fixed", 75),
+                TableColumnSpec("size", tr('view.piece_view.size', "Size"), "fixed", 85),
+                TableColumnSpec("progress", tr('view.piece_view.progress', "Progress"), "fixed", 90),
+                TableColumnSpec("blocks", tr('view.piece_view.blocks', "Blocks"), "stretch", 0.28),
+                TableColumnSpec("availability", tr('view.piece_view.availability', "Availability"), "fixed", 95),
+                TableColumnSpec("state", tr('view.piece_view.state', "State"), "fixed", 110),
+            )
+            self.live_table = LiveTable(DearPyGuiTableHost(), columns)
+            table_binding = self.live_table.build(parent=content, height=-1)
+            self.table_id = table_binding.table
+            add_help_tooltip(table_binding.column_item("piece"), "PIECE")
+            add_help_tooltip(table_binding.column_item("size"), "PIECE_SIZE")
+            add_text_tooltip(table_binding.column_item("progress"), tr('view.piece_view.piece_progress_how_much_of_this_piece', "Piece progress\n\nHow much of this piece's block payload has arrived. A piece at 100% is not trusted until its SHA-1 hash passes verification."))
+            add_help_tooltip(table_binding.column_item("blocks"), "BLOCK")
+            add_help_tooltip(table_binding.column_item("availability"), "PIECE_AVAILABILITY")
+            add_help_tooltip(table_binding.column_item("state"), "PIECE_STATE")
 
     @staticmethod
     def _format_size(byte_count: int) -> str:
@@ -146,19 +127,11 @@ class PieceView:
             return f"{received}/{total} received (+{requested} requested)"
         return f"{received}/{total} received"
 
-    def _clear_rows(self):
-        for row_id in self._row_ids:
-            if dpg.does_item_exist(row_id):
-                dpg.delete_item(row_id)
-        self._row_ids.clear()
-
-    def _clear_map(self):
-        if self.map_drawlist and dpg.does_item_exist(self.map_drawlist):
-            dpg.delete_item(self.map_drawlist, children_only=True)
-
     def reset(self):
-        self._clear_rows()
-        self._clear_map()
+        if self.live_table is not None:
+            self.live_table.clear()
+        if self.state_grid is not None:
+            self.state_grid.clear()
 
         if self.summary_text and dpg.does_item_exist(self.summary_text):
             dpg.set_value(
@@ -181,55 +154,26 @@ class PieceView:
                 tr('view.piece_view.piece_map_waiting_for_torrent_telemetry', "Piece map waiting for torrent telemetry"),
             )
 
-    def _render_map(self, piece_view: dict):
-        if not self.map_drawlist or not dpg.does_item_exist(self.map_drawlist):
-            return
-
-        cells = list(piece_view.get("map_cells") or [])
-        self._clear_map()
-
-        if not cells:
-            return
-
-        try:
-            rect_size = dpg.get_item_rect_size(self.map_drawlist)
-            width = float(rect_size[0]) if rect_size else 0.0
-        except Exception:
-            width = 0.0
-
-        if width < 100:
-            width = 1000.0
-
-        # Keep cells wide enough to remain legible. Large torrents are already
-        # bucketed by the backend, so this usually becomes a compact 6-8 row map.
-        columns = max(24, min(128, int(width // 7)))
-        rows = max(1, math.ceil(len(cells) / columns))
-        cell_width = width / columns
-        cell_height = self.MAP_HEIGHT / rows
-
-        for index, cell in enumerate(cells):
-            row = index // columns
-            column = index % columns
-
-            x1 = column * cell_width
-            y1 = row * cell_height
-            x2 = x1 + max(1.0, cell_width - 1.0)
-            y2 = y1 + max(1.0, cell_height - 1.0)
-
-            state = str(cell.get("state", "missing"))
-            fill = self.MAP_COLORS.get(state, self.MAP_COLORS["missing"])
-
-            dpg.draw_rectangle(
-                (x1, y1),
-                (x2, y2),
-                color=(35, 35, 40, 255),
-                fill=fill,
-                thickness=1.0,
-                parent=self.map_drawlist,
-            )
+    def _piece_row(self, piece: dict) -> TableRow:
+        progress = max(0.0, min(1.0, float(piece.get("progress", 0.0) or 0.0)))
+        availability_count = int(piece.get("availability", 0) or 0)
+        index = int(piece.get("index", 0) or 0)
+        return TableRow(
+            str(index),
+            (
+                TableCell(str(index), tooltip=help_text("PIECE")),
+                TableCell(self._format_size(piece.get("length", 0)), tooltip=help_text("PIECE_SIZE")),
+                TableCell(tr('view.piece_view.value', '{value0:.1f}%', value0=progress * 100), tooltip=tr('view.piece_view.piece_progress_how_much_of_this_piece', "Piece progress\n\nHow much of this piece's block payload has arrived. A piece at 100% is not trusted until its SHA-1 hash passes verification.")),
+                TableCell(self._format_blocks(piece), tooltip=help_text("BLOCK")),
+                TableCell(str(availability_count), tooltip=help_text("PIECE_AVAILABILITY")),
+                TableCell(str(piece.get("state", "Missing")), tooltip=help_text("PIECE_STATE")),
+            ),
+        )
 
     def render(self, snapshot: dict):
-        if not self.table_id or not dpg.does_item_exist(self.table_id):
+        if self.live_table is None or not self.live_table.exists():
+            return
+        if self.state_grid is None or not self.state_grid.exists():
             return
 
         piece_view = snapshot.get("piece_view") or {}
@@ -297,19 +241,12 @@ class PieceView:
             )
         dpg.set_value(self.map_info_text, map_info)
 
-        self._render_map(piece_view)
-        self._clear_rows()
-
-        for piece in list(piece_view.get("details") or []):
-            progress = max(0.0, min(1.0, float(piece.get("progress", 0.0) or 0.0)))
-            availability_count = int(piece.get("availability", 0) or 0)
-
-            with dpg.table_row(parent=self.table_id) as row_id:
-                dpg.add_text(str(int(piece.get("index", 0) or 0)))
-                dpg.add_text(self._format_size(piece.get("length", 0)))
-                dpg.add_text(tr('view.piece_view.value', '{value0:.1f}%', value0=progress * 100))
-                dpg.add_text(self._format_blocks(piece))
-                dpg.add_text(str(availability_count))
-                dpg.add_text(str(piece.get("state", "Missing")))
-
-            self._row_ids.append(row_id)
+        map_cells = []
+        for index, cell in enumerate(list(piece_view.get("map_cells") or [])):
+            state = str(cell.get("state", "missing"))
+            fill = self.MAP_COLORS.get(state, self.MAP_COLORS["missing"])
+            map_cells.append(StateGridCell(str(index), fill))
+        self.state_grid.render(StateGridFrame(map_cells))
+        self.live_table.render(
+            TableFrame(self._piece_row(piece) for piece in list(piece_view.get("details") or []))
+        )

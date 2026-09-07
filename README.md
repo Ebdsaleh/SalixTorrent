@@ -8,9 +8,9 @@ SalixTorrent is a desktop BitTorrent client written in Python with a custom asyn
 
 **v0.5.0 milestone — reusable GUI component foundation:** SalixTorrent now has a physically separated, backend-neutral internal framework boundary for reusable controls, layout profiles, structural composition, explicit bindings/events/lifecycle, semantic documentation, pure geometry, and responsive coordination. Dear PyGui remains an explicit application/backend adapter, framework-internal imports are package-relative, and an isolated relocation probe proves the reusable tree can be copied and imported under a different package name without SalixTorrent or Dear PyGui.
 
-**Post-v0.5.0 direction — modular application ecosystem:** SalixTorrent remains the reference application while reusable behavior is extracted downward into two cooperating layers: an application engine/runtime and an optional RAD/application framework. Dear PyGui is the current reference desktop backend, Tkinter is now the prepared compatibility implementation for the common GUI surface, and headless/CLI operation remains first-class. Realtime telemetry/graphs, generic network/runtime awareness, lifecycle/presentation-host boundaries and rich live-data views are explicit extraction candidates before final framework naming or API freeze. See `SalixTorrent-Ecosystem-Architecture.md`.
+**Post-v0.5.0 direction — modular application ecosystem:** SalixTorrent remains the reference application while reusable behavior is extracted downward into two cooperating layers: an application engine/runtime and an optional RAD/application framework. Dear PyGui is the current reference desktop backend, Tkinter is now the validated compatibility implementation for the common GUI surface, and headless/CLI operation remains first-class. Realtime telemetry/graphs, generic network/runtime awareness, lifecycle/presentation-host boundaries and rich live-data views are explicit extraction candidates before final framework naming or API freeze. See `SalixTorrent-Ecosystem-Architecture.md`.
 
-**Current `dev` extraction — second presentation backend / blank-application proof:** the runtime/network tranche is committed/pushed at `8e707efeb0cda162ee038a028a39a77663c2fa4e` after passing 482 / 482 tests on Windows. The next prepared tranche adds a Tkinter compatibility implementation of the existing component, responsive-layout, scene, and realtime-plot contracts; explicit Dear PyGui/Tkinter/headless presentation bundles; minimal reusable application hosts; and a product-neutral `examples/ecosystem_blank_app.py` that runs the same component/graph definition through Dear PyGui or Tkinter and the same runtime in headless mode. Prepared complete discovery is 516 tests. Dear PyGui remains SalixTorrent's reference desktop backend; this tranche does not rewrite SalixTorrent in Tkinter.
+**Current `dev` extraction — rich live-data/RAD surfaces:** the second-backend/blank-application proof is committed/pushed at `522ac8467fc55a5ac0e3d71fe5fd470251e13562` after passing 516 / 516 tests on Windows. The current prepared tranche adds renderer-neutral keyed live tables and categorical state grids with Dear PyGui/Tkinter hosts; migrates the Peers, Sources, and Pieces live surfaces to those contracts; and extends the product-neutral blank application to prove components + live table + state grid + realtime graph through either GUI backend. Prepared complete discovery is 529 tests. Dear PyGui remains SalixTorrent's reference desktop backend; interactive transfer/file tables remain application-owned until their richer command/menu semantics are genuinely generalized.
 
 **v0.4.0 milestone — durability and transfer lifecycle:** SalixTorrent built on the v0.3.0 protocol/network foundation with an offline-first localization system, semantic Help/Glossary content, provider-neutral translation tooling, backend-neutral application settings and session-state persistence, optional SalixORM/SQLite adapters, a fully tracked `unittest` regression suite, and durable per-torrent seeding goals. Timed goals use an instanced baseline so a newly requested duration starts from the moment it is applied, while cumulative Seed Time remains available as historical telemetry.
 
@@ -333,9 +333,9 @@ Post-v0.5.0 development now uses the `dev` branch. The goal is broader than a wi
 
 The engine/runtime should eventually provide the intact machinery needed to spin up a blank application: lifecycle, services, scheduling/events, presentation-host ownership, resources, generic network/runtime awareness, persistence integration points and orderly shutdown. The RAD layer should provide reusable application construction and presentation: components, forms, layout, documentation, realtime visualization, live tables/state views, validation and later designer metadata.
 
-Dear PyGui remains the current reference SalixTorrent desktop backend. Tkinter is now the prepared compatibility implementation for the common GUI surface: it implements the same component, layout, scene, and realtime-plot contracts but is not required to reproduce Dear PyGui-specific capabilities or presentation pixel-for-pixel. Headless/CLI operation remains first-class and does not require a graphical toolkit. A future GLFW/OpenGL path is permitted by the architecture where a real project justifies it, but it is not a current dependency or parity requirement.
+Dear PyGui remains the current reference SalixTorrent desktop backend. Tkinter is now the validated compatibility implementation for the common GUI surface: it implements the same component, layout, scene, and realtime-plot contracts but is not required to reproduce Dear PyGui-specific capabilities or presentation pixel-for-pixel. Headless/CLI operation remains first-class and does not require a graphical toolkit. A future GLFW/OpenGL path is permitted by the architecture where a real project justifies it, but it is not a current dependency or parity requirement.
 
-The first realtime Speed extraction and second runtime/network extraction are now committed on `dev`. The third prepared proof adds Dear PyGui/Tkinter/headless presentation bundles and minimal application hosts plus a small backend-neutral blank application. This is the first non-SalixTorrent application proof built on the extracted engine/framework contracts. Rich transfer/peer/piece/source views remain the next major RAD extraction audit after this second-backend checkpoint.
+The realtime Speed extraction, runtime/network extraction, and second-backend blank-application proof are now committed on `dev`. The current prepared tranche extracts keyed live-table and compact state-grid semantics, migrates the Peers/Sources/Pieces read-only live surfaces, and proves those same contracts through Tkinter in the product-neutral blank application. Interactive transfer-queue and Files-table command surfaces remain later audit targets because their sorting/filtering/context-menu/mutation behavior deserves explicit contracts rather than cosmetic wrapping.
 
 Final ecosystem naming, component vocabulary, public API freeze and external repository/package splits remain deliberately deferred until the wider engine/framework boundary has been proven with more than one presentation backend and at least one small non-SalixTorrent application.
 
@@ -391,6 +391,7 @@ SalixTorrent/
 │   │   ├── test_documentation.py
 │   │   ├── test_gui_components.py
 │   │   ├── test_realtime_visualization.py
+│   │   ├── test_live_data.py
 │   │   ├── test_scene_runtime_adapter.py
 │   │   └── test_tkinter_backend.py
 │   ├── cli/
@@ -434,6 +435,7 @@ SalixTorrent/
 │   │   ├── responsive.py
 │   │   ├── telemetry.py
 │   │   ├── visualization.py
+│   │   ├── live_data.py
 │   │   ├── documentation/
 │   │   │   ├── layout.py
 │   │   │   ├── model.py
@@ -470,6 +472,12 @@ SalixTorrent/
 │   │   │   ├── dearpygui.py
 │   │   │   └── tkinter.py
 │   │   ├── scene_hosts/
+│   │   │   ├── dearpygui.py
+│   │   │   └── tkinter.py
+│   │   ├── table_hosts/
+│   │   │   ├── dearpygui.py
+│   │   │   └── tkinter.py
+│   │   ├── state_grid_hosts/
 │   │   │   ├── dearpygui.py
 │   │   │   └── tkinter.py
 │   │   ├── documentation/              # compatibility + concrete renderer

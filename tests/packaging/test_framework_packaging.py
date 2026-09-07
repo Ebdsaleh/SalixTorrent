@@ -94,6 +94,7 @@ class FrameworkPackagingTests(unittest.TestCase):
                 assert "portable_framework.components" in imported
                 assert "portable_framework.documentation" in imported
                 assert "portable_framework.geometry" in imported
+                assert "portable_framework.live_data" in imported
                 assert "portable_framework.telemetry" in imported
                 assert "portable_framework.visualization" in imported
                 assert "portable_framework.property_cascade" in imported
@@ -126,6 +127,19 @@ class FrameworkPackagingTests(unittest.TestCase):
                 from portable_framework.components import Button, ComponentLayoutProfile
                 from portable_framework.documentation import DocPage, DocumentationTheme
                 from portable_framework.geometry import ContentMetrics, content_bounds
+                from portable_framework.live_data import (
+                    LiveTable,
+                    StateGrid,
+                    StateGridBinding,
+                    StateGridCell,
+                    StateGridFrame,
+                    TableBinding,
+                    TableColumnBinding,
+                    TableColumnSpec,
+                    TableFrame,
+                    TableRow,
+                    TableRowBinding,
+                )
                 from portable_framework.property_cascade import PropertySource, resolve_property
                 from portable_framework.responsive import LayoutCoordinator
                 from portable_framework.telemetry import RollingTelemetry
@@ -195,6 +209,49 @@ class FrameworkPackagingTests(unittest.TestCase):
                     def set_series(self, series, x_values, y_values):
                         self.series_values.append((series, tuple(x_values), tuple(y_values)))
 
+                class TableProbeHost:
+                    def __init__(self):
+                        self.alive = {{"table"}}
+                        self.values = {{}}
+                    def create_table(self, *, parent, columns, header_row=True, resizable=True, scroll_y=True, height=None):
+                        return TableBinding("table", tuple(TableColumnBinding(spec.key, spec.key) for spec in columns))
+                    def exists(self, item):
+                        return item in self.alive
+                    def destroy(self, item):
+                        self.alive.discard(item)
+                    def create_row(self, table, row):
+                        self.values[row.key] = tuple(cell.text for cell in row.cells)
+                        return TableRowBinding(row.key, row.key, tuple(range(len(row.cells))))
+                    def update_row(self, table, binding, row):
+                        self.values[row.key] = tuple(cell.text for cell in row.cells)
+                    def destroy_row(self, table, binding):
+                        self.values.pop(binding.key, None)
+                    def reorder_rows(self, table, rows):
+                        self.order = tuple(row.key for row in rows)
+
+                table_host = TableProbeHost()
+                live_table = LiveTable(table_host, (TableColumnSpec("name", "Name"),))
+                live_table.build(parent="panel")
+                live_table.render(TableFrame((TableRow("one", ("One",)),)))
+
+                class GridProbeHost:
+                    def __init__(self):
+                        self.alive = {{"grid"}}
+                        self.cells = ()
+                    def create_state_grid(self, *, parent, height, minimum_columns=24, maximum_columns=128, minimum_cell_width=7):
+                        return StateGridBinding("grid")
+                    def exists(self, item):
+                        return item in self.alive
+                    def destroy(self, item):
+                        self.alive.discard(item)
+                    def set_cells(self, grid, cells):
+                        self.cells = tuple(cells)
+
+                grid_host = GridProbeHost()
+                state_grid = StateGrid(grid_host)
+                state_grid.build(parent="panel", height=80)
+                state_grid.render(StateGridFrame((StateGridCell("one", (1, 2, 3)),)))
+
                 plot_host = PlotProbeHost()
                 graph = RealtimeGraph(plot_host, (PlotSeriesSpec("value", "Value"),))
                 graph.build(parent="panel", x_label="Time", y_label="Value")
@@ -216,6 +273,8 @@ class FrameworkPackagingTests(unittest.TestCase):
                 assert coordinator.width("panel", 320) is True
                 assert telemetry_window.statistics("value").average == 3.0
                 assert plot_host.series_values == [("value", (-1.0, 0.0), (2.0, 4.0))]
+                assert table_host.values == {{"one": ("One",)}}
+                assert len(grid_host.cells) == 1
                 assert resolved.value == "fallback"
                 assert resolved.source is PropertySource.DEFAULT
                 assert not any(name == "app" or name.startswith("app.") for name in sys.modules)

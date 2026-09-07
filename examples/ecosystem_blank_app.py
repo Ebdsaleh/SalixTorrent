@@ -30,6 +30,16 @@ from app.framework.components import (
     ProgressBar,
     TextInput,
 )
+from app.framework.live_data import (
+    LiveTable,
+    StateGrid,
+    StateGridCell,
+    StateGridFrame,
+    TableCell,
+    TableColumnSpec,
+    TableFrame,
+    TableRow,
+)
 from app.framework.telemetry import RollingTelemetry
 from app.framework.visualization import PlotFrame, PlotSeriesData, PlotSeriesSpec, RealtimeGraph
 from app.runtime.application import ApplicationSpec
@@ -46,6 +56,8 @@ class DemoView:
         self.mode = ComboBox(("Desktop", "Tool", "Dashboard"), default_value="Desktop")
         self.enabled = CheckBox("Enable greeting", default_value=True)
         self.progress = ProgressBar(default_value=0.0, overlay="0%", layout=ControlLayout(width=FILL))
+        self.table_container = ControlColumn(layout=ControlLayout(width=FILL, height=150))
+        self.grid_container = ControlColumn(layout=ControlLayout(width=FILL, height=72))
         self.plot_container = ControlColumn(layout=ControlLayout(width=FILL, height=220))
         self.root = ControlColumn(
             (
@@ -57,6 +69,8 @@ class DemoView:
                 Button("Say hello", callback=self._on_greet),
                 self.progress,
                 self.status,
+                self.table_container,
+                self.grid_container,
                 self.plot_container,
             ),
             layout=ControlLayout(width=FILL),
@@ -66,12 +80,32 @@ class DemoView:
             history_seconds=12.0,
             sample_interval_seconds=0.1,
         )
+        self.live_table = None
+        self.state_grid = None
         self.graph = None
         self.elapsed = 0.0
         self._last_sample = -1.0
 
     def build(self):
         self.host.build(self.root)
+        if self.host.presentation.supports(PresentationCapability.LIVE_TABLES):
+            self.live_table = LiveTable(
+                self.host.presentation.table_host,
+                (
+                    TableColumnSpec("item", "Live item", "stretch", 0.7),
+                    TableColumnSpec("value", "Value", "fixed", 110),
+                ),
+            )
+            self.live_table.build(parent=self.table_container.require_item(), height=130)
+        if self.host.presentation.supports(PresentationCapability.STATE_GRIDS):
+            self.state_grid = StateGrid(self.host.presentation.state_grid_host)
+            self.state_grid.build(
+                parent=self.grid_container.require_item(),
+                height=58,
+                minimum_columns=12,
+                maximum_columns=24,
+                minimum_cell_width=12,
+            )
         if self.host.presentation.supports(PresentationCapability.REALTIME_PLOTS):
             self.graph = RealtimeGraph(
                 self.host.presentation.plot_host,
@@ -99,6 +133,26 @@ class DemoView:
         progress = phase / 5.0
         self.progress.set_value(progress)
         self.progress.set_overlay(f"{round(progress * 100)}%")
+
+        if self.live_table is not None and self.live_table.exists():
+            self.live_table.render(
+                TableFrame((
+                    TableRow("backend", (TableCell("Presentation backend"), TableCell(self.host.presentation.name))),
+                    TableRow("mode", (TableCell("Selected mode"), TableCell(str(self.mode.get_value() or "Desktop")))),
+                    TableRow("progress", (TableCell("Runtime progress"), TableCell(f"{round(progress * 100)}%"))),
+                ))
+            )
+        if self.state_grid is not None and self.state_grid.exists():
+            active = max(0, min(23, int(progress * 24)))
+            self.state_grid.render(
+                StateGridFrame(
+                    StateGridCell(
+                        str(index),
+                        (0, 180, 110, 255) if index <= active else (65, 65, 72, 255),
+                    )
+                    for index in range(24)
+                )
+            )
 
         if self.elapsed - self._last_sample < 0.1:
             return
@@ -135,9 +189,9 @@ def _run_graphical(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
         "EcosystemBlankApp",
         title="Blank Ecosystem Application",
         width=820,
-        height=620,
+        height=780,
         minimum_width=560,
-        minimum_height=420,
+        minimum_height=560,
     )
     runtime = _make_runtime()
     if backend_name == "dearpygui":

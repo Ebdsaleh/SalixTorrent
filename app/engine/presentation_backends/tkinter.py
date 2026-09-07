@@ -6,6 +6,8 @@ from app.engine.component_renderers import TkinterRenderer
 from app.engine.layout_hosts import TkinterLayoutHost
 from app.engine.plot_hosts import TkinterPlotHost
 from app.engine.scene_hosts import TkinterSceneHost
+from app.engine.state_grid_hosts import TkinterStateGridHost
+from app.engine.table_hosts import TkinterTableHost
 from app.framework.components.profile import ComponentLayoutProfile
 from app.runtime.presentation import PresentationBackend
 
@@ -24,4 +26,6 @@ def create_tkinter_backend(
         layout_host=TkinterLayoutHost(renderer),
         scene_host=TkinterSceneHost(renderer),
         plot_host=TkinterPlotHost(renderer),
+        table_host=TkinterTableHost(renderer),
+        state_grid_host=TkinterStateGridHost(renderer),
     )

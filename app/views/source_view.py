@@ -6,9 +6,11 @@ import urllib.parse
 
 import dearpygui.dearpygui as dpg
 
+from app.engine.table_hosts import DearPyGuiTableHost
+from app.framework.live_data import LiveTable, TableCell, TableColumnSpec, TableFrame, TableRow
 from app.localization import tr, tr_value
 
-from app.views.help_terms import add_help_tooltip, add_text_tooltip
+from app.views.help_terms import add_help_tooltip, help_text
 
 
 class SourceView:
@@ -68,10 +70,10 @@ class SourceView:
         self.summary_text = None
         self.note_text = None
         self.table_id = None
-        self._row_ids = []
+        self.live_table = None
 
     def build_view(self, parent_tag):
-        with dpg.child_window(parent=parent_tag, height=-1, border=True):
+        with dpg.child_window(parent=parent_tag, height=-1, border=True) as content:
             self.summary_text = dpg.add_text(
                 tr('view.source_view.sources_select_a_torrent_to_inspect_peer', "Sources: select a torrent to inspect peer discovery"),
                 color=(100, 180, 255),
@@ -85,61 +87,20 @@ class SourceView:
             add_help_tooltip(self.note_text, "DISCOVERY")
             dpg.add_separator()
 
-            with dpg.table(
-                header_row=True,
-                resizable=True,
-                policy=dpg.mvTable_SizingStretchProp,
-                borders_outerH=True,
-                borders_innerH=True,
-                borders_innerV=True,
-                scrollY=True,
-                height=-1,
-            ) as self.table_id:
-                dpg.add_table_column(
-                    label=tr('view.source_view.source', "Source"),
-                    width_stretch=True,
-                    init_width_or_weight=0.38,
-                )
-                dpg.add_table_column(
-                    label=tr('view.source_view.type', "Type"),
-                    width_fixed=True,
-                    init_width_or_weight=65,
-                )
-                dpg.add_table_column(
-                    label=tr('view.source_view.discovery', "Discovery"),
-                    width_fixed=True,
-                    init_width_or_weight=95,
-                )
-                dpg.add_table_column(
-                    label=tr('view.source_view.peers', "Peers"),
-                    width_fixed=True,
-                    init_width_or_weight=65,
-                )
-                dpg.add_table_column(
-                    label=tr('view.source_view.swarm_s_l', "Swarm S/L"),
-                    width_fixed=True,
-                    init_width_or_weight=95,
-                )
-                dpg.add_table_column(
-                    label=tr('view.source_view.scrape_s_l_c', "Scrape S/L/C"),
-                    width_fixed=True,
-                    init_width_or_weight=125,
-                )
-                dpg.add_table_column(
-                    label=tr('view.source_view.response', "Response"),
-                    width_fixed=True,
-                    init_width_or_weight=90,
-                )
-                dpg.add_table_column(
-                    label=tr('view.source_view.last_update', "Last Update"),
-                    width_fixed=True,
-                    init_width_or_weight=90,
-                )
-                dpg.add_table_column(
-                    label=tr('view.source_view.detail', "Detail"),
-                    width_stretch=True,
-                    init_width_or_weight=0.22,
-                )
+            columns = (
+                TableColumnSpec("source", tr('view.source_view.source', "Source"), "stretch", 0.38),
+                TableColumnSpec("type", tr('view.source_view.type', "Type"), "fixed", 65),
+                TableColumnSpec("status", tr('view.source_view.discovery', "Discovery"), "fixed", 95),
+                TableColumnSpec("peers", tr('view.source_view.peers', "Peers"), "fixed", 65),
+                TableColumnSpec("swarm", tr('view.source_view.swarm_s_l', "Swarm S/L"), "fixed", 95),
+                TableColumnSpec("scrape", tr('view.source_view.scrape_s_l_c', "Scrape S/L/C"), "fixed", 125),
+                TableColumnSpec("response", tr('view.source_view.response', "Response"), "fixed", 90),
+                TableColumnSpec("age", tr('view.source_view.last_update', "Last Update"), "fixed", 90),
+                TableColumnSpec("detail", tr('view.source_view.detail', "Detail"), "stretch", 0.22),
+            )
+            self.live_table = LiveTable(DearPyGuiTableHost(), columns)
+            binding = self.live_table.build(parent=content, height=-1)
+            self.table_id = binding.table
 
     @staticmethod
     def _format_age(seconds) -> str:
@@ -451,22 +412,42 @@ class SourceView:
             "offline, unreachable, rejected, or already connected."
         )
 
-    def _clear_rows(self):
-        for row_id in self._row_ids:
-            if dpg.does_item_exist(row_id):
-                dpg.delete_item(row_id)
-        self._row_ids.clear()
-
     def reset(self):
-        self._clear_rows()
+        if self.live_table is not None:
+            self.live_table.clear()
         if self.summary_text and dpg.does_item_exist(self.summary_text):
             dpg.set_value(
                 self.summary_text,
                 tr('view.source_view.sources_select_a_torrent_to_inspect_peer', "Sources: select a torrent to inspect peer discovery"),
             )
 
+    def _source_row(self, source: dict, index: int) -> TableRow:
+        status = str(source.get("status", "Waiting"))
+        color = self.STATUS_COLORS.get(status, (180, 180, 180))
+        try:
+            peers = max(0, int(source.get("peers", 0) or 0))
+        except (TypeError, ValueError):
+            peers = 0
+        source_name = str(source.get("source", "Unknown"))
+        source_type = str(source.get("type", "--"))
+        key = str(source.get("id") or f"{source_type}:{source_name}:{index}")
+        return TableRow(
+            key,
+            (
+                TableCell(source_name, tooltip=self._source_tooltip(source)),
+                TableCell(source_type, tooltip=help_text(self._type_help_term(source_type))),
+                TableCell(tr_value(status), foreground=color, tooltip=self._status_tooltip(source)),
+                TableCell(str(peers), tooltip=self._peers_tooltip(source)),
+                TableCell(self._format_swarm(source), tooltip=help_text("SWARM_SL")),
+                TableCell(self._format_scrape(source), tooltip=self._scrape_tooltip(source)),
+                TableCell(self._format_response(source.get("response_ms")), tooltip=help_text("SOURCE_RESPONSE")),
+                TableCell(self._format_age(source.get("last_update_seconds")), tooltip=help_text("SOURCE_LAST_UPDATE")),
+                TableCell(self._detail(source), tooltip=help_text("SOURCE_DETAIL")),
+            ),
+        )
+
     def render(self, snapshot: dict):
-        if not self.table_id or not dpg.does_item_exist(self.table_id):
+        if self.live_table is None or not self.live_table.exists():
             return
 
         sources_view = snapshot.get("sources_view") or {}
@@ -486,67 +467,10 @@ class SourceView:
         scrape_errors = int(sources_view.get("scrape_error_count", 0) or 0)
 
         if sources:
-            summary = (
-                tr('view.source_view.sources_value_tracker_s_dht_pex_lan_responding_value', 'Sources: {tracker_count} tracker(s) + DHT + PEX + LAN | Responding: {active_count} | Pending: {pending_count} | Warnings: {warning_count} | Errors: {error_count} | Scrape A/P/W/E: {scrape_active}/{scrape_pending}/{scrape_warnings}/{scrape_errors} | Peers seen - Tracker {tracker_peers} | DHT {dht_peers} | PEX {pex_peers} | LAN {lan_peers}', tracker_count=tracker_count, active_count=active_count, pending_count=pending_count, warning_count=warning_count, error_count=error_count, scrape_active=scrape_active, scrape_pending=scrape_pending, scrape_warnings=scrape_warnings, scrape_errors=scrape_errors, tracker_peers=tracker_peers, dht_peers=dht_peers, pex_peers=pex_peers, lan_peers=lan_peers)
-            )
+            summary = tr('view.source_view.sources_value_tracker_s_dht_pex_lan_responding_value', 'Sources: {tracker_count} tracker(s) + DHT + PEX + LAN | Responding: {active_count} | Pending: {pending_count} | Warnings: {warning_count} | Errors: {error_count} | Scrape A/P/W/E: {scrape_active}/{scrape_pending}/{scrape_warnings}/{scrape_errors} | Peers seen - Tracker {tracker_peers} | DHT {dht_peers} | PEX {pex_peers} | LAN {lan_peers}', tracker_count=tracker_count, active_count=active_count, pending_count=pending_count, warning_count=warning_count, error_count=error_count, scrape_active=scrape_active, scrape_pending=scrape_pending, scrape_warnings=scrape_warnings, scrape_errors=scrape_errors, tracker_peers=tracker_peers, dht_peers=dht_peers, pex_peers=pex_peers, lan_peers=lan_peers)
         else:
             summary = tr("view.source_view.sources_no_telemetry", "Sources: no peer-discovery telemetry available")
         dpg.set_value(self.summary_text, summary)
-
-        self._clear_rows()
-
-        for source in sources:
-            status = str(source.get("status", "Waiting"))
-            color = self.STATUS_COLORS.get(status, (180, 180, 180))
-            try:
-                peers = max(0, int(source.get("peers", 0) or 0))
-            except (TypeError, ValueError):
-                peers = 0
-
-            with dpg.table_row(parent=self.table_id) as row_id:
-                source_name = str(source.get("source", "Unknown"))
-                source_type = str(source.get("type", "--"))
-
-                # Every cell gets help for what is actually under the mouse. In
-                # particular, the Source column is dynamic: a tracker URL explains
-                # that exact tracker and its current state rather than merely showing
-                # a generic definition for the neighbouring Type column.
-                source_name_item = dpg.add_text(source_name)
-                add_text_tooltip(
-                    source_name_item,
-                    self._source_tooltip(source),
-                    wrap=520,
-                )
-
-                source_type_item = dpg.add_text(source_type)
-                add_help_tooltip(
-                    source_type_item,
-                    self._type_help_term(source_type),
-                )
-
-                status_item = dpg.add_text(tr_value(status), color=color)
-                add_text_tooltip(status_item, self._status_tooltip(source), wrap=460)
-
-                peers_item = dpg.add_text(str(peers))
-                add_text_tooltip(peers_item, self._peers_tooltip(source), wrap=460)
-
-                swarm_item = dpg.add_text(self._format_swarm(source))
-                add_help_tooltip(swarm_item, "SWARM_SL")
-
-                scrape_item = dpg.add_text(self._format_scrape(source))
-                add_text_tooltip(scrape_item, self._scrape_tooltip(source), wrap=520)
-
-                response_item = dpg.add_text(
-                    self._format_response(source.get("response_ms"))
-                )
-                add_help_tooltip(response_item, "SOURCE_RESPONSE")
-
-                age_item = dpg.add_text(
-                    self._format_age(source.get("last_update_seconds"))
-                )
-                add_help_tooltip(age_item, "SOURCE_LAST_UPDATE")
-
-                detail_item = dpg.add_text(self._detail(source))
-                add_help_tooltip(detail_item, "SOURCE_DETAIL")
-
-            self._row_ids.append(row_id)
+        self.live_table.render(
+            TableFrame(self._source_row(source, index) for index, source in enumerate(sources))
+        )

@@ -20,6 +20,8 @@ class PresentationCapability(str, Enum):
     RESPONSIVE_LAYOUT = "responsive_layout"
     SCENES = "scenes"
     REALTIME_PLOTS = "realtime_plots"
+    LIVE_TABLES = "live_tables"
+    STATE_GRIDS = "state_grids"
 
 
 def _backend_name(value: object) -> str:
@@ -44,6 +46,8 @@ class PresentationBackend:
     layout_host: object | None = None
     scene_host: object | None = None
     plot_host: object | None = None
+    table_host: object | None = None
+    state_grid_host: object | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "name", _backend_name(self.name))
@@ -59,6 +63,10 @@ class PresentationBackend:
             values.add(PresentationCapability.SCENES)
         if self.plot_host is not None:
             values.add(PresentationCapability.REALTIME_PLOTS)
+        if self.table_host is not None:
+            values.add(PresentationCapability.LIVE_TABLES)
+        if self.state_grid_host is not None:
+            values.add(PresentationCapability.STATE_GRIDS)
         return frozenset(values)
 
     def supports(self, capability: PresentationCapability | str) -> bool:

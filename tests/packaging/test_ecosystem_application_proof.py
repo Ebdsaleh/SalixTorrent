@@ -11,6 +11,7 @@ from tests.helpers import PROJECT_ROOT
 
 from app.engine.presentation_backends import create_dearpygui_backend, create_headless_backend
 from app.framework.components import ComponentRenderer
+from app.framework.live_data import StateGridHost, TableHost
 from app.framework.responsive import LayoutHost
 from app.framework.visualization import PlotHost
 from app.runtime.presentation import PresentationCapability
@@ -33,6 +34,8 @@ class EcosystemApplicationProofTests(unittest.TestCase):
         forbidden = ("app.logic", "app.views", "app.localization")
         self.assertFalse(any(name.startswith(forbidden) for name in imports))
         self.assertIn("--ui-backend", source)
+        self.assertIn("LiveTable", source)
+        self.assertIn("StateGrid", source)
         self.assertIn('("dearpygui", "tkinter", "headless")', source)
 
     def test_blank_view_definition_does_not_branch_on_toolkit_name(self):
@@ -78,6 +81,8 @@ class EcosystemApplicationProofTests(unittest.TestCase):
         self.assertIsInstance(backend.layout_host, LayoutHost)
         self.assertIsInstance(backend.scene_host, SceneHost)
         self.assertIsInstance(backend.plot_host, PlotHost)
+        self.assertIsInstance(backend.table_host, TableHost)
+        self.assertIsInstance(backend.state_grid_host, StateGridHost)
         self.assertFalse(any(name == "dearpygui" or name.startswith("dearpygui.") for name in loaded))
 
     def test_headless_bundle_advertises_no_graphical_capabilities(self):

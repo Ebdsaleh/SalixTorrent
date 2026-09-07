@@ -62,7 +62,7 @@ Application Engine / Runtime                   reusable
 Backend / Platform Adapters
         |
         +-- Dear PyGui                         current reference GUI backend
-        +-- Tkinter                            prepared compatibility GUI backend
+        +-- Tkinter                            validated compatibility GUI backend
         +-- headless / CLI                     already proven presentation mode
         +-- OS-specific desktop/network adapters
         +-- future GLFW/OpenGL or other backends where justified
@@ -96,7 +96,7 @@ engine/runtime
 + Tkinter presentation backend
 ```
 
-Tkinter is the prepared standard-library-compatible compatibility implementation for the common desktop surface. It proves that framework contracts can be implemented without Dear PyGui while keeping application definitions backend-neutral.
+Tkinter is the validated standard-library-compatible compatibility implementation for the common desktop surface. It proves that framework contracts can be implemented without Dear PyGui while keeping application definitions backend-neutral.
 
 Tkinter is **not** a complete SalixTorrent presentation rewrite and this tranche does not claim feature parity with Dear PyGui. The compatibility backend is introduced incrementally behind the same framework-facing contracts and is first proven by the product-neutral blank-application example.
 
@@ -428,7 +428,7 @@ The second implementation tranche is complete and pushed at `8e707efeb0cda162ee0
 
 ### Stage D — second GUI implementation
 
-The third implementation tranche is prepared as a real second-backend proof rather than an interface exercise. Tkinter implements the common component, responsive-layout, scene, and realtime-plot contracts. Small Dear PyGui/Tkinter/headless presentation bundles and application hosts keep toolkit loops outside the runtime. `examples/ecosystem_blank_app.py` runs one product-neutral component/graph definition through either GUI backend and the same runtime headlessly.
+The third implementation tranche is completed and pushed as a real second-backend proof rather than an interface exercise. Tkinter implements the common component, responsive-layout, scene, and realtime-plot contracts. Small Dear PyGui/Tkinter/headless presentation bundles and application hosts keep toolkit loops outside the runtime. `examples/ecosystem_blank_app.py` runs one product-neutral component/graph definition through either GUI backend and the same runtime headlessly.
 
 This remains a compatibility surface, not a wholesale Tkinter rewrite of SalixTorrent and not a feature-parity promise.
 
@@ -635,6 +635,44 @@ The concrete backend bundle factories assemble Dear PyGui, Tkinter, or headless 
 
 `examples/ecosystem_blank_app.py` is the first product-neutral proof. Its `DemoView` contains one component tree and one realtime graph definition. The outer `--ui-backend dearpygui|tkinter|headless` choice changes the host, not the view. Headless mode proves the runtime remains usable without loading a graphical toolkit.
 
-Prepared validation adds 34 focused regressions and advances complete discovery from 482 to **516** tests. Live Tkinter tests pass under the source environment's Xvfb display; ordinary display-less Linux discovery skips those GUI-live checks while keeping source/contract tests active. Expected real-Windows acceptance is 516 / 516 with the existing one non-Windows shell-behavior skip. `APP_VERSION` remains `0.5.0`.
+Validation added 34 focused regressions and passed both complete real-Windows discovery paths at **516 / 516** with the existing one non-Windows shell-behavior skip. Live Dear PyGui and Tkinter blank-application proof and the unchanged SalixTorrent desktop smoke also passed. The exact pushed checkpoint is `522ac8467fc55a5ac0e3d71fe5fd470251e13562` (`Add Tkinter compatibility application backend`). `APP_VERSION` remains `0.5.0`.
 
 Dear PyGui remains SalixTorrent's reference desktop backend. This checkpoint does not rewrite SalixTorrent in Tkinter, promise identical backend capabilities, freeze final ecosystem names/API, tag a release, or merge `dev` into `main`. After this proof, the next major extraction target returns to rich live-data/RAD surfaces: transfer/peer/source tables, piece/state maps, status/diagnostic presentation, and the reusable data models beneath them.
+
+---
+
+## 18. Fourth post-v0.5.0 implementation checkpoint
+
+The fourth `dev` tranche begins extracting the rich live-data surfaces that make the future RAD environment useful for dashboards, diagnostics, monitors and data-heavy desktop tools.
+
+The framework now has two new provisional presentation contracts under `app/framework/live_data.py`:
+
+```text
+LiveTable
+  -> TableColumnSpec / TableCell / TableRow / TableFrame
+  -> stable keyed row identity
+  -> changed-row updates
+  -> removal + reorder
+  -> TableHost
+
+StateGrid
+  -> StateGridCell / StateGridFrame
+  -> compact categorical/high-density state maps
+  -> StateGridHost
+```
+
+Dear PyGui and Tkinter each provide concrete table and state-grid hosts. `PresentationBackend` advertises `LIVE_TABLES` and `STATE_GRIDS` separately so a future backend can support one capability without falsely claiming the other. Headless remains free of graphical dependencies.
+
+SalixTorrent now proves the contracts in real product surfaces rather than only a demo:
+
+- **Peers** uses stable connection IDs to keep live table rows across telemetry frames instead of deleting/recreating the complete table every render;
+- **Sources** uses stable source IDs with the same live-table coordinator while retaining application-owned tracker/DHT/PEX/LPD wording, response formatting, source-specific diagnostics and status colors;
+- **Pieces** routes focused detail rows through `LiveTable` and the compact piece map through `StateGrid`; torrent-specific piece bucketing, scheduler/disk telemetry, state meanings and colors remain in SalixTorrent.
+
+The product-neutral blank application is expanded again: one `DemoView` definition now exercises semantic components, a keyed live table, a categorical state grid and a realtime graph. Dear PyGui and Tkinter implement those presentation capabilities independently; the view still contains no toolkit-name branch.
+
+The interactive transfer queue and Files table are intentionally not migrated yet. Those surfaces combine row selection, filtering/sorting, context menus, commands, lazy menu construction and model mutation. A future tranche should generalize those interaction semantics explicitly instead of pretending a read-only `LiveTable` is sufficient.
+
+Prepared source validation adds 13 focused regressions and advances complete discovery from the committed 516-test checkpoint to **529** tests. The Dear PyGui state-grid host owns physical resize reflow and its handler-registry lifetime, so the renderer-neutral `StateGrid` can continue suppressing identical data frames without blocking presentation reflow. Canonical localization remains 1,337 strings; only extraction-source metadata changes. `APP_VERSION` remains `0.5.0`.
+
+No final ecosystem/package naming, public API freeze, release tag or merge to `main` is implied.
