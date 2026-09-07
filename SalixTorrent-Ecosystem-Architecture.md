@@ -671,8 +671,14 @@ SalixTorrent now proves the contracts in real product surfaces rather than only 
 
 The product-neutral blank application is expanded again: one `DemoView` definition now exercises semantic components, a keyed live table, a categorical state grid and a realtime graph. Dear PyGui and Tkinter implement those presentation capabilities independently; the view still contains no toolkit-name branch.
 
-The interactive transfer queue and Files table are intentionally not migrated yet. Those surfaces combine row selection, filtering/sorting, context menus, commands, lazy menu construction and model mutation. A future tranche should generalize those interaction semantics explicitly instead of pretending a read-only `LiveTable` is sufficient.
+Tranche 4 completed with both real Windows discovery paths at **529 / 529** and was pushed as `a561b50ddc64520d1dc10b362fb4180378da5dc8` (`Extract live table and state grid presentation`).
 
-Prepared source validation adds 13 focused regressions and advances complete discovery from the committed 516-test checkpoint to **529** tests. The Dear PyGui state-grid host owns physical resize reflow and its handler-registry lifetime, so the renderer-neutral `StateGrid` can continue suppressing identical data frames without blocking presentation reflow. Canonical localization remains 1,337 strings; only extraction-source metadata changes. `APP_VERSION` remains `0.5.0`.
+### Interactive data and command semantics
+
+The next layer deliberately separates *what an interactive data surface means* from *how a toolkit draws it*. `DataView` owns deterministic keyed search, exact-choice filtering and stable multi-column sorting over ordinary records. `SelectionModel` owns explicit single-selection identity. `CommandSpec`/`CommandSet` describe stable command keys and enabled/checked/submenu state without embedding callbacks or backend objects. All of these contracts are standard-library-only and relocatable with `app/framework`.
+
+SalixTorrent proves those semantics in two real surfaces. Active Transfers keeps its current Dear PyGui table and rich torrent context menu, but queue ordering/filter visibility now come from `DataView` rather than product-local sorting/filter loops. Files moves its physical rows to `LiveTable` and describes file-priority availability through a `CommandSet`; torrent mutation and the concrete Dear PyGui popup remain application-owned. This avoids falsely claiming that lazy seeding-goal menus, destructive confirmations or torrent lifecycle policy are generic framework behavior.
+
+Prepared source validation adds 18 focused regressions and advances complete discovery to **547** tests. Canonical localization remains 1,337 strings and `APP_VERSION` remains `0.5.0`. A later tranche can extract multi-backend physical command/context-menu hosts after the semantic command tree is proven across additional application surfaces.
 
 No final ecosystem/package naming, public API freeze, release tag or merge to `main` is implied.

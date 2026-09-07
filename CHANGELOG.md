@@ -4,6 +4,16 @@ Notable SalixTorrent changes are recorded here.
 
 ## Unreleased
 
+### Ecosystem Extraction — Interactive Data, Selection and Commands
+
+- Added standard-library-only `DataView`, `DataRecord`, `SortTerm`, and `SortDirection` contracts for deterministic keyed search/filter/sort projection outside any GUI toolkit.
+- Added explicit `SelectionModel`, `CommandSpec`, and `CommandSet` interaction contracts. Commands expose stable identities plus enabled/checked/submenu state without embedding backend callbacks or introducing observer/reactive machinery.
+- Routed Active Transfers queue ordering and visibility projection through the generic data-view layer while preserving Dear PyGui's existing sortable headers, filters, persisted queue order, row actions, and SalixTorrent-specific policy.
+- Migrated the Files detail table onto the renderer-neutral `LiveTable` boundary. Stable file identity, changed-row updates, colours and contextual cell help now use the same live-data contract already proven by Peers, Sources and Pieces.
+- Reframed file-priority context-menu state through backend-neutral command specifications while leaving actual torrent mutation and the current Dear PyGui popup host application-owned. This intentionally separates semantic command state from physical menu rendering before a later multi-backend command host is extracted.
+- Extended framework relocation proof to import and execute the interaction/data-view contracts after package copy/rename with no application or GUI dependency.
+- Added 18 focused regressions. Complete source discovery advances from 529 to 547 tests; canonical localization remains 1,337 strings.
+
 ### Ecosystem Extraction — Live Tables and State-Grid Presentation
 
 - Added renderer-neutral keyed live-table contracts under `app/framework/live_data.py`, including column/cell/row/frame models, explicit backend bindings, stable row identity, incremental changed-row updates, removal/reordering, optional cell foreground metadata, and per-cell explanatory text without requiring a GUI toolkit in the framework.

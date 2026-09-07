@@ -1702,7 +1702,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 1813,
+              "line": 1821,
               "column": 17,
               "kind": "python-tr"
             }
@@ -1716,7 +1716,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 1812,
+              "line": 1820,
               "column": 17,
               "kind": "python-tr"
             }
@@ -4204,13 +4204,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2591,
+              "line": 2599,
               "column": 44,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 301,
+              "line": 304,
               "column": 21,
               "kind": "python-tr"
             }
@@ -4224,13 +4224,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 197,
+              "line": 200,
               "column": 48,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 409,
+              "line": 412,
               "column": 65,
               "kind": "python-tr"
             }
@@ -4244,7 +4244,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 183,
+              "line": 186,
               "column": 44,
               "kind": "python-tr"
             }
@@ -4258,13 +4258,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2607,
+              "line": 2615,
               "column": 42,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 337,
+              "line": 340,
               "column": 66,
               "kind": "python-tr"
             }
@@ -4282,7 +4282,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2903,
+              "line": 2911,
               "column": 13,
               "kind": "python-tr"
             }
@@ -4296,7 +4296,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 549,
+              "line": 552,
               "column": 21,
               "kind": "python-tr"
             }
@@ -4324,7 +4324,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 447,
+              "line": 450,
               "column": 80,
               "kind": "python-tr"
             }
@@ -4338,7 +4338,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 193,
+              "line": 196,
               "column": 27,
               "kind": "python-tr"
             }
@@ -4352,13 +4352,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 779,
+              "line": 782,
               "column": 27,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 869,
+              "line": 872,
               "column": 27,
               "kind": "python-tr"
             }
@@ -4372,13 +4372,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2617,
+              "line": 2625,
               "column": 47,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 372,
+              "line": 375,
               "column": 71,
               "kind": "python-tr"
             }
@@ -4396,7 +4396,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2952,
+              "line": 2960,
               "column": 47,
               "kind": "python-tr"
             }
@@ -4410,13 +4410,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 614,
+              "line": 617,
               "column": 21,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 666,
+              "line": 669,
               "column": 21,
               "kind": "python-tr"
             }
@@ -4430,7 +4430,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 559,
+              "line": 562,
               "column": 21,
               "kind": "python-tr"
             }
@@ -4444,7 +4444,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 668,
+              "line": 671,
               "column": 39,
               "kind": "python-tr"
             }
@@ -4458,7 +4458,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 616,
+              "line": 619,
               "column": 39,
               "kind": "python-tr"
             }
@@ -4472,7 +4472,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 1097,
+              "line": 1100,
               "column": 13,
               "kind": "python-tr"
             }
@@ -4486,7 +4486,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 219,
+              "line": 222,
               "column": 60,
               "kind": "python-tr"
             }
@@ -4500,7 +4500,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 220,
+              "line": 223,
               "column": 55,
               "kind": "python-tr"
             }
@@ -4514,7 +4514,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 1979,
+              "line": 1987,
               "column": 31,
               "kind": "python-tr"
             }
@@ -4528,7 +4528,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 366,
+              "line": 369,
               "column": 68,
               "kind": "python-tr"
             }
@@ -4542,7 +4542,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 367,
+              "line": 370,
               "column": 71,
               "kind": "python-tr"
             }
@@ -4556,19 +4556,19 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 565,
+              "line": 568,
               "column": 21,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 792,
+              "line": 795,
               "column": 38,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 874,
+              "line": 877,
               "column": 27,
               "kind": "python-tr"
             }
@@ -4582,13 +4582,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2639,
+              "line": 2647,
               "column": 42,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 474,
+              "line": 477,
               "column": 66,
               "kind": "python-tr"
             }
@@ -4606,7 +4606,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 3124,
+              "line": 3132,
               "column": 42,
               "kind": "python-tr"
             }
@@ -4620,7 +4620,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 1999,
+              "line": 2007,
               "column": 27,
               "kind": "python-tr"
             }
@@ -4634,13 +4634,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2611,
+              "line": 2619,
               "column": 40,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 349,
+              "line": 352,
               "column": 64,
               "kind": "python-tr"
             }
@@ -4658,7 +4658,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2925,
+              "line": 2933,
               "column": 13,
               "kind": "python-tr"
             }
@@ -4672,13 +4672,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2628,
+              "line": 2636,
               "column": 52,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 394,
+              "line": 397,
               "column": 76,
               "kind": "python-tr"
             }
@@ -4696,7 +4696,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 3063,
+              "line": 3071,
               "column": 13,
               "kind": "python-tr"
             }
@@ -4710,7 +4710,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2061,
+              "line": 2069,
               "column": 23,
               "kind": "python-tr"
             }
@@ -4724,7 +4724,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 786,
+              "line": 789,
               "column": 63,
               "kind": "python-tr"
             }
@@ -4738,7 +4738,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2066,
+              "line": 2074,
               "column": 23,
               "kind": "python-tr"
             }
@@ -4752,7 +4752,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 788,
+              "line": 791,
               "column": 65,
               "kind": "python-tr"
             }
@@ -4766,13 +4766,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2638,
+              "line": 2646,
               "column": 47,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 472,
+              "line": 475,
               "column": 71,
               "kind": "python-tr"
             }
@@ -4786,13 +4786,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2637,
+              "line": 2645,
               "column": 45,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 470,
+              "line": 473,
               "column": 69,
               "kind": "python-tr"
             }
@@ -4810,7 +4810,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 3119,
+              "line": 3127,
               "column": 45,
               "kind": "python-tr"
             }
@@ -4828,7 +4828,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 3122,
+              "line": 3130,
               "column": 13,
               "kind": "python-tr"
             }
@@ -4846,13 +4846,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 1571,
+              "line": 1579,
               "column": 13,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 1639,
+              "line": 1647,
               "column": 17,
               "kind": "python-tr"
             }
@@ -4866,25 +4866,25 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2554,
+              "line": 2562,
               "column": 21,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 713,
+              "line": 716,
               "column": 43,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 842,
+              "line": 845,
               "column": 27,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 1990,
+              "line": 1998,
               "column": 37,
               "kind": "python-tr"
             }
@@ -4898,13 +4898,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2618,
+              "line": 2626,
               "column": 44,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 374,
+              "line": 377,
               "column": 68,
               "kind": "python-tr"
             }
@@ -4922,7 +4922,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2955,
+              "line": 2963,
               "column": 13,
               "kind": "python-tr"
             }
@@ -4936,7 +4936,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 901,
+              "line": 904,
               "column": 21,
               "kind": "python-tr"
             }
@@ -4950,7 +4950,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 413,
+              "line": 416,
               "column": 50,
               "kind": "python-tr"
             }
@@ -4964,7 +4964,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 261,
+              "line": 264,
               "column": 31,
               "kind": "python-tr"
             }
@@ -4978,7 +4978,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 276,
+              "line": 279,
               "column": 49,
               "kind": "python-tr"
             }
@@ -4992,7 +4992,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 879,
+              "line": 882,
               "column": 13,
               "kind": "python-tr"
             }
@@ -5006,7 +5006,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 886,
+              "line": 889,
               "column": 17,
               "kind": "python-tr"
             }
@@ -5024,7 +5024,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 1821,
+              "line": 1829,
               "column": 13,
               "kind": "python-tr"
             }
@@ -5038,7 +5038,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 319,
+              "line": 322,
               "column": 64,
               "kind": "python-tr"
             }
@@ -5056,7 +5056,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2594,
+              "line": 2602,
               "column": 13,
               "kind": "python-tr"
             }
@@ -5070,13 +5070,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2600,
+              "line": 2608,
               "column": 45,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 323,
+              "line": 326,
               "column": 69,
               "kind": "python-tr"
             }
@@ -5096,7 +5096,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2878,
+              "line": 2886,
               "column": 13,
               "kind": "python-tr"
             }
@@ -5118,7 +5118,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 1415,
+              "line": 1423,
               "column": 16,
               "kind": "python-tr"
             }
@@ -5132,7 +5132,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 1079,
+              "line": 1082,
               "column": 56,
               "kind": "python-tr"
             }
@@ -5146,7 +5146,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 352,
+              "line": 355,
               "column": 67,
               "kind": "python-tr"
             }
@@ -5164,7 +5164,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 1076,
+              "line": 1079,
               "column": 17,
               "kind": "python-tr"
             }
@@ -5178,13 +5178,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2606,
+              "line": 2614,
               "column": 38,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 335,
+              "line": 338,
               "column": 62,
               "kind": "python-tr"
             }
@@ -5202,7 +5202,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2900,
+              "line": 2908,
               "column": 38,
               "kind": "python-tr"
             }
@@ -5216,13 +5216,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2629,
+              "line": 2637,
               "column": 48,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 396,
+              "line": 399,
               "column": 72,
               "kind": "python-tr"
             }
@@ -5240,7 +5240,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 3073,
+              "line": 3081,
               "column": 30,
               "kind": "python-tr"
             }
@@ -5254,7 +5254,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 3075,
+              "line": 3083,
               "column": 30,
               "kind": "python-tr"
             }
@@ -5274,7 +5274,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 3071,
+              "line": 3079,
               "column": 30,
               "kind": "python-tr"
             }
@@ -5294,7 +5294,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2835,
+              "line": 2843,
               "column": 21,
               "kind": "python-tr"
             }
@@ -5308,13 +5308,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2635,
+              "line": 2643,
               "column": 44,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 466,
+              "line": 469,
               "column": 68,
               "kind": "python-tr"
             }
@@ -5328,7 +5328,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 495,
+              "line": 498,
               "column": 40,
               "kind": "python-tr"
             }
@@ -5342,7 +5342,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 515,
+              "line": 518,
               "column": 45,
               "kind": "python-tr"
             }
@@ -5362,7 +5362,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 3116,
+              "line": 3124,
               "column": 13,
               "kind": "python-tr"
             }
@@ -5376,7 +5376,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 204,
+              "line": 207,
               "column": 26,
               "kind": "python-tr"
             }
@@ -5390,7 +5390,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 637,
+              "line": 640,
               "column": 13,
               "kind": "python-tr"
             }
@@ -5404,7 +5404,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 661,
+              "line": 664,
               "column": 21,
               "kind": "python-tr"
             }
@@ -5418,7 +5418,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 645,
+              "line": 648,
               "column": 17,
               "kind": "python-tr"
             }
@@ -5432,7 +5432,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2053,
+              "line": 2061,
               "column": 23,
               "kind": "python-tr"
             }
@@ -5450,7 +5450,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 1877,
+              "line": 1885,
               "column": 13,
               "kind": "python-tr"
             }
@@ -5464,7 +5464,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 313,
+              "line": 316,
               "column": 40,
               "kind": "python-tr"
             }
@@ -5478,7 +5478,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 512,
+              "line": 515,
               "column": 47,
               "kind": "python-tr"
             }
@@ -5492,7 +5492,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 811,
+              "line": 814,
               "column": 17,
               "kind": "python-tr"
             }
@@ -5506,7 +5506,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2910,
+              "line": 2918,
               "column": 34,
               "kind": "python-tr"
             }
@@ -5520,25 +5520,25 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2555,
+              "line": 2563,
               "column": 22,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 723,
+              "line": 726,
               "column": 44,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 843,
+              "line": 846,
               "column": 28,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 1992,
+              "line": 2000,
               "column": 37,
               "kind": "python-tr"
             }
@@ -5552,13 +5552,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 1049,
+              "line": 1052,
               "column": 52,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 571,
+              "line": 574,
               "column": 25,
               "kind": "python-tr"
             }
@@ -5572,13 +5572,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2624,
+              "line": 2632,
               "column": 47,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 386,
+              "line": 389,
               "column": 71,
               "kind": "python-tr"
             }
@@ -5592,13 +5592,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2625,
+              "line": 2633,
               "column": 49,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 388,
+              "line": 391,
               "column": 73,
               "kind": "python-tr"
             }
@@ -5618,7 +5618,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 3044,
+              "line": 3052,
               "column": 13,
               "kind": "python-tr"
             }
@@ -5636,7 +5636,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 3038,
+              "line": 3046,
               "column": 30,
               "kind": "python-tr"
             }
@@ -5656,7 +5656,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 3036,
+              "line": 3044,
               "column": 30,
               "kind": "python-tr"
             }
@@ -5670,13 +5670,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2633,
+              "line": 2641,
               "column": 44,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 462,
+              "line": 465,
               "column": 68,
               "kind": "python-tr"
             }
@@ -5694,7 +5694,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 3108,
+              "line": 3116,
               "column": 44,
               "kind": "python-tr"
             }
@@ -5708,13 +5708,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2621,
+              "line": 2629,
               "column": 44,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 380,
+              "line": 383,
               "column": 68,
               "kind": "python-tr"
             }
@@ -5738,7 +5738,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 3003,
+              "line": 3011,
               "column": 13,
               "kind": "python-tr"
             }
@@ -5752,13 +5752,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2631,
+              "line": 2639,
               "column": 38,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 400,
+              "line": 403,
               "column": 62,
               "kind": "python-tr"
             }
@@ -5776,7 +5776,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 3091,
+              "line": 3099,
               "column": 17,
               "kind": "python-tr"
             }
@@ -5790,7 +5790,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 3087,
+              "line": 3095,
               "column": 42,
               "kind": "python-tr"
             }
@@ -5804,7 +5804,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 3094,
+              "line": 3102,
               "column": 42,
               "kind": "python-tr"
             }
@@ -5818,13 +5818,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2605,
+              "line": 2613,
               "column": 46,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 333,
+              "line": 336,
               "column": 70,
               "kind": "python-tr"
             }
@@ -5842,7 +5842,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2898,
+              "line": 2906,
               "column": 13,
               "kind": "python-tr"
             }
@@ -5856,13 +5856,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2642,
+              "line": 2650,
               "column": 47,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 453,
+              "line": 456,
               "column": 37,
               "kind": "python-tr"
             }
@@ -5882,7 +5882,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2969,
+              "line": 2977,
               "column": 13,
               "kind": "python-tr"
             }
@@ -5896,13 +5896,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2619,
+              "line": 2627,
               "column": 46,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 376,
+              "line": 379,
               "column": 70,
               "kind": "python-tr"
             }
@@ -5922,7 +5922,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2978,
+              "line": 2986,
               "column": 13,
               "kind": "python-tr"
             }
@@ -5936,13 +5936,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2620,
+              "line": 2628,
               "column": 52,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 378,
+              "line": 381,
               "column": 76,
               "kind": "python-tr"
             }
@@ -5956,7 +5956,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2994,
+              "line": 3002,
               "column": 30,
               "kind": "python-tr"
             }
@@ -5974,7 +5974,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2992,
+              "line": 3000,
               "column": 30,
               "kind": "python-tr"
             }
@@ -5988,7 +5988,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 528,
+              "line": 531,
               "column": 17,
               "kind": "python-tr"
             }
@@ -6002,7 +6002,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 542,
+              "line": 545,
               "column": 22,
               "kind": "python-tr"
             }
@@ -6016,13 +6016,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2627,
+              "line": 2635,
               "column": 49,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 392,
+              "line": 395,
               "column": 73,
               "kind": "python-tr"
             }
@@ -6040,7 +6040,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 3058,
+              "line": 3066,
               "column": 13,
               "kind": "python-tr"
             }
@@ -6054,13 +6054,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2626,
+              "line": 2634,
               "column": 50,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 390,
+              "line": 393,
               "column": 74,
               "kind": "python-tr"
             }
@@ -6080,7 +6080,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 3048,
+              "line": 3056,
               "column": 13,
               "kind": "python-tr"
             }
@@ -6094,13 +6094,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 733,
+              "line": 736,
               "column": 46,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 844,
+              "line": 847,
               "column": 30,
               "kind": "python-tr"
             }
@@ -6114,13 +6114,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2556,
+              "line": 2564,
               "column": 24,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 1994,
+              "line": 2002,
               "column": 37,
               "kind": "python-tr"
             }
@@ -6134,7 +6134,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 1912,
+              "line": 1920,
               "column": 23,
               "kind": "python-tr"
             }
@@ -6148,7 +6148,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 1907,
+              "line": 1915,
               "column": 23,
               "kind": "python-tr"
             }
@@ -6162,7 +6162,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 246,
+              "line": 249,
               "column": 31,
               "kind": "python-tr"
             }
@@ -6176,7 +6176,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 271,
+              "line": 274,
               "column": 48,
               "kind": "python-tr"
             }
@@ -6266,7 +6266,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 1711,
+              "line": 1719,
               "column": 16,
               "kind": "python-tr"
             }
@@ -6280,13 +6280,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2623,
+              "line": 2631,
               "column": 47,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 384,
+              "line": 387,
               "column": 71,
               "kind": "python-tr"
             }
@@ -6300,7 +6300,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 3021,
+              "line": 3029,
               "column": 28,
               "kind": "python-tr"
             }
@@ -6320,7 +6320,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 3019,
+              "line": 3027,
               "column": 28,
               "kind": "python-tr"
             }
@@ -6334,7 +6334,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 631,
+              "line": 634,
               "column": 17,
               "kind": "python-tr"
             }
@@ -6348,7 +6348,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2043,
+              "line": 2051,
               "column": 23,
               "kind": "python-tr"
             }
@@ -6362,19 +6362,19 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 790,
+              "line": 793,
               "column": 65,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 896,
+              "line": 899,
               "column": 21,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 484,
+              "line": 487,
               "column": 79,
               "kind": "python-tr"
             }
@@ -6388,7 +6388,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 162,
+              "line": 165,
               "column": 27,
               "kind": "python-tr"
             }
@@ -6402,7 +6402,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 520,
+              "line": 523,
               "column": 13,
               "kind": "python-tr"
             }
@@ -6416,7 +6416,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 157,
+              "line": 160,
               "column": 27,
               "kind": "python-tr"
             }
@@ -6430,7 +6430,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 554,
+              "line": 557,
               "column": 21,
               "kind": "python-tr"
             }
@@ -6444,7 +6444,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 533,
+              "line": 536,
               "column": 17,
               "kind": "python-tr"
             }
@@ -6458,13 +6458,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 1051,
+              "line": 1054,
               "column": 13,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 576,
+              "line": 579,
               "column": 17,
               "kind": "python-tr"
             }
@@ -6478,7 +6478,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 556,
+              "line": 559,
               "column": 39,
               "kind": "python-tr"
             }
@@ -6492,7 +6492,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2020,
+              "line": 2028,
               "column": 23,
               "kind": "python-tr"
             }
@@ -6506,7 +6506,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 173,
+              "line": 176,
               "column": 27,
               "kind": "python-tr"
             }
@@ -6520,7 +6520,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2754,
+              "line": 2762,
               "column": 41,
               "kind": "python-tr"
             }
@@ -6534,7 +6534,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 489,
+              "line": 492,
               "column": 40,
               "kind": "python-tr"
             }
@@ -6548,7 +6548,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 513,
+              "line": 516,
               "column": 45,
               "kind": "python-tr"
             }
@@ -6562,13 +6562,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2634,
+              "line": 2642,
               "column": 45,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 464,
+              "line": 467,
               "column": 69,
               "kind": "python-tr"
             }
@@ -6582,7 +6582,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 514,
+              "line": 517,
               "column": 46,
               "kind": "python-tr"
             }
@@ -6596,7 +6596,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 492,
+              "line": 495,
               "column": 40,
               "kind": "python-tr"
             }
@@ -6616,7 +6616,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 3111,
+              "line": 3119,
               "column": 13,
               "kind": "python-tr"
             }
@@ -6630,7 +6630,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 255,
+              "line": 258,
               "column": 31,
               "kind": "python-tr"
             }
@@ -6644,7 +6644,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 1920,
+              "line": 1928,
               "column": 23,
               "kind": "python-tr"
             }
@@ -6658,7 +6658,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 1930,
+              "line": 1938,
               "column": 23,
               "kind": "python-tr"
             }
@@ -6672,7 +6672,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 1925,
+              "line": 1933,
               "column": 23,
               "kind": "python-tr"
             }
@@ -6686,13 +6686,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2636,
+              "line": 2644,
               "column": 42,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 468,
+              "line": 471,
               "column": 66,
               "kind": "python-tr"
             }
@@ -6710,7 +6710,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 3118,
+              "line": 3126,
               "column": 42,
               "kind": "python-tr"
             }
@@ -6724,7 +6724,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 252,
+              "line": 255,
               "column": 31,
               "kind": "python-tr"
             }
@@ -6738,7 +6738,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 273,
+              "line": 276,
               "column": 52,
               "kind": "python-tr"
             }
@@ -6752,7 +6752,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2071,
+              "line": 2079,
               "column": 23,
               "kind": "python-tr"
             }
@@ -6766,7 +6766,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 486,
+              "line": 489,
               "column": 78,
               "kind": "python-tr"
             }
@@ -6780,7 +6780,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 221,
+              "line": 224,
               "column": 59,
               "kind": "python-tr"
             }
@@ -6794,13 +6794,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 698,
+              "line": 701,
               "column": 17,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 820,
+              "line": 823,
               "column": 17,
               "kind": "python-tr"
             }
@@ -6814,13 +6814,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2601,
+              "line": 2609,
               "column": 44,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 325,
+              "line": 328,
               "column": 68,
               "kind": "python-tr"
             }
@@ -6838,7 +6838,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2882,
+              "line": 2890,
               "column": 13,
               "kind": "python-tr"
             }
@@ -6852,7 +6852,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 620,
+              "line": 623,
               "column": 13,
               "kind": "python-tr"
             }
@@ -6866,7 +6866,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 609,
+              "line": 612,
               "column": 21,
               "kind": "python-tr"
             }
@@ -6880,7 +6880,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2418,
+              "line": 2426,
               "column": 17,
               "kind": "python-tr"
             }
@@ -6894,7 +6894,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 604,
+              "line": 607,
               "column": 21,
               "kind": "python-tr"
             }
@@ -6908,7 +6908,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2422,
+              "line": 2430,
               "column": 17,
               "kind": "python-tr"
             }
@@ -6922,7 +6922,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 583,
+              "line": 586,
               "column": 13,
               "kind": "python-tr"
             }
@@ -6936,7 +6936,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2079,
+              "line": 2087,
               "column": 23,
               "kind": "python-tr"
             }
@@ -6950,7 +6950,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 591,
+              "line": 594,
               "column": 17,
               "kind": "python-tr"
             }
@@ -6968,7 +6968,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2413,
+              "line": 2421,
               "column": 13,
               "kind": "python-tr"
             }
@@ -6982,7 +6982,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2437,
+              "line": 2445,
               "column": 38,
               "kind": "python-tr"
             }
@@ -7000,7 +7000,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 1089,
+              "line": 1092,
               "column": 13,
               "kind": "python-tr"
             }
@@ -7014,7 +7014,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2025,
+              "line": 2033,
               "column": 23,
               "kind": "python-tr"
             }
@@ -7028,7 +7028,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2035,
+              "line": 2043,
               "column": 23,
               "kind": "python-tr"
             }
@@ -7042,7 +7042,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 354,
+              "line": 357,
               "column": 43,
               "kind": "python-tr"
             }
@@ -7056,7 +7056,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 201,
+              "line": 204,
               "column": 45,
               "kind": "python-tr"
             }
@@ -7070,13 +7070,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2610,
+              "line": 2618,
               "column": 47,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 346,
+              "line": 349,
               "column": 37,
               "kind": "python-tr"
             }
@@ -7094,7 +7094,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2917,
+              "line": 2925,
               "column": 13,
               "kind": "python-tr"
             }
@@ -7108,7 +7108,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 685,
+              "line": 688,
               "column": 17,
               "kind": "python-tr"
             }
@@ -7122,13 +7122,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 795,
+              "line": 798,
               "column": 13,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 803,
+              "line": 806,
               "column": 17,
               "kind": "python-tr"
             }
@@ -7142,13 +7142,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2609,
+              "line": 2617,
               "column": 47,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 342,
+              "line": 345,
               "column": 37,
               "kind": "python-tr"
             }
@@ -7162,7 +7162,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 1955,
+              "line": 1963,
               "column": 23,
               "kind": "python-tr"
             }
@@ -7180,7 +7180,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 1865,
+              "line": 1873,
               "column": 13,
               "kind": "python-tr"
             }
@@ -7200,7 +7200,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 1853,
+              "line": 1861,
               "column": 16,
               "kind": "python-tr"
             }
@@ -7214,7 +7214,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 1852,
+              "line": 1860,
               "column": 17,
               "kind": "python-tr"
             }
@@ -7228,13 +7228,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 1647,
+              "line": 1655,
               "column": 17,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 1696,
+              "line": 1704,
               "column": 17,
               "kind": "python-tr"
             }
@@ -7248,7 +7248,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 1846,
+              "line": 1854,
               "column": 27,
               "kind": "python-tr"
             }
@@ -7266,7 +7266,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 1563,
+              "line": 1571,
               "column": 13,
               "kind": "python-tr"
             }
@@ -7284,7 +7284,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2913,
+              "line": 2921,
               "column": 13,
               "kind": "python-tr"
             }
@@ -7298,7 +7298,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 1836,
+              "line": 1844,
               "column": 27,
               "kind": "python-tr"
             }
@@ -7312,7 +7312,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 1841,
+              "line": 1849,
               "column": 27,
               "kind": "python-tr"
             }
@@ -7326,13 +7326,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2615,
+              "line": 2623,
               "column": 45,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 368,
+              "line": 371,
               "column": 69,
               "kind": "python-tr"
             }
@@ -7352,7 +7352,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2939,
+              "line": 2947,
               "column": 13,
               "kind": "python-tr"
             }
@@ -7366,7 +7366,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 1144,
+              "line": 1147,
               "column": 19,
               "kind": "python-tr"
             }
@@ -7380,7 +7380,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 286,
+              "line": 289,
               "column": 51,
               "kind": "python-tr"
             }
@@ -7394,13 +7394,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2614,
+              "line": 2622,
               "column": 40,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 364,
+              "line": 367,
               "column": 64,
               "kind": "python-tr"
             }
@@ -7418,7 +7418,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2810,
+              "line": 2818,
               "column": 40,
               "kind": "python-tr"
             }
@@ -7432,13 +7432,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2608,
+              "line": 2616,
               "column": 40,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 339,
+              "line": 342,
               "column": 64,
               "kind": "python-tr"
             }
@@ -7456,7 +7456,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2907,
+              "line": 2915,
               "column": 40,
               "kind": "python-tr"
             }
@@ -7470,7 +7470,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 223,
+              "line": 226,
               "column": 58,
               "kind": "python-tr"
             }
@@ -7492,7 +7492,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 1360,
+              "line": 1362,
               "column": 17,
               "kind": "python-tr"
             }
@@ -7506,7 +7506,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 249,
+              "line": 252,
               "column": 31,
               "kind": "python-tr"
             }
@@ -7520,7 +7520,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 272,
+              "line": 275,
               "column": 48,
               "kind": "python-tr"
             }
@@ -7534,7 +7534,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 498,
+              "line": 501,
               "column": 40,
               "kind": "python-tr"
             }
@@ -7548,7 +7548,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 516,
+              "line": 519,
               "column": 47,
               "kind": "python-tr"
             }
@@ -7562,7 +7562,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 501,
+              "line": 504,
               "column": 40,
               "kind": "python-tr"
             }
@@ -7576,7 +7576,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 517,
+              "line": 520,
               "column": 45,
               "kind": "python-tr"
             }
@@ -7590,7 +7590,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2015,
+              "line": 2023,
               "column": 23,
               "kind": "python-tr"
             }
@@ -7604,7 +7604,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 168,
+              "line": 171,
               "column": 27,
               "kind": "python-tr"
             }
@@ -7618,7 +7618,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 1087,
+              "line": 1090,
               "column": 52,
               "kind": "python-tr"
             }
@@ -7632,13 +7632,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 210,
+              "line": 213,
               "column": 52,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 258,
+              "line": 261,
               "column": 31,
               "kind": "python-tr"
             }
@@ -7652,13 +7652,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2589,
+              "line": 2597,
               "column": 41,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 288,
+              "line": 291,
               "column": 21,
               "kind": "python-tr"
             }
@@ -7678,7 +7678,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2808,
+              "line": 2816,
               "column": 13,
               "kind": "python-tr"
             }
@@ -7692,7 +7692,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2030,
+              "line": 2038,
               "column": 23,
               "kind": "python-tr"
             }
@@ -7706,7 +7706,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 178,
+              "line": 181,
               "column": 27,
               "kind": "python-tr"
             }
@@ -7720,19 +7720,19 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2630,
+              "line": 2638,
               "column": 42,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 3082,
+              "line": 3090,
               "column": 46,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 398,
+              "line": 401,
               "column": 66,
               "kind": "python-tr"
             }
@@ -7746,7 +7746,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 3080,
+              "line": 3088,
               "column": 46,
               "kind": "python-tr"
             }
@@ -7760,13 +7760,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2640,
+              "line": 2648,
               "column": 47,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 478,
+              "line": 481,
               "column": 71,
               "kind": "python-tr"
             }
@@ -7784,7 +7784,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 3127,
+              "line": 3135,
               "column": 13,
               "kind": "python-tr"
             }
@@ -7798,19 +7798,19 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2632,
+              "line": 2640,
               "column": 41,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 3106,
+              "line": 3114,
               "column": 45,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 402,
+              "line": 405,
               "column": 65,
               "kind": "python-tr"
             }
@@ -7824,7 +7824,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 3104,
+              "line": 3112,
               "column": 49,
               "kind": "python-tr"
             }
@@ -7838,7 +7838,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 3097,
+              "line": 3105,
               "column": 45,
               "kind": "python-tr"
             }
@@ -7852,7 +7852,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 3102,
+              "line": 3110,
               "column": 49,
               "kind": "python-tr"
             }
@@ -7866,7 +7866,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 3100,
+              "line": 3108,
               "column": 49,
               "kind": "python-tr"
             }
@@ -7880,7 +7880,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 361,
+              "line": 364,
               "column": 62,
               "kind": "python-tr"
             }
@@ -7894,7 +7894,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 362,
+              "line": 365,
               "column": 65,
               "kind": "python-tr"
             }
@@ -7912,7 +7912,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2693,
+              "line": 2701,
               "column": 17,
               "kind": "python-tr"
             }
@@ -7926,7 +7926,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 651,
+              "line": 654,
               "column": 17,
               "kind": "python-tr"
             }
@@ -7940,13 +7940,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 711,
+              "line": 714,
               "column": 17,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 841,
+              "line": 844,
               "column": 25,
               "kind": "python-tr"
             }
@@ -7960,13 +7960,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2641,
+              "line": 2649,
               "column": 47,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 480,
+              "line": 483,
               "column": 71,
               "kind": "python-tr"
             }
@@ -7980,7 +7980,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 459,
+              "line": 462,
               "column": 69,
               "kind": "python-tr"
             }
@@ -7994,7 +7994,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 460,
+              "line": 463,
               "column": 72,
               "kind": "python-tr"
             }
@@ -8008,13 +8008,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 679,
+              "line": 682,
               "column": 50,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 672,
+              "line": 675,
               "column": 19,
               "kind": "python-tr"
             }
@@ -8032,7 +8032,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 1760,
+              "line": 1768,
               "column": 13,
               "kind": "python-tr"
             }
@@ -8046,7 +8046,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2753,
+              "line": 2761,
               "column": 41,
               "kind": "python-tr"
             }
@@ -8064,7 +8064,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2802,
+              "line": 2810,
               "column": 40,
               "kind": "python-tr"
             }
@@ -8082,7 +8082,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 3131,
+              "line": 3139,
               "column": 13,
               "kind": "python-tr"
             }
@@ -8096,13 +8096,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2588,
+              "line": 2596,
               "column": 40,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 283,
+              "line": 286,
               "column": 21,
               "kind": "python-tr"
             }
@@ -8116,13 +8116,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2616,
+              "line": 2624,
               "column": 49,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 370,
+              "line": 373,
               "column": 73,
               "kind": "python-tr"
             }
@@ -8144,7 +8144,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2946,
+              "line": 2954,
               "column": 13,
               "kind": "python-tr"
             }
@@ -8158,7 +8158,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 316,
+              "line": 319,
               "column": 65,
               "kind": "python-tr"
             }
@@ -8172,7 +8172,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 407,
+              "line": 410,
               "column": 63,
               "kind": "python-tr"
             }
@@ -8186,7 +8186,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 317,
+              "line": 320,
               "column": 68,
               "kind": "python-tr"
             }
@@ -8200,7 +8200,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 1935,
+              "line": 1943,
               "column": 33,
               "kind": "python-tr"
             }
@@ -8214,7 +8214,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 230,
+              "line": 233,
               "column": 30,
               "kind": "python-tr"
             }
@@ -8228,13 +8228,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2622,
+              "line": 2630,
               "column": 44,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 382,
+              "line": 385,
               "column": 68,
               "kind": "python-tr"
             }
@@ -8256,7 +8256,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 3011,
+              "line": 3019,
               "column": 13,
               "kind": "python-tr"
             }
@@ -8270,7 +8270,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 449,
+              "line": 452,
               "column": 84,
               "kind": "python-tr"
             }
@@ -8284,7 +8284,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 430,
+              "line": 433,
               "column": 50,
               "kind": "python-tr"
             }
@@ -8298,7 +8298,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2048,
+              "line": 2056,
               "column": 23,
               "kind": "python-tr"
             }
@@ -8312,13 +8312,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2604,
+              "line": 2612,
               "column": 50,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 331,
+              "line": 334,
               "column": 74,
               "kind": "python-tr"
             }
@@ -8338,7 +8338,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2894,
+              "line": 2902,
               "column": 13,
               "kind": "python-tr"
             }
@@ -8352,7 +8352,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 320,
+              "line": 323,
               "column": 71,
               "kind": "python-tr"
             }
@@ -8370,7 +8370,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2598,
+              "line": 2606,
               "column": 13,
               "kind": "python-tr"
             }
@@ -8384,13 +8384,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2603,
+              "line": 2611,
               "column": 51,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 329,
+              "line": 332,
               "column": 75,
               "kind": "python-tr"
             }
@@ -8408,7 +8408,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2890,
+              "line": 2898,
               "column": 13,
               "kind": "python-tr"
             }
@@ -8422,13 +8422,13 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2602,
+              "line": 2610,
               "column": 43,
               "kind": "python-tr"
             },
             {
               "path": "app/views/download_view.py",
-              "line": 327,
+              "line": 330,
               "column": 67,
               "kind": "python-tr"
             }
@@ -8446,7 +8446,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2886,
+              "line": 2894,
               "column": 13,
               "kind": "python-tr"
             }
@@ -8464,7 +8464,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2729,
+              "line": 2737,
               "column": 20,
               "kind": "python-tr"
             }
@@ -8486,7 +8486,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2826,
+              "line": 2834,
               "column": 21,
               "kind": "python-tr"
             }
@@ -8510,7 +8510,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2856,
+              "line": 2864,
               "column": 21,
               "kind": "python-tr"
             }
@@ -8530,7 +8530,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 1824,
+              "line": 1832,
               "column": 13,
               "kind": "python-tr"
             }
@@ -8554,7 +8554,7 @@
           "occurrences": [
             {
               "path": "app/views/download_view.py",
-              "line": 2845,
+              "line": 2853,
               "column": 21,
               "kind": "python-tr"
             }
@@ -8568,8 +8568,8 @@
           "occurrences": [
             {
               "path": "app/views/file_view.py",
-              "line": 265,
-              "column": 42,
+              "line": 241,
+              "column": 21,
               "kind": "python-tr"
             }
           ]
@@ -8582,8 +8582,8 @@
           "occurrences": [
             {
               "path": "app/views/file_view.py",
-              "line": 343,
-              "column": 17,
+              "line": 274,
+              "column": 20,
               "kind": "python-tr"
             }
           ]
@@ -8596,8 +8596,8 @@
           "occurrences": [
             {
               "path": "app/views/file_view.py",
-              "line": 74,
-              "column": 27,
+              "line": 67,
+              "column": 41,
               "kind": "python-tr"
             }
           ]
@@ -8610,7 +8610,7 @@
           "occurrences": [
             {
               "path": "app/views/file_view.py",
-              "line": 206,
+              "line": 185,
               "column": 43,
               "kind": "python-tr"
             }
@@ -8624,8 +8624,8 @@
           "occurrences": [
             {
               "path": "app/views/file_view.py",
-              "line": 103,
-              "column": 44,
+              "line": 77,
+              "column": 59,
               "kind": "python-tr"
             }
           ]
@@ -8638,8 +8638,8 @@
           "occurrences": [
             {
               "path": "app/views/file_view.py",
-              "line": 104,
-              "column": 44,
+              "line": 78,
+              "column": 59,
               "kind": "python-tr"
             }
           ]
@@ -8652,14 +8652,14 @@
           "occurrences": [
             {
               "path": "app/views/file_view.py",
-              "line": 47,
+              "line": 50,
               "column": 17,
               "kind": "python-tr"
             },
             {
               "path": "app/views/file_view.py",
-              "line": 155,
-              "column": 17,
+              "line": 119,
+              "column": 46,
               "kind": "python-tr"
             }
           ]
@@ -8688,8 +8688,8 @@
           "occurrences": [
             {
               "path": "app/views/file_view.py",
-              "line": 333,
-              "column": 17,
+              "line": 270,
+              "column": 42,
               "kind": "python-tr"
             }
           ]
@@ -8702,7 +8702,7 @@
           "occurrences": [
             {
               "path": "app/views/file_view.py",
-              "line": 50,
+              "line": 53,
               "column": 49,
               "kind": "python-tr"
             }
@@ -8716,8 +8716,8 @@
           "occurrences": [
             {
               "path": "app/views/file_view.py",
-              "line": 89,
-              "column": 27,
+              "line": 70,
+              "column": 43,
               "kind": "python-tr"
             }
           ]
@@ -8730,8 +8730,8 @@
           "occurrences": [
             {
               "path": "app/views/file_view.py",
-              "line": 94,
-              "column": 27,
+              "line": 71,
+              "column": 45,
               "kind": "python-tr"
             }
           ]
@@ -8744,8 +8744,8 @@
           "occurrences": [
             {
               "path": "app/views/file_view.py",
-              "line": 351,
-              "column": 17,
+              "line": 278,
+              "column": 20,
               "kind": "python-tr"
             }
           ]
@@ -8758,8 +8758,8 @@
           "occurrences": [
             {
               "path": "app/views/file_view.py",
-              "line": 84,
-              "column": 27,
+              "line": 69,
+              "column": 45,
               "kind": "python-tr"
             }
           ]
@@ -8772,14 +8772,14 @@
           "occurrences": [
             {
               "path": "app/views/file_view.py",
-              "line": 57,
+              "line": 60,
               "column": 17,
               "kind": "python-tr"
             },
             {
               "path": "app/views/file_view.py",
-              "line": 162,
-              "column": 17,
+              "line": 123,
+              "column": 43,
               "kind": "python-tr"
             }
           ]
@@ -8798,8 +8798,8 @@
           "occurrences": [
             {
               "path": "app/views/file_view.py",
-              "line": 347,
-              "column": 17,
+              "line": 276,
+              "column": 20,
               "kind": "python-tr"
             }
           ]
@@ -8812,8 +8812,8 @@
           "occurrences": [
             {
               "path": "app/views/file_view.py",
-              "line": 79,
-              "column": 27,
+              "line": 68,
+              "column": 41,
               "kind": "python-tr"
             }
           ]
@@ -8826,8 +8826,8 @@
           "occurrences": [
             {
               "path": "app/views/file_view.py",
-              "line": 99,
-              "column": 27,
+              "line": 72,
+              "column": 42,
               "kind": "python-tr"
             }
           ]
@@ -8840,13 +8840,13 @@
           "occurrences": [
             {
               "path": "app/views/file_view.py",
-              "line": 52,
+              "line": 55,
               "column": 17,
               "kind": "python-tr"
             },
             {
               "path": "app/views/file_view.py",
-              "line": 158,
+              "line": 121,
               "column": 46,
               "kind": "python-tr"
             }
@@ -8864,8 +8864,8 @@
           "occurrences": [
             {
               "path": "app/views/file_view.py",
-              "line": 338,
-              "column": 13,
+              "line": 271,
+              "column": 42,
               "kind": "python-tr"
             }
           ]
@@ -8882,8 +8882,8 @@
           "occurrences": [
             {
               "path": "app/views/file_view.py",
-              "line": 375,
-              "column": 44,
+              "line": 243,
+              "column": 26,
               "kind": "python-tr"
             }
           ]
@@ -20332,13 +20332,13 @@
       "view.download_view.0_0_complete_0_0_pieces": [
         {
           "path": "app/views/download_view.py",
-          "line": 2591,
+          "line": 2599,
           "column": 44,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 301,
+          "line": 304,
           "column": 21,
           "kind": "python-tr"
         }
@@ -20346,13 +20346,13 @@
       "view.download_view.0_unlimited": [
         {
           "path": "app/views/download_view.py",
-          "line": 197,
+          "line": 200,
           "column": 48,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 409,
+          "line": 412,
           "column": 65,
           "kind": "python-tr"
         }
@@ -20360,13 +20360,13 @@
       "view.download_view.active_time_00_00": [
         {
           "path": "app/views/download_view.py",
-          "line": 2607,
+          "line": 2615,
           "column": 42,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 337,
+          "line": 340,
           "column": 66,
           "kind": "python-tr"
         }
@@ -20374,13 +20374,13 @@
       "view.download_view.apply_seeding_goal": [
         {
           "path": "app/views/download_view.py",
-          "line": 779,
+          "line": 782,
           "column": 27,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 869,
+          "line": 872,
           "column": 27,
           "kind": "python-tr"
         }
@@ -20388,13 +20388,13 @@
       "view.download_view.availability": [
         {
           "path": "app/views/download_view.py",
-          "line": 2617,
+          "line": 2625,
           "column": 47,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 372,
+          "line": 375,
           "column": 71,
           "kind": "python-tr"
         }
@@ -20402,13 +20402,13 @@
       "view.download_view.cancel": [
         {
           "path": "app/views/download_view.py",
-          "line": 614,
+          "line": 617,
           "column": 21,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 666,
+          "line": 669,
           "column": 21,
           "kind": "python-tr"
         }
@@ -20416,19 +20416,19 @@
       "view.download_view.close": [
         {
           "path": "app/views/download_view.py",
-          "line": 565,
+          "line": 568,
           "column": 21,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 792,
+          "line": 795,
           "column": 38,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 874,
+          "line": 877,
           "column": 27,
           "kind": "python-tr"
         }
@@ -20436,13 +20436,13 @@
       "view.download_view.comment": [
         {
           "path": "app/views/download_view.py",
-          "line": 2639,
+          "line": 2647,
           "column": 42,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 474,
+          "line": 477,
           "column": 66,
           "kind": "python-tr"
         }
@@ -20450,18 +20450,322 @@
       "view.download_view.connected_peers_0": [
         {
           "path": "app/views/download_view.py",
-          "line": 2611,
+          "line": 2619,
           "column": 40,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 349,
+          "line": 352,
           "column": 64,
           "kind": "python-tr"
         }
       ],
       "view.download_view.connectivity_hint": [
+        {
+          "path": "app/views/download_view.py",
+          "line": 2636,
+          "column": 52,
+          "kind": "python-tr"
+        },
+        {
+          "path": "app/views/download_view.py",
+          "line": 397,
+          "column": 76,
+          "kind": "python-tr"
+        }
+      ],
+      "view.download_view.created": [
+        {
+          "path": "app/views/download_view.py",
+          "line": 2646,
+          "column": 47,
+          "kind": "python-tr"
+        },
+        {
+          "path": "app/views/download_view.py",
+          "line": 475,
+          "column": 71,
+          "kind": "python-tr"
+        }
+      ],
+      "view.download_view.created_by": [
+        {
+          "path": "app/views/download_view.py",
+          "line": 2645,
+          "column": 45,
+          "kind": "python-tr"
+        },
+        {
+          "path": "app/views/download_view.py",
+          "line": 473,
+          "column": 69,
+          "kind": "python-tr"
+        }
+      ],
+      "view.download_view.current_seeding_goal_value": [
+        {
+          "path": "app/views/download_view.py",
+          "line": 1579,
+          "column": 13,
+          "kind": "python-tr"
+        },
+        {
+          "path": "app/views/download_view.py",
+          "line": 1647,
+          "column": 17,
+          "kind": "python-tr"
+        }
+      ],
+      "view.download_view.days": [
+        {
+          "path": "app/views/download_view.py",
+          "line": 2562,
+          "column": 21,
+          "kind": "python-tr"
+        },
+        {
+          "path": "app/views/download_view.py",
+          "line": 716,
+          "column": 43,
+          "kind": "python-tr"
+        },
+        {
+          "path": "app/views/download_view.py",
+          "line": 845,
+          "column": 27,
+          "kind": "python-tr"
+        },
+        {
+          "path": "app/views/download_view.py",
+          "line": 1998,
+          "column": 37,
+          "kind": "python-tr"
+        }
+      ],
+      "view.download_view.discovery": [
+        {
+          "path": "app/views/download_view.py",
+          "line": 2626,
+          "column": 44,
+          "kind": "python-tr"
+        },
+        {
+          "path": "app/views/download_view.py",
+          "line": 377,
+          "column": 68,
+          "kind": "python-tr"
+        }
+      ],
+      "view.download_view.downloaded_0_b_0_b": [
+        {
+          "path": "app/views/download_view.py",
+          "line": 2608,
+          "column": 45,
+          "kind": "python-tr"
+        },
+        {
+          "path": "app/views/download_view.py",
+          "line": 326,
+          "column": 69,
+          "kind": "python-tr"
+        }
+      ],
+      "view.download_view.eta": [
+        {
+          "path": "app/views/download_view.py",
+          "line": 2614,
+          "column": 38,
+          "kind": "python-tr"
+        },
+        {
+          "path": "app/views/download_view.py",
+          "line": 338,
+          "column": 62,
+          "kind": "python-tr"
+        }
+      ],
+      "view.download_view.external": [
+        {
+          "path": "app/views/download_view.py",
+          "line": 2637,
+          "column": 48,
+          "kind": "python-tr"
+        },
+        {
+          "path": "app/views/download_view.py",
+          "line": 399,
+          "column": 72,
+          "kind": "python-tr"
+        }
+      ],
+      "view.download_view.files": [
+        {
+          "path": "app/views/download_view.py",
+          "line": 2643,
+          "column": 44,
+          "kind": "python-tr"
+        },
+        {
+          "path": "app/views/download_view.py",
+          "line": 469,
+          "column": 68,
+          "kind": "python-tr"
+        }
+      ],
+      "view.download_view.hours": [
+        {
+          "path": "app/views/download_view.py",
+          "line": 2563,
+          "column": 22,
+          "kind": "python-tr"
+        },
+        {
+          "path": "app/views/download_view.py",
+          "line": 726,
+          "column": 44,
+          "kind": "python-tr"
+        },
+        {
+          "path": "app/views/download_view.py",
+          "line": 846,
+          "column": 28,
+          "kind": "python-tr"
+        },
+        {
+          "path": "app/views/download_view.py",
+          "line": 2000,
+          "column": 37,
+          "kind": "python-tr"
+        }
+      ],
+      "view.download_view.idle": [
+        {
+          "path": "app/views/download_view.py",
+          "line": 1052,
+          "column": 52,
+          "kind": "python-tr"
+        },
+        {
+          "path": "app/views/download_view.py",
+          "line": 574,
+          "column": 25,
+          "kind": "python-tr"
+        }
+      ],
+      "view.download_view.incoming": [
+        {
+          "path": "app/views/download_view.py",
+          "line": 2632,
+          "column": 47,
+          "kind": "python-tr"
+        },
+        {
+          "path": "app/views/download_view.py",
+          "line": 389,
+          "column": 71,
+          "kind": "python-tr"
+        }
+      ],
+      "view.download_view.incoming_peers_0_active_0_this_session": [
+        {
+          "path": "app/views/download_view.py",
+          "line": 2633,
+          "column": 49,
+          "kind": "python-tr"
+        },
+        {
+          "path": "app/views/download_view.py",
+          "line": 391,
+          "column": 73,
+          "kind": "python-tr"
+        }
+      ],
+      "view.download_view.info_hash": [
+        {
+          "path": "app/views/download_view.py",
+          "line": 2641,
+          "column": 44,
+          "kind": "python-tr"
+        },
+        {
+          "path": "app/views/download_view.py",
+          "line": 465,
+          "column": 68,
+          "kind": "python-tr"
+        }
+      ],
+      "view.download_view.ip_families": [
+        {
+          "path": "app/views/download_view.py",
+          "line": 2629,
+          "column": 44,
+          "kind": "python-tr"
+        },
+        {
+          "path": "app/views/download_view.py",
+          "line": 383,
+          "column": 68,
+          "kind": "python-tr"
+        }
+      ],
+      "view.download_view.lan_discovery": [
+        {
+          "path": "app/views/download_view.py",
+          "line": 2639,
+          "column": 38,
+          "kind": "python-tr"
+        },
+        {
+          "path": "app/views/download_view.py",
+          "line": 403,
+          "column": 62,
+          "kind": "python-tr"
+        }
+      ],
+      "view.download_view.last_upload": [
+        {
+          "path": "app/views/download_view.py",
+          "line": 2613,
+          "column": 46,
+          "kind": "python-tr"
+        },
+        {
+          "path": "app/views/download_view.py",
+          "line": 336,
+          "column": 70,
+          "kind": "python-tr"
+        }
+      ],
+      "view.download_view.limits_down_unlimited_up_unlimited": [
+        {
+          "path": "app/views/download_view.py",
+          "line": 2650,
+          "column": 47,
+          "kind": "python-tr"
+        },
+        {
+          "path": "app/views/download_view.py",
+          "line": 456,
+          "column": 37,
+          "kind": "python-tr"
+        }
+      ],
+      "view.download_view.listen_port": [
+        {
+          "path": "app/views/download_view.py",
+          "line": 2627,
+          "column": 46,
+          "kind": "python-tr"
+        },
+        {
+          "path": "app/views/download_view.py",
+          "line": 379,
+          "column": 70,
+          "kind": "python-tr"
+        }
+      ],
+      "view.download_view.listeners": [
         {
           "path": "app/views/download_view.py",
           "line": 2628,
@@ -20470,311 +20774,7 @@
         },
         {
           "path": "app/views/download_view.py",
-          "line": 394,
-          "column": 76,
-          "kind": "python-tr"
-        }
-      ],
-      "view.download_view.created": [
-        {
-          "path": "app/views/download_view.py",
-          "line": 2638,
-          "column": 47,
-          "kind": "python-tr"
-        },
-        {
-          "path": "app/views/download_view.py",
-          "line": 472,
-          "column": 71,
-          "kind": "python-tr"
-        }
-      ],
-      "view.download_view.created_by": [
-        {
-          "path": "app/views/download_view.py",
-          "line": 2637,
-          "column": 45,
-          "kind": "python-tr"
-        },
-        {
-          "path": "app/views/download_view.py",
-          "line": 470,
-          "column": 69,
-          "kind": "python-tr"
-        }
-      ],
-      "view.download_view.current_seeding_goal_value": [
-        {
-          "path": "app/views/download_view.py",
-          "line": 1571,
-          "column": 13,
-          "kind": "python-tr"
-        },
-        {
-          "path": "app/views/download_view.py",
-          "line": 1639,
-          "column": 17,
-          "kind": "python-tr"
-        }
-      ],
-      "view.download_view.days": [
-        {
-          "path": "app/views/download_view.py",
-          "line": 2554,
-          "column": 21,
-          "kind": "python-tr"
-        },
-        {
-          "path": "app/views/download_view.py",
-          "line": 713,
-          "column": 43,
-          "kind": "python-tr"
-        },
-        {
-          "path": "app/views/download_view.py",
-          "line": 842,
-          "column": 27,
-          "kind": "python-tr"
-        },
-        {
-          "path": "app/views/download_view.py",
-          "line": 1990,
-          "column": 37,
-          "kind": "python-tr"
-        }
-      ],
-      "view.download_view.discovery": [
-        {
-          "path": "app/views/download_view.py",
-          "line": 2618,
-          "column": 44,
-          "kind": "python-tr"
-        },
-        {
-          "path": "app/views/download_view.py",
-          "line": 374,
-          "column": 68,
-          "kind": "python-tr"
-        }
-      ],
-      "view.download_view.downloaded_0_b_0_b": [
-        {
-          "path": "app/views/download_view.py",
-          "line": 2600,
-          "column": 45,
-          "kind": "python-tr"
-        },
-        {
-          "path": "app/views/download_view.py",
-          "line": 323,
-          "column": 69,
-          "kind": "python-tr"
-        }
-      ],
-      "view.download_view.eta": [
-        {
-          "path": "app/views/download_view.py",
-          "line": 2606,
-          "column": 38,
-          "kind": "python-tr"
-        },
-        {
-          "path": "app/views/download_view.py",
-          "line": 335,
-          "column": 62,
-          "kind": "python-tr"
-        }
-      ],
-      "view.download_view.external": [
-        {
-          "path": "app/views/download_view.py",
-          "line": 2629,
-          "column": 48,
-          "kind": "python-tr"
-        },
-        {
-          "path": "app/views/download_view.py",
-          "line": 396,
-          "column": 72,
-          "kind": "python-tr"
-        }
-      ],
-      "view.download_view.files": [
-        {
-          "path": "app/views/download_view.py",
-          "line": 2635,
-          "column": 44,
-          "kind": "python-tr"
-        },
-        {
-          "path": "app/views/download_view.py",
-          "line": 466,
-          "column": 68,
-          "kind": "python-tr"
-        }
-      ],
-      "view.download_view.hours": [
-        {
-          "path": "app/views/download_view.py",
-          "line": 2555,
-          "column": 22,
-          "kind": "python-tr"
-        },
-        {
-          "path": "app/views/download_view.py",
-          "line": 723,
-          "column": 44,
-          "kind": "python-tr"
-        },
-        {
-          "path": "app/views/download_view.py",
-          "line": 843,
-          "column": 28,
-          "kind": "python-tr"
-        },
-        {
-          "path": "app/views/download_view.py",
-          "line": 1992,
-          "column": 37,
-          "kind": "python-tr"
-        }
-      ],
-      "view.download_view.idle": [
-        {
-          "path": "app/views/download_view.py",
-          "line": 1049,
-          "column": 52,
-          "kind": "python-tr"
-        },
-        {
-          "path": "app/views/download_view.py",
-          "line": 571,
-          "column": 25,
-          "kind": "python-tr"
-        }
-      ],
-      "view.download_view.incoming": [
-        {
-          "path": "app/views/download_view.py",
-          "line": 2624,
-          "column": 47,
-          "kind": "python-tr"
-        },
-        {
-          "path": "app/views/download_view.py",
-          "line": 386,
-          "column": 71,
-          "kind": "python-tr"
-        }
-      ],
-      "view.download_view.incoming_peers_0_active_0_this_session": [
-        {
-          "path": "app/views/download_view.py",
-          "line": 2625,
-          "column": 49,
-          "kind": "python-tr"
-        },
-        {
-          "path": "app/views/download_view.py",
-          "line": 388,
-          "column": 73,
-          "kind": "python-tr"
-        }
-      ],
-      "view.download_view.info_hash": [
-        {
-          "path": "app/views/download_view.py",
-          "line": 2633,
-          "column": 44,
-          "kind": "python-tr"
-        },
-        {
-          "path": "app/views/download_view.py",
-          "line": 462,
-          "column": 68,
-          "kind": "python-tr"
-        }
-      ],
-      "view.download_view.ip_families": [
-        {
-          "path": "app/views/download_view.py",
-          "line": 2621,
-          "column": 44,
-          "kind": "python-tr"
-        },
-        {
-          "path": "app/views/download_view.py",
-          "line": 380,
-          "column": 68,
-          "kind": "python-tr"
-        }
-      ],
-      "view.download_view.lan_discovery": [
-        {
-          "path": "app/views/download_view.py",
-          "line": 2631,
-          "column": 38,
-          "kind": "python-tr"
-        },
-        {
-          "path": "app/views/download_view.py",
-          "line": 400,
-          "column": 62,
-          "kind": "python-tr"
-        }
-      ],
-      "view.download_view.last_upload": [
-        {
-          "path": "app/views/download_view.py",
-          "line": 2605,
-          "column": 46,
-          "kind": "python-tr"
-        },
-        {
-          "path": "app/views/download_view.py",
-          "line": 333,
-          "column": 70,
-          "kind": "python-tr"
-        }
-      ],
-      "view.download_view.limits_down_unlimited_up_unlimited": [
-        {
-          "path": "app/views/download_view.py",
-          "line": 2642,
-          "column": 47,
-          "kind": "python-tr"
-        },
-        {
-          "path": "app/views/download_view.py",
-          "line": 453,
-          "column": 37,
-          "kind": "python-tr"
-        }
-      ],
-      "view.download_view.listen_port": [
-        {
-          "path": "app/views/download_view.py",
-          "line": 2619,
-          "column": 46,
-          "kind": "python-tr"
-        },
-        {
-          "path": "app/views/download_view.py",
-          "line": 376,
-          "column": 70,
-          "kind": "python-tr"
-        }
-      ],
-      "view.download_view.listeners": [
-        {
-          "path": "app/views/download_view.py",
-          "line": 2620,
-          "column": 52,
-          "kind": "python-tr"
-        },
-        {
-          "path": "app/views/download_view.py",
-          "line": 378,
+          "line": 381,
           "column": 76,
           "kind": "python-tr"
         }
@@ -20782,13 +20782,13 @@
       "view.download_view.mapping_detail": [
         {
           "path": "app/views/download_view.py",
-          "line": 2627,
+          "line": 2635,
           "column": 49,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 392,
+          "line": 395,
           "column": 73,
           "kind": "python-tr"
         }
@@ -20796,13 +20796,13 @@
       "view.download_view.mapping_methods_upnp_nat_pmp": [
         {
           "path": "app/views/download_view.py",
-          "line": 2626,
+          "line": 2634,
           "column": 50,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 390,
+          "line": 393,
           "column": 74,
           "kind": "python-tr"
         }
@@ -20810,13 +20810,13 @@
       "view.download_view.minutes": [
         {
           "path": "app/views/download_view.py",
-          "line": 733,
+          "line": 736,
           "column": 46,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 844,
+          "line": 847,
           "column": 30,
           "kind": "python-tr"
         }
@@ -20824,13 +20824,13 @@
       "view.download_view.minutes_title": [
         {
           "path": "app/views/download_view.py",
-          "line": 2556,
+          "line": 2564,
           "column": 24,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 1994,
+          "line": 2002,
           "column": 37,
           "kind": "python-tr"
         }
@@ -20838,13 +20838,13 @@
       "view.download_view.network_path": [
         {
           "path": "app/views/download_view.py",
-          "line": 2623,
+          "line": 2631,
           "column": 47,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 384,
+          "line": 387,
           "column": 71,
           "kind": "python-tr"
         }
@@ -20852,19 +20852,19 @@
       "view.download_view.open_folder": [
         {
           "path": "app/views/download_view.py",
-          "line": 790,
+          "line": 793,
           "column": 65,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 896,
+          "line": 899,
           "column": 21,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 484,
+          "line": 487,
           "column": 79,
           "kind": "python-tr"
         }
@@ -20872,13 +20872,13 @@
       "view.download_view.paste_a_magnet_link_to_begin": [
         {
           "path": "app/views/download_view.py",
-          "line": 1051,
+          "line": 1054,
           "column": 13,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 576,
+          "line": 579,
           "column": 17,
           "kind": "python-tr"
         }
@@ -20886,13 +20886,13 @@
       "view.download_view.pieces": [
         {
           "path": "app/views/download_view.py",
-          "line": 2634,
+          "line": 2642,
           "column": 45,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 464,
+          "line": 467,
           "column": 69,
           "kind": "python-tr"
         }
@@ -20900,13 +20900,13 @@
       "view.download_view.private": [
         {
           "path": "app/views/download_view.py",
-          "line": 2636,
+          "line": 2644,
           "column": 42,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 468,
+          "line": 471,
           "column": 66,
           "kind": "python-tr"
         }
@@ -20914,13 +20914,13 @@
       "view.download_view.ratio_target": [
         {
           "path": "app/views/download_view.py",
-          "line": 698,
+          "line": 701,
           "column": 17,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 820,
+          "line": 823,
           "column": 17,
           "kind": "python-tr"
         }
@@ -20928,13 +20928,13 @@
       "view.download_view.remaining_0_b": [
         {
           "path": "app/views/download_view.py",
-          "line": 2601,
+          "line": 2609,
           "column": 44,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 325,
+          "line": 328,
           "column": 68,
           "kind": "python-tr"
         }
@@ -20942,13 +20942,13 @@
       "view.download_view.seed_time_00_00": [
         {
           "path": "app/views/download_view.py",
-          "line": 2610,
+          "line": 2618,
           "column": 47,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 346,
+          "line": 349,
           "column": 37,
           "kind": "python-tr"
         }
@@ -20956,13 +20956,13 @@
       "view.download_view.seeding_goal_for_torrent": [
         {
           "path": "app/views/download_view.py",
-          "line": 795,
+          "line": 798,
           "column": 13,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 803,
+          "line": 806,
           "column": 17,
           "kind": "python-tr"
         }
@@ -20970,13 +20970,13 @@
       "view.download_view.seeding_goal_indefinite": [
         {
           "path": "app/views/download_view.py",
-          "line": 2609,
+          "line": 2617,
           "column": 47,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 342,
+          "line": 345,
           "column": 37,
           "kind": "python-tr"
         }
@@ -20984,13 +20984,13 @@
       "view.download_view.seeding_goal_saved_for_torrent": [
         {
           "path": "app/views/download_view.py",
-          "line": 1647,
+          "line": 1655,
           "column": 17,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 1696,
+          "line": 1704,
           "column": 17,
           "kind": "python-tr"
         }
@@ -20998,13 +20998,13 @@
       "view.download_view.seeds_leechers": [
         {
           "path": "app/views/download_view.py",
-          "line": 2615,
+          "line": 2623,
           "column": 45,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 368,
+          "line": 371,
           "column": 69,
           "kind": "python-tr"
         }
@@ -21012,13 +21012,13 @@
       "view.download_view.session_state_idle": [
         {
           "path": "app/views/download_view.py",
-          "line": 2614,
+          "line": 2622,
           "column": 40,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 364,
+          "line": 367,
           "column": 64,
           "kind": "python-tr"
         }
@@ -21026,13 +21026,13 @@
       "view.download_view.share_ratio": [
         {
           "path": "app/views/download_view.py",
-          "line": 2608,
+          "line": 2616,
           "column": 40,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 339,
+          "line": 342,
           "column": 64,
           "kind": "python-tr"
         }
@@ -21040,13 +21040,13 @@
       "view.download_view.status": [
         {
           "path": "app/views/download_view.py",
-          "line": 210,
+          "line": 213,
           "column": 52,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 258,
+          "line": 261,
           "column": 31,
           "kind": "python-tr"
         }
@@ -21054,13 +21054,13 @@
       "view.download_view.status_idle": [
         {
           "path": "app/views/download_view.py",
-          "line": 2589,
+          "line": 2597,
           "column": 41,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 288,
+          "line": 291,
           "column": 21,
           "kind": "python-tr"
         }
@@ -21068,19 +21068,19 @@
       "view.download_view.storage_downloads": [
         {
           "path": "app/views/download_view.py",
-          "line": 2630,
+          "line": 2638,
           "column": 42,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 3082,
+          "line": 3090,
           "column": 46,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 398,
+          "line": 401,
           "column": 66,
           "kind": "python-tr"
         }
@@ -21088,13 +21088,13 @@
       "view.download_view.storage_path": [
         {
           "path": "app/views/download_view.py",
-          "line": 2640,
+          "line": 2648,
           "column": 47,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 478,
+          "line": 481,
           "column": 71,
           "kind": "python-tr"
         }
@@ -21102,19 +21102,19 @@
       "view.download_view.swarm_health": [
         {
           "path": "app/views/download_view.py",
-          "line": 2632,
+          "line": 2640,
           "column": 41,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 3106,
+          "line": 3114,
           "column": 45,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 402,
+          "line": 405,
           "column": 65,
           "kind": "python-tr"
         }
@@ -21122,13 +21122,13 @@
       "view.download_view.time_target": [
         {
           "path": "app/views/download_view.py",
-          "line": 711,
+          "line": 714,
           "column": 17,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 841,
+          "line": 844,
           "column": 25,
           "kind": "python-tr"
         }
@@ -21136,13 +21136,13 @@
       "view.download_view.torrent": [
         {
           "path": "app/views/download_view.py",
-          "line": 2641,
+          "line": 2649,
           "column": 47,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 480,
+          "line": 483,
           "column": 71,
           "kind": "python-tr"
         }
@@ -21150,13 +21150,13 @@
       "view.download_view.torrent_properties": [
         {
           "path": "app/views/download_view.py",
-          "line": 679,
+          "line": 682,
           "column": 50,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 672,
+          "line": 675,
           "column": 19,
           "kind": "python-tr"
         }
@@ -21164,13 +21164,13 @@
       "view.download_view.torrent_waiting_for_selection": [
         {
           "path": "app/views/download_view.py",
-          "line": 2588,
+          "line": 2596,
           "column": 40,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 283,
+          "line": 286,
           "column": 21,
           "kind": "python-tr"
         }
@@ -21178,13 +21178,13 @@
       "view.download_view.tracker_scrape_s_l_c": [
         {
           "path": "app/views/download_view.py",
-          "line": 2616,
+          "line": 2624,
           "column": 49,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 370,
+          "line": 373,
           "column": 73,
           "kind": "python-tr"
         }
@@ -21192,13 +21192,13 @@
       "view.download_view.transport": [
         {
           "path": "app/views/download_view.py",
-          "line": 2622,
+          "line": 2630,
           "column": 44,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 382,
+          "line": 385,
           "column": 68,
           "kind": "python-tr"
         }
@@ -21206,13 +21206,13 @@
       "view.download_view.upload_requests_0_served_0_received": [
         {
           "path": "app/views/download_view.py",
-          "line": 2604,
+          "line": 2612,
           "column": 50,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 331,
+          "line": 334,
           "column": 74,
           "kind": "python-tr"
         }
@@ -21220,13 +21220,13 @@
       "view.download_view.uploaded_this_session_0_b": [
         {
           "path": "app/views/download_view.py",
-          "line": 2603,
+          "line": 2611,
           "column": 51,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 329,
+          "line": 332,
           "column": 75,
           "kind": "python-tr"
         }
@@ -21234,13 +21234,13 @@
       "view.download_view.uploaded_total_0_b": [
         {
           "path": "app/views/download_view.py",
-          "line": 2602,
+          "line": 2610,
           "column": 43,
           "kind": "python-tr"
         },
         {
           "path": "app/views/download_view.py",
-          "line": 327,
+          "line": 330,
           "column": 67,
           "kind": "python-tr"
         }
@@ -21248,41 +21248,41 @@
       "view.file_view.files_select_a_torrent_to_inspect_payload": [
         {
           "path": "app/views/file_view.py",
-          "line": 47,
+          "line": 50,
           "column": 17,
           "kind": "python-tr"
         },
         {
           "path": "app/views/file_view.py",
-          "line": 155,
-          "column": 17,
+          "line": 119,
+          "column": 46,
           "kind": "python-tr"
         }
       ],
       "view.file_view.right_click_a_file_to_set_high": [
         {
           "path": "app/views/file_view.py",
-          "line": 57,
+          "line": 60,
           "column": 17,
           "kind": "python-tr"
         },
         {
           "path": "app/views/file_view.py",
-          "line": 162,
-          "column": 17,
+          "line": 123,
+          "column": 43,
           "kind": "python-tr"
         }
       ],
       "view.file_view.storage_root": [
         {
           "path": "app/views/file_view.py",
-          "line": 52,
+          "line": 55,
           "column": 17,
           "kind": "python-tr"
         },
         {
           "path": "app/views/file_view.py",
-          "line": 158,
+          "line": 121,
           "column": 46,
           "kind": "python-tr"
         }

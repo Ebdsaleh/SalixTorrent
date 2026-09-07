@@ -658,7 +658,7 @@ Validation added **34** focused application/presentation/backend regressions and
 
 Do **not** rewrite SalixTorrent wholesale in Tkinter and do not require identical capability/performance parity between backends. Dear PyGui remains the reference SalixTorrent desktop backend.
 
-### A6. Rich live-data presentation — current tranche prepared
+### A6. Rich live-data presentation — completed/pushed
 
 The first rich-live-data tranche extracts only the semantics already proven by the read-only Peers, Sources and Pieces surfaces:
 
@@ -672,11 +672,25 @@ The first rich-live-data tranche extracts only the semantics already proven by t
 - Pieces detail rows and piece-map drawing migrated behind the same generic boundaries;
 - the blank ecosystem application expanded to prove live tables and state grids through both GUI backends.
 
-Prepared source validation adds **13** focused regressions and advances complete discovery from 516 to **529** tests. The added adapter-specific regression proves that an unchanged state-grid frame still reflows when the Dear PyGui drawlist is resized and that the associated resize-handler registry is released on disposal. Display-less Linux discovery passes with expected GUI skips; Xvfb-backed discovery passes the live Tkinter table/state-grid checks. Expected Windows acceptance is 529 / 529 with one expected non-Windows shell-behavior skip.
+Validation added **13** focused regressions and passed both complete real-Windows discovery paths at **529 / 529** with one expected non-Windows shell-behavior skip. Live Dear PyGui/Tkinter blank-application proof, state-grid resize reflow, Peers/Sources/Pieces smoke and the existing SalixTorrent desktop surface all passed. The exact pushed checkpoint is `a561b50ddc64520d1dc10b362fb4180378da5dc8` (`Extract live table and state grid presentation`).
 
-The transfer queue and Files table deliberately remain application-owned in this tranche. Their filtering/sorting, selection, context menus, per-row actions, lazy submenus and file-priority mutation require a richer interaction/command model. Do not force those behaviors through a read-only table abstraction merely to increase migration count.
+### A7. Interactive data, selection and command semantics — current tranche prepared
 
-### A7. WYSIWYG designer prerequisites
+The next extraction builds the richer semantics deliberately deferred from the read-only live-data tranche:
+
+- standard-library-only keyed `DataView` search/filter/sort projection;
+- explicit multi-term ascending/descending sort state;
+- explicit single-selection state;
+- renderer-neutral command identity plus enabled/checked/submenu state;
+- Active Transfers queue sorting/filter visibility routed through the generic data-view model while its torrent-specific actions remain application-owned;
+- Files migrated to `LiveTable`, retaining per-file priority mutation but describing priority command availability through generic `CommandSet` state;
+- relocation/package-boundary proof for the new interaction modules.
+
+This tranche intentionally does **not** pretend the entire Active Transfers context menu is generic. Its lazy seeding-time submenus, torrent lifecycle consequences and destructive confirmation flows remain SalixTorrent policy. A later presentation-host tranche can extract physical context-menu rendering once the semantic command tree has been proven by more than one application surface.
+
+Prepared source validation adds **18** focused regressions and advances complete discovery from 529 to **547** tests. Canonical localization remains 1,337 strings. Expected Windows acceptance is 547 / 547 with one expected non-Windows shell-behavior skip.
+
+### A8. WYSIWYG designer prerequisites
 
 After the runtime/presentation contracts are better proven, introduce the metadata needed by a future RAD editor:
 
@@ -692,7 +706,7 @@ After the runtime/presentation contracts are better proven, introduce the metada
 
 The future designer should itself use the same engine/framework wherever practical.
 
-### A8. Naming, public API and package/repository split
+### A9. Naming, public API and package/repository split
 
 This remains **after** the wider extraction.
 

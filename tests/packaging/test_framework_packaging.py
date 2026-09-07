@@ -95,6 +95,8 @@ class FrameworkPackagingTests(unittest.TestCase):
                 assert "portable_framework.documentation" in imported
                 assert "portable_framework.geometry" in imported
                 assert "portable_framework.live_data" in imported
+                assert "portable_framework.data_view" in imported
+                assert "portable_framework.interactions" in imported
                 assert "portable_framework.telemetry" in imported
                 assert "portable_framework.visualization" in imported
                 assert "portable_framework.property_cascade" in imported
@@ -127,6 +129,8 @@ class FrameworkPackagingTests(unittest.TestCase):
                 from portable_framework.components import Button, ComponentLayoutProfile
                 from portable_framework.documentation import DocPage, DocumentationTheme
                 from portable_framework.geometry import ContentMetrics, content_bounds
+                from portable_framework.data_view import DataRecord, DataView, SortDirection, SortTerm
+                from portable_framework.interactions import CommandSet, CommandSpec, SelectionModel
                 from portable_framework.live_data import (
                     LiveTable,
                     StateGrid,
@@ -175,6 +179,21 @@ class FrameworkPackagingTests(unittest.TestCase):
                         return True
 
                 coordinator = LayoutCoordinator(Host())
+
+                selection = SelectionModel("row-b")
+                commands = CommandSet((
+                    CommandSpec("open", "Open"),
+                    CommandSpec("mode", "Mode", children=(CommandSpec("mode:a", "A"),)),
+                ))
+                command_seen = []
+                commands.dispatch("open", lambda key: command_seen.append(key))
+                data_view = DataView()
+                data_view.set_search("alp", ("name",))
+                data_view.set_sort((SortTerm("size", SortDirection.DESCENDING),))
+                projection = data_view.project((
+                    DataRecord("row-a", {{"name": "Beta", "size": 1}}),
+                    DataRecord("row-b", {{"name": "Alpha", "size": 2}}),
+                ))
 
                 telemetry = RollingTelemetry(
                     ("value",),

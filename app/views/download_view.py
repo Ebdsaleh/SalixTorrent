@@ -50,6 +50,7 @@ from app.framework.components import (
 )
 from app.engine.responsive_layout import ResponsiveLayout
 from app.framework.geometry import DialogMetrics, clamp, fill_height, split_widths
+from app.framework.data_view import DataRecord, DataView, SortDirection, SortTerm
 from app.views.peer_view import PeerView
 from app.views.piece_view import PieceView
 from app.views.file_view import FileView
@@ -100,6 +101,8 @@ class DownloadView:
         self.desktop = DesktopIntegration.get_instance()
         self._sort_specs = None
         self._sort_column_ids = {}
+        self._queue_sort_view = DataView()
+        self._queue_filter_view = DataView()
         # Restore the previously selected torrent before telemetry starts
         # rebuilding the rows. If the saved selection is unavailable the
         # manager returns an empty string and the first restored row wins.
@@ -1278,86 +1281,91 @@ class DownloadView:
         self._apply_queue_sort()
         self._apply_queue_filters()
 
-    def _queue_sort_value(self, info_hash: str, key: str):
-        stats = self.latest_stats.get(info_hash, {})
-        if key == "name":
-            return str(stats.get("torrent_name") or "").lower()
-        if key == "size":
-            return int(stats.get("total_bytes") or 0)
-        if key == "progress":
-            return float(stats.get("progress") or 0.0)
-        if key == "priority":
-            rank = {"High": 0, "Normal": 1, "Low": 2}
-            return rank.get(str(stats.get("queue_priority") or "Normal"), 1)
-        if key == "status":
-            return str(stats.get("state_label") or stats.get("state") or "").lower()
-        if key == "speed":
-            return (
-                float(stats.get("speed_kbps") or 0.0),
-                float(stats.get("upload_speed_kbps") or 0.0),
+    def _queue_data_records(self) -> tuple[DataRecord, ...]:
+        priority_rank = {"High": 0, "Normal": 1, "Low": 2}
+        active_states = {"Queued", "Checking", "Fast Resume", "Downloading", "Seeding"}
+        records = []
+        for info_hash in self.torrent_order:
+            if info_hash not in self.torrent_rows:
+                continue
+            stats = self.latest_stats.get(info_hash, {})
+            state = str(stats.get("state") or "Idle")
+            records.append(
+                DataRecord(
+                    info_hash,
+                    {
+                        "name": str(stats.get("torrent_name") or ""),
+                        "size": int(stats.get("total_bytes") or 0),
+                        "progress": float(stats.get("progress") or 0.0),
+                        "priority": priority_rank.get(str(stats.get("queue_priority") or "Normal"), 1),
+                        "status": str(stats.get("state_label") or state),
+                        "speed": (
+                            float(stats.get("speed_kbps") or 0.0),
+                            float(stats.get("upload_speed_kbps") or 0.0),
+                        ),
+                        "state": state,
+                        "activity": "Active" if state in active_states else "Inactive",
+                    },
+                )
             )
-        return 0
+        return tuple(records)
+
+    def _queue_sort_terms(self) -> tuple[SortTerm, ...]:
+        terms = []
+        for column_id, direction in list(self._sort_specs or ()):
+            key = self._sort_column_ids.get(column_id)
+            if key:
+                terms.append(
+                    SortTerm(
+                        key,
+                        SortDirection.ASCENDING if int(direction) > 0 else SortDirection.DESCENDING,
+                    )
+                )
+        return tuple(terms)
 
     def _apply_queue_sort(self):
         if not hasattr(self, "queue_table") or not dpg.does_item_exist(self.queue_table):
             return
-
-        order = [h for h in self.torrent_order if h in self.torrent_rows]
-        specs = self._sort_specs
-        if specs:
-            # Dear PyGui supports multi-column sort specs. Apply them in reverse
-            # order so Python's stable sort preserves the higher-priority key.
-            for column_id, direction in reversed(list(specs)):
-                key = self._sort_column_ids.get(column_id)
-                if not key:
-                    continue
-                order.sort(
-                    key=lambda h, k=key: self._queue_sort_value(h, k),
-                    reverse=int(direction) < 0,
-                )
-
-        row_ids = [self.torrent_rows[h]["row"] for h in order]
+        records = self._queue_data_records()
+        self._queue_sort_view.set_sort(self._queue_sort_terms())
+        result = self._queue_sort_view.project(records)
+        row_ids = [self.torrent_rows[h]["row"] for h in result.keys]
         if row_ids:
             try:
                 dpg.reorder_items(self.queue_table, 1, row_ids)
             except Exception:
                 pass
 
-    def _row_matches_filter(self, info_hash: str) -> bool:
-        stats = self.latest_stats.get(info_hash, {})
-        name = str(stats.get("torrent_name") or "").lower()
-        if self._search_query and self._search_query not in name:
-            return False
-
-        state = str(stats.get("state") or "Idle")
-        wanted = self._state_filter
-        if wanted == "All":
-            return True
-        if wanted == "Active":
-            return state in {"Queued", "Checking", "Fast Resume", "Downloading", "Seeding"}
-        return state == wanted
-
     def _apply_queue_filters(self):
-        visible = 0
+        records = self._queue_data_records()
+        self._queue_filter_view.clear_filters()
+        self._queue_filter_view.set_search(self._search_query, ("name",))
+        if self._state_filter == "Active":
+            self._queue_filter_view.set_choice_filter("activity", ("Active",))
+        elif self._state_filter != "All":
+            self._queue_filter_view.set_choice_filter("state", (self._state_filter,))
+        result = self._queue_filter_view.project(records)
+        visible_keys = set(result.keys)
         for info_hash, row in self.torrent_rows.items():
-            show = self._row_matches_filter(info_hash)
             if dpg.does_item_exist(row["row"]):
-                dpg.configure_item(row["row"], show=show)
-            if show:
-                visible += 1
+                dpg.configure_item(row["row"], show=info_hash in visible_keys)
+
         if hasattr(self, "queue_filter_summary") and dpg.does_item_exist(self.queue_filter_summary):
             sort_suffix = ""
-            if self._sort_specs:
-                try:
-                    column_id, direction = self._sort_specs[0]
-                    key = self._sort_column_ids.get(column_id, "")
-                    if key:
-                        sort_suffix = f" | Sort: {key.title()} {'ASC' if int(direction) > 0 else 'DESC'}"
-                except Exception:
-                    sort_suffix = ""
+            terms = self._queue_sort_terms()
+            if terms:
+                term = terms[0]
+                direction = "ASC" if term.direction is SortDirection.ASCENDING else "DESC"
+                sort_suffix = f" | Sort: {term.field.title()} {direction}"
             dpg.set_value(
                 self.queue_filter_summary,
-                tr('view.download_view.showing_value_value_value', 'Showing {visible} / {value1}{sort_suffix}', visible=visible, value1=len(self.torrent_rows), sort_suffix=sort_suffix),
+                tr(
+                    'view.download_view.showing_value_value_value',
+                    'Showing {visible} / {value1}{sort_suffix}',
+                    visible=result.visible_count,
+                    value1=result.total_count,
+                    sort_suffix=sort_suffix,
+                ),
             )
 
     @staticmethod

@@ -217,6 +217,13 @@ class LiveTable:
     def row_count(self) -> int:
         return len(self._rows)
 
+    @property
+    def row_keys(self) -> tuple[str, ...]:
+        return self._order
+
+    def row_binding(self, key: object) -> TableRowBinding | None:
+        return self._rows.get(str(key))
+
     def build(
         self,
         *,
