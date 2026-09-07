@@ -10,6 +10,8 @@ SalixTorrent is a desktop BitTorrent client written in Python with a custom asyn
 
 **Post-v0.5.0 direction — modular application ecosystem:** SalixTorrent remains the reference application while reusable behavior is extracted downward into two cooperating layers: an application engine/runtime and an optional RAD/application framework. Dear PyGui is the current reference desktop backend, Tkinter is the planned compatibility backend for the common GUI surface, and headless/CLI operation remains first-class. Realtime telemetry/graphs, generic network/runtime awareness, lifecycle/presentation-host boundaries and rich live-data views are explicit extraction candidates before final framework naming or API freeze. See `SalixTorrent-Ecosystem-Architecture.md`.
 
+**Current `dev` extraction — realtime telemetry/visualization:** the first post-v0.5.0 implementation tranche extracts bounded multi-series telemetry/statistics and renderer-neutral realtime graph frames/coordination into the provisional framework, with Dear PyGui plotting isolated behind `DearPyGuiPlotHost`. The existing Speed view remains the application proof and keeps torrent-specific labels/rate semantics outside the generic layer. The prepared Windows gate is 432 tests; Tkinter remains a planned second implementation rather than a completed backend.
+
 **v0.4.0 milestone — durability and transfer lifecycle:** SalixTorrent built on the v0.3.0 protocol/network foundation with an offline-first localization system, semantic Help/Glossary content, provider-neutral translation tooling, backend-neutral application settings and session-state persistence, optional SalixORM/SQLite adapters, a fully tracked `unittest` regression suite, and durable per-torrent seeding goals. Timed goals use an instanced baseline so a newly requested duration starts from the moment it is applied, while cumulative Seed Time remains available as historical telemetry.
 
 - Load v1, v2 or hybrid `.torrent` files and `btih`/`btmh` magnet links.
@@ -378,7 +380,8 @@ SalixTorrent/
 │   ├── presentation/
 │   │   ├── test_responsive_layout.py
 │   │   ├── test_documentation.py
-│   │   └── test_gui_components.py
+│   │   ├── test_gui_components.py
+│   │   └── test_realtime_visualization.py
 │   ├── cli/
 │   │   └── test_headless_cli.py
 │   └── localization/
@@ -410,6 +413,8 @@ SalixTorrent/
 │   │   ├── property_cascade.py
 │   │   ├── geometry.py
 │   │   ├── responsive.py
+│   │   ├── telemetry.py
+│   │   ├── visualization.py
 │   │   ├── documentation/
 │   │   │   ├── layout.py
 │   │   │   ├── model.py
@@ -431,6 +436,8 @@ SalixTorrent/
 │   │   ├── component_renderers/
 │   │   │   └── dearpygui.py
 │   │   ├── layout_hosts/
+│   │   │   └── dearpygui.py
+│   │   ├── plot_hosts/
 │   │   │   └── dearpygui.py
 │   │   ├── documentation/              # compatibility + concrete renderer
 │   │   │   ├── layout.py               # compatibility facade

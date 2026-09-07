@@ -4,6 +4,13 @@ from __future__ import annotations
 
 import dearpygui.dearpygui as dpg
 
+from app.engine.plot_hosts import DearPyGuiPlotHost
+from app.framework.visualization import (
+    PlotFrame,
+    PlotSeriesData,
+    PlotSeriesSpec,
+    RealtimeGraph,
+)
 from app.localization import canonical_choice, localized_choices, tr
 
 from app.views.help_terms import add_help_tooltip, add_text_tooltip
@@ -29,18 +36,22 @@ class SpeedView:
         self.stats_text = None
         self.limit_text = None
         self.window_combo = None
-        self.plot_id = None
-        self.x_axis = None
-        self.y_axis = None
-        self.download_series = None
-        self.upload_series = None
-        self.download_limit_series = None
-        self.upload_limit_series = None
         self._latest_snapshot = None
         self._rate_unit = "Auto"
 
+        self._plot_host = DearPyGuiPlotHost()
+        self._graph = RealtimeGraph(
+            self._plot_host,
+            (
+                PlotSeriesSpec("download", tr('view.speed_view.download', "Download")),
+                PlotSeriesSpec("upload", tr('view.speed_view.upload', "Upload")),
+                PlotSeriesSpec("download_limit", tr('view.speed_view.down_limit', "Down Limit")),
+                PlotSeriesSpec("upload_limit", tr('view.speed_view.up_limit', "Up Limit")),
+            ),
+        )
+
     def build_view(self, parent_tag):
-        with dpg.child_window(parent=parent_tag, height=-1, border=True):
+        with dpg.child_window(parent=parent_tag, height=-1, border=True) as panel_id:
             with dpg.group(horizontal=True):
                 self.summary_text = dpg.add_text(
                     tr('view.speed_view.speed_select_a_torrent_to_inspect_transfer', "Speed: select a torrent to inspect transfer history"),
@@ -70,49 +81,28 @@ class SpeedView:
             add_help_tooltip(self.limit_text, "TRANSFER_LIMITS")
             dpg.add_separator()
 
-            with dpg.plot(height=-1, width=-1) as self.plot_id:
-                dpg.add_plot_legend()
-                self.x_axis = dpg.add_plot_axis(
-                    dpg.mvXAxis,
-                    label=tr('view.speed_view.seconds_ago', "Seconds ago"),
-                )
-                self.y_axis = dpg.add_plot_axis(
-                    dpg.mvYAxis,
-                    label=tr('view.speed_view.kb_s', "KB/s"),
-                )
+            self._graph.build(
+                parent=panel_id,
+                x_label=tr('view.speed_view.seconds_ago', "Seconds ago"),
+                y_label=tr('view.speed_view.kb_s', "KB/s"),
+                height=-1,
+                width=-1,
+            )
 
-                self.download_series = dpg.add_line_series(
-                    [],
-                    [],
-                    label=tr('view.speed_view.download', "Download"),
-                    parent=self.y_axis,
-                )
-                self.upload_series = dpg.add_line_series(
-                    [],
-                    [],
-                    label=tr('view.speed_view.upload', "Upload"),
-                    parent=self.y_axis,
-                )
-                self.download_limit_series = dpg.add_line_series(
-                    [],
-                    [],
-                    label=tr('view.speed_view.down_limit', "Down Limit"),
-                    parent=self.y_axis,
-                )
-                self.upload_limit_series = dpg.add_line_series(
-                    [],
-                    [],
-                    label=tr('view.speed_view.up_limit', "Up Limit"),
-                    parent=self.y_axis,
-                )
+            download_series = self._graph.series_handle("download")
+            upload_series = self._graph.series_handle("upload")
+            download_limit_series = self._graph.series_handle("download_limit")
+            upload_limit_series = self._graph.series_handle("upload_limit")
+            x_axis = self._graph.axis_handle("x")
+            y_axis = self._graph.axis_handle("y")
 
-            add_text_tooltip(self.download_series, tr('view.speed_view.download_history_measured_payload_download_rate_for', "Download history\n\nMeasured payload download rate for the selected torrent across the visible time window."))
-            add_text_tooltip(self.upload_series, tr('view.speed_view.upload_history_measured_payload_upload_rate_for', "Upload history\n\nMeasured payload upload rate for the selected torrent across the visible time window. Upload can occur while downloading as soon as verified pieces are available."))
-            add_text_tooltip(self.download_limit_series, tr('view.speed_view.download_limit_line_reference_line_showing_the', "Download limit line\n\nReference line showing the selected torrent's configured download ceiling when one is active. The global shared limit is reported in the text summary above."))
-            add_text_tooltip(self.upload_limit_series, tr('view.speed_view.upload_limit_line_reference_line_showing_the', "Upload limit line\n\nReference line showing the selected torrent's configured upload ceiling when one is active. The global shared limit is reported in the text summary above."))
-            add_help_tooltip(self.plot_id, "SPEED_HISTORY")
-            add_text_tooltip(self.x_axis, tr('view.speed_view.time_axis_the_graph_runs_from_older', "Time axis\n\nThe graph runs from older samples on the left toward the current moment at 0 seconds on the right."))
-            add_help_tooltip(self.y_axis, "TRANSFER_RATE")
+            add_text_tooltip(download_series, tr('view.speed_view.download_history_measured_payload_download_rate_for', "Download history\n\nMeasured payload download rate for the selected torrent across the visible time window."))
+            add_text_tooltip(upload_series, tr('view.speed_view.upload_history_measured_payload_upload_rate_for', "Upload history\n\nMeasured payload upload rate for the selected torrent across the visible time window. Upload can occur while downloading as soon as verified pieces are available."))
+            add_text_tooltip(download_limit_series, tr('view.speed_view.download_limit_line_reference_line_showing_the', "Download limit line\n\nReference line showing the selected torrent's configured download ceiling when one is active. The global shared limit is reported in the text summary above."))
+            add_text_tooltip(upload_limit_series, tr('view.speed_view.upload_limit_line_reference_line_showing_the', "Upload limit line\n\nReference line showing the selected torrent's configured upload ceiling when one is active. The global shared limit is reported in the text summary above."))
+            add_help_tooltip(self._graph.plot_handle(), "SPEED_HISTORY")
+            add_text_tooltip(x_axis, tr('view.speed_view.time_axis_the_graph_runs_from_older', "Time axis\n\nThe graph runs from older samples on the left toward the current moment at 0 seconds on the right."))
+            add_help_tooltip(y_axis, "TRANSFER_RATE")
             history_note = dpg.add_text(
                 tr('view.speed_view.rolling_session_history_sampled_every_0_5', "Rolling session history sampled every 0.5 seconds. History resets when SalixTorrent restarts."),
                 color=(140, 140, 145),
@@ -153,18 +143,10 @@ class SpeedView:
             )
         if self.limit_text and dpg.does_item_exist(self.limit_text):
             dpg.set_value(self.limit_text, tr('view.speed_view.limits_down_unlimited_up_unlimited', "Limits: Down Unlimited | Up Unlimited"))
-
-        for series in (
-            self.download_series,
-            self.upload_series,
-            self.download_limit_series,
-            self.upload_limit_series,
-        ):
-            if series and dpg.does_item_exist(series):
-                dpg.set_value(series, [[], []])
+        self._graph.clear()
 
     def render(self, snapshot: dict):
-        if not self.plot_id or not dpg.does_item_exist(self.plot_id):
+        if not self._graph.exists():
             return
 
         self._latest_snapshot = snapshot
@@ -249,28 +231,6 @@ class SpeedView:
         down_limit = transfer_rate_value(down_limit_raw, plot_unit) if down_limit_raw > 0 else 0.0
         up_limit = transfer_rate_value(up_limit_raw, plot_unit) if up_limit_raw > 0 else 0.0
 
-        dpg.configure_item(self.y_axis, label=plot_unit)
-        dpg.set_value(self.download_series, [x_values, download_values])
-        dpg.set_value(self.upload_series, [x_values, upload_values])
-
-        if down_limit > 0:
-            dpg.set_value(
-                self.download_limit_series,
-                [[-window_seconds, 0.0], [down_limit, down_limit]],
-            )
-        else:
-            dpg.set_value(self.download_limit_series, [[], []])
-
-        if up_limit > 0:
-            dpg.set_value(
-                self.upload_limit_series,
-                [[-window_seconds, 0.0], [up_limit, up_limit]],
-            )
-        else:
-            dpg.set_value(self.upload_limit_series, [[], []])
-
-        dpg.set_axis_limits(self.x_axis, -window_seconds, 0.0)
-
         candidates = download_values + upload_values
         if down_limit > 0:
             candidates.append(down_limit)
@@ -279,4 +239,25 @@ class SpeedView:
         peak = max(candidates) if candidates else 0.0
         minimum_scale = 0.125 if plot_unit in {"MB/s", "Mbps"} else 128.0
         y_max = max(minimum_scale, peak * 1.15)
-        dpg.set_axis_limits(self.y_axis, 0.0, y_max)
+
+        self._graph.render(
+            PlotFrame(
+                x_limits=(-window_seconds, 0.0),
+                y_limits=(0.0, y_max),
+                y_label=plot_unit,
+                series=(
+                    PlotSeriesData("download", x_values, download_values),
+                    PlotSeriesData("upload", x_values, upload_values),
+                    PlotSeriesData(
+                        "download_limit",
+                        (-window_seconds, 0.0) if down_limit > 0 else (),
+                        (down_limit, down_limit) if down_limit > 0 else (),
+                    ),
+                    PlotSeriesData(
+                        "upload_limit",
+                        (-window_seconds, 0.0) if up_limit > 0 else (),
+                        (up_limit, up_limit) if up_limit > 0 else (),
+                    ),
+                ),
+            )
+        )

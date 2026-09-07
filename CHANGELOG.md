@@ -4,6 +4,17 @@ Notable SalixTorrent changes are recorded here.
 
 ## Unreleased
 
+### Ecosystem Extraction — Realtime Telemetry and Plot Boundary
+
+- Added backend-neutral rolling telemetry contracts under `app/framework/telemetry.py`, including fixed-series samples, bounded rolling history, immutable snapshots, age-based windows, and current/average/peak/minimum statistics suitable for GUI or headless consumers.
+- Added renderer-neutral realtime line-plot contracts under `app/framework/visualization.py`, including semantic series specifications/data, complete plot frames, a small `PlotHost` protocol, explicit plot bindings, and `RealtimeGraph` coordination without Dear PyGui imports.
+- Added `DearPyGuiPlotHost` under `app/engine/plot_hosts/` so plot creation, line-series updates, axis labels/limits, existence checks, and disposal are concrete backend responsibilities.
+- Migrated the Active Transfers Speed graph to the new graph/plot-host boundary while preserving its existing localized labels, tooltips, rate-unit semantics, visible-window behavior, limit lines, and SalixTorrent-specific summary text.
+- Replaced the torrent session's private deque/statistics implementation with the generic rolling telemetry model while preserving the existing `speed_view` snapshot shape consumed by the desktop application.
+- Extended the framework relocation probe to import and exercise telemetry and realtime visualization after package rename, with no SalixTorrent or Dear PyGui dependency in the relocated framework.
+- Added 16 focused telemetry/visualization regressions; expected full real-Windows discovery advances from 416 to 432 tests with the same one expected non-Windows skip. Canonical localization remains 1,337 strings; only extraction source metadata changes.
+- Current names remain provisional and no Tkinter plot implementation, backend-selection CLI, public API freeze, application-version bump, protocol change, or persistence-schema change is introduced.
+
 ### Development Architecture and Documentation
 
 - Documented the post-v0.5.0 reverse-pyramid extraction strategy: SalixTorrent remains the reference application while reusable behavior moves into a general application engine/runtime, optional RAD/application framework, and concrete backend/platform adapters.

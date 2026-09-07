@@ -2,8 +2,8 @@
 
 **Current application version string:** `0.5.0`
 **Roadmap status:** v0.5.0 released; post-v0.5.0 ecosystem extraction on `dev`
-**Current implementation checkpoint:** v0.5.0 released/tagged at `d403c47f98f7e30d8adf879cd04e098dabc8767e`; the `dev` branch starts from that stable release and is the integration line for broader engine/framework/backend extraction
-**Current real Windows regression baseline:** 416 / 416 at the released v0.5.0 checkpoint with one expected non-Windows shell-behavior skip
+**Current implementation checkpoint:** post-v0.5.0 ecosystem documentation is pushed on `dev` at `eb906e45f7b9f62403dc7887b36aae81a1818b6f`; the first realtime telemetry/visualization extraction tranche is prepared from that checkpoint
+**Current real Windows regression baseline:** 416 / 416 at the released v0.5.0 checkpoint with one expected non-Windows shell-behavior skip; prepared tranche target: 432 / 432 with the same expected skip
 
 This roadmap records intended engineering direction rather than promising dates or release numbers. Changes should remain incremental, testable, reviewable, and compatible with SalixTorrent's existing protocol, persistence, packaging, localization, and cross-platform boundaries.
 
@@ -553,15 +553,15 @@ The detailed architectural target is maintained in `SalixTorrent-Ecosystem-Archi
 
 ## Priority A — immediate: ecosystem extraction on `dev`
 
-### A1. Inventory and ownership map
+### A1. Inventory and ownership map — initial map established, audit ongoing
 
-- audit current engine, views, platform services and logic modules for reusable seams;
-- classify each candidate as product/domain, engine/runtime, RAD/framework, or backend/platform;
-- document why a candidate belongs to a layer before moving it;
+- [x] classify the first major candidates across product/domain, engine/runtime, RAD/framework, and backend/platform ownership;
+- [x] document the Speed, network/runtime, lifecycle/presentation-host, desktop/platform, and rich-live-view seams before moving code;
+- [ ] continue the inventory as deeper implementation details expose additional candidates;
 - keep current names provisional while the wider boundary is still being discovered;
 - preserve the v0.5.0 `main` branch as the stable rollback line.
 
-### A2. Realtime telemetry and visualization
+### A2. Realtime telemetry and visualization — first tranche prepared
 
 Use the proven Active Transfers Speed view as the first major post-v0.5.0 extraction candidate.
 
@@ -581,6 +581,16 @@ renderer-neutral realtime graph contract
 ```
 
 Do not move torrent-specific labels, Help terms, transfer policy or rate semantics into generic visualization merely to reduce file count.
+
+Prepared first-tranche ownership:
+
+- `app/framework/telemetry.py` owns bounded fixed-series history, immutable snapshots, age windows and recent statistics;
+- `app/framework/visualization.py` owns semantic line-series specs/data, complete plot frames, `PlotHost`, plot bindings and `RealtimeGraph`;
+- `app/engine/plot_hosts/dearpygui.py` owns Dear PyGui plot/axis/line-series operations;
+- `TorrentSession` uses the generic rolling history while preserving the existing `speed_view` snapshot contract;
+- `SpeedView` routes plot creation/updates through the new boundary while retaining SalixTorrent text, tooltips, rate units and limit semantics;
+- framework relocation tests exercise telemetry/visualization after package rename;
+- prepared test count: 432 total (Windows expected `skipped=1`).
 
 ### A3. Application-engine/runtime boundary
 
@@ -807,8 +817,9 @@ frozen CLI version:              SalixTorrent 0.5.0
 
 Development workflow:
 main:                            stable v0.5.0 release line
-dev:                             created from current main and tracks origin/dev
-working tree at branch creation: clean
+dev documentation checkpoint:   eb906e45f7b9f62403dc7887b36aae81a1818b6f
+dev:                             tracks origin/dev
+prepared next full-test target:  432 / 432, Windows skipped=1
 
 Localization:
 canonical catalog:               1337 entries

@@ -10892,7 +10892,7 @@
           "occurrences": [
             {
               "path": "app/views/speed_view.py",
-              "line": 189,
+              "line": 171,
               "column": 17,
               "kind": "python-tr"
             }
@@ -10906,13 +10906,13 @@
           "occurrences": [
             {
               "path": "app/views/speed_view.py",
-              "line": 62,
+              "line": 73,
               "column": 17,
               "kind": "python-tr"
             },
             {
               "path": "app/views/speed_view.py",
-              "line": 152,
+              "line": 142,
               "column": 17,
               "kind": "python-tr"
             }
@@ -10932,7 +10932,7 @@
           "occurrences": [
             {
               "path": "app/views/speed_view.py",
-              "line": 183,
+              "line": 165,
               "column": 17,
               "kind": "python-tr"
             }
@@ -10946,8 +10946,8 @@
           "occurrences": [
             {
               "path": "app/views/speed_view.py",
-              "line": 99,
-              "column": 27,
+              "line": 48,
+              "column": 50,
               "kind": "python-tr"
             }
           ]
@@ -10960,8 +10960,8 @@
           "occurrences": [
             {
               "path": "app/views/speed_view.py",
-              "line": 87,
-              "column": 27,
+              "line": 46,
+              "column": 44,
               "kind": "python-tr"
             }
           ]
@@ -10974,8 +10974,8 @@
           "occurrences": [
             {
               "path": "app/views/speed_view.py",
-              "line": 109,
-              "column": 52,
+              "line": 99,
+              "column": 47,
               "kind": "python-tr"
             }
           ]
@@ -10988,8 +10988,8 @@
           "occurrences": [
             {
               "path": "app/views/speed_view.py",
-              "line": 111,
-              "column": 58,
+              "line": 101,
+              "column": 53,
               "kind": "python-tr"
             }
           ]
@@ -11002,8 +11002,8 @@
           "occurrences": [
             {
               "path": "app/views/speed_view.py",
-              "line": 81,
-              "column": 27,
+              "line": 87,
+              "column": 25,
               "kind": "python-tr"
             }
           ]
@@ -11016,13 +11016,13 @@
           "occurrences": [
             {
               "path": "app/views/speed_view.py",
-              "line": 67,
+              "line": 78,
               "column": 17,
               "kind": "python-tr"
             },
             {
               "path": "app/views/speed_view.py",
-              "line": 155,
+              "line": 145,
               "column": 44,
               "kind": "python-tr"
             }
@@ -11036,7 +11036,7 @@
           "occurrences": [
             {
               "path": "app/views/speed_view.py",
-              "line": 117,
+              "line": 107,
               "column": 17,
               "kind": "python-tr"
             }
@@ -11050,8 +11050,8 @@
           "occurrences": [
             {
               "path": "app/views/speed_view.py",
-              "line": 77,
-              "column": 27,
+              "line": 86,
+              "column": 25,
               "kind": "python-tr"
             }
           ]
@@ -11064,13 +11064,13 @@
           "occurrences": [
             {
               "path": "app/views/speed_view.py",
-              "line": 147,
+              "line": 137,
               "column": 17,
               "kind": "python-tr"
             },
             {
               "path": "app/views/speed_view.py",
-              "line": 46,
+              "line": 57,
               "column": 21,
               "kind": "python-tr"
             }
@@ -11084,8 +11084,8 @@
           "occurrences": [
             {
               "path": "app/views/speed_view.py",
-              "line": 114,
-              "column": 43,
+              "line": 104,
+              "column": 38,
               "kind": "python-tr"
             }
           ]
@@ -11098,8 +11098,8 @@
           "occurrences": [
             {
               "path": "app/views/speed_view.py",
-              "line": 105,
-              "column": 27,
+              "line": 49,
+              "column": 48,
               "kind": "python-tr"
             }
           ]
@@ -11112,8 +11112,8 @@
           "occurrences": [
             {
               "path": "app/views/speed_view.py",
-              "line": 93,
-              "column": 27,
+              "line": 47,
+              "column": 42,
               "kind": "python-tr"
             }
           ]
@@ -11126,8 +11126,8 @@
           "occurrences": [
             {
               "path": "app/views/speed_view.py",
-              "line": 110,
-              "column": 50,
+              "line": 100,
+              "column": 45,
               "kind": "python-tr"
             }
           ]
@@ -11140,8 +11140,8 @@
           "occurrences": [
             {
               "path": "app/views/speed_view.py",
-              "line": 112,
-              "column": 56,
+              "line": 102,
+              "column": 51,
               "kind": "python-tr"
             }
           ]
@@ -11154,7 +11154,7 @@
           "occurrences": [
             {
               "path": "app/views/speed_view.py",
-              "line": 51,
+              "line": 62,
               "column": 45,
               "kind": "python-tr"
             }
@@ -21416,13 +21416,13 @@
       "view.speed_view.average_down_0_0_kb_s_up": [
         {
           "path": "app/views/speed_view.py",
-          "line": 62,
+          "line": 73,
           "column": 17,
           "kind": "python-tr"
         },
         {
           "path": "app/views/speed_view.py",
-          "line": 152,
+          "line": 142,
           "column": 17,
           "kind": "python-tr"
         }
@@ -21430,13 +21430,13 @@
       "view.speed_view.limits_down_unlimited_up_unlimited": [
         {
           "path": "app/views/speed_view.py",
-          "line": 67,
+          "line": 78,
           "column": 17,
           "kind": "python-tr"
         },
         {
           "path": "app/views/speed_view.py",
-          "line": 155,
+          "line": 145,
           "column": 44,
           "kind": "python-tr"
         }
@@ -21444,13 +21444,13 @@
       "view.speed_view.speed_select_a_torrent_to_inspect_transfer": [
         {
           "path": "app/views/speed_view.py",
-          "line": 147,
+          "line": 137,
           "column": 17,
           "kind": "python-tr"
         },
         {
           "path": "app/views/speed_view.py",
-          "line": 46,
+          "line": 57,
           "column": 21,
           "kind": "python-tr"
         }

@@ -416,11 +416,11 @@ The sequence is architectural rather than calendar-driven.
 
 ### Stage A — inventory and ownership map
 
-Audit the current application for reusable engine, framework and adapter seams. Record why each candidate belongs to a layer before moving it.
+The initial ownership map is now established for the first extraction candidates: Speed telemetry/plotting, network/runtime awareness, application lifecycle/presentation hosting, desktop/platform services, and rich live-data views. The inventory remains a living audit as deeper seams are discovered. Record why each candidate belongs to a layer before moving it.
 
 ### Stage B — realtime data and visualization
 
-Extract rolling telemetry/time-series/statistics and a renderer-neutral graph contract from the proven Speed view. Keep Dear PyGui plotting as an adapter.
+The first implementation tranche is prepared from the proven Speed view. Backend-neutral rolling telemetry/statistics and realtime graph coordination now live in the provisional framework, while Dear PyGui plot operations live in a concrete plot host. SalixTorrent's existing Speed snapshot/labels/rate semantics remain application-owned. A future Tkinter Canvas implementation should consume the same plot-facing contract rather than duplicate application logic.
 
 ### Stage C — engine/runtime services
 
@@ -518,3 +518,33 @@ BitTorrent-specific behavior
 Every extraction must preserve SalixTorrent's working transfer engine, headless path, desktop behavior, persistence compatibility and release discipline.
 
 The broader ecosystem succeeds when SalixTorrent becomes one application built on it, rather than when SalixTorrent is distorted merely to make an abstraction look generic.
+---
+
+## 15. First post-v0.5.0 implementation checkpoint
+
+The first `dev` implementation tranche applies the reverse-pyramid rule to the live Speed subsystem.
+
+```text
+TorrentSession transfer counters
+        |
+        v
+RollingTelemetry                      app/framework/telemetry.py
+        |
+        v
+existing SalixTorrent speed snapshot  application compatibility boundary
+        |
+        v
+PlotFrame / RealtimeGraph             app/framework/visualization.py
+        |
+        v
+PlotHost
+        |
+        +-- DearPyGuiPlotHost          current concrete adapter
+        +-- future Tkinter Canvas host second-backend proof
+```
+
+The generic telemetry layer has no GUI dependency and is therefore usable by desktop, CLI/headless, tests, and future designer/runtime consumers. The visualization layer describes complete graph updates without importing Dear PyGui. Concrete plot creation, axis mutation, line-series updates, existence checks, and disposal remain adapter-owned.
+
+The SalixTorrent Speed view deliberately still owns localized labels, Help/tooltips, transfer-rate unit conversion, torrent/global limit wording, and visible-window selection. This tranche proves a reusable data/plot seam without pretending the entire Speed view is a generic component.
+
+Prepared validation adds 7 telemetry tests and 9 realtime-visualization tests while keeping the existing five framework-relocation tests. Full discovery is expected to advance from 416 to 432 tests on Windows with the same one expected non-Windows skip. `APP_VERSION` remains `0.5.0`; this is development work on `dev`, not a release/tag boundary.

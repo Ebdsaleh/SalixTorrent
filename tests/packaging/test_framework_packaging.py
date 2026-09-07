@@ -94,6 +94,8 @@ class FrameworkPackagingTests(unittest.TestCase):
                 assert "portable_framework.components" in imported
                 assert "portable_framework.documentation" in imported
                 assert "portable_framework.geometry" in imported
+                assert "portable_framework.telemetry" in imported
+                assert "portable_framework.visualization" in imported
                 assert "portable_framework.property_cascade" in imported
                 assert not any(name == "app" or name.startswith("app.") for name in sys.modules)
                 assert not any(name == "dearpygui" or name.startswith("dearpygui.") for name in sys.modules)
@@ -109,7 +111,7 @@ class FrameworkPackagingTests(unittest.TestCase):
                 check=False,
             )
             self.assertEqual(0, result.returncode, result.stderr or result.stdout)
-            self.assertGreaterEqual(int(result.stdout.strip()), 19)
+            self.assertGreaterEqual(int(result.stdout.strip()), 21)
 
     def test_relocated_framework_contracts_are_usable_without_application_package(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -126,6 +128,15 @@ class FrameworkPackagingTests(unittest.TestCase):
                 from portable_framework.geometry import ContentMetrics, content_bounds
                 from portable_framework.property_cascade import PropertySource, resolve_property
                 from portable_framework.responsive import LayoutCoordinator
+                from portable_framework.telemetry import RollingTelemetry
+                from portable_framework.visualization import (
+                    PlotBinding,
+                    PlotFrame,
+                    PlotSeriesBinding,
+                    PlotSeriesData,
+                    PlotSeriesSpec,
+                    RealtimeGraph,
+                )
 
                 button = Button("Run")
                 profile = ComponentLayoutProfile("probe")
@@ -151,6 +162,51 @@ class FrameworkPackagingTests(unittest.TestCase):
 
                 coordinator = LayoutCoordinator(Host())
 
+                telemetry = RollingTelemetry(
+                    ("value",),
+                    history_seconds=10,
+                    sample_interval_seconds=1,
+                    clock=lambda: 3.0,
+                )
+                telemetry.record({{"value": 2}}, timestamp=2.0)
+                telemetry.record({{"value": 4}}, timestamp=3.0)
+                telemetry_window = telemetry.snapshot(now=3.0)
+
+                class PlotProbeHost:
+                    def __init__(self):
+                        self.alive = set()
+                        self.series_values = []
+                    def create_line_plot(self, *, parent, x_label, y_label, series, legend=True, width=None, height=None):
+                        self.alive.add("plot")
+                        return PlotBinding(
+                            "plot",
+                            "x",
+                            "y",
+                            tuple(PlotSeriesBinding(spec.key, spec.key) for spec in series),
+                        )
+                    def exists(self, item):
+                        return item in self.alive
+                    def destroy(self, item):
+                        self.alive.discard(item)
+                    def set_axis_label(self, axis, label):
+                        return None
+                    def set_axis_limits(self, axis, minimum, maximum):
+                        return None
+                    def set_series(self, series, x_values, y_values):
+                        self.series_values.append((series, tuple(x_values), tuple(y_values)))
+
+                plot_host = PlotProbeHost()
+                graph = RealtimeGraph(plot_host, (PlotSeriesSpec("value", "Value"),))
+                graph.build(parent="panel", x_label="Time", y_label="Value")
+                graph.render(
+                    PlotFrame(
+                        x_limits=(-1, 0),
+                        y_limits=(0, 5),
+                        y_label="Value",
+                        series=(PlotSeriesData("value", (-1, 0), (2, 4)),),
+                    )
+                )
+
                 assert button.label == "Run"
                 assert profile.name == "probe"
                 assert page.title == "Portable"
@@ -158,6 +214,8 @@ class FrameworkPackagingTests(unittest.TestCase):
                 assert bounds.width == 700
                 assert coordinator.item_size("panel") == (400, 300)
                 assert coordinator.width("panel", 320) is True
+                assert telemetry_window.statistics("value").average == 3.0
+                assert plot_host.series_values == [("value", (-1.0, 0.0), (2.0, 4.0))]
                 assert resolved.value == "fallback"
                 assert resolved.source is PropertySource.DEFAULT
                 assert not any(name == "app" or name.startswith("app.") for name in sys.modules)

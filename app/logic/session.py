@@ -9,8 +9,7 @@ import socket
 import struct
 import threading
 import time
-from collections import deque
-from typing import Callable, Deque, Dict, List, Optional, Set, Tuple
+from typing import Callable, Dict, List, Optional, Set, Tuple
 
 from app.logic.bencode import Bencode
 from app.logic.dht import DHTClient, DHT_REFRESH_INTERVAL
@@ -71,6 +70,7 @@ from app.logic.seeding_policy import (
 )
 from app.logic.torrent_v2 import expected_piece_layer_count, piece_layer_depth, zero_hash
 from app.logic.tracker import TrackerClient
+from app.framework.telemetry import RollingTelemetry
 from app.logic.transfer_add import (
     TORRENT_PROTOCOL_AUTO,
     TORRENT_PROTOCOL_V1_ONLY,
@@ -396,10 +396,15 @@ class TorrentSession:
         # the existing 0.5 second telemetry cadence is only ~240 samples.
         self._current_download_speed_kbps: float = 0.0
         self._current_upload_speed_kbps: float = 0.0
-        self._speed_history: Deque[Tuple[float, float, float]] = deque(
-            maxlen=SPEED_HISTORY_MAX_SAMPLES
+        self._speed_history = RollingTelemetry(
+            ("download_kbps", "upload_kbps"),
+            history_seconds=SPEED_HISTORY_SECONDS,
+            sample_interval_seconds=SPEED_SAMPLE_INTERVAL,
+            max_samples=SPEED_HISTORY_MAX_SAMPLES,
         )
-        self._speed_history.append((time.monotonic(), 0.0, 0.0))
+        self._speed_history.record(
+            {"download_kbps": 0.0, "upload_kbps": 0.0}
+        )
 
         self._detail_telemetry_cached_at: float = 0.0
         self._piece_view_cache: dict = {}
@@ -1780,34 +1785,22 @@ class TorrentSession:
         up = max(0.0, float(upload_kbps or 0.0))
         self._current_download_speed_kbps = down
         self._current_upload_speed_kbps = up
-        self._speed_history.append((time.monotonic(), down, up))
+        self._speed_history.record(
+            {"download_kbps": down, "upload_kbps": up}
+        )
 
     def _build_speed_view_snapshot(self) -> dict:
-        now = time.monotonic()
-        cutoff = now - SPEED_HISTORY_SECONDS
-        samples = [sample for sample in self._speed_history if sample[0] >= cutoff]
-
+        history = self._speed_history.snapshot()
         rendered_samples = [
             {
-                "age_seconds": max(0.0, now - timestamp),
-                "download_kbps": download_kbps,
-                "upload_kbps": upload_kbps,
+                "age_seconds": age_seconds,
+                "download_kbps": values[0],
+                "upload_kbps": values[1],
             }
-            for timestamp, download_kbps, upload_kbps in samples
+            for age_seconds, values in history.aged_rows()
         ]
-
-        if samples:
-            down_values = [sample[1] for sample in samples]
-            up_values = [sample[2] for sample in samples]
-            average_download = sum(down_values) / len(down_values)
-            average_upload = sum(up_values) / len(up_values)
-            peak_download = max(down_values)
-            peak_upload = max(up_values)
-        else:
-            average_download = 0.0
-            average_upload = 0.0
-            peak_download = 0.0
-            peak_upload = 0.0
+        down_stats = history.statistics("download_kbps")
+        up_stats = history.statistics("upload_kbps")
 
         return {
             "samples": rendered_samples,
@@ -1815,10 +1808,10 @@ class TorrentSession:
             "sample_interval_seconds": SPEED_SAMPLE_INTERVAL,
             "current_download_kbps": self._current_download_speed_kbps,
             "current_upload_kbps": self._current_upload_speed_kbps,
-            "average_download_kbps": average_download,
-            "average_upload_kbps": average_upload,
-            "peak_download_kbps": peak_download,
-            "peak_upload_kbps": peak_upload,
+            "average_download_kbps": down_stats.average,
+            "average_upload_kbps": up_stats.average,
+            "peak_download_kbps": down_stats.peak,
+            "peak_upload_kbps": up_stats.peak,
             "download_limit_kbps": self.download_limit_bps / 1024.0,
             "upload_limit_kbps": self.upload_limit_bps / 1024.0,
             "global_download_limit_kbps": (
