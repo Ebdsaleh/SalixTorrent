@@ -1,7 +1,7 @@
 # SalixTorrent Application Persistence Design
 
 **Status:** settings boundary stable; session-state v9 seeding-goal boundary complete and validated on the real Windows checkout
-**Current application version string:** `0.3.0`
+**Current application version string:** `0.5.0`
 **Storage policy:** preserve purpose-built file formats where they are the right abstraction; introduce SalixORM only behind bounded application-state contracts that benefit from transactional/schema-managed persistence.
 
 ---
@@ -270,7 +270,7 @@ When the SalixORM session backend is selected and `session.db` has no session sn
 1. the primary database is checked first;
 2. historical `session.json` is consulted as a read-only fallback;
 3. `TorrentManager` restores the queue with existing compatibility behavior;
-4. the next normal save writes a current version-8 snapshot to SalixORM;
+4. the next normal save writes a current version-9 snapshot to SalixORM;
 5. the database becomes authoritative for that selected backend.
 
 The legacy JSON file is not deleted or dual-written.

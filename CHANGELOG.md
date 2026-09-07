@@ -4,9 +4,25 @@ Notable SalixTorrent changes are recorded here.
 
 ## Unreleased
 
+### Development Architecture and Documentation
+
+- Documented the post-v0.5.0 reverse-pyramid extraction strategy: SalixTorrent remains the reference application while reusable behavior moves into a general application engine/runtime, optional RAD/application framework, and concrete backend/platform adapters.
+- Defined Dear PyGui as the current reference desktop backend, Tkinter as the planned compatibility implementation for the common GUI surface, and headless/CLI execution as a first-class profile.
+- Recorded realtime telemetry/graph extraction, generic network/runtime awareness, application lifecycle/presentation-host separation, rich live-data views, and later designer metadata as explicit audit targets before final public naming/API freeze.
+- Added `SalixTorrent-Ecosystem-Architecture.md` to describe the long-term WYSIWYG RAD-editor destination, backend-capability policy, reverse-pyramid classification rules, extraction sequence, and conditions required before external package/API stabilization.
+- Established `main` as the stable/release line and `dev` as the active post-v0.5.0 integration branch.
+- No runtime, protocol, persistence, localization, packaging or user-facing application behavior changes are introduced by this documentation update.
+
 ## v0.5.0 - 2026-09-07
 
 v0.5.0 completes the reusable GUI component/framework foundation developed after v0.4.0 while preserving the established torrent engine, persistence, localization, and packaging behavior. The release keeps the framework namespace provisional: final external package/repository naming and a frozen third-party API remain later work.
+
+### Release
+
+- Released and tagged v0.5.0 at `d403c47f98f7e30d8adf879cd04e098dabc8767e` (`Prepare SalixTorrent v0.5.0 release`).
+- Passed both complete real-Windows discovery paths at 416 / 416 tests with one expected non-Windows shell-behavior skip.
+- Built and smoke-tested the standalone desktop executable, standalone CLI executable, portable ZIP and Inno Setup installer.
+- Verified the frozen CLI reports exactly `SalixTorrent 0.5.0` before publishing the annotated `v0.5.0` tag.
 
 ### GUI/RAD Extraction — Backend-Neutral Responsive Coordination
 
@@ -155,7 +171,7 @@ v0.5.0 completes the reusable GUI component/framework foundation developed after
 - Updated release-facing README and roadmap state to make v0.5.0 the current release checkpoint while preserving v0.4.0 as the previous immutable release boundary.
 - Updated the Inno Setup fallback `MyAppVersion` to `0.5.0`; normal Windows builds still inject `APP_VERSION` explicitly.
 - Added a release-packaging regression that requires the Inno fallback version to match `APP_VERSION`, preventing stale manual-installer metadata in future releases.
-- The final release gate is 416 tests on Windows with one expected non-Windows skip, followed by standalone GUI/CLI, portable ZIP, installer, and frozen `SalixTorrent 0.5.0` verification before the annotated tag is pushed.
+- Completed the final release gate at 416 tests on Windows with one expected non-Windows skip, then built/smoked the standalone GUI/CLI, portable ZIP and installer, verified frozen `SalixTorrent 0.5.0` output, pushed the release commit, and published the annotated `v0.5.0` tag.
 
 ## v0.4.0 - 2026-09-05
 

@@ -1,9 +1,9 @@
 # SalixTorrent Development Roadmap
 
 **Current application version string:** `0.5.0`
-**Roadmap status:** v0.5.0 release preparation
-**Current implementation checkpoint:** reusable GUI/RAD foundation feature scope complete and pushed through responsive coordination at `ab1b3f6d1ba3fa697aabd5e0970a4ae0822e367d`; release-only preparation in progress
-**Current real Windows regression baseline:** 415 / 415 at the pushed responsive-coordination checkpoint with one expected non-Windows skip; release preparation adds one packaging-version consistency regression for a 416-test release gate
+**Roadmap status:** v0.5.0 released; post-v0.5.0 ecosystem extraction on `dev`
+**Current implementation checkpoint:** v0.5.0 released/tagged at `d403c47f98f7e30d8adf879cd04e098dabc8767e`; the `dev` branch starts from that stable release and is the integration line for broader engine/framework/backend extraction
+**Current real Windows regression baseline:** 416 / 416 at the released v0.5.0 checkpoint with one expected non-Windows shell-behavior skip
 
 This roadmap records intended engineering direction rather than promising dates or release numbers. Changes should remain incremental, testable, reviewable, and compatible with SalixTorrent's existing protocol, persistence, packaging, localization, and cross-platform boundaries.
 
@@ -547,208 +547,144 @@ A relational database is not automatically the right format for every durable ar
 
 # 13. Priority order
 
-## Priority A — immediate
+The next phase is a **dual extraction**: continue broadening the reusable RAD/framework surface while also separating a reusable application engine/runtime from SalixTorrent's current concrete desktop shell.
 
-**Continue the reusable GUI/RAD extraction through proven application forms and renderer-adjacent behavior.**
+The detailed architectural target is maintained in `SalixTorrent-Ecosystem-Architecture.md`.
 
-First tranche — complete/pushed (`66b46fa7070128f13bc87fbe4f9556a86049e895`):
+## Priority A — immediate: ecosystem extraction on `dev`
 
-- [x] create a framework-owned `app/engine/components/` package;
-- [x] add backend-neutral primitive Label, Button, ComboBox, NumericStepper, CheckBox and Spacer controls;
-- [x] add semantic `AUTO` / `FILL` sizing rather than exposing Dear PyGui sizing sentinel values;
-- [x] resolve width, height and row spacing through the existing default -> theme -> instance property cascade;
-- [x] add generic `ControlRow`, `ControlColumn` and aligned `ControlGrid` composition;
-- [x] add `LabeledComboField`, `LabeledNumericField` and three-part `DurationEditor` composites;
-- [x] migrate Torrent Properties, `Configure targets...`, and Preferences seeding-goal controls without changing seeding-policy semantics;
-- [x] add nine headless component/layout regressions;
-- [x] regenerate deterministic localization extraction metadata without adding or changing canonical strings;
-- [x] real Windows focused component/localization validation;
-- [x] both full Windows discovery commands at 343/343 with one expected skip;
-- [x] visual parity smoke for Torrent Properties, `Configure targets...`, and Preferences.
+### A1. Inventory and ownership map
 
-Second tranche — Preferences composition expansion — complete/pushed (`139931246280818694de1920b4b49c4e5cf734ca`):
+- audit current engine, views, platform services and logic modules for reusable seams;
+- classify each candidate as product/domain, engine/runtime, RAD/framework, or backend/platform;
+- document why a candidate belongs to a layer before moving it;
+- keep current names provisional while the wider boundary is still being discovered;
+- preserve the v0.5.0 `main` branch as the stable rollback line.
 
-- [x] add backend-neutral `TextInput`;
-- [x] add generic `LabeledField` with one primary control plus zero-or-more trailing/accessory components;
-- [x] make `LabeledComboField` and `LabeledNumericField` reuse the generic field contract;
-- [x] add `NumericUnitField` for numeric-value + unit-selector rows;
-- [x] migrate Preferences value controls and action rows while retaining existing item-id compatibility aliases;
-- [x] add five additional headless component regressions (14 component tests total);
-- [x] regenerate deterministic localization extraction metadata with no canonical string changes;
-- [x] focused Windows component/localization validation;
-- [x] both full Windows discovery commands at 348/348 with one expected skip;
-- [x] visual/behavior smoke across Preferences before commit.
+### A2. Realtime telemetry and visualization
 
-Third tranche — component layout profiles — complete/pushed (`f5e30e30012958429240bcf2646ac9a09d348de5`):
+Use the proven Active Transfers Speed view as the first major post-v0.5.0 extraction candidate.
 
-- [x] add backend-neutral `ComponentLayoutProfile` with named layout and aligned-grid column slots;
-- [x] keep a framework profile with safe `AUTO` fallbacks and established composite defaults;
-- [x] let the active renderer carry one application-selected profile;
-- [x] select SalixTorrent's desktop profile once in `GuiEngine` rather than inside individual views;
-- [x] preserve profile/default -> component theme -> explicit instance precedence;
-- [x] move Preferences and seeding-goal component dimensions out of view construction into `ui_component_profile.py`;
-- [x] retain explicit width overrides in the generic APIs for exceptional one-off layouts;
-- [x] add six profile/layout regressions (20 component tests total);
-- [x] regenerate deterministic localization extraction metadata with no canonical string changes;
-- [x] run focused Windows component/localization validation;
-- [x] run both full Windows discovery commands at 354/354 with one expected skip;
-- [x] visually confirm Preferences, Torrent Properties and `Configure targets...` retain their established dimensions.
+Target separation:
 
-Fourth tranche — structural composition and attachment boundary — complete/pushed (`61d9d8424eecfbf3201d529d824fc68a85f079d5`):
+```text
+SalixTorrent transfer telemetry
+        |
+        v
+generic time-series / rolling history / statistics
+        |
+        v
+renderer-neutral realtime graph contract
+        |
+        +-- Dear PyGui plot adapter
+        +-- future Tkinter Canvas adapter
+```
 
-- [x] add a backend-neutral `Separator` primitive;
-- [x] add reusable `SectionPanel` and `Dialog` structural containers;
-- [x] let `ControlRow` and `ControlColumn` expose context-managed incremental composition as well as declarative child builds;
-- [x] add generic post-build component attachment hooks without importing SalixTorrent Help semantics into the reusable layer;
-- [x] extend the Dear PyGui bridge with separator, panel/child-window and dialog/window rendering;
-- [x] move the eight Preferences panel dimensions into the application component profile;
-- [x] migrate Preferences root/pair/panel structure away from direct Dear PyGui group/child-window construction while retaining responsive item-id layout behavior;
-- [x] migrate `Configure targets...` onto the reusable dialog boundary and profile-owned dialog dimensions;
-- [x] add eight structural/attachment regressions (28 component tests total);
-- [x] regenerate deterministic localization extraction metadata with no canonical string changes;
-- [x] run focused Windows component/localization validation;
-- [x] run both full Windows discovery commands at 362/362 with one expected skip;
-- [x] visually confirm Preferences and `Configure targets...` retain their established structure and behavior;
-- [x] commit/push as `61d9d8424eecfbf3201d529d824fc68a85f079d5` (`Add reusable structural GUI composition`).
+Do not move torrent-specific labels, Help terms, transfer policy or rate semantics into generic visualization merely to reduce file count.
 
-Fifth tranche — Create Torrent form composition and tooltip renderer boundary — complete/pushed (`e11e05eb50238d540e798cbb689476afc302d939`):
+### A3. Application-engine/runtime boundary
 
-- [x] add a backend-neutral `Tooltip` attachment that delegates backend tooltip creation through `ComponentRenderer`;
-- [x] centralize Dear PyGui tooltip creation/failure isolation in the renderer while preserving existing Help helper compatibility;
-- [x] add an application attachment adapter that turns SalixTorrent Help/Glossary terms into generic tooltip attachments;
-- [x] add reusable `ProgressBar` and backend-neutral `TextInput` label support;
-- [x] move Create Torrent panel/control dimensions into the application component profile;
-- [x] migrate the complete Create Torrent form onto `ControlColumn`, `ControlRow`, `SectionPanel`, primitive/value components and generic attachments;
-- [x] retain the existing raw item IDs consumed by background creation, state updates and `ResponsiveLayout`;
-- [x] preserve exact user-facing strings, torrent-generation choices, callbacks and torrent-creation semantics;
-- [x] add eight form/tooltip regressions (36 component tests total);
-- [x] regenerate deterministic localization extraction metadata with no canonical string changes;
-- [x] source-side component and focused localization/documentation validation;
-- [x] run both real-Windows full discovery commands at 370/370 with one expected skip;
-- [x] complete the real-Windows Create Torrent behavior/tooltips smoke before commit;
-- [x] commit/push as `e11e05eb50238d540e798cbb689476afc302d939` (`Migrate Create Torrent to reusable GUI components`).
+Audit `GuiEngine`, `MasterViewport`, `SceneManager`, desktop integration, runtime paths and related services for generic application-runtime ownership:
 
-Sixth tranche — backend-neutral runtime state lifecycle — complete/pushed (`30fee9f65ba08f1563f8a0a0f1b43d34eb046297`):
+- startup/shutdown;
+- composition-root ownership;
+- services and scheduling;
+- application events/task ownership;
+- scene/view lifecycle where generic;
+- presentation-host installation/teardown;
+- window/input integration;
+- resources/runtime paths;
+- generic diagnostics/failure isolation.
 
-- [x] add generic component `configure`, `exists`, `set_enabled` and `set_visible` helpers;
-- [x] add `ComponentGroup` for coordinated runtime state transitions across already-built controls;
-- [x] keep the contract renderer-neutral and avoid introducing an automatic observer/data-binding framework prematurely;
-- [x] migrate Create Torrent runtime reads and updates from direct Dear PyGui calls to component objects;
-- [x] preserve raw backend item IDs for `ResponsiveLayout` geometry compatibility only;
-- [x] remove the direct Dear PyGui import from `create_torrent_view.py`;
-- [x] add four runtime-state regressions (40 component tests total);
-- [x] regenerate deterministic localization extraction metadata with no canonical string changes;
-- [x] source-side component and focused localization/documentation validation;
-- [x] run both real-Windows full discovery commands at 374/374 with one expected skip;
-- [x] smoke Create Torrent source/output selection, busy/cancel transitions, progress/status updates and Start Seeding show/enable transitions;
-- [x] commit/push as `30fee9f65ba08f1563f8a0a0f1b43d34eb046297` (`Add backend-neutral component runtime state`).
+The engine must remain usable without a graphical backend.
 
-Seventh tranche — transfer utility dialogs and second runtime-state proof — complete/pushed (`3ee3982687810f709ab0a34312e8e8b73d47324e`):
+### A4. Generic network/runtime awareness
 
-- [x] add backend-neutral `Dialog` minimum-size and renderer-driven centering support;
-- [x] add `ProgressBar.set_overlay(...)` through the component runtime configuration boundary;
-- [x] migrate Open Magnet construction onto reusable dialog/row/input/button/progress/label components and application tooltip attachments;
-- [x] migrate Open Magnet input, progress, status, Add/Cancel and dialog visibility transitions onto component runtime APIs;
-- [x] preserve clipboard acquisition and responsive geometry services as separate application/backend concerns rather than forcing them into value binding;
-- [x] migrate Remove Torrent, Removal Notice, Force Recheck and Download Complete onto reusable dialog/control/profile structures;
-- [x] centralize magnet/remove/recheck/completion dialog dimensions in the SalixTorrent component profile;
-- [x] preserve removal safety, force-recheck behavior, completion/seeding-goal notifications, BEP-9 cancellation and auto-close semantics;
-- [x] add six additional component/dialog regressions (46 component tests total);
-- [x] regenerate deterministic localization extraction metadata with no canonical string changes;
-- [x] source-side component and focused localization/documentation validation;
-- [x] run both real-Windows full discovery commands at 380/380 with one expected skip;
-- [x] smoke Open Magnet add/cancel/auto-close plus remove/recheck/completion utility-dialog behavior;
-- [x] commit/push as `3ee3982687810f709ab0a34312e8e8b73d47324e` (`Migrate transfer dialogs to reusable GUI components`).
+Extract generic mechanism only:
 
-Eighth tranche — explicit synchronous value binding and Preferences runtime migration — complete/pushed (`665faab`):
+- IP/address normalization;
+- family and endpoint helpers;
+- interface discovery;
+- bind availability;
+- generic route/network-awareness primitives;
+- platform adapters where required.
 
-- [x] add backend-neutral `ValueBinding` and `BindingSet` contracts for named value synchronization;
-- [x] support explicit read/write transforms and per-binding defaults without implicit observers or background mutation;
-- [x] migrate Preferences ordinary settings collection/synchronization onto the binding contract;
-- [x] keep multi-control seeding-duration composition explicit rather than hiding it behind a fake one-control binding;
-- [x] move network-interface refresh and Preferences status/connectivity updates onto component APIs;
-- [x] replace remaining Preferences raw text/spacer construction with reusable components;
-- [x] remove the direct Dear PyGui import/calls from `settings_view.py`;
-- [x] keep Tk/native folder selection, networking services and `ResponsiveLayout` geometry as separate application concerns;
-- [x] preserve settings persistence, localization/canonical-choice conversion, seeding-goal bulk apply and user-facing strings;
-- [x] add five binding/runtime regressions (51 component tests total);
-- [x] regenerate deterministic localization extraction metadata with no canonical string changes;
-- [x] source-side component and focused localization/documentation validation;
-- [x] run both real-Windows full discovery commands at 385/385 with one expected skip;
-- [x] smoke Preferences load/save/restore, interface refresh, connectivity status, folder chooser, limits, desktop toggles and seeding defaults;
-- [x] commit/push as `665faab` (`Add explicit component value bindings`).
+Keep BitTorrent routing policy, trackers, DHT/PEX/LPD, peer sessions, listener policy, MSE/PE and torrent-specific diagnostics in SalixTorrent.
 
-Ninth tranche — renderer-neutral events and explicit disposal ownership — complete/pushed (`447c6296c37c288384345bebef220ac1e2901c22`):
+### A5. Second GUI implementation
 
-- [x] add immutable `ComponentEvent` metadata with semantic `ACTIVATE` and `CHANGE` event types;
-- [x] keep backend callback arguments inside the renderer bridge instead of exposing Dear PyGui sender/app-data/user-data conventions to reusable controls;
-- [x] replace reusable-control `user_data` with explicit backend-neutral `event_data`;
-- [x] add `action_callback(...)` for deliberate adaptation of existing no-argument application actions;
-- [x] propagate event metadata through labeled/composite value fields without adding observer/reactive behavior;
-- [x] add renderer-owned `destroy(...)` and explicit idempotent `Component.dispose()` lifecycle ownership;
-- [x] reject stale rendered handles through `require_item()` while allowing an explicitly rebuilt component to bind a fresh item;
-- [x] migrate callbacks for Create Torrent, Preferences and the already-componentized transfer utility dialogs through the event adapter;
-- [x] leave queue tables, context menus, high-frequency telemetry, native dialogs, networking services and responsive geometry at their existing application/backend boundaries;
-- [x] add seven event/lifecycle regressions (58 component tests total);
-- [x] regenerate deterministic localization extraction metadata with no canonical string changes;
-- [x] source-side component and focused localization/documentation validation;
-- [x] run both real-Windows full discovery commands at 392/392 with one expected skip;
-- [x] smoke Create Torrent, Preferences, Open Magnet, remove/recheck/completion dialog button actions and ordinary close/cancel paths;
-- [x] commit/push as `447c6296c37c288384345bebef220ac1e2901c22` (`Add renderer-neutral component events and disposal`).
+Introduce Tkinter incrementally as the compatibility implementation for the common presentation contracts.
 
-Tenth tranche — first physical framework boundary — complete/pushed (`bfc0e7a4fd5a49234425980c4dd5ce04f6f5a10f`):
+Initial proof should be a small backend-neutral demonstration application that can exercise the same semantic component/layout/application contracts with Dear PyGui or Tkinter.
 
-- [x] create a provisional internal `app/framework/` namespace without choosing the eventual external framework name;
-- [x] move the reusable property cascade and component implementations into that physical boundary;
-- [x] retain `app/engine/components/` and `app/engine/property_cascade.py` as temporary compatibility facades rather than breaking established imports during extraction;
-- [x] migrate SalixTorrent views, component profile/attachment adapters, documentation layout and component tests onto the new framework-facing imports;
-- [x] split concrete `DearPyGuiRenderer` implementation into `app/engine/component_renderers/` so the framework candidate does not import the desktop backend;
-- [x] replace hidden renderer selection with explicit `set_default_renderer(...)`, `get_default_renderer()` and `clear_default_renderer(...)` ownership;
-- [x] make `GuiEngine` construct, install, profile and clear the Dear PyGui renderer at the application composition root;
-- [x] add a source-level extraction audit rejecting engine/view/logic/localization/Dear PyGui imports from framework-candidate modules;
-- [x] preserve explicit bindings/events/disposal and avoid observers, automatic lifecycle management, or cosmetic table/graph wrapping;
-- [x] add five net component regressions (63 component tests total);
-- [x] preserve canonical UI/Help/Glossary wording and application/session persistence schemas;
-- [x] run focused real-Windows component/documentation/localization validation;
-- [x] run both real-Windows full discovery commands at 397/397 with one expected skip;
-- [x] smoke startup plus Create Torrent, Preferences, Open Magnet, utility-dialog actions, Help/Glossary tooltips and ordinary shutdown;
-- [x] commit/push as `bfc0e7a4fd5a49234425980c4dd5ce04f6f5a10f` (`Extract reusable GUI framework boundary`).
+Do **not** rewrite SalixTorrent wholesale in Tkinter and do not require identical capability/performance parity between backends.
 
-Eleventh tranche — framework documentation and pure geometry boundary — implementation complete:
+### A6. Rich live-data presentation
 
-- [x] extract pure geometry contracts from the Dear PyGui `ResponsiveLayout` dispatcher into `app/framework/geometry.py`;
-- [x] keep `app.engine.responsive_layout` as the concrete resize/event adapter and compatibility re-export boundary;
-- [x] move semantic documentation model, layout policy/cascade and typography/theme contracts into `app/framework/documentation/`;
-- [x] retain the concrete Dear PyGui `DocumentationRenderer` under `app/engine/documentation/renderer.py`;
-- [x] keep runtime-resource lookup, media cache, SalixTorrent `UiTypography`, resize watching and Dear PyGui ownership outside the reusable documentation contracts;
-- [x] retain engine documentation model/layout/typography paths as compatibility facades during extraction;
-- [x] migrate Help/Preferences and presentation tests onto framework-facing documentation/geometry imports where they consume reusable contracts;
-- [x] extend extraction audits to reject product/backend dependencies from framework documentation/geometry modules;
-- [x] add six documentation/framework-boundary regressions (23 documentation tests; 40 focused documentation/localization tests);
-- [x] regenerate deterministic localization extraction metadata with canonical wording unchanged at 1,337 entries;
-- [x] source-side component, responsive-layout and focused documentation/localization validation;
-- [ ] run both real-Windows full discovery commands and account for the expected 397 -> 403 test-count increase;
-- [ ] smoke Help Topics/Glossary at normal/maximized/resized layouts, documentation scale changes, Preferences documentation-scale persistence, and ordinary GUI shutdown.
+Audit the transfer queue, Peers, Pieces and Sources views for reusable patterns such as:
 
-## Priority B — user-facing durability
+- stable row identity;
+- incremental live updates;
+- filtering/sorting;
+- master/detail selection;
+- bounded state-grid/heat-map visualization;
+- status/health presentation.
+
+Only extract proven reusable semantics; avoid cosmetic wrappers around torrent-specific tables.
+
+### A7. WYSIWYG designer prerequisites
+
+After the runtime/presentation contracts are better proven, introduce the metadata needed by a future RAD editor:
+
+- component/type registry;
+- property metadata;
+- serializable hierarchy;
+- stable object identity;
+- command-based mutations;
+- undo/redo;
+- copy/paste;
+- project document/schema;
+- preview/runtime bridge.
+
+The future designer should itself use the same engine/framework wherever practical.
+
+### A8. Naming, public API and package/repository split
+
+This remains **after** the wider extraction.
+
+Do not freeze component terminology or external package names until:
+
+- engine lifecycle is reusable;
+- Dear PyGui is clearly an adapter;
+- a meaningful Tkinter slice implements the same contracts;
+- headless remains first-class;
+- realtime visualization is renderer-neutral;
+- rich live-data view auditing is substantially complete;
+- designer metadata requirements are understood;
+- a small non-SalixTorrent application can be created without copying SalixTorrent-specific code.
+
+## Priority B — user-facing SalixTorrent durability
 
 1. safe data relocation;
 2. labels/categories;
 3. watch folder;
-4. additional transfer-lifecycle polish discovered during seeding-goal mileage.
+4. additional transfer-lifecycle polish discovered through normal use.
+
+These should not interrupt Priority A merely because they are easier to ship.
 
 ## Priority C — privacy/network transport
 
 1. SOCKS5 proxy policy;
 2. uTP/BEP 29;
-3. WebSeed support.
+3. WebSeed support;
+4. additional cross-platform networking validation.
 
-## Priority D — release/content
+## Priority D — localization/release/content
 
-1. complete target locale population/review;
-2. Windows frozen/portable/installer localization smoke;
+1. complete target-locale population/review;
+2. Windows frozen/portable/installer localization smoke as locale content matures;
 3. Linux/BSD/macOS native desktop smoke;
-4. choose next release scope.
+4. preserve deterministic offline locale/review tooling.
 
 ## Priority E — later automation
 
@@ -758,124 +694,53 @@ Eleventh tranche — framework documentation and pure geometry boundary — impl
 
 ---
 
-# 14. Possible release themes
+# 14. Release and branch themes
 
-Version numbers below are planning examples, not commitments.
+Version numbers below remain planning guides rather than promises.
 
-## Current engineering checkpoint
-
-```text
-v0.4.0 — durability and transfer lifecycle
-```
-
-The v0.4.0 release consolidates the completed persistence, tracked-test, localization-foundation, and seeding-goal milestones behind the current `0.4.0` application version.
-
-## v0.4.0 release theme
-
-```text
-Durability and transfer lifecycle
-```
-
-Included release pillars:
-
-- stable backend-neutral application/session persistence;
-- tracked regression-suite ownership;
-- offline-first localization/framework foundations;
-- durable per-torrent seeding goals and automatic-stop policy.
-
-## Post-v0.4.0 GUI-framework direction
-
-The first component tranche is now implemented in source. It introduces a backend-neutral component model with a Dear PyGui renderer bridge, primitive controls, semantic sizing, and reusable composition objects.
-
-Current component hierarchy:
-
-```text
-Primitive controls
-    Label
-    Button
-    ComboBox
-    TextInput
-    NumericStepper
-    CheckBox
-    ProgressBar
-    Separator
-    Spacer
-        |
-        v
-Layout / structural composition
-    ControlRow
-    ControlColumn
-    ControlGrid
-    SectionPanel
-    Dialog
-        |
-        v
-Field composition
-    LabeledField
-        primary control + 0..n accessories
-    LabeledComboField
-    LabeledNumericField
-    NumericUnitField
-    DurationEditor
-
-Cross-cutting component hooks
-    post-build attachments
-        -> Tooltip
-        -> application-owned Help/Glossary/accessibility/diagnostic semantics
-```
-
-`ControlRow` is the generic single-row-capacity composition primitive: it accepts an arbitrary number of child components and resolves width, height and horizontal spacing independently through the existing framework property cascade. `AUTO` and `FILL` are semantic framework sizes; Dear PyGui-specific values are translated only inside the renderer bridge.
-
-The first live migration deliberately targeted the already-polished seeding-goal controls and is now Windows-validated:
-
-- Torrent Properties uses one dense `ControlRow` containing the existing goal-mode, ratio and D/H/M primitives;
-- `Configure targets...` uses labeled combo/numeric composites plus `DurationEditor`;
-- Preferences new-torrent defaults use the same semantic composites and duration editor.
-
-The second tranche broadens the same contract across Preferences. `LabeledField` provides the generic row shape for a label, one primary control and arbitrary trailing accessories; `NumericUnitField` is a convenience built on that contract rather than a parallel layout system. Preferences no longer constructs input/combo/checkbox value controls directly through Dear PyGui, while its surrounding panel/child-window structure remains intentionally application-specific. Existing raw item-id aliases are retained temporarily so persistence, refresh, tooltips and save/restore logic continue through their proven boundaries.
-
-The third tranche introduces renderer-selected `ComponentLayoutProfile` policy. Framework components select semantic profile slots for layout defaults; SalixTorrent's application profile centralizes the exact established Preferences and seeding-goal dimensions in one place. Missing slots fall back safely to framework `AUTO` sizing, sparse `ControlLayoutTheme` values remain the theme layer, and `ControlLayout` stays the explicit per-instance override. `DurationEditor` also resolves its aligned grid/input/column metrics from profile slots, so views no longer need to repeat those numbers. The tranche is now committed/pushed and Windows-validated at 354/354 with visual parity confirmed.
-
-The fourth tranche extends the reusable layer upward into structural composition without wrapping complex tables or telemetry views cosmetically. `SectionPanel` owns child-window/panel sizing, heading and separator structure; `Dialog` owns window/dialog construction and semantic profile sizing; `ControlRow` and `ControlColumn` support context-managed incremental migration where existing view logic still needs imperative construction. Preferences now uses those structural boundaries instead of direct Dear PyGui groups/child windows, and `Configure targets...` uses the reusable dialog boundary. The same tranche adds a generic post-build attachment hook so future tooltip/accessibility metadata can attach to components without embedding SalixTorrent-specific Help semantics in the framework.
-
-The fifth tranche proves those contracts on a complete ordinary form. Create Torrent now uses framework-owned rows, panels, value controls and profile dimensions throughout its construction path, including a reusable `ProgressBar`. Generic `Tooltip` attachments call the active renderer rather than Dear PyGui directly, while a SalixTorrent adapter converts glossary/help terms into tooltip text.
-
-The sixth tranche separates runtime component state from Dear PyGui as well. Generic components can now configure their rendered item, query existence, toggle enabled/visible state, and coordinate those transitions through `ComponentGroup`. Create Torrent uses component value/state APIs for its entire runtime workflow, while raw backend IDs remain only where the established `ResponsiveLayout` geometry service still requires them. This is intentionally a small lifecycle contract derived from proven duplication, not an automatic observer/data-binding subsystem.
-
-The seventh tranche proves that lifecycle on a second independent workflow and broadens ordinary dialog reuse. Open Magnet now uses component-owned input/progress/status/button state, including progress overlay updates and dialog visibility, while `Dialog` itself can express minimum size and delegate viewport centering through the renderer. Remove Torrent, Removal Notice, Force Recheck and Download Complete use the same reusable dialog/control/profile boundary, leaving tables, row popups and high-frequency telemetry deliberately untouched. It is committed/pushed and Windows-validated at 380/380.
-
-The eighth tranche adds the minimal explicit synchronization contract justified by the duplicated form/settings code: `ValueBinding` maps one named application value to one `ValueComponent`, with explicit presentation/model transforms and defaults, while `BindingSet` collects or applies those bindings only when application code calls it. Preferences now uses that contract for ordinary persisted values and component APIs for status/connectivity updates, eliminating direct Dear PyGui usage from `settings_view.py`. This remains intentionally synchronous rather than observer/reactive, and is pushed/Windows-validated at 385/385.
-
-The ninth tranche formalizes the two renderer-adjacent boundaries exposed by that extraction. Reusable controls now emit immutable `ComponentEvent` objects with semantic `ACTIVATE`/`CHANGE` types and explicit application `event_data`; backend callback tuple conventions stay inside `ComponentRenderer`. Existing command-style view actions are adapted deliberately through `action_callback(...)` rather than relying on renderer argument quirks. In parallel, rendered lifetime gains explicit renderer-owned `destroy(...)` and idempotent `Component.dispose()` semantics, with stale backend handles rejected before state/value operations. No observer system, automatic teardown manager, or application-service ownership is introduced. It is pushed/Windows-validated at 392/392 under `447c6296c37c288384345bebef220ac1e2901c22`.
-
-The tenth tranche begins the first physical extraction without freezing final framework naming. Reusable property-cascade and component implementations move under the provisional internal `app.framework` boundary, while the old engine paths remain temporary compatibility facades. Dear PyGui becomes a concrete engine/backend adapter rather than part of the framework core, and `GuiEngine` explicitly installs/clears that renderer at the composition root. A source audit enforces that framework-candidate modules do not import SalixTorrent engine/view/logic/localization layers or Dear PyGui. It is pushed/Windows-validated at 397/397 under `bfc0e7a4fd5a49234425980c4dd5ce04f6f5a10f`.
-
-The eleventh tranche proves that physical boundary with a second independent reusable subsystem. Pure alignment/content/split/fill/dialog geometry moves to `app.framework.geometry`, while the Dear PyGui `ResponsiveLayout` dispatcher remains an engine adapter. Semantic documentation model/layout/typography contracts move to `app.framework.documentation`; the concrete `DocumentationRenderer` deliberately remains in the engine because it owns Dear PyGui, resource paths, application typography, media and resize callbacks. Compatibility facades preserve the former engine documentation import paths during extraction. It is pushed/Windows-validated at 403/403 under `1f70669678b3621718467b60e2fcb94aa8e77642`.
-
-The twelfth tranche proves package relocation ergonomics before any external repository split. All dependencies inside `app/framework/` now use package-relative imports, so the framework tree does not hard-code SalixTorrent's `app.framework` namespace internally. A packaging regression copies that directory to a temporary package named `portable_framework`, imports every module under Python isolated mode, and confirms that neither SalixTorrent's `app` package nor Dear PyGui is loaded. A second probe exercises representative component, documentation, geometry and property-cascade contracts from the renamed package, while a source audit restricts absolute framework dependencies to the Python standard library. The provisional framework root intentionally does not publish a version or wildcard public surface yet. It is pushed/Windows-validated at 408/408 under `cb019feb16362534367af168aa39706cc4808824`; live Active Transfers smoke also confirmed the Speed graph updating while a selected torrent was seeding with connected peers.
-
-The thirteenth tranche proves the remaining responsive-layout boundary instead of moving Dear PyGui state wholesale. `app.framework.responsive` introduces the backend-neutral `LayoutHost` contract plus `LayoutCoordinator`, which owns keyed viewport/item callbacks, explicit refresh/trigger behavior, item-watch replacement, safe callback dispatch, item-size normalization, and memoized width/height/size/wrap/indent/dialog geometry. `app.engine.layout_hosts.dearpygui` owns the concrete viewport callback adaptation, item-handler registry lifecycle, item rectangle reads, existence checks, and `configure_item(...)` calls. `app.engine.responsive_layout.ResponsiveLayout` remains the SalixTorrent singleton/composition facade so existing views do not change API. The isolated package-relocation probe now exercises this coordinator too. Seven net responsive-layout regressions advance the suite from 408 to 415. The tranche passed 415/415 on both Windows discovery paths, passed live startup/navigation/resizing/dialog/help/shutdown smoke, and was pushed at `ab1b3f6d1ba3fa697aabd5e0970a4ae0822e367d`.
-
-This tranche closes the **v0.5.0 reusable GUI component foundation feature scope**. No further extraction feature tranche is required for the release. The dedicated v0.5.0 release-preparation change advances `APP_VERSION`, freezes release-facing documentation, aligns the Inno fallback version with application metadata, and adds one release-packaging consistency regression. The release commit must pass the complete 416-test Windows gate plus GUI/CLI/portable/installer/frozen-version verification, be pushed, and only then receive the annotated `v0.5.0` tag. Final external framework repository/name/API extraction remains a later project boundary and is not required to ship SalixTorrent v0.5.0.
-
-Names such as `components`, `SectionPanel`, `Dialog`, and profile identifiers remain working extraction names. Final RAD-framework naming and public API terminology are deliberately deferred until the full reusable boundary has been extracted and proven.
-
-### v0.5.0 release theme
+## v0.5.0 — released
 
 ```text
 Reusable GUI component foundation
 ```
 
-Release-preparation path after the responsive-coordination tranche validated:
+Release commit/tag target:
 
-- create this dedicated v0.5.0 release-preparation commit rather than another feature/extraction tranche;
-- bump the application version to `0.5.0` only in the release-preparation change and update release-facing README/changelog/roadmap state;
-- rerun the complete 416-test Windows regression suite and explicit framework/component/documentation/release-packaging gates;
-- rebuild standalone GUI and CLI artifacts, the portable ZIP, and the Inno Setup installer;
-- verify the frozen CLI reports `SalixTorrent 0.5.0`;
-- push the release-preparation commit before creating the annotated `v0.5.0` tag;
-- keep external framework repository naming/public API work for a later deliberate boundary rather than making it a prerequisite for this SalixTorrent release;
-- continue avoiding cosmetic conversion of complex transfer tables/graphs and keep clipboard/native dialogs/networking/application services outside the generic component framework.
+```text
+d403c47f98f7e30d8adf879cd04e098dabc8767e
+v0.5.0
+```
+
+Release pillars:
+
+- backend-neutral component and composition foundation;
+- explicit binding/event/disposal semantics;
+- semantic documentation and pure geometry;
+- framework package-relocation proof;
+- backend-neutral responsive coordination;
+- Dear PyGui isolated as the current concrete desktop adapter;
+- 416 / 416 real-Windows release tests with one expected non-Windows skip;
+- standalone GUI/CLI, portable ZIP and installer release artifacts.
+
+## Post-v0.5.0 development theme
+
+```text
+Modular application ecosystem extraction
+```
+
+The active `dev` line now broadens the work in two directions at once:
+
+```text
+reusable application engine/runtime
+            +
+optional RAD/application framework
+            +
+presentation/platform adapters
+```
+
+Dear PyGui remains the reference GUI backend. Tkinter is the planned compatibility backend for the common GUI surface. Headless/CLI remains a first-class execution profile. Future GLFW/OpenGL or other backends are allowed by the architecture when a real project justifies them; they are not current dependencies.
+
+A future v0.6.0 may consolidate a coherent portion of this ecosystem work, but the release number should follow proven scope rather than drive it.
 
 ## Later network release
 
@@ -894,76 +759,71 @@ Possible contents:
 
 # 15. Engineering rules
 
-1. Preserve shared GUI/headless engine paths.
-2. Avoid alternate implementations of add/start/pause/restore behavior.
-3. Keep protocol identity/storage verification explicit.
-4. Keep optional dependencies lazy until deliberately promoted.
-5. Prefer event/timer-driven work over polling.
-6. Keep peer/block/network hot-path state out of ORM storage.
-7. Preserve JSON/file compatibility until deliberately retired.
-8. Treat corrupt durable state fail-closed where silent replacement destroys recovery evidence.
-9. Keep maintained regression tests in version control once the test-tree migration lands.
-10. Add regression coverage before declaring milestones complete.
-11. Run real Windows smoke tests for persistence/packaging features.
-12. Fix genuine SalixORM correctness defects in SalixORM.
-13. Do not tag/bump versions without a deliberate release gate.
+1. Keep `main` stable and released; perform active extraction/integration work on `dev`.
+2. Preserve shared GUI/headless engine behavior and keep headless operation first-class.
+3. Treat the ecosystem as cohesive but modular: applications should import only the capabilities they need.
+4. Keep Dear PyGui as the current reference presentation backend without allowing Dear PyGui concepts to define generic contracts.
+5. Use Tkinter as the planned compatibility implementation to challenge backend assumptions; do not force identical feature parity.
+6. Keep UI-backend selection conceptually separate from hardware/3D acceleration.
+7. Application/view code should depend on semantic contracts rather than branch on Dear PyGui versus Tkinter for ordinary framework behavior.
+8. Prefer small backend contracts plus explicit capabilities over one premature monolithic presentation interface.
+9. Extract generic mechanism; keep BitTorrent/product policy in SalixTorrent and OS/toolkit details in adapters.
+10. Do not freeze framework/engine names or a public third-party API until the wider extraction and second-backend proof are mature.
+11. Do not wrap complex tables/graphs cosmetically; generalize only when reusable semantics are demonstrated.
+12. Prefer event/timer-driven work over polling.
+13. Keep peer/block/network hot-path state out of ORM storage.
+14. Preserve JSON/file compatibility until deliberately retired.
+15. Treat corrupt durable state fail-closed where silent replacement destroys recovery evidence.
+16. Keep maintained regression tests in version control and add regressions for new boundaries.
+17. Run real Windows smoke/release gates before merging a release candidate back to `main`.
+18. Fix genuine SalixORM correctness defects in SalixORM rather than compensating for them in application code.
+19. Do not tag/bump versions without a deliberate release gate.
+20. Keep final WYSIWYG designer metadata driven by proven runtime/component contracts rather than designing the editor model in isolation.
 
 ---
 
 # 16. Current validation checkpoint
 
 ```text
-Current real Windows feature validation:
-seeding policy: 14 / 14 OK
-application settings persistence: 12 / 12 OK
-session persistence: 34 / 34 OK
-semantic-documentation + localization-UI focus: 17 / 17 OK
+Released SalixTorrent:
+version:                         0.5.0
+release commit:                  d403c47f98f7e30d8adf879cd04e098dabc8767e
+annotated tag:                   v0.5.0
 
-Full canonical discovery (current pushed tranche 12):
-408 / 408 OK
-1 expected non-Windows skip
+Real Windows release gate:
+canonical discovery:             416 / 416 OK, skipped=1
+plain discovery:                 416 / 416 OK, skipped=1
+component focus:                  63 / 63 OK
+responsive-layout focus:          14 / 14 OK
+framework packaging focus:         5 / 5 OK
+documentation/localization:       40 / 40 OK
 
-Plain repository-root discovery (current pushed tranche 12):
-408 / 408 OK
-1 expected non-Windows skip
+Release artifacts:
+standalone GUI:                  built/smoked
+standalone CLI:                  built/smoked
+portable ZIP:                    built/smoked
+Inno Setup installer:            built/smoked
+frozen CLI version:              SalixTorrent 0.5.0
 
-Tranche 13 prepared target:
-415 tests total
-14 / 14 responsive-layout tests
-5 / 5 framework packaging/relocation tests
-63 / 63 component tests
-40 / 40 focused documentation/localization tests
+Development workflow:
+main:                            stable v0.5.0 release line
+dev:                             created from current main and tracks origin/dev
+working tree at branch creation: clean
 
 Localization:
-canonical catalog: 1337 entries
-UI: 695
-Help: 260
-Glossary: 382
-extraction/manifests: current
-pseudo locale: OK
-offline validation: OK with expected incomplete-target warnings
-translation-memory parity: 432 / 432
+canonical catalog:               1337 entries
+UI:                              695
+Help:                            260
+Glossary:                        382
+extraction/manifests:            current
+translation-memory parity:       432 / 432
 
 Current session persistence:
-snapshot version 9
-historical JSON versions 1-8 accepted
-SalixORM migration head session-state-0003
-historical SalixORM v7/v8 upgrades covered by regression
-
-Previous live SalixORM session smoke (pre-v8):
-migration session-state-0001
-snapshot version 7
-2 persisted torrents
-beta before alpha
-beta priority High
-both Stopped
-alpha selected
-process restart restored 2 torrents
-first GUI frame displayed persisted queue order
+snapshot version:                9
+historical JSON versions:        1-8 accepted
+SalixORM migration head:         session-state-0003
 ```
 
-The v0.4.0 release baseline remains 334/334 tests with one expected non-Windows skip. The first GUI-component tranche is committed/pushed at `66b46fa7070128f13bc87fbe4f9556a86049e895` and passed 343/343 on the real Windows checkout. The second Preferences-composition tranche is committed/pushed at `139931246280818694de1920b4b49c4e5cf734ca` and passed 348/348. The third component-profile tranche is committed/pushed at `f5e30e30012958429240bcf2646ac9a09d348de5` and passed 354/354. The fourth structural tranche is committed/pushed at `61d9d8424eecfbf3201d529d824fc68a85f079d5` and passed 362/362. The Create Torrent form/tooltip tranche is committed/pushed at `e11e05eb50238d540e798cbb689476afc302d939` and passed 370/370 on the real Windows checkout. The runtime-state tranche is committed/pushed at `30fee9f65ba08f1563f8a0a0f1b43d34eb046297` and passed 374/374. The transfer-dialog tranche is committed/pushed at `3ee3982687810f709ab0a34312e8e8b73d47324e` and passed 380/380. The explicit Preferences-binding tranche is committed/pushed at `665faab` and passed 385/385. The renderer-neutral event/disposal tranche is committed/pushed at `447c6296c37c288384345bebef220ac1e2901c22` and passed 392/392. The first physical framework-boundary tranche is committed/pushed at `bfc0e7a4fd5a49234425980c4dd5ce04f6f5a10f` and passed 397/397 on Windows. The documentation/geometry tranche is committed/pushed at `1f70669678b3621718467b60e2fcb94aa8e77642` and passed 403/403. The package-relocation tranche is committed/pushed at `cb019feb16362534367af168aa39706cc4808824` and passed 408/408. The responsive-coordination tranche is committed/pushed at `ab1b3f6d1ba3fa697aabd5e0970a4ae0822e367d` and passed 415/415 on both real-Windows discovery paths with the expected single skip. The release-preparation change adds one generic packaging-version consistency regression, producing a 416-test v0.5.0 release gate while keeping the 63 component, 14 responsive-layout, 40 focused documentation/localization, and 5 framework-packaging gates unchanged.
+The v0.5.0 live/release smoke covered startup/navigation, repeated resizing, ordinary dialogs, Help/Glossary, clean shutdown, live Speed-history updates while seeding, standalone and portable launches, installer behavior, and frozen version identity.
 
-The v0.5.0 feature-close smoke confirmed Active Transfers, Create Torrent, Preferences, Help/Glossary, ordinary dialogs, repeated viewport resizing, clean shutdown, and live Speed-history updates while seeding with connected peers.
-
-The v0.4.0 live GUI smoke covers per-torrent editing, additive Days/Hours/Minutes quick controls, explicit bulk Preferences application, persistence, in-app/native notifications, instanced time-based automatic stop, Days/Hours/Minutes exact editors, stacked compact duration controls, and the widened Preferences ratio field. Ratio-threshold behavior remains covered by deterministic regressions without requiring a second live peer. Future changes must preserve the applicable baseline or account explicitly for every intentional test-count change.
+Post-v0.5.0 development should preserve this release boundary while accounting explicitly for every intentional test-count or behavior change introduced on `dev`.

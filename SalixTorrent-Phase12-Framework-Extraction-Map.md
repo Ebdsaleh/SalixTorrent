@@ -4,6 +4,8 @@
 
 **Purpose:** Define the boundary between reusable localization infrastructure and SalixTorrent-specific adapters before the future umbrella application framework is split into its own repository.
 
+> **Post-v0.5.0 note:** this document remains the localization-specific extraction map for the Phase 12 work. The broader application-engine, RAD-framework, presentation-backend, headless, Tkinter-compatibility and future WYSIWYG direction is now defined in `SalixTorrent-Ecosystem-Architecture.md`. Final external package names and public APIs remain intentionally unfrozen while that wider boundary is still being discovered.
+
 ---
 
 ## 1. Why this extraction boundary exists
