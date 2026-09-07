@@ -57,7 +57,9 @@ class RuntimePackagingTests(unittest.TestCase):
                     importlib.import_module(module.name)
                     imported.append(module.name)
 
+                assert "portable_runtime.application" in imported
                 assert "portable_runtime.lifecycle" in imported
+                assert "portable_runtime.presentation" in imported
                 assert "portable_runtime.scenes" in imported
                 assert "portable_runtime.network" in imported
                 assert "portable_runtime.paths" in imported
@@ -75,7 +77,7 @@ class RuntimePackagingTests(unittest.TestCase):
                 check=False,
             )
             self.assertEqual(0, result.returncode, result.stderr or result.stdout)
-            self.assertGreaterEqual(int(result.stdout.strip()), 6)
+            self.assertGreaterEqual(int(result.stdout.strip()), 8)
 
     def test_relocated_runtime_contracts_are_usable_without_application_package(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -88,11 +90,15 @@ class RuntimePackagingTests(unittest.TestCase):
                 from pathlib import Path
                 sys.path.insert(0, {str(temp_root)!r})
 
+                from portable_runtime.application import ApplicationSpec
                 from portable_runtime.lifecycle import ApplicationRuntime, CallbackService
                 from portable_runtime.network import format_endpoint, normalise_bind_address
                 from portable_runtime.paths import RuntimePathSpec, RuntimePaths
+                from portable_runtime.presentation import PresentationBackend, PresentationCapability
                 from portable_runtime.scenes import SceneRegistry
 
+                spec = ApplicationSpec("PortableProbe", target_fps=20)
+                presentation = PresentationBackend("headless")
                 calls = []
                 runtime = ApplicationRuntime()
                 runtime.services.register("probe", CallbackService(on_update=lambda delta: calls.append(delta)))
@@ -118,6 +124,8 @@ class RuntimePackagingTests(unittest.TestCase):
                 )
 
                 assert calls[0] == 0.5
+                assert spec.frame_interval_seconds == 0.05
+                assert presentation.supports(PresentationCapability.COMPONENTS) is False
                 assert normalise_bind_address("2001:0db8::1") == "2001:db8::1"
                 assert format_endpoint("2001:db8::1", 80) == "[2001:db8::1]:80"
                 assert paths.default_download_directory().name == "PortableProbe"

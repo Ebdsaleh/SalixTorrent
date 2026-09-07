@@ -1,0 +1,298 @@
+from __future__ import annotations
+
+import ast
+import subprocess
+import sys
+import unittest
+
+from tests.helpers import PROJECT_ROOT
+
+from app.engine.application_hosts.tkinter import TkinterApplicationHost
+from app.engine.component_renderers import TkinterRenderer
+from app.engine.layout_hosts import TkinterLayoutHost
+from app.engine.plot_hosts import TkinterPlotHost
+from app.engine.presentation_backends import create_tkinter_backend
+from app.engine.scene_hosts import TkinterSceneHost
+from app.framework.components import (
+    Button,
+    CheckBox,
+    ComboBox,
+    ComponentEventType,
+    ComponentRenderer,
+    ControlColumn,
+    ControlGrid,
+    ControlLayout,
+    Dialog,
+    FILL,
+    Label,
+    NumericKind,
+    NumericStepper,
+    ProgressBar,
+    TextInput,
+)
+from app.framework.responsive import LayoutCoordinator, LayoutHost
+from app.framework.visualization import (
+    PlotFrame,
+    PlotHost,
+    PlotSeriesData,
+    PlotSeriesSpec,
+    RealtimeGraph,
+)
+from app.runtime.application import ApplicationHost, ApplicationSpec
+from app.runtime.lifecycle import ApplicationRuntime, CallbackService, RuntimeState
+from app.runtime.presentation import PresentationCapability
+from app.runtime.scenes import SceneHost, SceneRegistry
+
+
+class TkinterSourceBoundaryTests(unittest.TestCase):
+    def test_tkinter_adapters_do_not_import_dearpygui_or_salix_product_layers(self):
+        paths = (
+            PROJECT_ROOT / "app" / "engine" / "component_renderers" / "tkinter.py",
+            PROJECT_ROOT / "app" / "engine" / "layout_hosts" / "tkinter.py",
+            PROJECT_ROOT / "app" / "engine" / "plot_hosts" / "tkinter.py",
+            PROJECT_ROOT / "app" / "engine" / "scene_hosts" / "tkinter.py",
+            PROJECT_ROOT / "app" / "engine" / "presentation_backends" / "tkinter.py",
+            PROJECT_ROOT / "app" / "engine" / "application_hosts" / "tkinter.py",
+        )
+        forbidden = ("dearpygui", "app.logic", "app.views", "app.localization")
+        for path in paths:
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+            imports = []
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    imports.extend(alias.name for alias in node.names)
+                elif isinstance(node, ast.ImportFrom) and node.module:
+                    imports.append(node.module)
+            self.assertFalse(
+                any(name.startswith(forbidden) for name in imports),
+                str(path.relative_to(PROJECT_ROOT)),
+            )
+
+
+class TkinterBackendLiveTests(unittest.TestCase):
+    def setUp(self):
+        try:
+            import tkinter as tk
+
+            self.root = tk.Tk()
+            self.root.withdraw()
+            self.root.geometry("640x480")
+            self.root.update_idletasks()
+        except Exception as exc:
+            self.skipTest(f"Tk display unavailable: {exc}")
+        self.renderer = TkinterRenderer(self.root)
+
+    def tearDown(self):
+        root = getattr(self, "root", None)
+        if root is not None:
+            try:
+                root.destroy()
+            except Exception:
+                pass
+
+    def test_renderer_and_hosts_satisfy_existing_backend_contracts(self):
+        layout_host = TkinterLayoutHost(self.renderer)
+        scene_host = TkinterSceneHost(self.renderer)
+        plot_host = TkinterPlotHost(self.renderer)
+        self.assertIsInstance(self.renderer, ComponentRenderer)
+        self.assertIsInstance(layout_host, LayoutHost)
+        self.assertIsInstance(scene_host, SceneHost)
+        self.assertIsInstance(plot_host, PlotHost)
+
+    def test_backend_factory_exposes_common_capabilities(self):
+        backend = create_tkinter_backend(self.root)
+        self.assertEqual(backend.name, "tkinter")
+        for capability in (
+            PresentationCapability.COMPONENTS,
+            PresentationCapability.RESPONSIVE_LAYOUT,
+            PresentationCapability.SCENES,
+            PresentationCapability.REALTIME_PLOTS,
+        ):
+            self.assertTrue(backend.supports(capability))
+
+    def test_common_component_tree_builds_and_round_trips_values(self):
+        name = TextInput(default_value="Ada", layout=ControlLayout(width=180))
+        mode = ComboBox(("One", "Two"), default_value="One")
+        count = NumericStepper(kind=NumericKind.INTEGER, default_value=3)
+        enabled = CheckBox("Enabled", default_value=True)
+        progress = ProgressBar(default_value=0.25, overlay="25%")
+        root = ControlColumn((Label("Demo"), name, mode, count, enabled, progress))
+        root.build(renderer=self.renderer)
+        self.root.update_idletasks()
+
+        self.assertEqual(name.get_value(), "Ada")
+        self.assertEqual(mode.get_value(), "One")
+        self.assertEqual(int(count.get_value()), 3)
+        self.assertTrue(bool(enabled.get_value()))
+        self.assertAlmostEqual(float(progress.get_value()), 0.25)
+
+        name.set_value("Grace")
+        mode.set_value("Two")
+        count.set_value(7)
+        enabled.set_value(False)
+        progress.set_value(0.75)
+        progress.set_overlay("75%")
+        self.assertEqual(name.get_value(), "Grace")
+        self.assertEqual(mode.get_value(), "Two")
+        self.assertEqual(int(count.get_value()), 7)
+        self.assertFalse(bool(enabled.get_value()))
+        self.assertAlmostEqual(float(progress.get_value()), 0.75)
+
+    def test_button_dispatches_normalized_component_event(self):
+        received = []
+        button = Button("Run", callback=received.append, event_data={"id": 4})
+        button.build(renderer=self.renderer)
+        self.renderer.native_widget(button.require_item()).invoke()
+        self.assertEqual(len(received), 1)
+        self.assertIs(received[0].source, button)
+        self.assertEqual(received[0].event_type, ComponentEventType.ACTIVATE)
+        self.assertEqual(received[0].data, {"id": 4})
+
+    def test_combo_items_visibility_enabled_state_and_disposal_are_backend_neutral(self):
+        combo = ComboBox(("A", "B"), default_value="A")
+        combo.build(renderer=self.renderer)
+        combo.set_items(("B", "C"))
+        widget = self.renderer.native_widget(combo.require_item())
+        self.assertEqual(tuple(widget.cget("values")), ("B", "C"))
+
+        combo.set_enabled(False)
+        self.assertIn("disabled", widget.state())
+        combo.set_enabled(True)
+        self.assertNotIn("disabled", widget.state())
+
+        mount = combo.require_item().mount
+        combo.set_visible(False)
+        self.assertEqual(mount.winfo_manager(), "")
+        combo.set_visible(True)
+        self.assertTrue(mount.winfo_manager())
+        self.assertTrue(combo.dispose())
+        self.assertFalse(combo.exists())
+
+    def test_grid_and_dialog_composition_build_without_toolkit_leaks(self):
+        grid = ControlGrid(
+            ((Label("Name"), TextInput(default_value="Ada")),),
+            column_widths=(90, 180),
+        )
+        grid.build(renderer=self.renderer)
+        dialog = Dialog(
+            "Example",
+            (Label("Hello"),),
+            show=False,
+            minimum_size=(240, 120),
+        )
+        dialog.build(renderer=self.renderer)
+        self.assertTrue(grid.exists())
+        self.assertTrue(dialog.exists())
+        dialog.show_centered()
+        self.root.update_idletasks()
+        widget = self.renderer.native_widget(dialog.require_item())
+        self.assertNotEqual(str(widget.state()), "withdrawn")
+        dialog.dispose()
+
+    def test_tooltip_attachment_is_supported_by_compatibility_renderer(self):
+        label = Label("Hover")
+        label.build(renderer=self.renderer)
+        tooltip = self.renderer.attach_tooltip(label.require_item(), "Details", wrap=220)
+        self.assertIsNotNone(tooltip)
+        tooltip.destroy()
+
+    def test_layout_coordinator_uses_tkinter_host_without_framework_changes(self):
+        column = ControlColumn((Label("Sized"),), layout=ControlLayout(width=FILL))
+        column.build(renderer=self.renderer)
+        self.root.deiconify()
+        self.root.update_idletasks()
+        coordinator = LayoutCoordinator(TkinterLayoutHost(self.renderer))
+        width, height = coordinator.item_size(column.require_item())
+        self.assertGreaterEqual(width, 0)
+        self.assertGreaterEqual(height, 0)
+        self.assertTrue(coordinator.width(column.require_item(), 260))
+
+    def test_scene_registry_switches_tkinter_containers_through_same_contract(self):
+        first = ControlColumn((Label("First"),))
+        second = ControlColumn((Label("Second"),))
+        first.build(renderer=self.renderer)
+        second.build(renderer=self.renderer)
+        registry = SceneRegistry(TkinterSceneHost(self.renderer))
+        registry.register("first", object(), container=first.require_item())
+        registry.register("second", object(), container=second.require_item())
+        self.assertTrue(registry.activate("first"))
+        self.assertTrue(first.require_item().mount.winfo_manager())
+        self.assertEqual(second.require_item().mount.winfo_manager(), "")
+        self.assertTrue(registry.activate("second"))
+        self.assertEqual(first.require_item().mount.winfo_manager(), "")
+        self.assertTrue(second.require_item().mount.winfo_manager())
+
+    def test_realtime_graph_renders_through_tkinter_canvas_host(self):
+        parent = ControlColumn(layout=ControlLayout(width=FILL, height=220))
+        parent.build(renderer=self.renderer)
+        graph = RealtimeGraph(
+            TkinterPlotHost(self.renderer),
+            (PlotSeriesSpec("one", "One"), PlotSeriesSpec("two", "Two")),
+        )
+        graph.build(
+            parent=parent.require_item(),
+            x_label="Seconds",
+            y_label="Value",
+            width=420,
+            height=180,
+        )
+        graph.render(
+            PlotFrame(
+                x_limits=(-2, 0),
+                y_limits=(0, 10),
+                y_label="Units",
+                series=(
+                    PlotSeriesData("one", (-2, -1, 0), (1, 4, 2)),
+                    PlotSeriesData("two", (-2, -1, 0), (3, 2, 8)),
+                ),
+            )
+        )
+        self.root.deiconify()
+        self.root.update_idletasks()
+        binding = graph.require_binding()
+        self.assertGreater(len(binding.plot.canvas.find_all()), 0)
+        graph.clear()
+        graph.dispose()
+        self.assertFalse(graph.exists())
+
+    def test_blank_application_demo_runs_tkinter_backend_and_auto_closes(self):
+        example = PROJECT_ROOT / "examples" / "ecosystem_blank_app.py"
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(example),
+                "--ui-backend",
+                "tkinter",
+                "--smoke-seconds",
+                "0.15",
+            ],
+            cwd=PROJECT_ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=10,
+        )
+        self.assertEqual(0, result.returncode, result.stderr or result.stdout)
+
+    def test_tkinter_application_host_drives_shared_runtime_and_closes_cleanly(self):
+        root = self.root
+        runtime = ApplicationRuntime()
+        updates = []
+        host = TkinterApplicationHost(
+            ApplicationSpec("HostProbe", width=500, height=360),
+            runtime=runtime,
+            root=root,
+        )
+        runtime.services.register("probe", CallbackService(on_update=updates.append))
+        host.build(ControlColumn((Label("Host"), Button("Stop", callback=lambda _e: host.request_stop()))))
+        root.deiconify()
+        root.after(80, host.request_stop)
+        self.assertIsInstance(host, ApplicationHost)
+        self.assertEqual(host.run(), 0)
+        self.root = None  # host owns/destroys the supplied root
+        self.assertGreaterEqual(len(updates), 1)
+        self.assertEqual(runtime.state, RuntimeState.STOPPED)
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

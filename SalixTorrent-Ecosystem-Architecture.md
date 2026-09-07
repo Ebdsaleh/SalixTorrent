@@ -62,7 +62,7 @@ Application Engine / Runtime                   reusable
 Backend / Platform Adapters
         |
         +-- Dear PyGui                         current reference GUI backend
-        +-- Tkinter                            planned compatibility GUI backend
+        +-- Tkinter                            prepared compatibility GUI backend
         +-- headless / CLI                     already proven presentation mode
         +-- OS-specific desktop/network adapters
         +-- future GLFW/OpenGL or other backends where justified
@@ -96,9 +96,9 @@ engine/runtime
 + Tkinter presentation backend
 ```
 
-Tkinter is the planned standard-library-compatible reference implementation for the common desktop surface. It should prove that framework contracts are not merely Dear PyGui concepts moved behind different names.
+Tkinter is the prepared standard-library-compatible compatibility implementation for the common desktop surface. It proves that framework contracts can be implemented without Dear PyGui while keeping application definitions backend-neutral.
 
-Tkinter is **not yet** a complete SalixTorrent presentation backend. Current source uses Tk support only for native file/folder dialogs. A full Tkinter backend must be introduced incrementally behind the same framework-facing contracts.
+Tkinter is **not** a complete SalixTorrent presentation rewrite and this tranche does not claim feature parity with Dear PyGui. The compatibility backend is introduced incrementally behind the same framework-facing contracts and is first proven by the product-neutral blank-application example.
 
 ### Headless / CLI
 
@@ -220,7 +220,7 @@ generic rolling/time-series model
 generic realtime graph contract
         |
         +-- Dear PyGui plot adapter
-        +-- future Tkinter Canvas adapter
+        +-- Tkinter Canvas adapter       prepared in ecosystem tranche 3
 ```
 
 Likely reusable concepts include:
@@ -420,17 +420,17 @@ The initial ownership map is now established for the first extraction candidates
 
 ### Stage B — realtime data and visualization
 
-The first implementation tranche is complete, Windows-validated, committed and pushed on `dev` at `ef8b4be998a714a86455940d8642fdd926a6609d`. Backend-neutral rolling telemetry/statistics and realtime graph coordination live in the provisional framework, while Dear PyGui plot operations live in a concrete plot host. SalixTorrent's existing Speed snapshot/labels/rate semantics remain application-owned. A future Tkinter Canvas implementation should consume the same plot-facing contract rather than duplicate application logic.
+The first implementation tranche is complete, Windows-validated, committed and pushed on `dev` at `ef8b4be998a714a86455940d8642fdd926a6609d`. Backend-neutral rolling telemetry/statistics and realtime graph coordination live in the provisional framework, while Dear PyGui plot operations live in a concrete plot host. SalixTorrent's existing Speed snapshot/labels/rate semantics remain application-owned. Ecosystem tranche 3 now provides a Tkinter Canvas implementation that consumes the same plot-facing contract rather than duplicating application logic.
 
 ### Stage C — engine/runtime services
 
-The second implementation tranche is prepared around a standard-library-only `app/runtime/` package. It extracts explicit application/service lifecycle, scene registration, generic failure reporting, parameterized runtime paths, and generic dual-stack interface/address/source-binding mechanisms. Dear PyGui scene visibility remains a concrete engine adapter, and BitTorrent network policy remains in SalixTorrent. The same `ApplicationRuntime` now drives both desktop update services and headless torrent-engine startup/shutdown, proving that the runtime does not require a GUI.
+The second implementation tranche is complete and pushed at `8e707efeb0cda162ee038a028a39a77663c2fa4e`. A standard-library-only `app/runtime/` package now owns explicit application/service lifecycle, scene registration, generic failure reporting, parameterized runtime paths, and generic dual-stack interface/address/source-binding mechanisms. Dear PyGui scene visibility remains a concrete engine adapter and BitTorrent network policy remains in SalixTorrent. The same `ApplicationRuntime` drives desktop and headless lifecycle.
 
 ### Stage D — second GUI implementation
 
-Build a small Tkinter compatibility backend incrementally, beginning with the common component/layout/window surface. Use it to challenge assumptions in the existing Dear PyGui-facing contracts.
+The third implementation tranche is prepared as a real second-backend proof rather than an interface exercise. Tkinter implements the common component, responsive-layout, scene, and realtime-plot contracts. Small Dear PyGui/Tkinter/headless presentation bundles and application hosts keep toolkit loops outside the runtime. `examples/ecosystem_blank_app.py` runs one product-neutral component/graph definition through either GUI backend and the same runtime headlessly.
 
-The first proof should be a small backend-neutral demonstration application, not a wholesale Tkinter rewrite of SalixTorrent.
+This remains a compatibility surface, not a wholesale Tkinter rewrite of SalixTorrent and not a feature-parity promise.
 
 ### Stage E — rich RAD presentation
 
@@ -540,7 +540,7 @@ PlotFrame / RealtimeGraph             app/framework/visualization.py
 PlotHost
         |
         +-- DearPyGuiPlotHost          current concrete adapter
-        +-- future Tkinter Canvas host second-backend proof
+        +-- Tkinter Canvas host          prepared second-backend proof
 ```
 
 The generic telemetry layer has no GUI dependency and is therefore usable by desktop, CLI/headless, tests, and future designer/runtime consumers. The visualization layer describes complete graph updates without importing Dear PyGui. Concrete plot creation, axis mutation, line-series updates, existence checks, and disposal remain adapter-owned.
@@ -575,10 +575,12 @@ Dear PyGui desktop                    headless CLI
         +-- headless: torrent-engine start/shutdown service
 ```
 
-The prepared generic package is:
+The committed generic package is:
 
 ```text
 app/runtime/
+├── application.py        application metadata/host contract added by tranche 3
+├── presentation.py       presentation capability/bundle contract added by tranche 3
 ├── lifecycle.py
 ├── scenes.py
 ├── diagnostics.py
@@ -598,6 +600,41 @@ app/runtime/
 
 The desktop and headless paths now provide the most important engine proof so far: **the same generic runtime lifecycle can supervise an application with or without a graphical presentation backend**. The Dear PyGui render/callback loop, tray/native-window policy, component/layout/plot hosts, and `MasterViewport` composition remain concrete while their reusable seams continue to be discovered.
 
-Prepared validation adds 50 focused runtime/scene/network/adapter/relocation regressions and advances complete discovery from the committed 432-test checkpoint to **482** tests. Expected real-Windows acceptance is 482 / 482 with one expected non-Windows shell-behavior skip. Canonical localization remains 1,337 strings; only deterministic extraction source-location metadata changes because `app/cli/headless.py` moved.
+Validation added 50 focused runtime/scene/network/adapter/relocation regressions and passed both complete real-Windows discovery paths at **482 / 482** with one expected non-Windows shell-behavior skip. The exact pushed checkpoint is `8e707efeb0cda162ee038a028a39a77663c2fa4e` (`Extract application runtime and network foundation`). Canonical localization remains 1,337 strings.
 
-Tkinter remains the next second-backend proof after this tranche is validated/pushed. No final ecosystem naming, public API freeze, version bump, release tag, or merge to `main` is implied by this checkpoint.
+No final ecosystem naming, public API freeze, version bump, release tag, or merge to `main` is implied by this checkpoint.
+
+---
+
+## 17. Third post-v0.5.0 implementation checkpoint
+
+The third `dev` tranche proves that the extracted engine/framework contracts can support a second real GUI implementation and a small application that is not SalixTorrent.
+
+```text
+                         ApplicationSpec / ApplicationRuntime
+                                      |
+                         PresentationBackend capabilities
+                         /            |             \
+                        /             |              \
+                Dear PyGui         Tkinter          headless
+                    |                 |                |
+        component/layout/      component/layout/      runtime only
+        scene/plot hosts       scene/Canvas plot
+                    \                /
+                     \              /
+                      same framework components
+                      same RealtimeGraph contract
+                      same DemoView definition
+```
+
+New backend-neutral runtime contracts are `ApplicationSpec`, the minimal `ApplicationHost` protocol, `PresentationCapability`, and `PresentationBackend`. They describe application/window metadata and which presentation adapters are available without importing a GUI toolkit into `app/runtime`.
+
+Tkinter now implements `ComponentRenderer`, `LayoutHost`, `SceneHost`, and `PlotHost`. Common controls, value/state mutation, rows/columns/grids, dialogs, tooltips, responsive callbacks, scene visibility, and realtime line plotting therefore have two concrete implementations. The Tkinter plot host uses Canvas and consumes the same `PlotFrame` updates as Dear PyGui.
+
+The concrete backend bundle factories assemble Dear PyGui, Tkinter, or headless adapters explicitly. Minimal application hosts own the toolkit-specific event loops and drive `ApplicationRuntime`; this keeps GUI loop ownership out of the reusable runtime while making blank application startup repeatable.
+
+`examples/ecosystem_blank_app.py` is the first product-neutral proof. Its `DemoView` contains one component tree and one realtime graph definition. The outer `--ui-backend dearpygui|tkinter|headless` choice changes the host, not the view. Headless mode proves the runtime remains usable without loading a graphical toolkit.
+
+Prepared validation adds 34 focused regressions and advances complete discovery from 482 to **516** tests. Live Tkinter tests pass under the source environment's Xvfb display; ordinary display-less Linux discovery skips those GUI-live checks while keeping source/contract tests active. Expected real-Windows acceptance is 516 / 516 with the existing one non-Windows shell-behavior skip. `APP_VERSION` remains `0.5.0`.
+
+Dear PyGui remains SalixTorrent's reference desktop backend. This checkpoint does not rewrite SalixTorrent in Tkinter, promise identical backend capabilities, freeze final ecosystem names/API, tag a release, or merge `dev` into `main`. After this proof, the next major extraction target returns to rich live-data/RAD surfaces: transfer/peer/source tables, piece/state maps, status/diagnostic presentation, and the reusable data models beneath them.

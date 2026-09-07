@@ -2,8 +2,8 @@
 
 **Current application version string:** `0.5.0`
 **Roadmap status:** v0.5.0 released; post-v0.5.0 ecosystem extraction on `dev`
-**Current implementation checkpoint:** realtime telemetry/plot extraction is pushed on `dev` at `ef8b4be998a714a86455940d8642fdd926a6609d`; the next application-runtime/generic-network tranche is prepared from that checkpoint
-**Current real Windows regression baseline:** 432 / 432 at the pushed realtime-telemetry checkpoint with one expected non-Windows shell-behavior skip; prepared runtime/network tranche target: 482 / 482 with the same expected skip
+**Current implementation checkpoint:** application runtime/network extraction is pushed on `dev` at `8e707efeb0cda162ee038a028a39a77663c2fa4e`; the next Tkinter compatibility / blank-application tranche is prepared from that checkpoint
+**Current real Windows regression baseline:** 482 / 482 at the pushed runtime/network checkpoint with one expected non-Windows shell-behavior skip; prepared second-backend tranche target: 516 / 516 with the same expected skip
 
 This roadmap records intended engineering direction rather than promising dates or release numbers. Changes should remain incremental, testable, reviewable, and compatible with SalixTorrent's existing protocol, persistence, packaging, localization, and cross-platform boundaries.
 
@@ -582,7 +582,7 @@ Established ownership:
 - the framework relocation probe exercises telemetry/visualization after package rename;
 - real-Windows validation passed 432 / 432 on both discovery paths with one expected skip, plus live Speed and broader button/action smoke.
 
-A future Tkinter Canvas plot host should consume the same plot-facing contract rather than duplicate SalixTorrent application logic.
+Ecosystem tranche 3 now provides a Tkinter Canvas plot host that consumes the same plot-facing contract rather than duplicating SalixTorrent application logic.
 
 ### A3. Application-engine/runtime boundary — current tranche prepared
 
@@ -627,7 +627,7 @@ Runtime-path proof:
 - `app/engine/runtime_paths.py` remains the SalixTorrent composition facade that supplies product-specific application/environment names;
 - existing source/frozen/portable behavior and compatibility function surface remain intact.
 
-### A4. Generic network/runtime awareness — current tranche prepared
+### A4. Generic network/runtime awareness — completed/pushed
 
 The same tranche moves the already reusable interface/address/source-binding mechanisms to `app/runtime/network.py`.
 
@@ -646,15 +646,17 @@ SalixTorrent production callers now consume these generic mechanisms directly. `
 
 The following remain explicitly application/domain-owned: trackers, DHT, PEX, LPD, peer sessions, torrent listener policy, MSE/PE, Interface Lock policy, connectivity interpretation/diagnostic wording, and torrent lifecycle consequences. `ConnectivityManager` is therefore **not** moved wholesale.
 
-Prepared validation adds **50** focused runtime/scene/network/adapter/relocation regressions and advances complete discovery from 432 to **482** tests. Expected real-Windows acceptance is 482 / 482 with the same one expected non-Windows shell-behavior skip.
+Validation added **50** focused runtime/scene/network/adapter/relocation regressions and passed both complete real-Windows discovery paths at **482 / 482** with the same one expected non-Windows shell-behavior skip. The exact pushed checkpoint is `8e707efeb0cda162ee038a028a39a77663c2fa4e` (`Extract application runtime and network foundation`).
 
-### A5. Second GUI implementation
+### A5. Second GUI implementation — current tranche prepared
 
-Introduce Tkinter incrementally as the compatibility implementation for the common presentation contracts.
+Tkinter now provides the compatibility implementation for the common component, responsive-layout, scene, and realtime-plot contracts. Dear PyGui, Tkinter, and headless execution are composed through explicit presentation-backend bundles, while small toolkit-specific application hosts own their event loops and drive the same `ApplicationRuntime`.
 
-Initial proof should be a small backend-neutral demonstration application that can exercise the same semantic component/layout/application contracts with Dear PyGui or Tkinter.
+The first non-SalixTorrent proof is `examples/ecosystem_blank_app.py`. Its semantic component tree and realtime graph definition are identical for Dear PyGui and Tkinter; only the outer host selected by `--ui-backend dearpygui|tkinter|headless` changes. Headless mode exercises the same runtime with no graphical toolkit.
 
-Do **not** rewrite SalixTorrent wholesale in Tkinter and do not require identical capability/performance parity between backends.
+Prepared validation adds **34** focused application/presentation/backend regressions and advances complete discovery from 482 to **516** tests. On source Linux without a display the live Tkinter tests skip; under Xvfb they pass, leaving only the established platform skips. Expected real-Windows acceptance is 516 / 516 with one expected non-Windows shell-behavior skip.
+
+Do **not** rewrite SalixTorrent wholesale in Tkinter and do not require identical capability/performance parity between backends. Dear PyGui remains the reference SalixTorrent desktop backend.
 
 ### A6. Rich live-data presentation
 
@@ -775,7 +777,7 @@ optional RAD/application framework
 presentation/platform adapters
 ```
 
-Dear PyGui remains the reference GUI backend. Tkinter is the planned compatibility backend for the common GUI surface. Headless/CLI remains a first-class execution profile. Future GLFW/OpenGL or other backends are allowed by the architecture when a real project justifies them; they are not current dependencies.
+Dear PyGui remains the reference GUI backend. Tkinter is now the prepared compatibility implementation for the common GUI surface, while headless/CLI remains a first-class execution profile. Future GLFW/OpenGL or other backends are allowed by the architecture when a real project justifies them; they are not current dependencies.
 
 A future v0.6.0 may consolidate a coherent portion of this ecosystem work, but the release number should follow proven scope rather than drive it.
 
@@ -800,7 +802,7 @@ Possible contents:
 2. Preserve shared GUI/headless engine behavior and keep headless operation first-class.
 3. Treat the ecosystem as cohesive but modular: applications should import only the capabilities they need.
 4. Keep Dear PyGui as the current reference presentation backend without allowing Dear PyGui concepts to define generic contracts.
-5. Use Tkinter as the planned compatibility implementation to challenge backend assumptions; do not force identical feature parity.
+5. Use Tkinter as the compatibility implementation to challenge backend assumptions; do not force identical feature parity.
 6. Keep UI-backend selection conceptually separate from hardware/3D acceleration.
 7. Application/view code should depend on semantic contracts rather than branch on Dear PyGui versus Tkinter for ordinary framework behavior.
 8. Prefer small backend contracts plus explicit capabilities over one premature monolithic presentation interface.
@@ -846,9 +848,10 @@ Development workflow:
 main:                            stable v0.5.0 release line
 dev documentation checkpoint:   eb906e45f7b9f62403dc7887b36aae81a1818b6f
 dev realtime/plot checkpoint:   ef8b4be998a714a86455940d8642fdd926a6609d
-current pushed Windows dev gate: 432 / 432 OK, skipped=1
+dev runtime/network checkpoint: 8e707efeb0cda162ee038a028a39a77663c2fa4e
+current pushed Windows dev gate: 482 / 482 OK, skipped=1
 dev:                             tracks origin/dev
-prepared runtime/network target: 482 / 482, Windows skipped=1
+prepared Tkinter/blank-app target: 516 / 516, Windows skipped=1
 
 Localization:
 canonical catalog:               1337 entries

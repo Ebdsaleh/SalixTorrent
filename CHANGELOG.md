@@ -4,6 +4,17 @@ Notable SalixTorrent changes are recorded here.
 
 ## Unreleased
 
+### Ecosystem Extraction — Tkinter Compatibility Backend and Blank Application Proof
+
+- Added backend-neutral `ApplicationSpec` / `ApplicationHost` metadata and explicit `PresentationBackend` capability bundles so desktop and headless hosts share one application vocabulary without making a GUI toolkit a runtime dependency.
+- Added a Tkinter compatibility implementation of the existing component renderer, responsive layout host, scene host, and realtime plot host contracts. The same framework `Button`, inputs, grids, dialogs, runtime state, scene switching, and `RealtimeGraph` contracts now have a second concrete GUI implementation.
+- Added a Tkinter Canvas realtime line-plot adapter that consumes the renderer-neutral `PlotHost` / `PlotFrame` contract introduced by the first ecosystem tranche; SalixTorrent-specific Speed labels and transfer semantics remain outside the compatibility backend.
+- Added reusable Dear PyGui, Tkinter, and headless presentation-bundle composition factories plus minimal Dear PyGui/Tkinter/headless application hosts. The hosts own toolkit event loops and drive the same `ApplicationRuntime` lifecycle while generic application content depends only on framework contracts.
+- Added `examples/ecosystem_blank_app.py`, a product-neutral blank-application proof whose component tree and realtime graph definition are unchanged between Dear PyGui and Tkinter. `--ui-backend dearpygui|tkinter|headless` selects only the outer host; headless mode runs the same application runtime without importing a graphical toolkit.
+- Added focused application-spec/capability, packaging, headless-host, Tkinter component/layout/scene/plot, application-host, and blank-demo regressions. Prepared complete discovery advances from the committed 482-test development checkpoint to 516 tests; real-Windows acceptance is expected to retain the existing one non-Windows shell-behavior skip.
+- This is a compatibility/reference backend, not a Tkinter rewrite of SalixTorrent and not a promise of pixel-identical or feature-identical parity. Dear PyGui remains the reference SalixTorrent desktop backend.
+- No application version bump, persistence-schema change, localization-string change, final ecosystem naming/API freeze, release tag, or merge to `main` is introduced.
+
 ### Ecosystem Extraction — Application Runtime and Generic Network Foundation
 
 - Added a provisional, standard-library-only `app/runtime/` package for backend-neutral application mechanics that can be used by graphical, CLI/headless, test, and future designer hosts without importing Dear PyGui or BitTorrent protocol code.
@@ -14,8 +25,9 @@ Notable SalixTorrent changes are recorded here.
 - Kept runtime root normalization lexical rather than filesystem-canonicalizing caller-supplied roots, preserving Windows short/long path aliases returned by temporary, portable and bundled locations while still producing absolute roots.
 - Extracted generic dual-stack network-interface/address/source-binding helpers into `app/runtime/network.py`; SalixTorrent production callers now use that runtime boundary directly while `app/logic/network_binding.py` remains a compatibility facade. BitTorrent routing policy, trackers, DHT/PEX/LPD, peer sessions, listener policy, MSE/PE, and torrent-specific connectivity diagnosis remain application-owned.
 - Integrated the same `ApplicationRuntime` lifecycle into both the Dear PyGui desktop engine and the headless CLI. Desktop application-menu and active-scene updates are explicit runtime services driven by measured frame delta; headless manager startup/shutdown is supervised by the same runtime without importing a GUI backend.
-- Added 50 focused runtime/scene/network/adapter/relocation regressions. Prepared full discovery advances from the committed 432-test development checkpoint to 482 tests; expected real-Windows acceptance remains one non-Windows shell-behavior skip.
-- No application version bump, persistence-schema change, localization-string change, Tkinter backend, public API freeze, or merge to `main` is introduced.
+- Added 50 focused runtime/scene/network/adapter/relocation regressions. Real-Windows validation passed both complete discovery paths at 482 / 482 with one expected non-Windows shell-behavior skip; the repaired Windows path-alias regression is included in that gate.
+- Committed/pushed on `dev` as `8e707efeb0cda162ee038a028a39a77663c2fa4e` (`Extract application runtime and network foundation`).
+- No application version bump, persistence-schema change, localization-string change, public API freeze, release tag, or merge to `main` was introduced.
 
 ### Ecosystem Extraction — Realtime Telemetry and Plot Boundary
 
