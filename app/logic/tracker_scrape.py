@@ -14,7 +14,7 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tupl
 import aiohttp
 
 from app.logic.bencode import Bencode
-from app.logic.network_binding import ip_family, normalise_bind_address
+from app.runtime.network import ip_family, normalise_bind_address
 
 
 SCRAPE_REFRESH_INTERVAL = 15 * 60.0

@@ -1,18 +1,30 @@
 # app/engine/scene_manager.py
 
-from typing import Optional, Dict, Any
-import dearpygui.dearpygui as dpg
+from __future__ import annotations
+
+from typing import Any, Optional
+
+from app.runtime.scenes import SceneHost, SceneRegistry
 
 
 class SceneManager:
+    """SalixTorrent singleton facade over the reusable scene registry.
+
+    The application keeps its historical singleton/access pattern while the
+    reusable registration/activation semantics live in ``app.runtime.scenes``.
+    Concrete visibility operations are supplied by the selected presentation
+    backend through ``set_host(...)``.
+    """
+
     _instance: Optional["SceneManager"] = None
 
     def __new__(cls, engine=None):
         if cls._instance is None:
             cls._instance = super(SceneManager, cls).__new__(cls)
             cls._instance.engine = engine
-            cls._instance.scenes: Dict[str, Any] = {}
-            cls._instance.current_scene: Optional[str] = None
+            cls._instance._registry = SceneRegistry()
+        elif engine is not None:
+            cls._instance.engine = engine
         return cls._instance
 
     @classmethod
@@ -21,25 +33,34 @@ class SceneManager:
             cls._instance = cls()
         return cls._instance
 
-    def register_scene(self, name: str, scene_instance: Any):
-        self.scenes[name] = scene_instance
+    @property
+    def scenes(self) -> dict[str, Any]:
+        return self._registry.scenes
+
+    @property
+    def current_scene(self) -> Optional[str]:
+        return self._registry.current_name
+
+    def set_host(self, host: SceneHost) -> SceneHost:
+        return self._registry.set_host(host)
+
+    def get_scene(self, name: str) -> Any | None:
+        return self._registry.get(name)
+
+    def active_scene(self) -> Any | None:
+        return self._registry.active_scene()
+
+    def register_scene(self, name: str, scene_instance: Any, container=None):
+        if container is None:
+            container = f"view_container_{name}"
+        return self._registry.register(
+            name,
+            scene_instance,
+            container=container,
+        )
+
+    def unregister_scene(self, name: str):
+        return self._registry.unregister(name)
 
     def switch_to(self, name: str, **kwargs):
-        if name not in self.scenes:
-            return
-
-        # Hide all registered container groups
-        for scene_key in self.scenes:
-            container_tag = f"view_container_{scene_key}"
-            if dpg.does_item_exist(container_tag):
-                dpg.hide_item(container_tag)
-
-        # Show target container
-        target_tag = f"view_container_{name}"
-        if dpg.does_item_exist(target_tag):
-            dpg.show_item(target_tag)
-
-        self.current_scene = name
-        target_scene = self.scenes[name]
-        if hasattr(target_scene, "on_show"):
-            target_scene.on_show(**kwargs)
+        return self._registry.activate(name, **kwargs)

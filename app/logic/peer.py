@@ -10,7 +10,7 @@ from typing import Dict, Iterable, List, Optional, Tuple
 
 from app.logic.bencode import Bencode
 from app.logic.mse import MSEError, PeerWireStream, mse_initiator_handshake
-from app.logic.network_binding import (
+from app.runtime.network import (
     format_endpoint,
     ip_family,
     normalise_bind_address,

@@ -3,11 +3,10 @@
 from typing import Optional
 import os
 import time
-import traceback
-from pathlib import Path
 
 import dearpygui.dearpygui as dpg
 from app.engine.scene_manager import SceneManager
+from app.engine.scene_hosts import DearPyGuiSceneHost
 from app.engine.desktop_integration import (
     DesktopIntegration,
     TRAY_ACTION_CLOSE_REQUESTED,
@@ -20,6 +19,8 @@ from app.engine.desktop_integration import (
 from app.engine.ui_typography import UiTypography
 from app.engine.responsive_layout import ResponsiveLayout
 from app.engine.runtime_paths import state_directory
+from app.runtime.diagnostics import ExceptionReporter
+from app.runtime.lifecycle import ApplicationRuntime, CallbackService
 from app.framework.components import clear_default_renderer, set_default_renderer
 from app.engine.component_renderers import DearPyGuiRenderer
 from app.engine.ui_component_profile import SALIXTORRENT_COMPONENT_PROFILE
@@ -137,8 +138,23 @@ class GuiEngine:
 
         self.scene_mgr = SceneManager.get_instance()
         self.scene_mgr.engine = self
-        self._last_ui_error_signature = None
-        self._last_ui_error_at = 0.0
+        self.scene_mgr.set_host(DearPyGuiSceneHost())
+
+        self._ui_error_reporter = ExceptionReporter(
+            log_path=state_directory() / "ui_errors.log",
+            prefix="[Salix_T UI Error]",
+            throttle_seconds=5.0,
+        )
+        self.runtime = ApplicationRuntime(error_handler=self._report_runtime_exception)
+        self.runtime.services.register(
+            "application menu update",
+            CallbackService(on_update=self._update_application_menu),
+        )
+        self.runtime.services.register(
+            "active scene update",
+            CallbackService(on_update=self._update_active_scene),
+        )
+
         self.desktop = DesktopIntegration.get_instance()
         self._last_minimize_check = 0.0
         self.application_menu = None
@@ -168,32 +184,21 @@ class GuiEngine:
         """Register the viewport-level menu for lightweight state refreshes."""
         self.application_menu = application_menu
 
-    @staticmethod
-    def _ui_error_log_path() -> Path:
-        return state_directory() / "ui_errors.log"
-
     def _report_ui_exception(self, context: str, exc: BaseException):
-        now = time.monotonic()
-        signature = (context, type(exc).__name__, str(exc))
-        # A persistent bad widget should not write the same traceback 60 times
-        # per second. Keep one report every five seconds for a repeated error.
-        if signature == self._last_ui_error_signature and now - self._last_ui_error_at < 5.0:
-            return
+        self._ui_error_reporter.report(context, exc)
 
-        self._last_ui_error_signature = signature
-        self._last_ui_error_at = now
-        rendered = traceback.format_exc()
-        print(f"[Salix_T UI Error] {context}: {exc}\n{rendered}")
+    def _report_runtime_exception(self, service_name: str, exc: BaseException):
+        self._report_ui_exception(service_name, exc)
 
-        try:
-            path = self._ui_error_log_path()
-            path.parent.mkdir(parents=True, exist_ok=True)
-            stamp = time.strftime("%Y-%m-%d %H:%M:%S")
-            with path.open("a", encoding="utf-8") as handle:
-                handle.write(f"\n[{stamp}] {context}: {type(exc).__name__}: {exc}\n")
-                handle.write(rendered)
-        except OSError:
-            pass
+    def _update_application_menu(self, _delta_seconds: float):
+        if self.application_menu is not None:
+            self.application_menu.update()
+
+    def _update_active_scene(self, delta_seconds: float):
+        active_scene = self.scene_mgr.active_scene()
+        update = getattr(active_scene, "update", None)
+        if callable(update):
+            update(delta_seconds)
 
     def _on_viewport_close_requested(self, sender=None, app_data=None, user_data=None):
         """Route the native close button through the main UI thread.
@@ -231,7 +236,9 @@ class GuiEngine:
         # clicks already know which HWND they must restore and focus.
         self.desktop.configure(manager.get_app_settings())
 
+        last_frame_at = time.monotonic()
         try:
+            self.runtime.start()
             while dpg.is_dearpygui_running():
                 # Tray callbacks are produced on a tiny native message thread,
                 # then consumed here so all Dear PyGui/window operations remain
@@ -293,27 +300,17 @@ class GuiEngine:
                                     f"DearPyGui callback {callback_name}", exc
                                 )
 
-                if self.application_menu is not None:
-                    try:
-                        self.application_menu.update()
-                    except Exception as exc:
-                        self._report_ui_exception("application menu update", exc)
-
-                if self.scene_mgr.current_scene:
-                    active_scene = self.scene_mgr.scenes.get(self.scene_mgr.current_scene)
-                    if active_scene and hasattr(active_scene, "update"):
-                        try:
-                            active_scene.update(0.016)
-                        except Exception as exc:
-                            self._report_ui_exception(
-                                f"{self.scene_mgr.current_scene}.update", exc
-                            )
+                frame_at = time.monotonic()
+                delta_seconds = max(0.0, min(1.0, frame_at - last_frame_at))
+                last_frame_at = frame_at
+                self.runtime.update(delta_seconds)
 
                 try:
                     dpg.render_dearpygui_frame()
                 except Exception as exc:
                     self._report_ui_exception("DearPyGui render", exc)
         finally:
+            self.runtime.stop()
             self.desktop.stop()
             clear_default_renderer(self.component_renderer)
             dpg.destroy_context()

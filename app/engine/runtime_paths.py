@@ -1,14 +1,4 @@
-"""Runtime/application path policy for source, installed and portable builds.
-
-Phase 10 deliberately keeps three concepts separate:
-
-* bundled resources belong to the application bundle and are read-only;
-* installed application state belongs in the platform's per-user state area;
-* portable state belongs beside the executable when ``portable.flag`` is present.
-
-This keeps file/magnet shell launches independent of the process working
-folder and gives PyInstaller one-file builds the same behavior as source runs.
-"""
+"""SalixTorrent runtime-path composition over the reusable path policy."""
 
 from __future__ import annotations
 
@@ -17,15 +7,21 @@ import sys
 from pathlib import Path
 from typing import Dict
 
+from app.runtime.paths import RuntimePathSpec, RuntimePaths
+
 
 PORTABLE_FLAG_NAME = "portable.flag"
 PORTABLE_ENV = "SALIX_T_PORTABLE"
 STATE_DIR_ENV = "SALIX_T_STATE_DIR"
 DOWNLOAD_DIR_ENV = "SALIX_T_DOWNLOAD_DIR"
 
-
-def _env_truthy(value: object) -> bool:
-    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+_PATH_SPEC = RuntimePathSpec(
+    app_name="SalixTorrent",
+    portable_flag_name=PORTABLE_FLAG_NAME,
+    portable_env=PORTABLE_ENV,
+    state_dir_env=STATE_DIR_ENV,
+    download_dir_env=DOWNLOAD_DIR_ENV,
+)
 
 
 def is_frozen() -> bool:
@@ -34,12 +30,7 @@ def is_frozen() -> bool:
 
 
 def bundle_directory() -> Path:
-    """Return the read-only bundle/project root containing application data.
-
-    PyInstaller 4.3+ gives bundled modules a useful absolute ``__file__``.
-    The module lives at ``app/engine/runtime_paths.py``, therefore two parents
-    above ``app`` is the application root in both source and frozen builds.
-    """
+    """Return the read-only bundle/project root containing application data."""
     return Path(__file__).resolve().parents[2]
 
 
@@ -50,86 +41,38 @@ def application_directory() -> Path:
     return bundle_directory()
 
 
+def _paths() -> RuntimePaths:
+    return RuntimePaths(
+        _PATH_SPEC,
+        bundle_directory=bundle_directory(),
+        application_directory=application_directory(),
+    )
+
+
 def portable_flag_path() -> Path:
-    return application_directory() / PORTABLE_FLAG_NAME
+    return _paths().portable_flag_path()
 
 
 def portable_mode() -> bool:
     """Return whether state/download defaults should stay beside the app."""
-    if _env_truthy(os.environ.get(PORTABLE_ENV)):
-        return True
-    try:
-        return portable_flag_path().is_file()
-    except OSError:
-        return False
+    return _paths().portable_mode()
 
 
 def state_directory() -> Path:
     """Return SalixTorrent's writable state directory."""
-    override = os.environ.get(STATE_DIR_ENV)
-    if override:
-        return Path(override).expanduser().resolve()
-
-    if portable_mode():
-        return application_directory() / "data"
-
-    if os.name == "nt":
-        base = os.environ.get("LOCALAPPDATA")
-        if base:
-            return Path(base) / "SalixTorrent"
-        return Path.home() / "AppData" / "Local" / "SalixTorrent"
-
-    if sys.platform == "darwin":
-        return Path.home() / "Library" / "Application Support" / "SalixTorrent"
-
-    xdg_state_home = os.environ.get("XDG_STATE_HOME")
-    if xdg_state_home:
-        return Path(xdg_state_home) / "SalixTorrent"
-    return Path.home() / ".local" / "state" / "SalixTorrent"
+    return _paths().state_directory()
 
 
 def default_download_directory() -> Path:
     """Return the default payload folder for a new installation/profile."""
-    override = os.environ.get(DOWNLOAD_DIR_ENV)
-    if override:
-        return Path(override).expanduser().resolve()
-
-    if portable_mode():
-        return application_directory() / "downloads"
-
-    # Do not use cwd here: Explorer file associations, Start Menu shortcuts and
-    # URL protocol launches may start with unrelated working directories.
-    downloads = Path.home() / "Downloads"
-    return downloads / "SalixTorrent"
+    return _paths().default_download_directory()
 
 
 def resource_path(relative_path: os.PathLike[str] | str) -> Path:
-    """Resolve a bundled/read-only resource without depending on cwd.
-
-    External files beside the executable win when present. This lets a portable
-    bundle carry README/LICENSE or future media next to the executable, while a
-    one-file PyInstaller build can fall back to its extracted bundle contents.
-    """
-    relative = Path(relative_path)
-    if relative.is_absolute():
-        return relative
-
-    external = application_directory() / relative
-    try:
-        if external.exists():
-            return external
-    except OSError:
-        pass
-    return bundle_directory() / relative
+    """Resolve a bundled/read-only resource without depending on cwd."""
+    return _paths().resource_path(relative_path)
 
 
 def runtime_snapshot() -> Dict[str, object]:
     """Return small diagnostics suitable for Help > Diagnostics/tests."""
-    return {
-        "frozen": is_frozen(),
-        "portable": portable_mode(),
-        "application_directory": str(application_directory()),
-        "bundle_directory": str(bundle_directory()),
-        "state_directory": str(state_directory()),
-        "default_download_directory": str(default_download_directory()),
-    }
+    return _paths().snapshot(frozen=is_frozen())

@@ -420,11 +420,11 @@ The initial ownership map is now established for the first extraction candidates
 
 ### Stage B — realtime data and visualization
 
-The first implementation tranche is prepared from the proven Speed view. Backend-neutral rolling telemetry/statistics and realtime graph coordination now live in the provisional framework, while Dear PyGui plot operations live in a concrete plot host. SalixTorrent's existing Speed snapshot/labels/rate semantics remain application-owned. A future Tkinter Canvas implementation should consume the same plot-facing contract rather than duplicate application logic.
+The first implementation tranche is complete, Windows-validated, committed and pushed on `dev` at `ef8b4be998a714a86455940d8642fdd926a6609d`. Backend-neutral rolling telemetry/statistics and realtime graph coordination live in the provisional framework, while Dear PyGui plot operations live in a concrete plot host. SalixTorrent's existing Speed snapshot/labels/rate semantics remain application-owned. A future Tkinter Canvas implementation should consume the same plot-facing contract rather than duplicate application logic.
 
 ### Stage C — engine/runtime services
 
-Extract generic lifecycle, service, presentation-host and network-awareness mechanisms where the current application demonstrates a real reusable contract.
+The second implementation tranche is prepared around a standard-library-only `app/runtime/` package. It extracts explicit application/service lifecycle, scene registration, generic failure reporting, parameterized runtime paths, and generic dual-stack interface/address/source-binding mechanisms. Dear PyGui scene visibility remains a concrete engine adapter, and BitTorrent network policy remains in SalixTorrent. The same `ApplicationRuntime` now drives both desktop update services and headless torrent-engine startup/shutdown, proving that the runtime does not require a GUI.
 
 ### Stage D — second GUI implementation
 
@@ -547,4 +547,57 @@ The generic telemetry layer has no GUI dependency and is therefore usable by des
 
 The SalixTorrent Speed view deliberately still owns localized labels, Help/tooltips, transfer-rate unit conversion, torrent/global limit wording, and visible-window selection. This tranche proves a reusable data/plot seam without pretending the entire Speed view is a generic component.
 
-Prepared validation adds 7 telemetry tests and 9 realtime-visualization tests while keeping the existing five framework-relocation tests. Full discovery is expected to advance from 416 to 432 tests on Windows with the same one expected non-Windows skip. `APP_VERSION` remains `0.5.0`; this is development work on `dev`, not a release/tag boundary.
+Validation added 7 telemetry tests and 9 realtime-visualization tests while keeping the existing five framework-relocation tests. Both complete real-Windows discovery paths passed 432 / 432 with one expected non-Windows skip, and live Speed/application behavior plus the broader button/action surface was smoke-tested before commit/push. The exact pushed checkpoint is `ef8b4be998a714a86455940d8642fdd926a6609d` (`Extract realtime telemetry and plot boundary`). `APP_VERSION` remains `0.5.0`; this is development work on `dev`, not a release/tag boundary.
+
+---
+
+## 16. Second post-v0.5.0 implementation checkpoint
+
+The second `dev` implementation tranche applies the same extraction discipline to the application engine/runtime and generic network mechanisms. It deliberately does **not** move the whole Dear PyGui engine or BitTorrent connectivity subsystem into a generic package.
+
+```text
+Dear PyGui desktop                    headless CLI
+        |                                 |
+        +---------------+-----------------+
+                        |
+                        v
+                ApplicationRuntime
+                        |
+        +---------------+-------------------+
+        |               |                   |
+        v               v                   v
+ service lifecycle   SceneRegistry       generic runtime policy
+ ordered start/stop  SceneHost contract  diagnostics / paths / network
+        |               |
+        |               +-- DearPyGuiSceneHost
+        |
+        +-- desktop: application-menu + active-scene update services
+        +-- headless: torrent-engine start/shutdown service
+```
+
+The prepared generic package is:
+
+```text
+app/runtime/
+├── lifecycle.py
+├── scenes.py
+├── diagnostics.py
+├── paths.py
+└── network.py
+```
+
+`lifecycle.py` provides explicit service supervision without owning a render loop, worker thread, observer graph, or model. Startup is ordered; teardown is reversed; partial starts receive best-effort cleanup; earlier services roll back when a later service fails; restart is supported; update failures can be isolated through an injected reporter; and control-flow `BaseException` types are not swallowed.
+
+`scenes.py` separates scene identity/activation from physical widget visibility. `app/engine/scene_manager.py` remains the SalixTorrent compatibility/composition facade, including its historical `view_container_<Name>` convention, while `app/engine/scene_hosts/dearpygui.py` owns the concrete Dear PyGui `show_item` / `hide_item` / existence operations.
+
+`diagnostics.py` extracts duplicate-rate-suppressed exception reporting and optional append-only logging. `GuiEngine` composes it with SalixTorrent's existing `ui_errors.log` path rather than duplicating the mechanism.
+
+`paths.py` parameterizes application name, portable flag/environment names, state/download overrides and bundled resources. `app/engine/runtime_paths.py` supplies SalixTorrent's product-specific policy while preserving the established source/frozen/portable function API.
+
+`network.py` moves the already generic IPv4/IPv6 interface/address/source-binding mechanism out of BitTorrent logic. SalixTorrent callers consume it directly, while `app/logic/network_binding.py` remains a compatibility facade. The extraction covers address normalization/families, wildcard and endpoint helpers, interface discovery, local-address inventories, route-source probing, bind availability, and display masking. It does **not** absorb trackers, DHT/PEX/LPD, peer sessions, MSE/PE, torrent listener policy, Interface Lock policy, or BitTorrent-specific connectivity diagnosis.
+
+The desktop and headless paths now provide the most important engine proof so far: **the same generic runtime lifecycle can supervise an application with or without a graphical presentation backend**. The Dear PyGui render/callback loop, tray/native-window policy, component/layout/plot hosts, and `MasterViewport` composition remain concrete while their reusable seams continue to be discovered.
+
+Prepared validation adds 50 focused runtime/scene/network/adapter/relocation regressions and advances complete discovery from the committed 432-test checkpoint to **482** tests. Expected real-Windows acceptance is 482 / 482 with one expected non-Windows shell-behavior skip. Canonical localization remains 1,337 strings; only deterministic extraction source-location metadata changes because `app/cli/headless.py` moved.
+
+Tkinter remains the next second-backend proof after this tranche is validated/pushed. No final ecosystem naming, public API freeze, version bump, release tag, or merge to `main` is implied by this checkpoint.

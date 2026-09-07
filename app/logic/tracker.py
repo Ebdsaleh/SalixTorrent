@@ -14,7 +14,7 @@ import aiohttp
 
 from app.logic.bencode import Bencode
 from app.logic.torrent_file import TorrentFile
-from app.logic.network_binding import ip_family, normalise_bind_address
+from app.runtime.network import ip_family, normalise_bind_address
 from app.logic.peer import (
     PEER_ENCRYPTION_DISABLED,
     PEER_ENCRYPTION_REQUIRE,

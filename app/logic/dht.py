@@ -13,7 +13,7 @@ import time
 from typing import Dict, List, Optional, Set, Tuple
 
 from app.logic.bencode import Bencode
-from app.logic.network_binding import default_route_address, ip_family, normalise_bind_address, wildcard_for_family
+from app.runtime.network import default_route_address, ip_family, normalise_bind_address, wildcard_for_family
 
 
 DHT_BOOTSTRAP_NODES = (

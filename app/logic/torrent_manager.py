@@ -21,7 +21,7 @@ from app.persistence import (
 )
 from app.localization import AUTO_LOCALE, normalise_locale_code
 from app.logic.connectivity import ConnectivityManager
-from app.logic.network_binding import normalise_bind_address
+from app.runtime.network import normalise_bind_address
 from app.logic.tracker_scrape import TrackerScrapeCoordinator
 from app.logic.transfer_add import (
     TORRENT_PROTOCOL_AUTO,

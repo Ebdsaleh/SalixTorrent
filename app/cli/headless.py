@@ -19,6 +19,7 @@ from typing import IO, Optional
 from app.localization import tr, tr_value
 from app.logic.session import SessionState
 from app.logic.transfer_add import TransferAddRequest
+from app.runtime.lifecycle import ApplicationRuntime, CallbackService
 
 
 @dataclass(frozen=True)
@@ -212,13 +213,21 @@ class HeadlessRunner:
             status_interval=options.status_interval,
             json_status=options.json_status,
         )
+        runtime = ApplicationRuntime()
+        runtime.services.register(
+            "torrent engine",
+            CallbackService(
+                on_start=self.manager.start_engine,
+                on_stop=self.manager.shutdown,
+            ),
+        )
         self._install_signal_handlers()
         target_hash = ""
         last_snapshot = None
         result_code = 0
 
         try:
-            self.manager.start_engine()
+            runtime.start()
             handle = self.manager.add_transfer(
                 TransferAddRequest(
                     source=source,
@@ -288,10 +297,11 @@ class HeadlessRunner:
             reporter.message(tr("cli.transfer.failed", "Headless transfer failed: {error}", error=exc), event_type="error")
             return 2
         finally:
-            # TorrentManager owns all networking tasks/sockets.  The headless
-            # presentation layer only requests shutdown and waits for that owner
-            # to tear them down in one place.
+            # The same backend-neutral runtime lifecycle used by the desktop
+            # engine supervises headless manager startup/shutdown. TorrentManager
+            # still owns every networking task/socket; the presentation layer
+            # merely drives the explicit runtime boundary.
             try:
-                self.manager.shutdown()
+                runtime.stop()
             finally:
                 self._restore_signal_handlers()

@@ -2,8 +2,8 @@
 
 **Current application version string:** `0.5.0`
 **Roadmap status:** v0.5.0 released; post-v0.5.0 ecosystem extraction on `dev`
-**Current implementation checkpoint:** post-v0.5.0 ecosystem documentation is pushed on `dev` at `eb906e45f7b9f62403dc7887b36aae81a1818b6f`; the first realtime telemetry/visualization extraction tranche is prepared from that checkpoint
-**Current real Windows regression baseline:** 416 / 416 at the released v0.5.0 checkpoint with one expected non-Windows shell-behavior skip; prepared tranche target: 432 / 432 with the same expected skip
+**Current implementation checkpoint:** realtime telemetry/plot extraction is pushed on `dev` at `ef8b4be998a714a86455940d8642fdd926a6609d`; the next application-runtime/generic-network tranche is prepared from that checkpoint
+**Current real Windows regression baseline:** 432 / 432 at the pushed realtime-telemetry checkpoint with one expected non-Windows shell-behavior skip; prepared runtime/network tranche target: 482 / 482 with the same expected skip
 
 This roadmap records intended engineering direction rather than promising dates or release numbers. Changes should remain incremental, testable, reviewable, and compatible with SalixTorrent's existing protocol, persistence, packaging, localization, and cross-platform boundaries.
 
@@ -561,65 +561,92 @@ The detailed architectural target is maintained in `SalixTorrent-Ecosystem-Archi
 - keep current names provisional while the wider boundary is still being discovered;
 - preserve the v0.5.0 `main` branch as the stable rollback line.
 
-### A2. Realtime telemetry and visualization — first tranche prepared
+### A2. Realtime telemetry and visualization — pushed/Windows-validated
 
-Use the proven Active Transfers Speed view as the first major post-v0.5.0 extraction candidate.
+The first post-v0.5.0 implementation tranche used the proven Active Transfers Speed view to establish a renderer-neutral realtime-data/plot boundary.
 
-Target separation:
+Committed/pushed checkpoint:
 
 ```text
-SalixTorrent transfer telemetry
-        |
-        v
-generic time-series / rolling history / statistics
-        |
-        v
-renderer-neutral realtime graph contract
-        |
-        +-- Dear PyGui plot adapter
-        +-- future Tkinter Canvas adapter
+ef8b4be998a714a86455940d8642fdd926a6609d
+Extract realtime telemetry and plot boundary
 ```
 
-Do not move torrent-specific labels, Help terms, transfer policy or rate semantics into generic visualization merely to reduce file count.
+Established ownership:
 
-Prepared first-tranche ownership:
-
-- `app/framework/telemetry.py` owns bounded fixed-series history, immutable snapshots, age windows and recent statistics;
+- `app/framework/telemetry.py` owns bounded fixed-series history, immutable snapshots, age windows and current/average/peak/minimum statistics;
 - `app/framework/visualization.py` owns semantic line-series specs/data, complete plot frames, `PlotHost`, plot bindings and `RealtimeGraph`;
 - `app/engine/plot_hosts/dearpygui.py` owns Dear PyGui plot/axis/line-series operations;
-- `TorrentSession` uses the generic rolling history while preserving the existing `speed_view` snapshot contract;
-- `SpeedView` routes plot creation/updates through the new boundary while retaining SalixTorrent text, tooltips, rate units and limit semantics;
-- framework relocation tests exercise telemetry/visualization after package rename;
-- prepared test count: 432 total (Windows expected `skipped=1`).
+- `TorrentSession` uses generic rolling history while preserving the existing `speed_view` snapshot contract;
+- `SpeedView` routes plot creation/updates through the generic boundary while retaining SalixTorrent labels, tooltips, rate units and limit semantics;
+- the framework relocation probe exercises telemetry/visualization after package rename;
+- real-Windows validation passed 432 / 432 on both discovery paths with one expected skip, plus live Speed and broader button/action smoke.
 
-### A3. Application-engine/runtime boundary
+A future Tkinter Canvas plot host should consume the same plot-facing contract rather than duplicate SalixTorrent application logic.
 
-Audit `GuiEngine`, `MasterViewport`, `SceneManager`, desktop integration, runtime paths and related services for generic application-runtime ownership:
+### A3. Application-engine/runtime boundary — current tranche prepared
 
-- startup/shutdown;
-- composition-root ownership;
-- services and scheduling;
-- application events/task ownership;
-- scene/view lifecycle where generic;
-- presentation-host installation/teardown;
-- window/input integration;
-- resources/runtime paths;
-- generic diagnostics/failure isolation.
+The next tranche establishes the first reusable non-presentation engine package under `app/runtime/` rather than attempting to move `GuiEngine` wholesale.
 
-The engine must remain usable without a graphical backend.
+Prepared generic runtime ownership:
 
-### A4. Generic network/runtime awareness
+```text
+app/runtime/
+├── lifecycle.py     explicit application/service lifecycle
+├── scenes.py        backend-neutral scene registry/host contract
+├── diagnostics.py   reusable exception reporting/throttling
+├── paths.py         parameterized installed/portable/resource path policy
+└── network.py       generic dual-stack interface/address/binding helpers
+```
 
-Extract generic mechanism only:
+Runtime/lifecycle semantics:
 
-- IP/address normalization;
-- family and endpoint helpers;
-- interface discovery;
-- bind availability;
-- generic route/network-awareness primitives;
-- platform adapters where required.
+- `ApplicationRuntime` supervises explicitly registered `RuntimeService` objects;
+- services start in registration order and stop in reverse order;
+- partial startup is cleaned up best-effort and earlier services roll back if a later start fails;
+- update exceptions may be isolated through an injected error handler, while control-flow `BaseException` types such as `KeyboardInterrupt` are not swallowed;
+- runtime restart is explicit and deterministic;
+- no worker thread, hidden observer graph, renderer, event loop or model mutation is owned by the generic runtime.
 
-Keep BitTorrent routing policy, trackers, DHT/PEX/LPD, peer sessions, listener policy, MSE/PE and torrent-specific diagnostics in SalixTorrent.
+Desktop integration proof:
+
+- `GuiEngine` installs `DearPyGuiSceneHost` into the generic scene registry;
+- application-menu and active-scene updates are explicit runtime services;
+- frame delta is measured from the actual monotonic frame clock instead of using a hard-coded `0.016`;
+- the existing Dear PyGui callback queue/render loop, tray/window policy and component/layout/plot adapters remain concrete engine/backend responsibilities;
+- UI exception throttling/logging is composed through reusable `ExceptionReporter`.
+
+Headless proof:
+
+- `HeadlessRunner` now uses the same `ApplicationRuntime` lifecycle for torrent-engine startup/shutdown;
+- headless execution still imports no Dear PyGui presentation backend.
+
+Runtime-path proof:
+
+- generic `RuntimePathSpec` / `RuntimePaths` owns installed/portable/state/download/resource resolution;
+- `app/engine/runtime_paths.py` remains the SalixTorrent composition facade that supplies product-specific application/environment names;
+- existing source/frozen/portable behavior and compatibility function surface remain intact.
+
+### A4. Generic network/runtime awareness — current tranche prepared
+
+The same tranche moves the already reusable interface/address/source-binding mechanisms to `app/runtime/network.py`.
+
+Extracted mechanism includes:
+
+- canonical IPv4/IPv6 bind-address normalization;
+- address-family and wildcard helpers;
+- endpoint formatting;
+- cross-platform interface discovery;
+- usable local-address inventories;
+- default-route source-address probing;
+- local bind-availability checks;
+- presentation-safe IP masking.
+
+SalixTorrent production callers now consume these generic mechanisms directly. `app/logic/network_binding.py` remains a compatibility facade during extraction.
+
+The following remain explicitly application/domain-owned: trackers, DHT, PEX, LPD, peer sessions, torrent listener policy, MSE/PE, Interface Lock policy, connectivity interpretation/diagnostic wording, and torrent lifecycle consequences. `ConnectivityManager` is therefore **not** moved wholesale.
+
+Prepared validation adds **50** focused runtime/scene/network/adapter/relocation regressions and advances complete discovery from 432 to **482** tests. Expected real-Windows acceptance is 482 / 482 with the same one expected non-Windows shell-behavior skip.
 
 ### A5. Second GUI implementation
 
@@ -818,8 +845,10 @@ frozen CLI version:              SalixTorrent 0.5.0
 Development workflow:
 main:                            stable v0.5.0 release line
 dev documentation checkpoint:   eb906e45f7b9f62403dc7887b36aae81a1818b6f
+dev realtime/plot checkpoint:   ef8b4be998a714a86455940d8642fdd926a6609d
+current pushed Windows dev gate: 432 / 432 OK, skipped=1
 dev:                             tracks origin/dev
-prepared next full-test target:  432 / 432, Windows skipped=1
+prepared runtime/network target: 482 / 482, Windows skipped=1
 
 Localization:
 canonical catalog:               1337 entries

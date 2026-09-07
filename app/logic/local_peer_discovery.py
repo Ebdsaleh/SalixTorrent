@@ -8,7 +8,7 @@ import struct
 import time
 from typing import List, Optional, Set, Tuple
 
-from app.logic.network_binding import ip_family, normalise_bind_address
+from app.runtime.network import ip_family, normalise_bind_address
 
 
 LPD_MULTICAST_GROUP = "239.192.152.143"

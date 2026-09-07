@@ -13,7 +13,7 @@ from typing import Optional
 
 import dearpygui.dearpygui as dpg
 
-from app.logic.network_binding import format_endpoint
+from app.runtime.network import format_endpoint
 from app.localization import localization_manager, tr
 from app.engine.responsive_layout import ResponsiveLayout
 from app.framework.geometry import DialogMetrics

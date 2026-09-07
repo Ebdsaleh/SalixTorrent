@@ -53,7 +53,7 @@ from app.localization import (
     localized_choices,
     canonical_choice,
 )
-from app.logic.network_binding import (
+from app.runtime.network import (
     format_endpoint,
     list_network_interfaces,
     mask_ip_for_display,

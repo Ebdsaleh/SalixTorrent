@@ -10,7 +10,7 @@ SalixTorrent is a desktop BitTorrent client written in Python with a custom asyn
 
 **Post-v0.5.0 direction — modular application ecosystem:** SalixTorrent remains the reference application while reusable behavior is extracted downward into two cooperating layers: an application engine/runtime and an optional RAD/application framework. Dear PyGui is the current reference desktop backend, Tkinter is the planned compatibility backend for the common GUI surface, and headless/CLI operation remains first-class. Realtime telemetry/graphs, generic network/runtime awareness, lifecycle/presentation-host boundaries and rich live-data views are explicit extraction candidates before final framework naming or API freeze. See `SalixTorrent-Ecosystem-Architecture.md`.
 
-**Current `dev` extraction — realtime telemetry/visualization:** the first post-v0.5.0 implementation tranche extracts bounded multi-series telemetry/statistics and renderer-neutral realtime graph frames/coordination into the provisional framework, with Dear PyGui plotting isolated behind `DearPyGuiPlotHost`. The existing Speed view remains the application proof and keeps torrent-specific labels/rate semantics outside the generic layer. The prepared Windows gate is 432 tests; Tkinter remains a planned second implementation rather than a completed backend.
+**Current `dev` extraction — application runtime and generic network foundation:** the first ecosystem implementation tranche is committed/pushed at `ef8b4be998a714a86455940d8642fdd926a6609d`, after passing 432 / 432 tests on Windows and live Speed/application smoke. The next tranche extracts a standard-library-only `app/runtime/` boundary for explicit application/service lifecycle, scene registration, failure reporting, runtime-path policy, and generic network-interface/address/source-binding mechanisms. Both the Dear PyGui desktop engine and headless CLI now compose through the same `ApplicationRuntime` lifecycle, while concrete Dear PyGui scene visibility remains behind `DearPyGuiSceneHost`. The prepared Windows gate is 482 tests; Tkinter remains a later second-backend proof rather than a completed backend.
 
 **v0.4.0 milestone — durability and transfer lifecycle:** SalixTorrent built on the v0.3.0 protocol/network foundation with an offline-first localization system, semantic Help/Glossary content, provider-neutral translation tooling, backend-neutral application settings and session-state persistence, optional SalixORM/SQLite adapters, a fully tracked `unittest` regression suite, and durable per-torrent seeding goals. Timed goals use an instanced baseline so a newly requested duration starts from the moment it is applied, while cumulative Seed Time remains available as historical telemetry.
 
@@ -335,7 +335,7 @@ The engine/runtime should eventually provide the intact machinery needed to spin
 
 Dear PyGui remains the current reference desktop backend. Tkinter is the planned compatibility backend for the common GUI surface and will be introduced incrementally as a second implementation of the same framework-facing contracts. Headless/CLI operation remains first-class and must not import a graphical backend. A future GLFW/OpenGL path is permitted by the architecture where a real project justifies it, but it is not a current dependency or parity requirement.
 
-Immediate extraction candidates already visible in the application include the realtime Speed view, generic portions of network-interface/address discovery, application lifecycle/presentation-host ownership, desktop/platform services, and reusable patterns in live transfer/peer/piece/source views. These are candidates for careful separation, not instructions to move product-specific BitTorrent policy wholesale.
+The first realtime Speed extraction is now committed on `dev`. The next prepared boundary moves generic application lifecycle/service coordination, scene registration, reusable error reporting, runtime-path policy, and network-interface/address/source-binding mechanisms into `app/runtime/`, while keeping Dear PyGui, desktop-shell policy, BitTorrent connectivity interpretation, trackers, DHT/PEX/LPD, peer sessions and torrent listener policy outside that generic package. Rich transfer/peer/piece/source views and the Tkinter compatibility slice remain later extraction proofs.
 
 Final ecosystem naming, component vocabulary, public API freeze and external repository/package splits remain deliberately deferred until the wider engine/framework boundary has been proven with more than one presentation backend and at least one small non-SalixTorrent application.
 
@@ -353,7 +353,10 @@ SalixTorrent/
 │   ├── helpers.py
 │   ├── core/
 │   │   ├── test_foundation.py
-│   │   └── test_seeding_policy.py
+│   │   ├── test_seeding_policy.py
+│   │   ├── test_realtime_telemetry.py
+│   │   ├── test_application_runtime.py
+│   │   └── test_scene_runtime.py
 │   ├── protocol/
 │   │   ├── test_piece_selection.py
 │   │   ├── test_request_scheduling.py
@@ -364,7 +367,8 @@ SalixTorrent/
 │   ├── network/
 │   │   ├── test_transport_security.py
 │   │   ├── test_ipv6.py
-│   │   └── test_tracker_scrape.py
+│   │   ├── test_tracker_scrape.py
+│   │   └── test_runtime_network.py
 │   ├── persistence/
 │   │   ├── test_disk_io.py
 │   │   ├── test_app_settings_persistence.py
@@ -376,12 +380,14 @@ SalixTorrent/
 │   ├── packaging/
 │   │   ├── test_release_packaging.py
 │   │   ├── test_framework_packaging.py
+│   │   ├── test_runtime_packaging.py
 │   │   └── test_localization_packaging.py
 │   ├── presentation/
 │   │   ├── test_responsive_layout.py
 │   │   ├── test_documentation.py
 │   │   ├── test_gui_components.py
-│   │   └── test_realtime_visualization.py
+│   │   ├── test_realtime_visualization.py
+│   │   └── test_scene_runtime_adapter.py
 │   ├── cli/
 │   │   └── test_headless_cli.py
 │   └── localization/
@@ -409,6 +415,12 @@ SalixTorrent/
 │   ├── version.py
 │   ├── cli/
 │   │   └── headless.py
+│   ├── runtime/
+│   │   ├── lifecycle.py
+│   │   ├── scenes.py
+│   │   ├── diagnostics.py
+│   │   ├── paths.py
+│   │   └── network.py
 │   ├── framework/
 │   │   ├── property_cascade.py
 │   │   ├── geometry.py
@@ -439,6 +451,8 @@ SalixTorrent/
 │   │   │   └── dearpygui.py
 │   │   ├── plot_hosts/
 │   │   │   └── dearpygui.py
+│   │   ├── scene_hosts/
+│   │   │   └── dearpygui.py
 │   │   ├── documentation/              # compatibility + concrete renderer
 │   │   │   ├── layout.py               # compatibility facade
 │   │   │   ├── model.py                # compatibility facade
@@ -464,7 +478,7 @@ SalixTorrent/
 │   │   ├── local_peer_discovery.py
 │   │   ├── magnet.py
 │   │   ├── mse.py
-│   │   ├── network_binding.py
+│   │   ├── network_binding.py          # compatibility facade to app.runtime.network
 │   │   ├── peer.py
 │   │   ├── piece_manager.py
 │   │   ├── seeding_policy.py

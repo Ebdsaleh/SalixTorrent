@@ -16,7 +16,7 @@ from app.logic.bencode import Bencode
 from app.logic.dht import DHTClient
 from app.logic.local_peer_discovery import LocalPeerDiscovery
 from app.logic.peer import PeerConnection, normalise_peer_encryption_policy
-from app.logic.network_binding import is_bind_address_available, normalise_bind_address
+from app.runtime.network import is_bind_address_available, normalise_bind_address
 from app.logic.tracker import TrackerClient
 from app.logic.torrent_v2 import (
     expected_piece_layer_count,

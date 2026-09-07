@@ -40,7 +40,7 @@ from app.logic.peer import (
     normalise_peer_encryption_policy,
 )
 from app.logic.mse import MSEError, PeerWireStream, mse_responder_handshake
-from app.logic.network_binding import (
+from app.runtime.network import (
     format_endpoint,
     ip_family,
     is_bind_address_available,

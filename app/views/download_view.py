@@ -13,7 +13,7 @@ import dearpygui.dearpygui as dpg
 
 from app.localization import canonical_choice, localized_choices, tr, tr_value
 
-from app.logic.network_binding import format_endpoint
+from app.runtime.network import format_endpoint
 from app.logic.seeding_policy import (
     SEEDING_GOAL_EITHER,
     SEEDING_GOAL_MODES,

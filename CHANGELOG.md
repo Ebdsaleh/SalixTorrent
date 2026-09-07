@@ -4,6 +4,19 @@ Notable SalixTorrent changes are recorded here.
 
 ## Unreleased
 
+### Ecosystem Extraction — Application Runtime and Generic Network Foundation
+
+- Added a provisional, standard-library-only `app/runtime/` package for backend-neutral application mechanics that can be used by graphical, CLI/headless, test, and future designer hosts without importing Dear PyGui or BitTorrent protocol code.
+- Added explicit `ApplicationRuntime`, `ServiceRegistry`, `RuntimeService`, and `CallbackService` lifecycle coordination with ordered startup, reverse-order teardown, restart support, per-service update failure isolation, startup rollback/cleanup, and no swallowing of control-flow `BaseException` types.
+- Added backend-neutral `SceneRegistry` / `SceneHost` contracts and the concrete `DearPyGuiSceneHost`; `SceneManager` is now the SalixTorrent compatibility/composition facade and no longer imports Dear PyGui directly.
+- Added reusable `ExceptionReporter` throttling/logging and moved `GuiEngine` UI-update diagnostics onto that generic failure-reporting mechanism while preserving SalixTorrent's `ui_errors.log` destination and repeated-error suppression.
+- Extracted the installed/portable/state/download/resource path rules into parameterized `RuntimePathSpec` / `RuntimePaths`; `app/engine/runtime_paths.py` now supplies SalixTorrent's application/env names through that generic policy while preserving its established public function surface.
+- Kept runtime root normalization lexical rather than filesystem-canonicalizing caller-supplied roots, preserving Windows short/long path aliases returned by temporary, portable and bundled locations while still producing absolute roots.
+- Extracted generic dual-stack network-interface/address/source-binding helpers into `app/runtime/network.py`; SalixTorrent production callers now use that runtime boundary directly while `app/logic/network_binding.py` remains a compatibility facade. BitTorrent routing policy, trackers, DHT/PEX/LPD, peer sessions, listener policy, MSE/PE, and torrent-specific connectivity diagnosis remain application-owned.
+- Integrated the same `ApplicationRuntime` lifecycle into both the Dear PyGui desktop engine and the headless CLI. Desktop application-menu and active-scene updates are explicit runtime services driven by measured frame delta; headless manager startup/shutdown is supervised by the same runtime without importing a GUI backend.
+- Added 50 focused runtime/scene/network/adapter/relocation regressions. Prepared full discovery advances from the committed 432-test development checkpoint to 482 tests; expected real-Windows acceptance remains one non-Windows shell-behavior skip.
+- No application version bump, persistence-schema change, localization-string change, Tkinter backend, public API freeze, or merge to `main` is introduced.
+
 ### Ecosystem Extraction — Realtime Telemetry and Plot Boundary
 
 - Added backend-neutral rolling telemetry contracts under `app/framework/telemetry.py`, including fixed-series samples, bounded rolling history, immutable snapshots, age-based windows, and current/average/peak/minimum statistics suitable for GUI or headless consumers.
@@ -12,8 +25,8 @@ Notable SalixTorrent changes are recorded here.
 - Migrated the Active Transfers Speed graph to the new graph/plot-host boundary while preserving its existing localized labels, tooltips, rate-unit semantics, visible-window behavior, limit lines, and SalixTorrent-specific summary text.
 - Replaced the torrent session's private deque/statistics implementation with the generic rolling telemetry model while preserving the existing `speed_view` snapshot shape consumed by the desktop application.
 - Extended the framework relocation probe to import and exercise telemetry and realtime visualization after package rename, with no SalixTorrent or Dear PyGui dependency in the relocated framework.
-- Added 16 focused telemetry/visualization regressions; expected full real-Windows discovery advances from 416 to 432 tests with the same one expected non-Windows skip. Canonical localization remains 1,337 strings; only extraction source metadata changes.
-- Current names remain provisional and no Tkinter plot implementation, backend-selection CLI, public API freeze, application-version bump, protocol change, or persistence-schema change is introduced.
+- Added 16 focused telemetry/visualization regressions. Real-Windows validation passed both complete discovery paths at 432 / 432 with one expected non-Windows skip, and live application/Speed behavior plus the broader button/action surface was smoke-tested before commit/push. Canonical localization remains 1,337 strings; only extraction source metadata changed.
+- Committed/pushed on `dev` as `ef8b4be998a714a86455940d8642fdd926a6609d` (`Extract realtime telemetry and plot boundary`). Current names remain provisional and no Tkinter plot implementation, backend-selection CLI, public API freeze, application-version bump, protocol change, or persistence-schema change was introduced.
 
 ### Development Architecture and Documentation
 
