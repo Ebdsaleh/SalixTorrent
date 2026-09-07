@@ -88,6 +88,13 @@ class DearPyGuiRenderer:
             with dpg.child_window(**kwargs) as item:
                 yield item
             return
+        if kind in {"positioned_panel", "positioned_slot"}:
+            kwargs.setdefault("border", False)
+            kwargs.setdefault("no_scrollbar", True)
+            kwargs.setdefault("no_scroll_with_mouse", True)
+            with dpg.child_window(**kwargs) as item:
+                yield item
+            return
         if kind == "dialog":
             with dpg.window(**kwargs) as item:
                 yield item
@@ -102,6 +109,32 @@ class DearPyGuiRenderer:
 
     def configure(self, item: object, **kwargs) -> None:
         self._dpg().configure_item(item, **kwargs)
+
+    def place(self, item: object, x: int, y: int) -> None:
+        dpg = self._dpg()
+        if not dpg.does_item_exist(item):
+            return
+        dpg.set_item_pos(item, [max(0, int(x)), max(0, int(y))])
+
+    def measure(self, item: object) -> tuple[int, int]:
+        dpg = self._dpg()
+        if not dpg.does_item_exist(item):
+            return (0, 0)
+        width = height = 0
+        try:
+            width, height = dpg.get_item_rect_size(item)
+        except Exception:
+            pass
+        if int(width or 0) <= 0 or int(height or 0) <= 0:
+            try:
+                config = dpg.get_item_configuration(item) or {}
+                if int(width or 0) <= 0:
+                    width = config.get("width", 0)
+                if int(height or 0) <= 0:
+                    height = config.get("height", 0)
+            except Exception:
+                pass
+        return max(0, int(width or 0)), max(0, int(height or 0))
 
     def exists(self, item: object) -> bool:
         return bool(self._dpg().does_item_exist(item))

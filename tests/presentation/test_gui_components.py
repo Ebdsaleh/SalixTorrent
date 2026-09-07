@@ -56,6 +56,7 @@ class RecordingRenderer:
         self.centered = []
         self.destroyed = []
         self.event_bindings = []
+        self.placements = []
 
     def _new_item(self, prefix: str) -> str:
         return f"{prefix}:{len(self.created) + len(self.containers) + 1}"
@@ -86,6 +87,20 @@ class RecordingRenderer:
 
     def configure(self, item, **kwargs):
         self.configured.setdefault(item, {}).update(kwargs)
+
+    def place(self, item, x, y):
+        self.placements.append((item, int(x), int(y)))
+
+    def measure(self, item):
+        for _kind, candidate, kwargs in (*self.created, *self.containers):
+            if candidate != item:
+                continue
+            width = kwargs.get("width", 80)
+            height = kwargs.get("height", 24)
+            width = 80 if width in (None, -1) else int(width)
+            height = 24 if height in (None, -1) else int(height)
+            return max(0, width), max(0, height)
+        return (0, 0)
 
     def exists(self, item):
         if item in self.destroyed:

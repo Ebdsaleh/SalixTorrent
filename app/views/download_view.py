@@ -51,6 +51,7 @@ from app.framework.components import (
 from app.engine.responsive_layout import ResponsiveLayout
 from app.framework.geometry import DialogMetrics, clamp, fill_height, split_widths
 from app.framework.data_view import DataRecord, DataView, SortDirection, SortTerm
+from app.framework.interactions import OrderedItems
 from app.views.peer_view import PeerView
 from app.views.piece_view import PieceView
 from app.views.file_view import FileView
@@ -111,7 +112,7 @@ class DownloadView:
         # Each entry is a dictionary containing the table row, its cells and
         # the context-menu widgets belonging to that torrent.
         self.torrent_rows = {}
-        self.torrent_order = []
+        self.torrent_order = OrderedItems()
         self.latest_stats = {}
         self._limit_controls_hash: str = ""
         self._pending_remove_info_hash: str = ""
@@ -2445,64 +2446,51 @@ class DownloadView:
         dpg.set_value(row["status"], tr('view.download_view.removing', "Removing..."))
         self.manager.remove_torrent(info_hash, delete_data=delete_data)
 
+    def _apply_physical_queue_order(self) -> None:
+        if not hasattr(self, "queue_table") or not dpg.does_item_exist(self.queue_table):
+            return
+        row_ids = [
+            self.torrent_rows[key]["row"]
+            for key in self.torrent_order
+            if key in self.torrent_rows
+        ]
+        if not row_ids:
+            return
+        try:
+            dpg.reorder_items(self.queue_table, 1, row_ids)
+        except Exception:
+            return
+
     def _move_torrent_up(self, info_hash: str):
         if info_hash not in self.torrent_rows:
             return
-
-        try:
-            index = self.torrent_order.index(info_hash)
-        except ValueError:
-            return
-
-        if index <= 0:
+        if not self.torrent_order.move_item_up(info_hash):
             return
 
         self._select_torrent(info_hash)
-        row_id = self.torrent_rows[info_hash]["row"]
-
-        # Dear PyGui moves the actual table-row item, so subsequent telemetry
-        # updates modify the same row without undoing the user's ordering.
-        dpg.move_item_up(row_id)
-        self.torrent_order[index - 1], self.torrent_order[index] = (
-            self.torrent_order[index],
-            self.torrent_order[index - 1],
-        )
-        self.manager.set_queue_order(self.torrent_order)
+        self.manager.set_queue_order(self.torrent_order.keys)
         if self._sort_specs:
-            # Move Up/Down changes the real scheduler order. If the table is
-            # currently under a visual column sort, immediately return it to
-            # queue order so the action is visible instead of appearing to do
-            # nothing until the separate Queue Order button is clicked.
+            # Manual movement changes durable scheduler order, so leave any
+            # temporary visual column sort and show the new queue order.
             self._clear_queue_sort()
+        else:
+            self._apply_physical_queue_order()
+            self._apply_queue_filters()
         self._refresh_context_menu_states()
 
     def _move_torrent_down(self, info_hash: str):
         if info_hash not in self.torrent_rows:
             return
-
-        try:
-            index = self.torrent_order.index(info_hash)
-        except ValueError:
-            return
-
-        if index >= len(self.torrent_order) - 1:
+        if not self.torrent_order.move_item_down(info_hash):
             return
 
         self._select_torrent(info_hash)
-        row_id = self.torrent_rows[info_hash]["row"]
-
-        dpg.move_item_down(row_id)
-        self.torrent_order[index], self.torrent_order[index + 1] = (
-            self.torrent_order[index + 1],
-            self.torrent_order[index],
-        )
-        self.manager.set_queue_order(self.torrent_order)
+        self.manager.set_queue_order(self.torrent_order.keys)
         if self._sort_specs:
-            # Move Up/Down changes the real scheduler order. If the table is
-            # currently under a visual column sort, immediately return it to
-            # queue order so the action is visible instead of appearing to do
-            # nothing until the separate Queue Order button is clicked.
             self._clear_queue_sort()
+        else:
+            self._apply_physical_queue_order()
+            self._apply_queue_filters()
         self._refresh_context_menu_states()
 
     def _refresh_context_menu_state(self, info_hash: str):
@@ -2514,13 +2502,8 @@ class DownloadView:
         stats = self.latest_stats.get(info_hash, {})
         state = stats.get("state", "Idle")
 
-        try:
-            index = self.torrent_order.index(info_hash)
-        except ValueError:
-            index = -1
-
-        can_move_up = index > 0
-        can_move_down = 0 <= index < len(self.torrent_order) - 1
+        can_move_up = self.torrent_order.can_move_item_up(info_hash)
+        can_move_down = self.torrent_order.can_move_item_down(info_hash)
 
         # Keep every lifecycle action visible and disable only actions that do
         # not make sense for the torrent's current state.
@@ -2677,8 +2660,7 @@ class DownloadView:
             if row_id and dpg.does_item_exist(row_id):
                 dpg.delete_item(row_id)
 
-        if info_hash in self.torrent_order:
-            self.torrent_order.remove(info_hash)
+        self.torrent_order.remove(info_hash)
         if self._seeding_time_preset_info_hash == info_hash:
             self._seeding_time_preset_info_hash = ""
 

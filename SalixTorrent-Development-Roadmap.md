@@ -2,8 +2,8 @@
 
 **Current application version string:** `0.5.0`
 **Roadmap status:** v0.5.0 released; post-v0.5.0 ecosystem extraction on `dev`
-**Current implementation checkpoint:** the Tkinter compatibility / blank-application proof is pushed on `dev` at `522ac8467fc55a5ac0e3d71fe5fd470251e13562`; the next rich live-data table/state-grid tranche is prepared from that checkpoint
-**Current real Windows regression baseline:** 516 / 516 at the pushed Tkinter/blank-application checkpoint with one expected non-Windows shell-behavior skip; prepared rich-live-data tranche target: 529 / 529 with the same expected skip
+**Current implementation checkpoint:** interactive data/selection/command semantics are pushed on `dev` at `e16e46884acc53adf54a29a35dbfd09bba40ed26`; the next tranche adds multi-backend command-menu presentation, generic ordered-item movement, and the first mixed-layout explicit-placement primitive
+**Current real Windows regression baseline:** 547 / 547 at the pushed interactive-data checkpoint with one expected non-Windows shell-behavior skip
 
 This roadmap records intended engineering direction rather than promising dates or release numbers. Changes should remain incremental, testable, reviewable, and compatible with SalixTorrent's existing protocol, persistence, packaging, localization, and cross-platform boundaries.
 
@@ -674,9 +674,9 @@ The first rich-live-data tranche extracts only the semantics already proven by t
 
 Validation added **13** focused regressions and passed both complete real-Windows discovery paths at **529 / 529** with one expected non-Windows shell-behavior skip. Live Dear PyGui/Tkinter blank-application proof, state-grid resize reflow, Peers/Sources/Pieces smoke and the existing SalixTorrent desktop surface all passed. The exact pushed checkpoint is `a561b50ddc64520d1dc10b362fb4180378da5dc8` (`Extract live table and state grid presentation`).
 
-### A7. Interactive data, selection and command semantics — current tranche prepared
+### A7. Interactive data, selection and command semantics — completed/pushed
 
-The next extraction builds the richer semantics deliberately deferred from the read-only live-data tranche:
+This tranche adds the richer semantics deliberately deferred from the read-only live-data tranche:
 
 - standard-library-only keyed `DataView` search/filter/sort projection;
 - explicit multi-term ascending/descending sort state;
@@ -686,11 +686,26 @@ The next extraction builds the richer semantics deliberately deferred from the r
 - Files migrated to `LiveTable`, retaining per-file priority mutation but describing priority command availability through generic `CommandSet` state;
 - relocation/package-boundary proof for the new interaction modules.
 
-This tranche intentionally does **not** pretend the entire Active Transfers context menu is generic. Its lazy seeding-time submenus, torrent lifecycle consequences and destructive confirmation flows remain SalixTorrent policy. A later presentation-host tranche can extract physical context-menu rendering once the semantic command tree has been proven by more than one application surface.
+The real Windows gate passed both discovery forms at **547 / 547** with one expected non-Windows shell-behavior skip. The exact pushed checkpoint is `e16e46884acc53adf54a29a35dbfd09bba40ed26` (`Extract interactive data and command models`).
 
-Prepared source validation adds **18** focused regressions and advances complete discovery from 529 to **547** tests. Canonical localization remains 1,337 strings. Expected Windows acceptance is 547 / 547 with one expected non-Windows shell-behavior skip.
+### A8. Command presentation, ordered items and mixed layout — current tranche prepared
 
-### A8. WYSIWYG designer prerequisites
+The next extraction turns the semantic command model into reusable physical presentation and begins the mixed-layout foundation required by a real WYSIWYG editor:
+
+- `CommandMenu` + `CommandMenuHost` with Dear PyGui and Tkinter implementations;
+- nested commands plus enabled/checked state rendered by either backend;
+- one shared File-priority command menu instead of one Dear PyGui popup per file row;
+- generic `OrderedItems` with `move_item_up`, `move_item_down` and explicit index movement, applied to the Active Transfers scheduler order instead of calling Dear PyGui movement primitives directly;
+- `Placement`, `PlacedComponent`, and `PositionedPanel`: local `(x, y)` placement remains parent-relative, and placed children reserve offset + margins + child size so automatic grid cells can grow around them;
+- a renderer `place(...)` contract implemented by Dear PyGui and Tkinter;
+- the blank ecosystem application expanded to prove command menus and local explicit placement through both GUI backends;
+- documentation of the long-term rule that layout strategy is container-local, so flow/grid/tab/split and explicit placement can coexist in one application.
+
+Prepared source validation advances complete discovery from **547 to 563 tests**. Both display-less discovery forms pass 563 / 563 with 54 expected preparation-environment skips, while both Xvfb-backed discovery forms pass 563 / 563 with 38 platform skips and execute the live Tkinter paths. Canonical localization remains 1,337 strings.
+
+This tranche does **not** convert the whole SalixTorrent queue/menu system to a generic widget API, and it does not make absolute positioning the default. The existing structured layout remains valuable; explicit positioning is introduced as another local composition strategy. Anchors, percentages and non-measuring overlays remain later passes.
+
+### A9. WYSIWYG designer prerequisites
 
 After the runtime/presentation contracts are better proven, introduce the metadata needed by a future RAD editor:
 
@@ -706,7 +721,7 @@ After the runtime/presentation contracts are better proven, introduce the metada
 
 The future designer should itself use the same engine/framework wherever practical.
 
-### A9. Naming, public API and package/repository split
+### A10. Naming, public API and package/repository split
 
 This remains **after** the wider extraction.
 
@@ -836,7 +851,8 @@ Possible contents:
 17. Run real Windows smoke/release gates before merging a release candidate back to `main`.
 18. Fix genuine SalixORM correctness defects in SalixORM rather than compensating for them in application code.
 19. Do not tag/bump versions without a deliberate release gate.
-20. Keep final WYSIWYG designer metadata driven by proven runtime/component contracts rather than designing the editor model in isolation.
+20. Treat layout strategy as container-local: structured and explicit-placement regions must be nestable rather than forcing one geometry model across an entire window. Parent-local placement coordinates are resolved inside the parent content origin, and placed children should reserve their occupied offset + margins + size so structured rows/columns can grow around them instead of clipping them.
+21. Keep final WYSIWYG designer metadata driven by proven runtime/component contracts rather than designing the editor model in isolation.
 
 ---
 
@@ -868,10 +884,11 @@ main:                            stable v0.5.0 release line
 dev documentation checkpoint:   eb906e45f7b9f62403dc7887b36aae81a1818b6f
 dev realtime/plot checkpoint:   ef8b4be998a714a86455940d8642fdd926a6609d
 dev runtime/network checkpoint: 8e707efeb0cda162ee038a028a39a77663c2fa4e
-current pushed Windows dev gate: 482 / 482 OK, skipped=1
+current pushed Windows dev gate: 547 / 547 OK, skipped=1
 dev:                             tracks origin/dev
 committed Tkinter/blank-app baseline: 516 / 516, Windows skipped=1
-prepared live-data/state-grid target: 529 / 529, Windows skipped=1
+committed live-data/state-grid baseline: 529 / 529, Windows skipped=1
+committed interactive-data baseline: 547 / 547, Windows skipped=1
 
 Localization:
 canonical catalog:               1337 entries

@@ -24,12 +24,18 @@ from app.framework.components import (
     CheckBox,
     ComboBox,
     ControlColumn,
+    ControlGrid,
     ControlLayout,
     FILL,
     Label,
     ProgressBar,
     TextInput,
+    PlacedComponent,
+    PositionedPanel,
+    positioned,
 )
+from app.framework.command_menu import CommandMenu
+from app.framework.interactions import CommandSet, CommandSpec
 from app.framework.live_data import (
     LiveTable,
     StateGrid,
@@ -56,6 +62,35 @@ class DemoView:
         self.mode = ComboBox(("Desktop", "Tool", "Dashboard"), default_value="Desktop")
         self.enabled = CheckBox("Enable greeting", default_value=True)
         self.progress = ProgressBar(default_value=0.0, overlay="0%", layout=ControlLayout(width=FILL))
+        self.positioned_panel = PositionedPanel(
+            (
+                positioned(
+                    Label("Local x/y"),
+                    x=10,
+                    y=8,
+                ),
+                positioned(
+                    Button(
+                        "Actions",
+                        callback=lambda _event: self._show_demo_menu(),
+                        layout=ControlLayout(width=100, height=28),
+                    ),
+                    x=135,
+                    y=42,
+                ),
+            ),
+            padding=6,
+            border=True,
+            layout=ControlLayout(width=250, height=90),
+        )
+        self.mixed_layout = ControlGrid(
+            ((
+                Label("Mixed layout"),
+                PlacedComponent(self.positioned_panel, x=24, y=12),
+            ),),
+            column_widths=(110, 180),
+            layout=ControlLayout(width=FILL),
+        )
         self.table_container = ControlColumn(layout=ControlLayout(width=FILL, height=150))
         self.grid_container = ControlColumn(layout=ControlLayout(width=FILL, height=72))
         self.plot_container = ControlColumn(layout=ControlLayout(width=FILL, height=220))
@@ -69,6 +104,7 @@ class DemoView:
                 Button("Say hello", callback=self._on_greet),
                 self.progress,
                 self.status,
+                self.mixed_layout,
                 self.table_container,
                 self.grid_container,
                 self.plot_container,
@@ -83,11 +119,32 @@ class DemoView:
         self.live_table = None
         self.state_grid = None
         self.graph = None
+        self.command_menu = None
         self.elapsed = 0.0
         self._last_sample = -1.0
 
     def build(self):
         self.host.build(self.root)
+        if self.host.presentation.supports(PresentationCapability.COMMAND_MENUS):
+            self.command_menu = CommandMenu(
+                self.host.presentation.command_menu_host,
+                title="Demo Actions",
+                on_command=self._on_demo_command,
+            )
+            self.command_menu.build(
+                CommandSet((
+                    CommandSpec("reset", "Reset progress"),
+                    CommandSpec(
+                        "mode",
+                        "Choose mode",
+                        children=(
+                            CommandSpec("mode:Desktop", "Desktop", checked=True),
+                            CommandSpec("mode:Tool", "Tool", checked=False),
+                            CommandSpec("mode:Dashboard", "Dashboard", checked=False),
+                        ),
+                    ),
+                ))
+            )
         if self.host.presentation.supports(PresentationCapability.LIVE_TABLES):
             self.live_table = LiveTable(
                 self.host.presentation.table_host,
@@ -118,6 +175,44 @@ class DemoView:
                 width=-1,
                 height=200,
             )
+
+    def _show_demo_menu(self):
+        if self.command_menu is None:
+            self.status.set_text("Command menus unavailable")
+            return
+        current_mode = str(self.mode.get_value() or "Desktop")
+        self.command_menu.update(
+            CommandSet((
+                CommandSpec("reset", "Reset progress"),
+                CommandSpec(
+                    "mode",
+                    "Choose mode",
+                    children=tuple(
+                        CommandSpec(
+                            f"mode:{name}",
+                            name,
+                            checked=(name == current_mode),
+                        )
+                        for name in ("Desktop", "Tool", "Dashboard")
+                    ),
+                ),
+            ))
+        )
+        self.command_menu.show()
+
+    def _on_demo_command(self, key: str):
+        if key == "reset":
+            self.elapsed = 0.0
+            self.status.set_text("Progress reset")
+            return
+        if key.startswith("mode:"):
+            mode = key.split(":", 1)[1]
+            self.mode.set_value(mode)
+            self.status.set_text(f"Mode changed to {mode}")
+            if self.command_menu is not None:
+                self.command_menu.hide()
+            return
+        raise ValueError(key)
 
     def _on_greet(self, _event):
         if not bool(self.enabled.get_value()):

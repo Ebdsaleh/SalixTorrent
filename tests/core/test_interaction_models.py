@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 
 from app.framework.data_view import DataRecord, DataView, SortDirection, SortTerm
-from app.framework.interactions import CommandSet, CommandSpec, SelectionModel
+from app.framework.interactions import CommandSet, CommandSpec, OrderedItems, SelectionModel
 
 
 class SelectionModelTests(unittest.TestCase):
@@ -55,6 +55,39 @@ class CommandModelTests(unittest.TestCase):
             commands.dispatch("disabled", lambda key: key)
         with self.assertRaisesRegex(RuntimeError, "submenu"):
             commands.dispatch("submenu", lambda key: key)
+
+
+class OrderedItemsTests(unittest.TestCase):
+    def test_move_up_down_and_to_are_stable_key_operations(self):
+        order = OrderedItems(("a", "b", "c"))
+        self.assertTrue(order.move_item_up("b"))
+        self.assertEqual(("b", "a", "c"), order.keys)
+        self.assertTrue(order.move_item_down("a"))
+        self.assertEqual(("b", "c", "a"), order.keys)
+        self.assertTrue(order.move_item_to("a", 0))
+        self.assertEqual(("a", "b", "c"), order.keys)
+
+    def test_boundary_moves_and_unknown_keys_are_noops(self):
+        order = OrderedItems(("a", "b"))
+        self.assertFalse(order.move_item_up("a"))
+        self.assertFalse(order.move_item_down("b"))
+        self.assertFalse(order.move_item_up("missing"))
+        self.assertFalse(order.move_item_down("missing"))
+        self.assertEqual(("a", "b"), order.keys)
+
+    def test_replace_append_remove_and_validation(self):
+        order = OrderedItems(("a",))
+        self.assertTrue(order.append("b"))
+        self.assertFalse(order.append("b"))
+        self.assertTrue(order.remove("a"))
+        self.assertFalse(order.remove("a"))
+        self.assertTrue(order.replace(("x", "y")))
+        self.assertEqual(("x", "y"), tuple(order))
+        with self.assertRaisesRegex(ValueError, "unique"):
+            order.replace(("x", "x"))
+        with self.assertRaises(IndexError):
+            order.move_item_to("x", 3)
+
 
 
 class DataViewTests(unittest.TestCase):

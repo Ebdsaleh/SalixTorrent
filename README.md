@@ -10,7 +10,7 @@ SalixTorrent is a desktop BitTorrent client written in Python with a custom asyn
 
 **Post-v0.5.0 direction — modular application ecosystem:** SalixTorrent remains the reference application while reusable behavior is extracted downward into two cooperating layers: an application engine/runtime and an optional RAD/application framework. Dear PyGui is the current reference desktop backend, Tkinter is now the validated compatibility implementation for the common GUI surface, and headless/CLI operation remains first-class. Realtime telemetry/graphs, generic network/runtime awareness, lifecycle/presentation-host boundaries and rich live-data views are explicit extraction candidates before final framework naming or API freeze. See `SalixTorrent-Ecosystem-Architecture.md`.
 
-**Current `dev` extraction — rich live-data/RAD surfaces:** the second-backend/blank-application proof is committed/pushed at `522ac8467fc55a5ac0e3d71fe5fd470251e13562` after passing 516 / 516 tests on Windows. The current prepared tranche adds renderer-neutral keyed live tables and categorical state grids with Dear PyGui/Tkinter hosts; migrates the Peers, Sources, and Pieces live surfaces to those contracts; and extends the product-neutral blank application to prove components + live table + state grid + realtime graph through either GUI backend. Tranche 4 is now Windows-validated and pushed at 529 tests. The next extraction adds renderer-neutral data-view sorting/filtering plus explicit selection/command-state models, routes the Active Transfers queue projection through those contracts, and migrates the Files surface onto `LiveTable` without moving BitTorrent mutation policy into the framework. Prepared complete discovery is 547 tests. Dear PyGui remains SalixTorrent's reference desktop backend.
+**Current `dev` extraction — interaction, command presentation and mixed layout:** the interactive-data tranche is Windows-validated and pushed at `e16e46884acc53adf54a29a35dbfd09bba40ed26` after passing 547 / 547 tests with one expected skip. The current prepared tranche adds renderer-neutral ordered-item movement, reusable `CommandMenu` coordination with Dear PyGui/Tkinter hosts, one shared File-priority command surface, and the first mixed-layout placement primitives (`Placement`, `PlacedComponent`, and `PositionedPanel`) for explicit local `(x, y)` positioning that still participates in parent measurement inside otherwise structured layouts. The product-neutral blank application now proves that flow/layout containers, local explicit placement, command menus, live tables, state grids and realtime graphs can coexist through either GUI backend. Prepared complete discovery is **563 tests**; Dear PyGui remains SalixTorrent's reference desktop backend, while final ecosystem naming and API freeze remain deferred.
 
 **v0.4.0 milestone — durability and transfer lifecycle:** SalixTorrent built on the v0.3.0 protocol/network foundation with an offline-first localization system, semantic Help/Glossary content, provider-neutral translation tooling, backend-neutral application settings and session-state persistence, optional SalixORM/SQLite adapters, a fully tracked `unittest` regression suite, and durable per-torrent seeding goals. Timed goals use an instanced baseline so a newly requested duration starts from the moment it is applied, while cumulative Seed Time remains available as historical telemetry.
 
@@ -44,7 +44,7 @@ SalixTorrent is a desktop BitTorrent client written in Python with a custom asyn
 - Python 3.13 is the primary development/runtime version for v0.5.0.
 - Dear PyGui 2.3.1 or newer in the 2.x series.
 - aiohttp 3.11 or newer in the 3.x series.
-- Tk support in the Python installation for the current native file/folder dialogs. Tkinter also provides the prepared post-v0.5.0 compatibility backend for the common component/layout/scene/realtime-plot surface; SalixTorrent itself still uses Dear PyGui as its reference desktop backend.
+- Tk support in the Python installation for the current native file/folder dialogs. Tkinter also provides the post-v0.5.0 compatibility backend for the common component/layout/scene/realtime-plot/live-data/command-menu surface, including local explicit placement and parent-aware occupied bounds; SalixTorrent itself still uses Dear PyGui as its reference desktop backend.
 
 Install the Python dependencies with:
 
@@ -335,7 +335,7 @@ The engine/runtime should eventually provide the intact machinery needed to spin
 
 Dear PyGui remains the current reference SalixTorrent desktop backend. Tkinter is now the validated compatibility implementation for the common GUI surface: it implements the same component, layout, scene, and realtime-plot contracts but is not required to reproduce Dear PyGui-specific capabilities or presentation pixel-for-pixel. Headless/CLI operation remains first-class and does not require a graphical toolkit. A future GLFW/OpenGL path is permitted by the architecture where a real project justifies it, but it is not a current dependency or parity requirement.
 
-The realtime Speed extraction, runtime/network extraction, and second-backend blank-application proof are now committed on `dev`. The current prepared tranche extracts keyed live-table and compact state-grid semantics, migrates the Peers/Sources/Pieces read-only live surfaces, and proves those same contracts through Tkinter in the product-neutral blank application. Interactive transfer-queue and Files-table command surfaces remain later audit targets because their sorting/filtering/context-menu/mutation behavior deserves explicit contracts rather than cosmetic wrapping.
+The realtime Speed, runtime/network, second-backend blank-application, live-table/state-grid, and interactive data/command-semantic tranches are now committed on `dev`. The current prepared tranche adds a physical command-menu host contract with Dear PyGui and Tkinter implementations, generic ordered-item movement, and the first parent-aware local explicit-placement model. This establishes a deliberate mixed-layout rule: row/column/grid/tab/split-style regions and local `(x, y)` regions may be nested together rather than forcing one geometry model across the whole window.
 
 Final ecosystem naming, component vocabulary, public API freeze and external repository/package splits remain deliberately deferred until the wider engine/framework boundary has been proven with more than one presentation backend and at least one small non-SalixTorrent application.
 
@@ -357,6 +357,7 @@ SalixTorrent/
 │   │   ├── test_foundation.py
 │   │   ├── test_seeding_policy.py
 │   │   ├── test_realtime_telemetry.py
+│   │   ├── test_interaction_models.py
 │   │   ├── test_application_runtime.py
 │   │   ├── test_application_host_contracts.py
 │   │   └── test_scene_runtime.py
@@ -392,6 +393,9 @@ SalixTorrent/
 │   │   ├── test_gui_components.py
 │   │   ├── test_realtime_visualization.py
 │   │   ├── test_live_data.py
+│   │   ├── test_interactive_data_migration.py
+│   │   ├── test_mixed_layout.py
+│   │   ├── test_command_menu.py
 │   │   ├── test_scene_runtime_adapter.py
 │   │   └── test_tkinter_backend.py
 │   ├── cli/
@@ -436,6 +440,9 @@ SalixTorrent/
 │   │   ├── telemetry.py
 │   │   ├── visualization.py
 │   │   ├── live_data.py
+│   │   ├── data_view.py
+│   │   ├── interactions.py
+│   │   ├── command_menu.py
 │   │   ├── documentation/
 │   │   │   ├── layout.py
 │   │   │   ├── model.py
@@ -478,6 +485,9 @@ SalixTorrent/
 │   │   │   ├── dearpygui.py
 │   │   │   └── tkinter.py
 │   │   ├── state_grid_hosts/
+│   │   │   ├── dearpygui.py
+│   │   │   └── tkinter.py
+│   │   ├── command_menu_hosts/
 │   │   │   ├── dearpygui.py
 │   │   │   └── tkinter.py
 │   │   ├── documentation/              # compatibility + concrete renderer

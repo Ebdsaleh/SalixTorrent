@@ -8,6 +8,7 @@ import unittest
 from tests.helpers import PROJECT_ROOT
 
 from app.engine.application_hosts.tkinter import TkinterApplicationHost
+from app.engine.command_menu_hosts import TkinterCommandMenuHost
 from app.engine.component_renderers import TkinterRenderer
 from app.engine.layout_hosts import TkinterLayoutHost
 from app.engine.plot_hosts import TkinterPlotHost
@@ -31,7 +32,12 @@ from app.framework.components import (
     NumericStepper,
     ProgressBar,
     TextInput,
+    PlacedComponent,
+    PositionedPanel,
+    positioned,
 )
+from app.framework.command_menu import CommandMenu, CommandMenuHost
+from app.framework.interactions import CommandSet, CommandSpec
 from app.framework.live_data import (
     LiveTable,
     StateGrid,
@@ -69,6 +75,7 @@ class TkinterSourceBoundaryTests(unittest.TestCase):
             PROJECT_ROOT / "app" / "engine" / "state_grid_hosts" / "tkinter.py",
             PROJECT_ROOT / "app" / "engine" / "presentation_backends" / "tkinter.py",
             PROJECT_ROOT / "app" / "engine" / "application_hosts" / "tkinter.py",
+            PROJECT_ROOT / "app" / "engine" / "command_menu_hosts" / "tkinter.py",
         )
         forbidden = ("dearpygui", "app.logic", "app.views", "app.localization")
         for path in paths:
@@ -112,12 +119,14 @@ class TkinterBackendLiveTests(unittest.TestCase):
         plot_host = TkinterPlotHost(self.renderer)
         table_host = TkinterTableHost(self.renderer)
         state_grid_host = TkinterStateGridHost(self.renderer)
+        command_menu_host = TkinterCommandMenuHost(self.root)
         self.assertIsInstance(self.renderer, ComponentRenderer)
         self.assertIsInstance(layout_host, LayoutHost)
         self.assertIsInstance(scene_host, SceneHost)
         self.assertIsInstance(plot_host, PlotHost)
         self.assertIsInstance(table_host, TableHost)
         self.assertIsInstance(state_grid_host, StateGridHost)
+        self.assertIsInstance(command_menu_host, CommandMenuHost)
 
     def test_backend_factory_exposes_common_capabilities(self):
         backend = create_tkinter_backend(self.root)
@@ -129,6 +138,7 @@ class TkinterBackendLiveTests(unittest.TestCase):
             PresentationCapability.REALTIME_PLOTS,
             PresentationCapability.LIVE_TABLES,
             PresentationCapability.STATE_GRIDS,
+            PresentationCapability.COMMAND_MENUS,
         ):
             self.assertTrue(backend.supports(capability))
 
@@ -331,6 +341,57 @@ class TkinterBackendLiveTests(unittest.TestCase):
         self.assertEqual(len(binding.grid.canvas.find_all()), 0)
         grid.dispose()
         self.assertFalse(grid.exists())
+
+    def test_mixed_layout_places_children_locally_and_reserves_grid_extent(self):
+        panel = PositionedPanel(
+            (
+                positioned(Label("Local"), x=20, y=16),
+                positioned(Button("Action", layout=ControlLayout(width=90, height=28)), x=150, y=52),
+            ),
+            layout=ControlLayout(width=280, height=110),
+            padding=6,
+        )
+        wrapped = PlacedComponent(panel, x=40, y=25)
+        grid = ControlGrid(((Label("Automatic"), wrapped),), column_widths=(100, 120))
+        grid.build(renderer=self.renderer)
+        self.root.deiconify()
+        self.root.update_idletasks()
+
+        panel_item = panel.require_item()
+        panel_mount = panel_item.mount or panel_item.widget
+        self.assertEqual("place", panel.children[0].component.require_item().geometry_manager)
+        self.assertEqual("place", panel.children[1].component.require_item().geometry_manager)
+        self.assertGreaterEqual(int(panel_mount.winfo_width()), 280)
+        self.assertEqual((320, 135), wrapped.occupied_size)
+
+    def test_tkinter_command_menu_uses_same_semantic_command_tree(self):
+        seen = []
+        menu = CommandMenu(
+            TkinterCommandMenuHost(self.root),
+            title="Actions",
+            on_command=seen.append,
+        )
+        commands = CommandSet((
+            CommandSpec("run", "Run"),
+            CommandSpec("mode", "Mode", children=(
+                CommandSpec("mode:a", "A", checked=True),
+                CommandSpec("mode:b", "B", checked=False),
+            )),
+        ))
+        binding = menu.build(commands)
+        self.assertTrue(menu.exists())
+        item = binding.items["run"]
+        item.menu.invoke(item.index)
+        self.assertEqual(["run"], seen)
+        menu.update(CommandSet((
+            CommandSpec("run", "Run", enabled=False),
+            CommandSpec("mode", "Mode", children=(
+                CommandSpec("mode:a", "A", checked=False),
+                CommandSpec("mode:b", "B", checked=True),
+            )),
+        )))
+        self.assertTrue(menu.dispose())
+        self.assertFalse(menu.exists())
 
     def test_blank_application_demo_runs_tkinter_backend_and_auto_closes(self):
         example = PROJECT_ROOT / "examples" / "ecosystem_blank_app.py"

@@ -33,8 +33,11 @@ from .containers import (
     ControlGrid,
     ControlRow,
     Dialog,
+    PlacedComponent,
+    PositionedPanel,
     SectionPanel,
 )
+from .placement import Insets, Placement, PositionedChild, insets, positioned
 from .fields import (
     DurationEditor,
     LabeledComboField,
@@ -54,6 +57,7 @@ from .renderer import (
 __all__ = [
     "AUTO",
     "FILL",
+    "Insets",
     "FRAMEWORK_COMPONENT_PROFILE",
     "BindingSet",
     "Button",
@@ -81,6 +85,10 @@ __all__ = [
     "NumericStepper",
     "ProgressBar",
     "NumericUnitField",
+    "Placement",
+    "PlacedComponent",
+    "PositionedChild",
+    "PositionedPanel",
     "ResolvedControlLayout",
     "SectionPanel",
     "Separator",
@@ -91,6 +99,8 @@ __all__ = [
     "action_callback",
     "clear_default_renderer",
     "get_default_renderer",
+    "insets",
+    "positioned",
     "resolve_control_layout",
     "set_default_renderer",
 ]

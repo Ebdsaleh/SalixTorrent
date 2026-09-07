@@ -4,6 +4,16 @@ Notable SalixTorrent changes are recorded here.
 
 ## Unreleased
 
+### Ecosystem Extraction — Command Menus, Ordered Items and Mixed Layout
+
+- Added standard-library-only `OrderedItems` semantics for stable keyed ordering with generic `move_item_up`, `move_item_down`, explicit-index movement, boundary queries, replacement, append and removal. Active Transfers now uses that model for scheduler-order changes instead of Dear PyGui item-movement primitives while `TorrentManager` remains the durable queue-policy owner.
+- Added renderer-neutral `CommandMenu` / `CommandMenuHost` coordination over the existing `CommandSet` tree, with Dear PyGui and Tkinter hosts for nested commands and enabled/checked state. Command semantics remain separate from physical menu widgets and application policy.
+- Replaced the Files view's per-row Dear PyGui priority popups with one shared command-menu surface. The generic command tree describes current/available priority choices; SalixTorrent still owns actual file-priority mutation and right-click attachment.
+- Added the first mixed-layout explicit-placement primitive: `PositionedPanel`, `Placement`, `PlacedComponent`, and `PositionedChild`. A positioned panel gives its direct children local `(x, y)` coordinates through the renderer `place(...)` contract, while `PlacedComponent` lets any ordinary component carry a parent-local offset and margins while still participating in a structured parent layout. The wrapper reserves the child's occupied offset + size, and `ControlGrid` consumes that semantic extent so the affected column/row can grow rather than clip the child. Dear PyGui maps this to item positioning and Tkinter maps it to `place()`.
+- Expanded the Dear PyGui/Tkinter presentation bundles with explicit `COMMAND_MENUS` capability and extended the product-neutral blank ecosystem application to prove structured flow layout, local explicit placement and command menus alongside live tables, state grids and realtime graphs without toolkit-name branching inside the view.
+- Documented the long-term mixed-layout rule for WYSIWYG work: layout policy is container-local, so structured layout and explicit placement can coexist in one hierarchy. Explicit coordinates are resolved inside the parent-assigned content space, naturally translating through parent padding/margins, and positioned children can contribute their occupied bounds to parent measurement instead of becoming invisible to layout.
+- Added focused ordering, command-menu, mixed-layout, backend and relocation regressions. No application version, persistence schema, canonical localization strings, final ecosystem naming/API freeze, release tag or merge to `main` is introduced.
+
 ### Ecosystem Extraction — Interactive Data, Selection and Commands
 
 - Added standard-library-only `DataView`, `DataRecord`, `SortTerm`, and `SortDirection` contracts for deterministic keyed search/filter/sort projection outside any GUI toolkit.

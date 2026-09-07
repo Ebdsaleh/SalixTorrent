@@ -14,13 +14,22 @@ class InteractiveDataMigrationTests(unittest.TestCase):
         self.assertIn("SortTerm", source)
         self.assertNotIn("def _queue_sort_value", source)
         self.assertNotIn("def _row_matches_filter", source)
+        self.assertIn("OrderedItems", source)
+        self.assertIn("move_item_up", source)
+        self.assertIn("move_item_down", source)
+        self.assertNotIn("dpg.move_item_up", source)
+        self.assertNotIn("dpg.move_item_down", source)
 
     def test_file_view_uses_live_table_and_command_state_models(self):
         source = (PROJECT_ROOT / "app" / "views" / "file_view.py").read_text(encoding="utf-8")
         self.assertIn("LiveTable", source)
         self.assertIn("CommandSet", source)
+        self.assertIn("CommandMenu", source)
+        self.assertIn("DearPyGuiCommandMenuHost", source)
         self.assertNotIn("dpg.table_row", source)
         self.assertNotIn("with dpg.table(", source)
+        self.assertNotIn("dpg.add_menu_item", source)
+        self.assertNotIn("dpg.window(popup=True", source)
 
     def test_new_framework_interaction_modules_are_standard_library_only(self):
         for name in ("data_view.py", "interactions.py"):

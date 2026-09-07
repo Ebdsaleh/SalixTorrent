@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from app.engine.command_menu_hosts import TkinterCommandMenuHost
 from app.engine.component_renderers import TkinterRenderer
 from app.engine.layout_hosts import TkinterLayoutHost
 from app.engine.plot_hosts import TkinterPlotHost
@@ -28,4 +29,5 @@ def create_tkinter_backend(
         plot_host=TkinterPlotHost(renderer),
         table_host=TkinterTableHost(renderer),
         state_grid_host=TkinterStateGridHost(renderer),
+        command_menu_host=TkinterCommandMenuHost(root),
     )

@@ -63,6 +63,23 @@ class Component(ABC):
         self.resolved_layout = resolved
         return resolved
 
+    def layout_size_hint(
+        self,
+        *,
+        renderer: ComponentRenderer | None = None,
+    ) -> tuple[int | None, int | None]:
+        """Return explicitly known semantic width/height without backend queries.
+
+        ``None`` means the component is AUTO/FILL sized on that axis.  Positioned
+        layout uses these hints before rendering, then asks the renderer for an
+        actual measured size after construction when available.
+        """
+
+        resolved = self._resolve_layout(renderer=renderer)
+        width = resolved.width if isinstance(resolved.width, int) else None
+        height = resolved.height if isinstance(resolved.height, int) else None
+        return width, height
+
     @staticmethod
     def _layout_kwargs(resolved: ResolvedControlLayout) -> dict:
         width = backend_dimension(resolved.width)

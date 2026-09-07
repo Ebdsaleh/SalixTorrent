@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from app.engine.command_menu_hosts import DearPyGuiCommandMenuHost
 from app.engine.component_renderers import DearPyGuiRenderer
 from app.engine.layout_hosts import DearPyGuiLayoutHost
 from app.engine.plot_hosts import DearPyGuiPlotHost
@@ -25,4 +26,5 @@ def create_dearpygui_backend(
         plot_host=DearPyGuiPlotHost(),
         table_host=DearPyGuiTableHost(),
         state_grid_host=DearPyGuiStateGridHost(),
+        command_menu_host=DearPyGuiCommandMenuHost(),
     )

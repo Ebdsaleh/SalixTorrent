@@ -129,3 +129,102 @@ class CommandSet:
         if command.children:
             raise RuntimeError(f"command {command.key!r} is a submenu and cannot be dispatched")
         return handler(command.key)
+
+
+class OrderedItems:
+    """Explicit stable-key ordering model for list/tree/table-like collections.
+
+    This is intentionally independent of any rendered list widget.  Callers
+    mutate this semantic order first, persist it when appropriate, then ask a
+    concrete surface to reflect the resulting key sequence.
+    """
+
+    def __init__(self, keys: Iterable[object] = ()):
+        self._keys: list[str] = []
+        self.replace(keys)
+
+    @property
+    def keys(self) -> tuple[str, ...]:
+        return tuple(self._keys)
+
+    def __len__(self) -> int:
+        return len(self._keys)
+
+    def __iter__(self):
+        return iter(tuple(self._keys))
+
+    def __contains__(self, key: object) -> bool:
+        return str(key) in self._keys
+
+    def index(self, key: object) -> int:
+        return self._keys.index(_key(key, field="ordered-item key"))
+
+    def replace(self, keys: Iterable[object]) -> bool:
+        normalized = [_key(value, field="ordered-item key") for value in keys]
+        if len(normalized) != len(set(normalized)):
+            raise ValueError("ordered-item keys must be unique")
+        changed = normalized != self._keys
+        self._keys = normalized
+        return changed
+
+    def append(self, key: object) -> bool:
+        resolved = _key(key, field="ordered-item key")
+        if resolved in self._keys:
+            return False
+        self._keys.append(resolved)
+        return True
+
+    def remove(self, key: object) -> bool:
+        resolved = _key(key, field="ordered-item key")
+        if resolved not in self._keys:
+            return False
+        self._keys.remove(resolved)
+        return True
+
+    def can_move_item_up(self, key: object) -> bool:
+        try:
+            return self.index(key) > 0
+        except ValueError:
+            return False
+
+    def can_move_item_down(self, key: object) -> bool:
+        try:
+            index = self.index(key)
+        except ValueError:
+            return False
+        return index < len(self._keys) - 1
+
+    def move_item_up(self, key: object) -> bool:
+        resolved = _key(key, field="ordered-item key")
+        if not self.can_move_item_up(resolved):
+            return False
+        index = self._keys.index(resolved)
+        self._keys[index - 1], self._keys[index] = self._keys[index], self._keys[index - 1]
+        return True
+
+    def move_item_down(self, key: object) -> bool:
+        resolved = _key(key, field="ordered-item key")
+        if not self.can_move_item_down(resolved):
+            return False
+        index = self._keys.index(resolved)
+        self._keys[index], self._keys[index + 1] = self._keys[index + 1], self._keys[index]
+        return True
+
+    def move_item_to(self, key: object, index: object) -> bool:
+        resolved = _key(key, field="ordered-item key")
+        if resolved not in self._keys:
+            return False
+        if isinstance(index, bool):
+            raise TypeError("ordered-item target index must be an integer")
+        try:
+            target = int(index)
+        except (TypeError, ValueError) as exc:
+            raise TypeError("ordered-item target index must be an integer") from exc
+        if target < 0 or target >= len(self._keys):
+            raise IndexError("ordered-item target index is out of range")
+        current = self._keys.index(resolved)
+        if current == target:
+            return False
+        self._keys.pop(current)
+        self._keys.insert(target, resolved)
+        return True

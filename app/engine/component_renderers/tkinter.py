@@ -635,7 +635,7 @@ class TkinterRenderer:
                 self._stack.pop()
             return
 
-        if kind not in {"row", "column", "grid", "panel"}:
+        if kind not in {"row", "column", "grid", "panel", "positioned_panel", "positioned_slot"}:
             raise ValueError(f"unsupported GUI component container: {kind!r}")
 
         border = bool(kwargs.pop("border", False))
@@ -645,9 +645,10 @@ class TkinterRenderer:
             widget.configure(width=int(width))
         if isinstance(height, (int, float)) and height > 0:
             widget.configure(height=int(height))
-        if (isinstance(width, (int, float)) and width > 0) or (
+        fixed_geometry = (isinstance(width, (int, float)) and width > 0) or (
             isinstance(height, (int, float)) and height > 0
-        ):
+        )
+        if fixed_geometry or kind in {"positioned_panel", "positioned_slot"}:
             widget.pack_propagate(False)
             widget.grid_propagate(False)
 
@@ -709,6 +710,8 @@ class TkinterRenderer:
                     mount.grid_remove()
                 elif item.geometry_manager == "pack":
                     mount.pack_forget()
+                elif item.geometry_manager == "place":
+                    mount.place_forget()
                 elif item.kind == "dialog":
                     item.widget.withdraw()
             except Exception:
@@ -724,6 +727,8 @@ class TkinterRenderer:
                 mount.grid(**item.geometry_options)
             elif item.geometry_manager == "pack":
                 mount.pack(**item.geometry_options)
+            elif item.geometry_manager == "place":
+                mount.place(**item.geometry_options)
         except Exception:
             pass
 
@@ -803,6 +808,43 @@ class TkinterRenderer:
                 # compatibility backend. Unsupported presentation decoration is
                 # intentionally best-effort rather than a runtime failure.
                 pass
+
+    def place(self, item: object, x: int, y: int) -> None:
+        if not isinstance(item, _TkItem) or not self.exists(item):
+            return
+        mount = item.mount or item.widget
+        if mount is None:
+            return
+        try:
+            if item.geometry_manager == "grid":
+                mount.grid_forget()
+            elif item.geometry_manager == "pack":
+                mount.pack_forget()
+            elif item.geometry_manager == "place":
+                mount.place_forget()
+        except Exception:
+            pass
+        options = {"x": max(0, int(x)), "y": max(0, int(y)), "anchor": "nw"}
+        item.geometry_manager = "place"
+        item.geometry_options = options
+        try:
+            mount.place(**options)
+        except Exception:
+            return
+
+    def measure(self, item: object) -> tuple[int, int]:
+        if not isinstance(item, _TkItem) or not self.exists(item):
+            return (0, 0)
+        target = item.mount or item.widget
+        if target is None:
+            return (0, 0)
+        try:
+            target.update_idletasks()
+            width = max(int(target.winfo_width()), int(target.winfo_reqwidth()))
+            height = max(int(target.winfo_height()), int(target.winfo_reqheight()))
+            return max(0, width), max(0, height)
+        except Exception:
+            return (0, 0)
 
     def exists(self, item: object) -> bool:
         if isinstance(item, _TkVirtualItem):

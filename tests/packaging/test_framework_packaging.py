@@ -95,6 +95,7 @@ class FrameworkPackagingTests(unittest.TestCase):
                 assert "portable_framework.documentation" in imported
                 assert "portable_framework.geometry" in imported
                 assert "portable_framework.live_data" in imported
+                assert "portable_framework.command_menu" in imported
                 assert "portable_framework.data_view" in imported
                 assert "portable_framework.interactions" in imported
                 assert "portable_framework.telemetry" in imported
@@ -126,11 +127,19 @@ class FrameworkPackagingTests(unittest.TestCase):
                 import sys
                 sys.path.insert(0, {str(temp_root)!r})
 
-                from portable_framework.components import Button, ComponentLayoutProfile
+                from portable_framework.command_menu import CommandMenu, CommandMenuBinding
+                from portable_framework.components import (
+                    Button,
+                    ComponentLayoutProfile,
+                    ControlLayout,
+                    PlacedComponent,
+                    PositionedPanel,
+                    positioned,
+                )
                 from portable_framework.documentation import DocPage, DocumentationTheme
                 from portable_framework.geometry import ContentMetrics, content_bounds
                 from portable_framework.data_view import DataRecord, DataView, SortDirection, SortTerm
-                from portable_framework.interactions import CommandSet, CommandSpec, SelectionModel
+                from portable_framework.interactions import CommandSet, CommandSpec, OrderedItems, SelectionModel
                 from portable_framework.live_data import (
                     LiveTable,
                     StateGrid,
@@ -181,6 +190,13 @@ class FrameworkPackagingTests(unittest.TestCase):
                 coordinator = LayoutCoordinator(Host())
 
                 selection = SelectionModel("row-b")
+                ordered = OrderedItems(("row-a", "row-b"))
+                assert ordered.move_item_up("row-b") is True
+                positioned_panel = PositionedPanel((
+                    positioned(Button("Inside", layout=ControlLayout(width=80, height=24)), x=20, y=10),
+                ), layout=ControlLayout(width=120, height=60))
+                placed_panel = PlacedComponent(positioned_panel, x=30, y=15)
+
                 commands = CommandSet((
                     CommandSpec("open", "Open"),
                     CommandSpec("mode", "Mode", children=(CommandSpec("mode:a", "A"),)),
@@ -194,6 +210,30 @@ class FrameworkPackagingTests(unittest.TestCase):
                     DataRecord("row-a", {{"name": "Beta", "size": 1}}),
                     DataRecord("row-b", {{"name": "Alpha", "size": 2}}),
                 ))
+
+                class MenuProbeHost:
+                    def __init__(self):
+                        self.alive = True
+                        self.callback = None
+                    def build(self, commands, *, title="", on_command):
+                        self.callback = on_command
+                        return CommandMenuBinding("menu", {{command.key: command.key for command in commands.commands}})
+                    def update(self, binding, commands):
+                        return None
+                    def show(self, binding):
+                        return None
+                    def hide(self, binding):
+                        return None
+                    def exists(self, binding):
+                        return self.alive
+                    def dispose(self, binding):
+                        self.alive = False
+
+                menu_seen = []
+                menu_host = MenuProbeHost()
+                command_menu = CommandMenu(menu_host, on_command=menu_seen.append)
+                command_menu.build(commands)
+                menu_host.callback("open")
 
                 telemetry = RollingTelemetry(
                     ("value",),
@@ -289,6 +329,10 @@ class FrameworkPackagingTests(unittest.TestCase):
                 assert theme is not None
                 assert bounds.width == 700
                 assert coordinator.item_size("panel") == (400, 300)
+                assert ordered.keys == ("row-b", "row-a")
+                assert placed_panel.placement.x == 30
+                assert positioned_panel.children[0].placement.y == 10
+                assert menu_seen == ["open"]
                 assert coordinator.width("panel", 320) is True
                 assert telemetry_window.statistics("value").average == 3.0
                 assert plot_host.series_values == [("value", (-1.0, 0.0), (2.0, 4.0))]

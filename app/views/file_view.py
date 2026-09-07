@@ -6,7 +6,9 @@ import dearpygui.dearpygui as dpg
 
 from app.localization import tr, tr_value
 from app.logic.torrent_manager import TorrentManager
+from app.engine.command_menu_hosts import DearPyGuiCommandMenuHost
 from app.engine.table_hosts import DearPyGuiTableHost
+from app.framework.command_menu import CommandMenu
 from app.framework.interactions import CommandSet, CommandSpec
 from app.framework.live_data import LiveTable, TableCell, TableColumnSpec, TableFrame, TableRow
 from app.views.help_terms import add_help_tooltip, add_text_tooltip, contextual_text
@@ -40,7 +42,10 @@ class FileView:
         self.note_text = None
         self.table_id = None
         self._table: LiveTable | None = None
-        self._menus: dict[int, dict] = {}
+        self._priority_menu: CommandMenu | None = None
+        self._row_handlers: dict[int, object] = {}
+        self._row_priorities: dict[int, str] = {}
+        self._menu_file_index: int | None = None
         self._current_info_hash = ""
         self._storage_mode = "Download"
 
@@ -81,6 +86,17 @@ class FileView:
             add_help_tooltip(binding.column_item("priority"), "FILE_PRIORITY")
             add_help_tooltip(binding.column_item("state"), "FILE_STATE")
 
+            self._priority_menu = CommandMenu(
+                DearPyGuiCommandMenuHost(),
+                title=tr('view.file_view.file_priority', "File Priority"),
+                on_command=self._dispatch_priority_command,
+            )
+            menu_binding = self._priority_menu.build(self._priority_commands("Normal"))
+            if menu_binding.title_item is not None:
+                add_help_tooltip(menu_binding.title_item, "FILE_PRIORITY")
+            for item in menu_binding.items.values():
+                add_help_tooltip(item, "FILE_PRIORITY")
+
     @staticmethod
     def _format_size(byte_count: int) -> str:
         try:
@@ -96,18 +112,18 @@ class FileView:
             return f"{value / kib:.1f} KiB"
         return f"{value} B"
 
-    def _destroy_menu(self, index: int) -> None:
-        menu = self._menus.pop(index, None)
-        if not menu:
-            return
-        for key in ("popup", "right_click_registry"):
-            item = menu.get(key)
-            if item and dpg.does_item_exist(item):
-                dpg.delete_item(item)
+    def _destroy_row_handler(self, index: int) -> None:
+        registry = self._row_handlers.pop(int(index), None)
+        self._row_priorities.pop(int(index), None)
+        if registry and dpg.does_item_exist(registry):
+            dpg.delete_item(registry)
 
     def _clear_rows(self):
-        for index in tuple(self._menus):
-            self._destroy_menu(index)
+        for index in tuple(self._row_handlers):
+            self._destroy_row_handler(index)
+        self._menu_file_index = None
+        if self._priority_menu is not None:
+            self._priority_menu.hide()
         if self._table is not None:
             self._table.clear()
 
@@ -126,11 +142,8 @@ class FileView:
         if not self._current_info_hash or self._storage_mode == "External Seed":
             return
         self.manager.set_file_priority(self._current_info_hash, int(file_index), priority)
-        menu = self._menus.get(int(file_index))
-        if menu:
-            popup_id = menu.get("popup")
-            if popup_id and dpg.does_item_exist(popup_id):
-                dpg.hide_item(popup_id)
+        if self._priority_menu is not None:
+            self._priority_menu.hide()
 
     def _priority_commands(self, priority: str) -> CommandSet:
         read_only = self._storage_mode == "External Seed"
@@ -144,71 +157,38 @@ class FileView:
             for name in self.PRIORITIES
         )
 
-    def _refresh_priority_menu(self, index: int, priority: str):
-        menu = self._menus.get(index)
-        if not menu:
+    def _refresh_priority_menu(self, index: int, priority: str) -> None:
+        if self._priority_menu is None:
             return
-        commands = self._priority_commands(priority)
-        for command in commands.commands:
-            item_id = menu.get("priority_items", {}).get(command.key)
-            if not item_id or not dpg.does_item_exist(item_id):
-                continue
-            dpg.configure_item(
-                item_id,
-                label=(f"* {command.label}" if command.checked else command.label),
-                enabled=command.enabled,
-            )
-        menu["commands"] = commands
+        self._menu_file_index = int(index)
+        self._priority_menu.update(self._priority_commands(priority))
 
-    def _on_file_right_clicked(self, file_index: int, popup_id):
-        menu = self._menus.get(int(file_index))
-        if not menu:
+    def _on_file_right_clicked(self, file_index: int) -> None:
+        if self._priority_menu is None:
             return
-        self._refresh_priority_menu(file_index, menu.get("priority_value", "Normal"))
-        dpg.configure_item(popup_id, show=True)
+        priority = self._row_priorities.get(int(file_index), "Normal")
+        self._refresh_priority_menu(file_index, priority)
+        self._priority_menu.show()
 
-    def _dispatch_priority_command(self, file_index: int, command_key: str):
-        menu = self._menus.get(file_index)
-        if not menu:
-            return
-        commands: CommandSet = menu["commands"]
-        def run(key: str):
-            prefix, priority = key.split(":", 1)
-            if prefix != "priority":
-                raise ValueError(key)
-            self._set_priority(file_index, priority)
-        commands.dispatch(command_key, run)
+    def _dispatch_priority_command(self, command_key: str):
+        file_index = self._menu_file_index
+        if file_index is None:
+            return None
+        prefix, priority = str(command_key).split(":", 1)
+        if prefix != "priority":
+            raise ValueError(command_key)
+        return self._set_priority(file_index, priority)
 
-    def _build_priority_menu(self, file_index: int, row_cells, priority: str):
-        commands = self._priority_commands(priority)
-        with dpg.window(popup=True, show=False, autosize=True, no_title_bar=True) as popup_id:
-            priority_title = dpg.add_text(tr('view.file_view.file_priority', "File Priority"), color=(180, 160, 255))
-            add_help_tooltip(priority_title, "FILE_PRIORITY")
-            dpg.add_separator()
-            priority_items = {}
-            for command in commands.commands:
-                priority_items[command.key] = dpg.add_menu_item(
-                    label=command.label,
-                    user_data=(file_index, command.key),
-                    callback=lambda s, a, u: self._dispatch_priority_command(u[0], u[1]),
-                )
-                add_help_tooltip(priority_items[command.key], "FILE_PRIORITY")
+    def _build_priority_handler(self, file_index: int, row_cells) -> None:
         with dpg.item_handler_registry() as registry:
             dpg.add_item_clicked_handler(
                 button=dpg.mvMouseButton_Right,
-                user_data=(file_index, popup_id),
-                callback=lambda s, a, u: self._on_file_right_clicked(u[0], u[1]),
+                user_data=int(file_index),
+                callback=lambda _s, _a, index: self._on_file_right_clicked(index),
             )
         for cell in row_cells:
             dpg.bind_item_handler_registry(cell, registry)
-        self._menus[file_index] = {
-            "popup": popup_id,
-            "right_click_registry": registry,
-            "priority_items": priority_items,
-            "priority_value": priority,
-            "commands": commands,
-        }
-        self._refresh_priority_menu(file_index, priority)
+        self._row_handlers[int(file_index)] = registry
 
     @staticmethod
     def _file_context_text(record: dict) -> str:
@@ -281,18 +261,17 @@ class FileView:
         records = list(file_view.get("files") or [])
         rows = tuple(self._row_for_record(record) for record in records)
         incoming = {int(record.get("index", 0) or 0) for record in records}
-        for index in tuple(self._menus):
+        for index in tuple(self._row_handlers):
             if index not in incoming:
-                self._destroy_menu(index)
+                self._destroy_row_handler(index)
         self._table.render(TableFrame(rows))
 
         by_index = {int(record.get("index", 0) or 0): record for record in records}
         for index, record in by_index.items():
             priority = str(record.get("priority", "Normal"))
+            self._row_priorities[index] = priority
             binding = self._table.row_binding(str(index))
-            if binding is not None and index not in self._menus:
-                self._build_priority_menu(index, binding.cells, priority)
-            menu = self._menus.get(index)
-            if menu:
-                menu["priority_value"] = priority
-                self._refresh_priority_menu(index, priority)
+            if binding is not None and index not in self._row_handlers:
+                self._build_priority_handler(index, binding.cells)
+            if self._menu_file_index == index and self._priority_menu is not None:
+                self._priority_menu.update(self._priority_commands(priority))

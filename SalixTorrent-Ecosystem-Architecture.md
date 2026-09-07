@@ -380,6 +380,37 @@ Designer metadata should not be bolted onto every runtime component prematurely.
 
 ---
 
+
+### Mixed layout composition
+
+The future RAD designer must support both structured layout and direct placement without forcing an entire window to choose one geometry model. Layout policy is therefore **container-local**: each region owns how its direct children are arranged, while regions themselves remain ordinary children of a larger layout.
+
+A valid application can therefore compose layouts such as:
+
+```text
+Application Window
++-- flow/stack region
+|   +-- transfer queue table
+|
++-- split region
+    +-- tabbed detail region
+    |   +-- flow/grid content
+    |   +-- a local explicit-position panel
+    |
+    +-- file tree / rendered viewport region
+        +-- future 2D/3D surface
+```
+
+The rule is deliberately not "automatic layout or absolute layout". It is "choose the right layout strategy for each local container and nest them freely." A designer should be able to drag a structured table into one region, place a tab container beside it, and put one widget at an explicit `(x, y)` inside a bounded panel without converting the surrounding application into pixel-positioned coordinates.
+
+The first runtime proof is intentionally small: `PositionedPanel` is a normal component container whose direct children receive explicit local coordinates through the renderer's `place(...)` contract. `Placement` holds non-negative parent-local `(x, y)` plus margins, and `PlacedComponent` can wrap any ordinary component—including another `PositionedPanel`—so the parent still places the wrapper structurally while the child receives a local offset inside that assigned content space. Parent padding/margins therefore translate the child's coordinates naturally instead of turning them into window-global pixels.
+
+Explicit placement also participates in measurement in this first pass. A placed child's occupied extent is its local offset + margins + measured/declared child size. `PlacedComponent` reserves that extent, and `ControlGrid` consumes the wrapper's semantic size hint so an affected column can grow to fit content placed at, for example, `(200, 100)` rather than clipping or overlapping it. Row height likewise follows the wrapper's reserved physical extent. A `PositionedPanel` can itself contain automatic layouts, and an automatic grid can contain a positioned panel; layout strategies are recursively nestable.
+
+Dear PyGui translates local placement through its item-position API; Tkinter translates it through `place()` only inside the bounded positioned region. This is a foundation, not the final designer layout API.
+
+Future passes should add richer container strategies only when proved by real application surfaces: split regions, tabbed containers, tree/list/detail composition, anchoring/edge offsets, percentages, min/max constraints, overlay placements that deliberately do not contribute to parent measurement, designer resize handles and eventually serializable placement metadata. Margins/padding remain useful for structured flow, but explicit placement must always remain available locally when a design requires it.
+
 ## 10. Branch and release discipline
 
 `main` is the stable/release line.
@@ -434,11 +465,11 @@ This remains a compatibility surface, not a wholesale Tkinter rewrite of SalixTo
 
 ### Stage E — rich RAD presentation
 
-Generalize live tables, state maps, diagnostic/status surfaces and other high-value patterns only when the application demonstrates reusable semantics.
+This stage is active. Tranche 4 extracted keyed live tables and categorical state grids; Tranche 5 added backend-neutral data projection, selection and command-state semantics. Tranche 6 adds physical Dear PyGui/Tkinter command-menu hosts, stable generic item-order operations and the first local explicit-placement component while preserving SalixTorrent policy at the application layer. Richer status/diagnostic surfaces, interactive table hosts and additional structural containers remain candidates only where the application demonstrates reusable semantics.
 
 ### Stage F — designer prerequisites
 
-Introduce component/property metadata, serialization and command/undo infrastructure needed for WYSIWYG editing.
+Introduce component/property metadata, serialization and command/undo infrastructure needed for WYSIWYG editing. The mixed-layout rule above is a prerequisite: designer geometry metadata must be local to a container strategy rather than assuming that a whole form uses one universal table/grid or one universal absolute-coordinate plane.
 
 ### Stage G — naming, API and package boundaries
 
@@ -675,10 +706,28 @@ Tranche 4 completed with both real Windows discovery paths at **529 / 529** and 
 
 ### Interactive data and command semantics
 
-The next layer deliberately separates *what an interactive data surface means* from *how a toolkit draws it*. `DataView` owns deterministic keyed search, exact-choice filtering and stable multi-column sorting over ordinary records. `SelectionModel` owns explicit single-selection identity. `CommandSpec`/`CommandSet` describe stable command keys and enabled/checked/submenu state without embedding callbacks or backend objects. All of these contracts are standard-library-only and relocatable with `app/framework`.
+The fifth post-v0.5.0 tranche separates *what an interactive data surface means* from *how a toolkit draws it*. `DataView` owns deterministic keyed search, exact-choice filtering and stable multi-column sorting over ordinary records. `SelectionModel` owns explicit single-selection identity. `CommandSpec`/`CommandSet` describe stable command keys and enabled/checked/submenu state without embedding callbacks or backend objects. All of these contracts are standard-library-only and relocatable with `app/framework`.
 
-SalixTorrent proves those semantics in two real surfaces. Active Transfers keeps its current Dear PyGui table and rich torrent context menu, but queue ordering/filter visibility now come from `DataView` rather than product-local sorting/filter loops. Files moves its physical rows to `LiveTable` and describes file-priority availability through a `CommandSet`; torrent mutation and the concrete Dear PyGui popup remain application-owned. This avoids falsely claiming that lazy seeding-goal menus, destructive confirmations or torrent lifecycle policy are generic framework behavior.
+SalixTorrent proves those semantics in two real surfaces. Active Transfers keeps its current Dear PyGui table and rich torrent context menu, but queue ordering/filter visibility now come from `DataView` rather than product-local sorting/filter loops. Files moves its physical rows to `LiveTable` and describes file-priority availability through a `CommandSet`; torrent mutation remains application-owned.
 
-Prepared source validation adds 18 focused regressions and advances complete discovery to **547** tests. Canonical localization remains 1,337 strings and `APP_VERSION` remains `0.5.0`. A later tranche can extract multi-backend physical command/context-menu hosts after the semantic command tree is proven across additional application surfaces.
+Tranche 5 passed both complete real-Windows discovery paths at **547 / 547** with one expected skip and was pushed as `e16e46884acc53adf54a29a35dbfd09bba40ed26` (`Extract interactive data and command models`). Canonical localization remains 1,337 strings and `APP_VERSION` remains `0.5.0`.
+
+---
+
+## 19. Sixth post-v0.5.0 implementation checkpoint
+
+The sixth `dev` tranche turns the proven semantic command model into reusable physical presentation while also extracting two related application-building primitives: stable item reordering and local explicit placement.
+
+`OrderedItems` is a backend-neutral keyed order model with `move_item_up`, `move_item_down`, `move_item_to`, boundary queries and explicit replace/append/remove operations. SalixTorrent's Active Transfers view now uses those semantics for durable queue reordering instead of calling Dear PyGui's `move_item_up` / `move_item_down` directly. The scheduler remains authoritative because the resulting key order is still committed explicitly through `TorrentManager.set_queue_order(...)`.
+
+`CommandMenu` coordinates a `CommandSet` with an injected `CommandMenuHost`. Dear PyGui and Tkinter each implement the host, including nested command trees, enabled state and checked state. The Files view now uses one shared command-menu surface for file-priority actions instead of constructing a separate Dear PyGui popup menu for every file row. File-priority mutation still belongs to SalixTorrent.
+
+The same presentation bundles now advertise command-menu capability explicitly. The product-neutral blank application exercises the command surface without branching on toolkit name.
+
+The first mixed-layout runtime primitive is also introduced. `PositionedPanel` positions its direct children with local `(x, y)` coordinates, while `PlacedComponent` lets any component carry an offset/margins inside the content space assigned by an automatic parent. The placed wrapper reserves offset + margins + child size, and `ControlGrid` consumes that occupied size so a positioned child can grow the affected structured cell. This deliberately proves parent-aware mixed layouts rather than replacing structured layouts with absolute positioning.
+
+Prepared source validation advances complete discovery from **547 to 563 tests**. Both ordinary discovery forms pass 563 / 563 in the display-less preparation environment, and both Xvfb-backed discovery forms pass 563 / 563 while exercising the live Tkinter paths. Canonical localization remains 1,337 strings.
+
+The tranche does **not** claim a final form designer, final split/tab API, generic torrent lifecycle menu, or complete interactive-table migration. Anchors, percentages, edge constraints and overlay placements that deliberately do not affect parent measurement remain later passes after the current contracts have been exercised on Windows.
 
 No final ecosystem/package naming, public API freeze, release tag or merge to `main` is implied.

@@ -37,6 +37,12 @@ class ComponentRenderer(Protocol):
     def configure(self, item: object, **kwargs) -> None:
         ...
 
+    def place(self, item: object, x: int, y: int) -> None:
+        ...
+
+    def measure(self, item: object) -> tuple[int, int]:
+        ...
+
     def exists(self, item: object) -> bool:
         ...
 
@@ -71,6 +77,8 @@ def _renderer_contract_errors(renderer: object) -> tuple[str, ...]:
         "get_value",
         "set_value",
         "configure",
+        "place",
+        "measure",
         "exists",
         "destroy",
         "event_callback",
