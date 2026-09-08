@@ -4,6 +4,17 @@ Notable SalixTorrent changes are recorded here.
 
 ## Unreleased
 
+### Ecosystem Extraction — Designer Structural Hierarchy Commands
+
+- Added provisional `DesignerChildSlotSpec` metadata to the component catalog so a future hierarchy editor can inspect which child relationships a container supports, whether a slot is single or repeated, which relationship metadata is required, and which metadata fields identify a unique sibling location. Existing captures now describe linear children, grid cells, placed/positioned children, tab pages, split panes and composite-field slots explicitly.
+- Added standard-library-only `app/framework/designer_structure.py` with immutable `InsertDesignerChild`, `RemoveDesignerNode`, `MoveDesignerNode` and `ReparentDesignerNode` commands plus `DesignerNodeLocation` / `locate_designer_node(...)`. Commands preserve stable subtree IDs, reject root removal/reparenting, cycles, reused IDs, unknown types, illegal slots, missing placement/cell/page/pane metadata and duplicate relationship identities.
+- Structural validation keeps container-local semantics intact: grid row/column locations must be non-negative and unique, tab page keys remain semantic and consistent with tab-page nodes, split-pane keys remain unique, and placed/positioned children reuse the validated fixed/anchored placement descriptors rather than flattening geometry.
+- Extended `DesignerEditSession` with location/insert/remove/move/reparent helpers. Structural commands use the same immutable whole-snapshot history, dirty tracking, undo/redo stacks and generic command availability as property edits; no parallel designer-only history system is introduced.
+- Expanded the relocation proof so a copied/renamed framework can insert and undo a structural child without SalixTorrent or a GUI toolkit. The blank-application regression reparents the real captured `Actions` node between positioned containers and proves the original live component hierarchy is untouched.
+- Updated tracked tranche validation to report both local `HEAD` and `origin/dev`, run the new structural hierarchy gate, and expect **630 tests** for complete discovery. Preparation passes 14 / 14 structural tests, 44 / 44 designer/relocation tests, 21 / 21 real Tkinter tests under Xvfb, and both complete Linux discovery forms at 630 / 630; canonical localization remains 1,337 strings. Real-Windows automation and visual regression acceptance remain required before publication.
+- Added an explicit `.gitignore` exception for repository-root `validate_tranche.bat`. The launcher existed in the accepted Tranche-10 working tree but the repository's broad `*.bat` ignore rule prevented it from being staged; Tranche 11 makes the one-command validator genuinely version-controlled alongside `tools/validate_tranche.py`.
+- This tranche intentionally stops before snapshot-to-live component reconstruction, live preview synchronization, copy/paste/duplicate commands, pointer-driven drag/drop, selection overlays/resize handles, persisted undo history, a final project schema or final ecosystem/package API freeze.
+
 ### Ecosystem Extraction — Designer Property Commands and Undo/Redo
 
 - Added standard-library-only `app/framework/designer_editing.py` as a document/snapshot editing layer above the Tranche-9 metadata model. `SetDesignerProperty`, `ClearDesignerProperty` and `CompositeDesignerEdit` are explicit command objects; they transform immutable `DesignerSnapshot` values rather than mutating live GUI components.

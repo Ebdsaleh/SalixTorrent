@@ -21,7 +21,7 @@ from typing import Iterable, Sequence, TextIO
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DISCOVERY_TEST_COUNT = 616
+DISCOVERY_TEST_COUNT = 630
 
 
 @dataclass(frozen=True)
@@ -34,17 +34,18 @@ class ValidationCommand:
 
 
 def validation_commands(python_executable: str | Path) -> tuple[ValidationCommand, ...]:
-    """Return the ordered Tranche-10 non-visual validation sequence."""
+    """Return the ordered Tranche-11 non-visual validation sequence."""
 
     python = str(python_executable)
     return (
         ValidationCommand("Current branch", ("git", "branch", "--show-current")),
         ValidationCommand("Current HEAD", ("git", "rev-parse", "HEAD")),
+        ValidationCommand("Published dev", ("git", "rev-parse", "origin/dev")),
         ValidationCommand("Application version", (python, "main.py", "--version")),
         ValidationCommand(
-            "Tranche 10 designer editing",
-            (python, "-m", "unittest", "tests.presentation.test_designer_editing", "-v"),
-            expected_test_count=12,
+            "Tranche 11 hierarchy editing",
+            (python, "-m", "unittest", "tests.presentation.test_designer_structure", "-v"),
+            expected_test_count=14,
         ),
         ValidationCommand(
             "Designer and relocation focus",
@@ -54,11 +55,12 @@ def validation_commands(python_executable: str | Path) -> tuple[ValidationComman
                 "unittest",
                 "tests.presentation.test_designer_model",
                 "tests.presentation.test_designer_editing",
+                "tests.presentation.test_designer_structure",
                 "tests.packaging.test_framework_packaging",
                 "tests.packaging.test_tranche_validation",
                 "-v",
             ),
-            expected_test_count=30,
+            expected_test_count=44,
         ),
         ValidationCommand(
             "GUI component regression",

@@ -2,8 +2,9 @@
 
 **Current application version string:** `0.5.0`
 **Roadmap status:** v0.5.0 released; post-v0.5.0 ecosystem extraction on `dev`
-**Current implementation checkpoint:** Tranche 10 designer property commands and undo/redo are Windows-validated at implementation commit `3968bd2`, built on pushed Tranche 9 checkpoint `d939f6443a95490881925ca8bdb93e5e94f7ec2c`
+**Current implementation checkpoint:** Tranche 11 structural hierarchy mutation/reparenting is prepared on accepted Tranche 10 closure checkpoint `df675e89bf025b570a339c7b3fb3c3518262d72a`
 **Current real Windows regression baseline:** 616 / 616 for accepted Tranche 10 with one expected non-Windows shell-behavior skip; Dear PyGui, Tkinter and SalixTorrent visual smoke checks pass
+**Prepared Tranche 11 baseline:** 630 / 630 on display-less Linux with 58 expected GUI/platform skips; real-Windows acceptance pending
 
 This roadmap records intended engineering direction rather than promising dates or release numbers. Changes should remain incremental, testable, reviewable, and compatible with SalixTorrent's existing protocol, persistence, packaging, localization, and cross-platform boundaries.
 
@@ -763,11 +764,28 @@ The next Stage-F slice adds editing semantics without pretending that a serializ
 - the relocation proof edits and undoes a snapshot after the framework package is copied/renamed, while the blank-application regression proves the real demo hierarchy can be edited as document data without changing its live components;
 - tracked `validate_tranche.bat` now automates non-visual tranche validation into `%USERPROFILE%\Desktop\console_output.txt` while leaving Dear PyGui/Tkinter visual inspection manual.
 
-Preparation advanced canonical discovery from 602 to **616 tests** on display-less Linux with 58 expected GUI/platform skips. After validator-launch and Tk/Tcl lifecycle repairs, real-Windows acceptance passes both complete discovery forms at **616 / 616** with one expected skip. The focused designer-editing, relocation, GUI-component and Tkinter gates pass, canonical localization remains 1,337 strings, manual Dear PyGui/Tkinter/SalixTorrent visual smoke passes, and the accepted implementation commit is `3968bd2`. `APP_VERSION` remains `0.5.0`.
+Preparation advanced canonical discovery from 602 to **616 tests** on display-less Linux with 58 expected GUI/platform skips. After validator-launch and Tk/Tcl lifecycle repairs, real-Windows acceptance passes both complete discovery forms at **616 / 616** with one expected skip. The focused designer-editing, relocation, GUI-component and Tkinter gates pass, canonical localization remains 1,337 strings, manual Dear PyGui/Tkinter/SalixTorrent visual smoke passes, the accepted implementation commit is `3968bd2`, and the Windows-acceptance documentation closure is `df675e89bf025b570a339c7b3fb3c3518262d72a`. `APP_VERSION` remains `0.5.0`.
 
 This tranche deliberately stops before reconstructing executable components from edited snapshots, mutating a live preview tree, structural insert/remove/reparent commands, copy/paste, drag/drop/resize handles, persisted command history, a final project schema or API/package naming freeze. Whole immutable snapshots are retained in history for correctness while the design contract is still provisional; later storage optimization must preserve the same explicit command semantics.
 
-### A13. Naming, public API and package/repository split
+### A13. WYSIWYG designer prerequisites — structural hierarchy mutation/reparenting prepared
+
+This Stage-F slice makes the serialized hierarchy editable without creating live preview objects:
+
+- `DesignerChildSlotSpec` makes allowed relationship slots, cardinality, required metadata and sibling-identity fields inspectable through the existing component type descriptors;
+- linear containers, grid cells, positioned/placed children, tab pages, split panes, labeled-field parts and duration-editor parts now describe their structural slots explicitly;
+- `DesignerNodeLocation` exposes a node's parent, sibling index, slot, relationship metadata and depth without depending on toolkit handles;
+- `InsertDesignerChild`, `RemoveDesignerNode`, `MoveDesignerNode` and `ReparentDesignerNode` transform immutable `DesignerSnapshot` values and preserve stable subtree IDs;
+- relationship validation rejects duplicate IDs, unknown types, invalid parent slots, root removal/reparenting, cycles, duplicate grid coordinates/tab keys/split keys and malformed fixed/anchored placement metadata;
+- `DesignerEditSession` exposes convenience helpers for all four operations while reusing the Tranche-10 undo/redo and dirty-state history exactly;
+- the relocated-framework proof performs a structural insertion/undo after package rename, and the blank application reparents its captured `Actions` node as document data while the live component tree remains unchanged;
+- tracked validation records `origin/dev` as well as local `HEAD` and adds the dedicated structural gate.
+
+Preparation advances complete discovery from 616 to **630 tests**. Structural tests pass 14 / 14, the combined designer/relocation gate passes 44 / 44, the real Tkinter backend passes 21 / 21 under Xvfb, canonical and plain display-less discovery pass 630 / 630 with 58 expected GUI/platform skips, Xvfb canonical discovery passes 630 / 630 with 38 expected skips, localization remains 1,337/current, and headless/compileall/Git checks remain clean. Real-Windows automated and visual acceptance remain required.
+
+This tranche deliberately does not instantiate live components from snapshots, synchronize a preview tree, add copy/paste or duplication, implement pointer-driven drag/drop/resize handles, persist history, or freeze a project schema/public API.
+
+### A14. Naming, public API and package/repository split
 
 This remains **after** the wider extraction.
 
@@ -936,7 +954,9 @@ accepted Tranche-9 Windows gate:  602 / 602 OK, skipped=1
 accepted Tranche-9 implementation: 5b54084f2d21dc331deb4614c15119ad94cab374
 pushed Tranche-9 closure:        d939f6443a95490881925ca8bdb93e5e94f7ec2c
 accepted Tranche-10 implementation: 3968bd2
+accepted Tranche-10 closure:       df675e89bf025b570a339c7b3fb3c3518262d72a
 accepted Tranche-10 Windows gate: 616 / 616 OK, skipped=1
+prepared Tranche-11 baseline:     630 / 630 Linux, Windows acceptance pending
 committed Tkinter/blank-app baseline: 516 / 516, Windows skipped=1
 committed live-data/state-grid baseline: 529 / 529, Windows skipped=1
 committed interactive-data baseline: 547 / 547, Windows skipped=1
@@ -978,3 +998,19 @@ The relocation gate now edits and undoes a copied/renamed framework snapshot, an
 The tranche also introduces tracked `validate_tranche.bat`, which runs the focused designer gates, component/Tkinter regressions, localization extraction, both complete discovery forms, headless proof, compileall and Git whitespace/status checks and writes one complete report to `%USERPROFILE%\Desktop\console_output.txt`. Visual GUI checks intentionally remain manual.
 
 Preparation canonical discovery passes **616 / 616** on display-less Linux with 58 expected GUI/platform skips. After the Windows validator-launch repair and Tk/Tcl owner-thread lifecycle repair, both complete real-Windows discovery forms pass **616 / 616** with one expected skip; the one-command validator ends in `TRANCHE VALIDATION PASSED`, and manual Dear PyGui/Tkinter/SalixTorrent visual smoke passes. The accepted implementation commit is `3968bd2`. No version bump, tag, merge to `main`, public API freeze or final project schema is implied. Structural hierarchy editing/reparenting, copy/paste, live preview reconstruction/mutation and draggable designer handles remain later Stage-F work.
+
+---
+
+## 24. Eleventh post-v0.5.0 implementation checkpoint — prepared
+
+The eleventh `dev` tranche adds structural document editing above the accepted property/history layer. Component type descriptors now include provisional child-slot metadata through `DesignerChildSlotSpec`, recording relationship names, cardinality, required metadata and sibling identity fields. This makes hierarchy mutation rules inspectable rather than burying them inside future editor widgets.
+
+`app/framework/designer_structure.py` adds immutable insert/remove/reorder/reparent commands plus `DesignerNodeLocation`. The operations preserve node IDs and complete subtrees, reject root removal/reparenting and cycles, and validate each destination against parent metadata. Grid coordinates, tab-page keys, split-pane keys and fixed/anchored placement descriptors remain semantic relationship data rather than being converted to backend coordinates.
+
+`DesignerEditSession` delegates structural operations through the same `execute(...)` path as property commands, so structural changes participate in deterministic undo/redo, redo invalidation and dirty-state tracking with no parallel history implementation. Snapshot JSON round-trips retain the structurally edited hierarchy.
+
+The blank ecosystem application proves the boundary by reparenting its captured `Actions` node between positioned panels while the original live component hierarchy remains untouched. The copied/renamed framework proof also performs and undoes a structural insertion without importing SalixTorrent or a GUI toolkit.
+
+Preparation advances the complete suite from 616 to **630 tests**. The structural gate passes 14 / 14, combined designer/relocation focus passes 44 / 44, display-less canonical and plain discovery pass 630 / 630 with 58 expected skips, Xvfb canonical discovery passes 630 / 630 with 38 expected skips, and the Tkinter live backend remains 21 / 21. Real-Windows `validate_tranche.bat` plus manual Dear PyGui/Tkinter/SalixTorrent visual smoke are still required before commit/push.
+
+The accepted Tranche-10 base for this work is closure commit `df675e89bf025b570a339c7b3fb3c3518262d72a`; `APP_VERSION` remains `0.5.0`. No release tag, merge to `main`, live preview reconstruction, drag/drop UI, copy/paste, persistent project schema or public API freeze is introduced.

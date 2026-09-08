@@ -6,9 +6,10 @@ RAD prerequisite: explicit commands that edit *snapshot data* plus deterministic
 undo/redo history.
 
 The editing boundary intentionally does not rebuild or mutate live component
-objects.  A future preview/runtime bridge can consume the resulting snapshot,
-but toolkit objects, callbacks, application models, drag/drop behavior and the
-final project-document schema remain outside this module.
+objects. Property commands and structural hierarchy commands share the same
+immutable-snapshot history. A future preview/runtime bridge can consume the
+resulting snapshot, but toolkit objects, callbacks, application models, drag/drop
+behavior and the final project-document schema remain outside this module.
 """
 
 from __future__ import annotations
@@ -24,6 +25,14 @@ from .designer import (
     DesignerNode,
     DesignerSnapshot,
     DesignerValueKind,
+)
+from .designer_structure import (
+    DesignerNodeLocation,
+    InsertDesignerChild,
+    MoveDesignerNode,
+    RemoveDesignerNode,
+    ReparentDesignerNode,
+    locate_designer_node,
 )
 from .interactions import CommandSet, CommandSpec
 
@@ -602,6 +611,58 @@ class DesignerEditSession:
 
     def clear_property(self, node_id: object, property_key: object) -> bool:
         return self.execute(ClearDesignerProperty(node_id, property_key))
+
+    def location(self, node_id: object) -> DesignerNodeLocation:
+        return locate_designer_node(self._snapshot, node_id)
+
+    def insert_child(
+        self,
+        parent_id: object,
+        node: DesignerNode,
+        *,
+        slot: object = "children",
+        metadata: Mapping[str, object] | None = None,
+        index: int | None = None,
+    ) -> bool:
+        return self.execute(
+            InsertDesignerChild(
+                parent_id,
+                node,
+                slot=slot,
+                metadata=metadata,
+                index=index,
+            )
+        )
+
+    def remove_node(self, node_id: object) -> bool:
+        return self.execute(RemoveDesignerNode(node_id))
+
+    def move_node(self, node_id: object, index: object) -> bool:
+        return self.execute(MoveDesignerNode(node_id, index))
+
+    def reparent_node(
+        self,
+        node_id: object,
+        parent_id: object,
+        *,
+        index: int | None = None,
+        slot: object | None = None,
+        metadata: Mapping[str, object] | None | object = None,
+        preserve_metadata: bool = True,
+    ) -> bool:
+        if preserve_metadata:
+            if metadata is not None:
+                raise ValueError("explicit metadata requires preserve_metadata=False")
+            command = ReparentDesignerNode(node_id, parent_id, index=index, slot=slot)
+        else:
+            command = ReparentDesignerNode(
+                node_id,
+                parent_id,
+                index=index,
+                slot=slot,
+                metadata=metadata,
+            )
+        return self.execute(command)
 
     def undo(self) -> bool:
         if not self._undo:

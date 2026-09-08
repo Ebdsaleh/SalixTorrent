@@ -15,6 +15,7 @@
 
 # Local scripts/artifacts. Keep the official Windows release builder tracked.
 *.bat
+!validate_tranche.bat
 !packaging/build_windows.bat
 !tools/localization/generate_initial_locales.bat
 !tools/localization/validate_localization.bat

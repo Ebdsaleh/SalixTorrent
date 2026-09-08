@@ -158,6 +158,83 @@ class DesignerPropertySpec:
 
 
 @dataclass(frozen=True)
+class DesignerChildSlotSpec:
+    """Provisional structural metadata for one allowed child relationship slot.
+
+    ``required_metadata`` lists relationship fields that must accompany children
+    inserted into the slot. ``unique_by`` identifies metadata fields whose
+    combined values must be unique among siblings in the same slot.  These are
+    editor/document constraints only; they do not construct runtime components.
+    """
+
+    key: str
+    label: str
+    multiple: bool = True
+    allowed_metadata: tuple[str, ...] = ()
+    required_metadata: tuple[str, ...] = ()
+    unique_by: tuple[str, ...] = ()
+
+    def __init__(
+        self,
+        key: object,
+        label: object,
+        *,
+        multiple: bool = True,
+        allowed_metadata: Iterable[object] = (),
+        required_metadata: Iterable[object] = (),
+        unique_by: Iterable[object] = (),
+    ):
+        resolved_allowed = tuple(
+            _key(value, field="designer child metadata key") for value in allowed_metadata
+        )
+        resolved_required = tuple(
+            _key(value, field="designer child metadata key") for value in required_metadata
+        )
+        resolved_unique = tuple(
+            _key(value, field="designer child metadata key") for value in unique_by
+        )
+        if len(resolved_allowed) != len(set(resolved_allowed)):
+            raise ValueError("designer child allowed metadata keys must be unique")
+        if len(resolved_required) != len(set(resolved_required)):
+            raise ValueError("designer child required metadata keys must be unique")
+        if len(resolved_unique) != len(set(resolved_unique)):
+            raise ValueError("designer child uniqueness metadata keys must be unique")
+        allowed = resolved_allowed or resolved_required
+        missing_required = set(resolved_required).difference(allowed)
+        if missing_required:
+            raise ValueError(
+                "designer child required metadata must also be allowed: "
+                + ", ".join(sorted(missing_required))
+            )
+        missing = set(resolved_unique).difference(resolved_required)
+        if missing:
+            raise ValueError(
+                "designer child uniqueness keys must also be required metadata: "
+                + ", ".join(sorted(missing))
+            )
+        object.__setattr__(self, "key", _key(key, field="designer child slot"))
+        object.__setattr__(self, "label", str(label))
+        object.__setattr__(self, "multiple", bool(multiple))
+        object.__setattr__(self, "allowed_metadata", allowed)
+        object.__setattr__(self, "required_metadata", resolved_required)
+        object.__setattr__(self, "unique_by", resolved_unique)
+
+    def to_descriptor(self) -> dict:
+        descriptor = {
+            "key": self.key,
+            "label": self.label,
+            "multiple": self.multiple,
+        }
+        if self.allowed_metadata:
+            descriptor["allowed_metadata"] = list(self.allowed_metadata)
+        if self.required_metadata:
+            descriptor["required_metadata"] = list(self.required_metadata)
+        if self.unique_by:
+            descriptor["unique_by"] = list(self.unique_by)
+        return descriptor
+
+
+@dataclass(frozen=True)
 class DesignerChildSource:
     """One runtime child plus metadata describing its relationship to a parent."""
 
@@ -186,6 +263,7 @@ class DesignerComponentSpec:
     component_type: type[Component]
     properties: tuple[DesignerPropertySpec, ...] = ()
     child_reader: ChildReader | None = None
+    child_slots: tuple[DesignerChildSlotSpec, ...] = ()
 
     def __init__(
         self,
@@ -196,6 +274,7 @@ class DesignerComponentSpec:
         category: object = "component",
         properties: Iterable[DesignerPropertySpec] = (),
         child_reader: ChildReader | None = None,
+        child_slots: Iterable[DesignerChildSlotSpec] = (),
     ):
         if not isinstance(component_type, type) or not issubclass(component_type, Component):
             raise TypeError("designer component type must derive from Component")
@@ -207,12 +286,21 @@ class DesignerComponentSpec:
             raise ValueError("designer property keys must be unique within a component type")
         if child_reader is not None and not callable(child_reader):
             raise TypeError("designer child reader must be callable or None")
+        resolved_child_slots = tuple(child_slots)
+        if not all(isinstance(slot, DesignerChildSlotSpec) for slot in resolved_child_slots):
+            raise TypeError("designer child slots must be DesignerChildSlotSpec instances")
+        slot_keys = tuple(slot.key for slot in resolved_child_slots)
+        if len(slot_keys) != len(set(slot_keys)):
+            raise ValueError("designer child slot keys must be unique within a component type")
+        if child_reader is None and resolved_child_slots:
+            raise ValueError("designer leaf component types cannot declare child slots")
         object.__setattr__(self, "key", _key(key, field="designer component type key"))
         object.__setattr__(self, "label", str(label))
         object.__setattr__(self, "category", _key(category, field="designer category"))
         object.__setattr__(self, "component_type", component_type)
         object.__setattr__(self, "properties", resolved_properties)
         object.__setattr__(self, "child_reader", child_reader)
+        object.__setattr__(self, "child_slots", resolved_child_slots)
 
     @property
     def accepts_children(self) -> bool:
@@ -224,6 +312,7 @@ class DesignerComponentSpec:
             "label": self.label,
             "category": self.category,
             "accepts_children": self.accepts_children,
+            "child_slots": [slot.to_descriptor() for slot in self.child_slots],
             "properties": [prop.to_descriptor() for prop in self.properties],
         }
 
@@ -678,6 +767,48 @@ def _duration_children(component: Component) -> Iterable[DesignerChildSource]:
     yield DesignerChildSource(component.minutes, slot="minutes")
 
 
+_CHILDREN_SLOT = DesignerChildSlotSpec("children", "Children")
+_GRID_CELL_SLOT = DesignerChildSlotSpec(
+    "cell",
+    "Grid cell",
+    required_metadata=("row", "column"),
+    unique_by=("row", "column"),
+)
+_PLACED_CHILD_SLOT = DesignerChildSlotSpec(
+    "child",
+    "Placed child",
+    multiple=False,
+    required_metadata=("placement",),
+)
+_POSITIONED_CHILD_SLOT = DesignerChildSlotSpec(
+    "children",
+    "Positioned children",
+    required_metadata=("placement",),
+)
+_TAB_PAGE_SLOT = DesignerChildSlotSpec(
+    "page",
+    "Tab page",
+    required_metadata=("key",),
+    unique_by=("key",),
+)
+_SPLIT_PANE_SLOT = DesignerChildSlotSpec(
+    "pane",
+    "Split pane",
+    allowed_metadata=("key", "weight", "minimum", "maximum", "border"),
+    required_metadata=("key",),
+    unique_by=("key",),
+)
+_LABELED_SLOTS = (
+    DesignerChildSlotSpec("label", "Label", multiple=False),
+    DesignerChildSlotSpec("control", "Control", multiple=False),
+    DesignerChildSlotSpec("accessory", "Accessory"),
+)
+_DURATION_SLOTS = tuple(
+    DesignerChildSlotSpec(key, key.title(), multiple=False)
+    for key in ("heading", "days", "hours", "minutes")
+)
+
+
 _COMMON_LAYOUT_PROPERTIES = (
     DesignerPropertySpec(
         "profile_key",
@@ -716,6 +847,7 @@ def _spec(
     category: str,
     properties: Iterable[DesignerPropertySpec] = (),
     child_reader: ChildReader | None = None,
+    child_slots: Iterable[DesignerChildSlotSpec] = (),
 ) -> DesignerComponentSpec:
     return DesignerComponentSpec(
         key,
@@ -724,6 +856,7 @@ def _spec(
         category=category,
         properties=(*_COMMON_LAYOUT_PROPERTIES, *tuple(properties)),
         child_reader=child_reader,
+        child_slots=child_slots,
     )
 
 
@@ -872,6 +1005,7 @@ def _framework_catalog() -> DesignerCatalog:
             ControlRow,
             category="container",
             child_reader=_linear_children,
+            child_slots=(_CHILDREN_SLOT,),
         ),
         _spec(
             "container.column",
@@ -879,6 +1013,7 @@ def _framework_catalog() -> DesignerCatalog:
             ControlColumn,
             category="container",
             child_reader=_linear_children,
+            child_slots=(_CHILDREN_SLOT,),
         ),
         _spec(
             "container.grid",
@@ -894,6 +1029,7 @@ def _framework_catalog() -> DesignerCatalog:
                 ),
             ),
             child_reader=_grid_children,
+            child_slots=(_GRID_CELL_SLOT,),
         ),
         _spec(
             "container.section",
@@ -910,6 +1046,7 @@ def _framework_catalog() -> DesignerCatalog:
                 DesignerPropertySpec("border", "Border", DesignerValueKind.BOOLEAN),
             ),
             child_reader=_linear_children,
+            child_slots=(_CHILDREN_SLOT,),
         ),
         _spec(
             "container.dialog",
@@ -925,6 +1062,7 @@ def _framework_catalog() -> DesignerCatalog:
                 DesignerPropertySpec("no_collapse", "Disable collapse", DesignerValueKind.BOOLEAN),
             ),
             child_reader=_linear_children,
+            child_slots=(_CHILDREN_SLOT,),
         ),
         _spec(
             "container.placed",
@@ -932,6 +1070,7 @@ def _framework_catalog() -> DesignerCatalog:
             PlacedComponent,
             category="layout",
             child_reader=_placed_child,
+            child_slots=(_PLACED_CHILD_SLOT,),
         ),
         _spec(
             "container.positioned",
@@ -944,6 +1083,7 @@ def _framework_catalog() -> DesignerCatalog:
                 DesignerPropertySpec("fit_content", "Fit content", DesignerValueKind.BOOLEAN),
             ),
             child_reader=_positioned_children,
+            child_slots=(_POSITIONED_CHILD_SLOT,),
         ),
         _spec(
             "structure.tab_page",
@@ -955,6 +1095,7 @@ def _framework_catalog() -> DesignerCatalog:
                 DesignerPropertySpec("label", "Label", DesignerValueKind.TEXT),
             ),
             child_reader=_linear_children,
+            child_slots=(_CHILDREN_SLOT,),
         ),
         _spec(
             "structure.tabs",
@@ -962,6 +1103,7 @@ def _framework_catalog() -> DesignerCatalog:
             TabContainer,
             category="structure",
             child_reader=_tab_pages,
+            child_slots=(_TAB_PAGE_SLOT,),
         ),
         _spec(
             "structure.split",
@@ -978,6 +1120,7 @@ def _framework_catalog() -> DesignerCatalog:
                 DesignerPropertySpec("gap", "Gap", DesignerValueKind.INTEGER, minimum=0),
             ),
             child_reader=_split_children,
+            child_slots=(_SPLIT_PANE_SLOT,),
         ),
         _spec(
             "field.labeled",
@@ -985,6 +1128,7 @@ def _framework_catalog() -> DesignerCatalog:
             LabeledField,
             category="field",
             child_reader=_labeled_children,
+            child_slots=_LABELED_SLOTS,
         ),
         _spec(
             "field.labeled_combo",
@@ -992,6 +1136,7 @@ def _framework_catalog() -> DesignerCatalog:
             LabeledComboField,
             category="field",
             child_reader=_labeled_children,
+            child_slots=_LABELED_SLOTS,
         ),
         _spec(
             "field.labeled_numeric",
@@ -999,6 +1144,7 @@ def _framework_catalog() -> DesignerCatalog:
             LabeledNumericField,
             category="field",
             child_reader=_labeled_children,
+            child_slots=_LABELED_SLOTS,
         ),
         _spec(
             "field.numeric_unit",
@@ -1006,6 +1152,7 @@ def _framework_catalog() -> DesignerCatalog:
             NumericUnitField,
             category="field",
             child_reader=_labeled_children,
+            child_slots=_LABELED_SLOTS,
         ),
         _spec(
             "field.duration",
@@ -1013,6 +1160,7 @@ def _framework_catalog() -> DesignerCatalog:
             DurationEditor,
             category="field",
             child_reader=_duration_children,
+            child_slots=_DURATION_SLOTS,
         ),
     )
     return DesignerCatalog(specs)
@@ -1026,6 +1174,7 @@ __all__ = [
     "DESIGNER_SNAPSHOT_VERSION",
     "DesignerCatalog",
     "DesignerChild",
+    "DesignerChildSlotSpec",
     "DesignerChildSource",
     "DesignerComponentSpec",
     "DesignerIdentityMap",
