@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import gc
 import subprocess
 import sys
 import unittest
@@ -115,12 +116,26 @@ class TkinterBackendLiveTests(unittest.TestCase):
         self.renderer = TkinterRenderer(self.root)
 
     def tearDown(self):
+        renderer = getattr(self, "renderer", None)
+        if renderer is not None:
+            try:
+                renderer.close()
+            except Exception:
+                pass
+
         root = getattr(self, "root", None)
         if root is not None:
             try:
                 root.destroy()
             except Exception:
                 pass
+
+        # Tkinter callback/Variable objects can form cycles.  Collect them
+        # explicitly on the Tk owner thread so a later asyncio/to_thread worker
+        # cannot become the thread that finalizes Tcl state.
+        self.renderer = None
+        self.root = None
+        gc.collect()
 
     def test_renderer_and_hosts_satisfy_existing_backend_contracts(self):
         layout_host = TkinterLayoutHost(self.renderer)
@@ -178,6 +193,11 @@ class TkinterBackendLiveTests(unittest.TestCase):
         self.assertEqual(int(count.get_value()), 7)
         self.assertFalse(bool(enabled.get_value()))
         self.assertAlmostEqual(float(progress.get_value()), 0.75)
+
+        value_items = (name.require_item(), mode.require_item(), count.require_item(), enabled.require_item(), progress.require_item())
+        self.renderer.close()
+        self.assertTrue(self.renderer.closed)
+        self.assertTrue(all(item.value_var is None for item in value_items))
 
     def test_button_dispatches_normalized_component_event(self):
         received = []
@@ -494,6 +514,7 @@ class TkinterBackendLiveTests(unittest.TestCase):
         binding = menu.build(commands)
         self.assertTrue(menu.exists())
         item = binding.items["run"]
+        checked_item = binding.items["mode:a"]
         item.menu.invoke(item.index)
         self.assertEqual(["run"], seen)
         menu.update(CommandSet((
@@ -505,6 +526,8 @@ class TkinterBackendLiveTests(unittest.TestCase):
         )))
         self.assertTrue(menu.dispose())
         self.assertFalse(menu.exists())
+        self.assertIsNone(checked_item.variable)
+        self.assertEqual({}, binding.items)
 
     def test_blank_application_demo_runs_tkinter_backend_and_auto_closes(self):
         example = PROJECT_ROOT / "examples" / "ecosystem_blank_app.py"
@@ -540,6 +563,7 @@ class TkinterBackendLiveTests(unittest.TestCase):
         root.after(80, host.request_stop)
         self.assertIsInstance(host, ApplicationHost)
         self.assertEqual(host.run(), 0)
+        self.assertTrue(host.component_renderer.closed)
         self.root = None  # host owns/destroys the supplied root
         self.assertGreaterEqual(len(updates), 1)
         self.assertEqual(runtime.state, RuntimeState.STOPPED)

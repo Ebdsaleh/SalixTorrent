@@ -2,7 +2,7 @@
 
 **Current application version string:** `0.5.0`
 **Roadmap status:** v0.5.0 released; post-v0.5.0 ecosystem extraction on `dev`
-**Current implementation checkpoint:** Tranche 9 designer metadata and hierarchy snapshots are Windows-validated in accepted implementation commit `5b54084f2d21dc331deb4614c15119ad94cab374`; the previous pushed Tranche-8 geometry checkpoint is `5cef12f534dfc44a8536f504d1aa7773644f5428`
+**Current implementation checkpoint:** Tranche 9 designer metadata and hierarchy snapshots are Windows-validated and pushed through acceptance-documentation checkpoint `d939f6443a95490881925ca8bdb93e5e94f7ec2c` (implementation commit `5b54084f2d21dc331deb4614c15119ad94cab374`); Tranche 10 snapshot property commands and undo/redo are prepared on top of that checkpoint
 **Current real Windows regression baseline:** 602 / 602 for accepted Tranche 9 with one expected non-Windows shell-behavior skip; Dear PyGui and Tkinter resize/structure smoke checks pass
 
 This roadmap records intended engineering direction rather than promising dates or release numbers. Changes should remain incremental, testable, reviewable, and compatible with SalixTorrent's existing protocol, persistence, packaging, localization, and cross-platform boundaries.
@@ -743,13 +743,31 @@ The next Stage-F slice describes the component tree that the geometry tranche ca
 - `capture_component_tree(...)` rejects cycles/reused component instances instead of silently producing ambiguous ownership;
 - the product-neutral blank application snapshots its actual nested component tree with stable IDs, and the relocation gate exercises the same snapshot after the framework is copied/renamed.
 
-Preparation advanced complete discovery from 591 to **602 tests**; display-less canonical Linux discovery passed 602 / 602 with 58 expected GUI/platform skips. Real-Windows acceptance then passed both complete discovery forms at **602 / 602** with one expected skip, Dear PyGui and Tkinter resize/structure smoke checks passed, and the accepted implementation commit is `5b54084f2d21dc331deb4614c15119ad94cab374`. Canonical localization remains 1,337 strings and `APP_VERSION` remains `0.5.0`.
+Preparation advanced complete discovery from 591 to **602 tests**; display-less canonical Linux discovery passed 602 / 602 with 58 expected GUI/platform skips. Real-Windows acceptance then passed both complete discovery forms at **602 / 602** with one expected skip, Dear PyGui and Tkinter resize/structure smoke checks passed, and the accepted implementation commit is `5b54084f2d21dc331deb4614c15119ad94cab374`. The acceptance-documentation closure was pushed at `d939f6443a95490881925ca8bdb93e5e94f7ec2c`. Canonical localization remains 1,337 strings and `APP_VERSION` remains `0.5.0`.
 
-This tranche intentionally stops before executable reconstruction/factories, live property mutation, command-based edits, undo/redo, copy/paste, drag/drop/reparenting, a final project document/schema, preview/runtime restoration, percentages or draggable split handles. The type keys and snapshot shape are internal working contracts and do not freeze a public designer API.
+This tranche intentionally stopped before executable reconstruction/factories, live property mutation, copy/paste, drag/drop/reparenting, a final project document/schema, preview/runtime restoration, percentages or draggable split handles. Snapshot-level property commands and undo/redo are prepared in the following tranche; the type keys and snapshot shape remain internal working contracts and do not freeze a public designer API.
 
 The future designer should itself use the same engine/framework wherever practical.
 
-### A12. Naming, public API and package/repository split
+### A12. WYSIWYG designer prerequisites — snapshot property commands and undo/redo prepared
+
+The next Stage-F slice adds editing semantics without pretending that a serialized snapshot is already an executable application project:
+
+- `app/framework/designer_editing.py` is standard-library-only and edits `DesignerSnapshot` values rather than live renderer/component objects;
+- `SetDesignerProperty`, `ClearDesignerProperty` and `CompositeDesignerEdit` are explicit commands with one deterministic `apply(snapshot)` boundary;
+- metadata-driven validation covers text, booleans, bounded integer/number values, choices, string/number lists, semantic dimensions and insets;
+- `DesignerPropertySpec.nullable` distinguishes explicit `None` from absence, while `unsettable` marks sparse overrides that may legally be reset to inherited/default state;
+- `DesignerPropertyState` exposes inspector-facing metadata plus whether a property is explicitly set;
+- `DesignerEditSession` owns current snapshot state, whole-snapshot undo/redo history, redo invalidation after divergent edits, grouped one-step edits, and clean/dirty tracking;
+- undo/redo command availability reuses the generic `CommandSet` model rather than creating a designer-only menu/action abstraction;
+- the relocation proof edits and undoes a snapshot after the framework package is copied/renamed, while the blank-application regression proves the real demo hierarchy can be edited as document data without changing its live components;
+- tracked `validate_tranche.bat` now automates non-visual tranche validation into `%USERPROFILE%\Desktop\console_output.txt` while leaving Dear PyGui/Tkinter visual inspection manual.
+
+Preparation advances canonical discovery from 602 to **616 tests** on display-less Linux with 58 expected GUI/platform skips. Real-Windows acceptance remains required before commit/push. Canonical localization remains 1,337 strings and `APP_VERSION` remains `0.5.0`.
+
+This tranche deliberately stops before reconstructing executable components from edited snapshots, mutating a live preview tree, structural insert/remove/reparent commands, copy/paste, drag/drop/resize handles, persisted command history, a final project schema or API/package naming freeze. Whole immutable snapshots are retained in history for correctness while the design contract is still provisional; later storage optimization must preserve the same explicit command semantics.
+
+### A13. Naming, public API and package/repository split
 
 This remains **after** the wider extraction.
 
@@ -916,6 +934,8 @@ previous pushed Windows dev gate: 591 / 591 OK, skipped=1
 previous pushed dev checkpoint:   5cef12f534dfc44a8536f504d1aa7773644f5428
 accepted Tranche-9 Windows gate:  602 / 602 OK, skipped=1
 accepted Tranche-9 implementation: 5b54084f2d21dc331deb4614c15119ad94cab374
+pushed Tranche-9 closure:        d939f6443a95490881925ca8bdb93e5e94f7ec2c
+prepared Tranche-10 Linux gate:   616 / 616 OK, skipped=58
 committed Tkinter/blank-app baseline: 516 / 516, Windows skipped=1
 committed live-data/state-grid baseline: 529 / 529, Windows skipped=1
 committed interactive-data baseline: 547 / 547, Windows skipped=1
@@ -923,6 +943,7 @@ committed command/mixed-layout baseline: 563 / 563, Windows skipped=1
 committed structural-region baseline: 581 / 581, Windows skipped=1
 committed designer-geometry baseline: 591 / 591, Windows skipped=1
 accepted designer-metadata baseline: 602 / 602 Windows, skipped=1; display-less Linux preparation also passed 602 / 602 with expected GUI/platform skips
+prepared designer-editing baseline: 616 / 616 display-less Linux, skipped=58; Windows acceptance pending
 
 Localization:
 canonical catalog:               1337 entries
@@ -941,3 +962,18 @@ SalixORM migration head:         session-state-0003
 The v0.5.0 live/release smoke covered startup/navigation, repeated resizing, ordinary dialogs, Help/Glossary, clean shutdown, live Speed-history updates while seeding, standalone and portable launches, installer behavior, and frozen version identity.
 
 Post-v0.5.0 development should preserve this release boundary while accounting explicitly for every intentional test-count or behavior change introduced on `dev`.
+---
+
+## 23. Tenth post-v0.5.0 implementation checkpoint — prepared
+
+The tenth `dev` tranche adds the first explicit editing/history layer above the designer metadata snapshots accepted in Tranche 9. `app/framework/designer_editing.py` remains backend-neutral and standard-library-only. Its command objects transform immutable `DesignerSnapshot` values; they do not reach into Dear PyGui, Tkinter, SalixTorrent models or live `Component` instances.
+
+`SetDesignerProperty` and `ClearDesignerProperty` validate edits against the type/property metadata embedded in the snapshot. `CompositeDesignerEdit` groups multiple property operations into one undo step. `DesignerPropertyState` exposes inspector-facing value/metadata state, including whether a value is explicitly present, while `DesignerPropertySpec.nullable` records properties for which explicit `None` is valid and therefore distinct from an absent inherited override.
+
+`DesignerEditSession` owns current document state plus deterministic undo/redo stacks. New edits clear the redo branch, no-op edits create no history, `mark_clean()` defines a save/checkpoint boundary, and generic `CommandSet` entries expose undo/redo availability using stable semantic keys. History stores immutable whole snapshots in this provisional pass to prioritize correctness and easy recovery over delta compression.
+
+The relocation gate now edits and undoes a copied/renamed framework snapshot, and the blank ecosystem application's existing component snapshot is edited in tests without mutating the live `Actions` button. This proves the editing boundary is document-oriented rather than an accidental toolkit mutation path.
+
+The tranche also introduces tracked `validate_tranche.bat`, which runs the focused designer gates, component/Tkinter regressions, localization extraction, both complete discovery forms, headless proof, compileall and Git whitespace/status checks and writes one complete report to `%USERPROFILE%\Desktop\console_output.txt`. Visual GUI checks intentionally remain manual.
+
+Preparation canonical discovery passes **616 / 616** on display-less Linux with 58 expected GUI/platform skips. Real-Windows acceptance is pending. No version bump, tag, merge to `main`, public API freeze or final project schema is implied. Structural hierarchy editing/reparenting, copy/paste, live preview reconstruction/mutation and draggable designer handles remain later Stage-F work.

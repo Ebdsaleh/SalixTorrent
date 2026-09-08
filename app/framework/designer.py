@@ -90,6 +90,8 @@ class DesignerPropertySpec:
     attribute: str | None = None
     editable: bool = True
     serializable: bool = True
+    nullable: bool = False
+    unsettable: bool = False
     choices: tuple[object, ...] = ()
     minimum: float | int | None = None
     maximum: float | int | None = None
@@ -103,6 +105,8 @@ class DesignerPropertySpec:
         attribute: str | None = None,
         editable: bool = True,
         serializable: bool = True,
+        nullable: bool = False,
+        unsettable: bool = False,
         choices: Iterable[object] = (),
         minimum: float | int | None = None,
         maximum: float | int | None = None,
@@ -124,6 +128,8 @@ class DesignerPropertySpec:
         object.__setattr__(self, "attribute", resolved_attribute)
         object.__setattr__(self, "editable", bool(editable))
         object.__setattr__(self, "serializable", bool(serializable))
+        object.__setattr__(self, "nullable", bool(nullable))
+        object.__setattr__(self, "unsettable", bool(unsettable))
         object.__setattr__(self, "choices", resolved_choices)
         object.__setattr__(self, "minimum", minimum)
         object.__setattr__(self, "maximum", maximum)
@@ -139,6 +145,8 @@ class DesignerPropertySpec:
             "kind": self.kind.value,
             "editable": self.editable,
             "serializable": self.serializable,
+            "nullable": self.nullable,
+            "unsettable": self.unsettable,
         }
         if self.choices:
             descriptor["choices"] = [_json_safe(value) for value in self.choices]
@@ -681,17 +689,21 @@ _COMMON_LAYOUT_PROPERTIES = (
         "layout.width",
         "Width",
         DesignerValueKind.DIMENSION,
+        unsettable=True,
     ),
     DesignerPropertySpec(
         "layout.height",
         "Height",
         DesignerValueKind.DIMENSION,
+        unsettable=True,
     ),
     DesignerPropertySpec(
         "layout.spacing",
         "Spacing",
         DesignerValueKind.INTEGER,
         minimum=0,
+        nullable=True,
+        unsettable=True,
     ),
 )
 
@@ -724,7 +736,13 @@ def _framework_catalog() -> DesignerCatalog:
             category="control",
             properties=(
                 DesignerPropertySpec("text", "Text", DesignerValueKind.TEXT),
-                DesignerPropertySpec("wrap", "Wrap", DesignerValueKind.INTEGER, minimum=1),
+                DesignerPropertySpec(
+                    "wrap",
+                    "Wrap",
+                    DesignerValueKind.INTEGER,
+                    minimum=1,
+                    nullable=True,
+                ),
                 DesignerPropertySpec("bullet", "Bullet", DesignerValueKind.BOOLEAN),
             ),
         ),
@@ -746,7 +764,12 @@ def _framework_catalog() -> DesignerCatalog:
             category="control",
             properties=(
                 DesignerPropertySpec("items", "Items", DesignerValueKind.STRING_LIST),
-                DesignerPropertySpec("default_value", "Default value", DesignerValueKind.TEXT),
+                DesignerPropertySpec(
+                    "default_value",
+                    "Default value",
+                    DesignerValueKind.TEXT,
+                    nullable=True,
+                ),
                 DesignerPropertySpec("enabled", "Enabled", DesignerValueKind.BOOLEAN),
                 DesignerPropertySpec("show", "Visible", DesignerValueKind.BOOLEAN),
             ),
@@ -757,9 +780,19 @@ def _framework_catalog() -> DesignerCatalog:
             TextInput,
             category="control",
             properties=(
-                DesignerPropertySpec("label", "Label", DesignerValueKind.TEXT),
+                DesignerPropertySpec(
+                    "label",
+                    "Label",
+                    DesignerValueKind.TEXT,
+                    nullable=True,
+                ),
                 DesignerPropertySpec("default_value", "Default value", DesignerValueKind.TEXT),
-                DesignerPropertySpec("hint", "Hint", DesignerValueKind.TEXT),
+                DesignerPropertySpec(
+                    "hint",
+                    "Hint",
+                    DesignerValueKind.TEXT,
+                    nullable=True,
+                ),
                 DesignerPropertySpec("multiline", "Multiline", DesignerValueKind.BOOLEAN),
                 DesignerPropertySpec("readonly", "Read only", DesignerValueKind.BOOLEAN),
                 DesignerPropertySpec("enabled", "Enabled", DesignerValueKind.BOOLEAN),
@@ -779,11 +812,26 @@ def _framework_catalog() -> DesignerCatalog:
                     choices=("integer", "float"),
                 ),
                 DesignerPropertySpec("default_value", "Default value", DesignerValueKind.NUMBER),
-                DesignerPropertySpec("min_value", "Minimum value", DesignerValueKind.NUMBER),
-                DesignerPropertySpec("max_value", "Maximum value", DesignerValueKind.NUMBER),
+                DesignerPropertySpec(
+                    "min_value",
+                    "Minimum value",
+                    DesignerValueKind.NUMBER,
+                    nullable=True,
+                ),
+                DesignerPropertySpec(
+                    "max_value",
+                    "Maximum value",
+                    DesignerValueKind.NUMBER,
+                    nullable=True,
+                ),
                 DesignerPropertySpec("min_clamped", "Clamp minimum", DesignerValueKind.BOOLEAN),
                 DesignerPropertySpec("max_clamped", "Clamp maximum", DesignerValueKind.BOOLEAN),
-                DesignerPropertySpec("format", "Format", DesignerValueKind.TEXT),
+                DesignerPropertySpec(
+                    "format",
+                    "Format",
+                    DesignerValueKind.TEXT,
+                    nullable=True,
+                ),
                 DesignerPropertySpec("enabled", "Enabled", DesignerValueKind.BOOLEAN),
                 DesignerPropertySpec("show", "Visible", DesignerValueKind.BOOLEAN),
             ),
@@ -795,7 +843,12 @@ def _framework_catalog() -> DesignerCatalog:
             category="control",
             properties=(
                 DesignerPropertySpec("default_value", "Default value", DesignerValueKind.NUMBER),
-                DesignerPropertySpec("overlay", "Overlay", DesignerValueKind.TEXT),
+                DesignerPropertySpec(
+                    "overlay",
+                    "Overlay",
+                    DesignerValueKind.TEXT,
+                    nullable=True,
+                ),
                 DesignerPropertySpec("show", "Visible", DesignerValueKind.BOOLEAN),
             ),
         ),

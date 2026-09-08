@@ -10,7 +10,7 @@ SalixTorrent is a desktop BitTorrent client written in Python with a custom asyn
 
 **Post-v0.5.0 direction — modular application ecosystem:** SalixTorrent remains the reference application while reusable behavior is extracted downward into two cooperating layers: an application engine/runtime and an optional RAD/application framework. Dear PyGui is the current reference desktop backend, Tkinter is now the validated compatibility implementation for the common GUI surface, and headless/CLI operation remains first-class. Realtime telemetry/graphs, generic network/runtime awareness, lifecycle/presentation-host boundaries and rich live-data views are explicit extraction candidates before final framework naming or API freeze. See `SalixTorrent-Ecosystem-Architecture.md`.
 
-**Current `dev` extraction — designer metadata and hierarchy prerequisites:** the responsive-anchor/constraint tranche is Windows-validated and pushed at `5cef12f534dfc44a8536f504d1aa7773644f5428` after passing 591 / 591 tests with one expected skip. Tranche 9 adds a standard-library-only provisional designer catalog for the framework component classes already used by SalixTorrent, editor-facing property metadata, stable live designer IDs, and JSON-safe component hierarchy snapshots. Grid cells, tab pages, split panes and fixed/anchored placement relationships retain their structural metadata, while the product-neutral blank application snapshots its actual nested component tree without consulting a GUI backend. Real-Windows acceptance passed both complete discovery forms at **602 / 602** with one expected skip, the Dear PyGui/Tkinter visual resize checks passed, and the accepted implementation commit is `5b54084f2d21dc331deb4614c15119ad94cab374`. This remains a designer prerequisite rather than a final RAD document/runtime bridge: component reconstruction, project schemas, mutation commands, drag/drop/reparenting, copy/paste, undo/redo and final ecosystem naming/API freeze remain deferred.
+**Current `dev` extraction — designer property commands and undo/redo preparation:** Tranche 9 designer metadata/hierarchy is Windows-validated and pushed through the acceptance-documentation checkpoint `d939f6443a95490881925ca8bdb93e5e94f7ec2c` (implementation commit `5b54084f2d21dc331deb4614c15119ad94cab374`) after both complete Windows discovery forms passed 602 / 602 tests with one expected skip. The current prepared tranche adds a standard-library-only snapshot-editing layer with nullable/unsettable property metadata, typed property validation, explicit set/reset/composite edit commands, inspector-facing property state, deterministic undo/redo history and clean/dirty tracking. Undo/redo availability is exposed through the existing generic `CommandSet` semantics, and the relocation/blank-application proofs exercise edits without importing a GUI toolkit or mutating live components. Preparation discovery is **616 tests** on display-less Linux. Executable component reconstruction, live preview mutation, structural reparenting, copy/paste, project schemas, drag/drop handles and final ecosystem naming/API freeze remain deferred.
 
 **v0.4.0 milestone — durability and transfer lifecycle:** SalixTorrent built on the v0.3.0 protocol/network foundation with an offline-first localization system, semantic Help/Glossary content, provider-neutral translation tooling, backend-neutral application settings and session-state persistence, optional SalixORM/SQLite adapters, a fully tracked `unittest` regression suite, and durable per-torrent seeding goals. Timed goals use an instanced baseline so a newly requested duration starts from the moment it is applied, while cumulative Seed Time remains available as historical telemetry.
 
@@ -311,6 +311,14 @@ Plain repository-root discovery remains supported:
 python -m unittest discover
 ```
 
+For post-v0.5.0 tranche acceptance on Windows, the repository also carries:
+
+```bat
+validate_tranche.bat
+```
+
+The batch launcher selects the repository virtual-environment interpreter and delegates command execution to the standard-library `tools/validate_tranche.py` runner. Commands are executed as argument lists rather than reconstructed CMD strings, so quoted Windows paths remain deterministic. The runner executes the tranche-focused gates, both complete discovery forms, Tkinter/component/localization/headless/compile checks and Git whitespace/status checks, then writes the complete non-visual report to `%USERPROFILE%\Desktop\console_output.txt`. Dear PyGui/Tkinter/application appearance and interaction still require manual visual inspection.
+
 Focused examples:
 
 ```bat
@@ -335,7 +343,7 @@ The engine/runtime should eventually provide the intact machinery needed to spin
 
 Dear PyGui remains the current reference SalixTorrent desktop backend. Tkinter is now the validated compatibility implementation for the common GUI surface: it implements the same component, layout, scene, and realtime-plot contracts but is not required to reproduce Dear PyGui-specific capabilities or presentation pixel-for-pixel. Headless/CLI operation remains first-class and does not require a graphical toolkit. A future GLFW/OpenGL path is permitted by the architecture where a real project justifies it, but it is not a current dependency or parity requirement.
 
-The realtime Speed, runtime/network, second-backend blank-application, live-data/interaction, command-menu/mixed-layout, structural-region and responsive-anchor tranches are now committed on `dev`. The current prepared work begins the metadata side of the designer boundary: provisional component type/property descriptions and serializable hierarchy snapshots sit above the already-proven mixed-layout geometry while remaining independent of Dear PyGui/Tkinter runtime objects.
+The realtime Speed, runtime/network, second-backend blank-application, live-data/interaction, command-menu/mixed-layout, structural-region, responsive-anchor and designer-metadata tranches are now committed on `dev`. The current prepared work adds explicit snapshot property commands, inspector value state and undo/redo history above that metadata while remaining independent of Dear PyGui/Tkinter runtime objects and deliberately avoiding live-preview reconstruction.
 
 Final ecosystem naming, component vocabulary, public API freeze and external repository/package splits remain deliberately deferred until the wider engine/framework boundary has been proven with more than one presentation backend and at least one small non-SalixTorrent application.
 
@@ -347,6 +355,9 @@ The complete architectural direction and extraction rules are documented in `Sal
 SalixTorrent/
 ├── main.py
 ├── cli_main.py
+├── validate_tranche.bat
+├── tools/
+│   └── validate_tranche.py
 ├── requirements.txt
 ├── requirements-build.txt
 ├── examples/
@@ -384,6 +395,7 @@ SalixTorrent/
 │   ├── packaging/
 │   │   ├── test_release_packaging.py
 │   │   ├── test_framework_packaging.py
+│   │   ├── test_tranche_validation.py
 │   │   ├── test_runtime_packaging.py
 │   │   ├── test_ecosystem_application_proof.py
 │   │   └── test_localization_packaging.py
@@ -392,6 +404,7 @@ SalixTorrent/
 │   │   ├── test_documentation.py
 │   │   ├── test_gui_components.py
 │   │   ├── test_designer_model.py
+│   │   ├── test_designer_editing.py
 │   │   ├── test_realtime_visualization.py
 │   │   ├── test_live_data.py
 │   │   ├── test_interactive_data_migration.py
@@ -436,6 +449,7 @@ SalixTorrent/
 │   │   └── network.py
 │   ├── framework/
 │   │   ├── designer.py
+│   │   ├── designer_editing.py
 │   │   ├── property_cascade.py
 │   │   ├── geometry.py
 │   │   ├── responsive.py

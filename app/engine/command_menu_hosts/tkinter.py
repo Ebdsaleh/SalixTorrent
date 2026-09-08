@@ -67,6 +67,12 @@ class TkinterCommandMenuHost:
         callback = self._callbacks[id(menu)]
         title = self._titles.get(id(menu), "")
         menu.delete(0, "end")
+        for item in tuple(binding.items.values()):
+            if isinstance(item, _TkMenuItem):
+                item.variable = None
+        binding.items.clear()
+        binding.title_item = None
+
         items: dict[str, object] = {}
         title_item = None
         if title:
@@ -74,7 +80,6 @@ class TkinterCommandMenuHost:
             title_item = _TkMenuItem(menu, 0)
             menu.add_separator()
         self._populate(menu, commands.commands, items, callback)
-        binding.items.clear()
         binding.items.update(items)
         binding.title_item = title_item
 
@@ -122,3 +127,12 @@ class TkinterCommandMenuHost:
             menu.destroy()
         except Exception:
             pass
+
+        # BooleanVar instances used by check items must be released on the Tk
+        # owner thread.  Retaining them in an otherwise-dead binding can defer
+        # Tcl finalization until arbitrary later garbage collection.
+        for item in tuple(binding.items.values()):
+            if isinstance(item, _TkMenuItem):
+                item.variable = None
+        binding.items.clear()
+        binding.title_item = None

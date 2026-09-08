@@ -94,6 +94,7 @@ class FrameworkPackagingTests(unittest.TestCase):
                 assert "portable_framework.components" in imported
                 assert "portable_framework.documentation" in imported
                 assert "portable_framework.designer" in imported
+                assert "portable_framework.designer_editing" in imported
                 assert "portable_framework.geometry" in imported
                 assert "portable_framework.components.regions" in imported
                 assert "portable_framework.live_data" in imported
@@ -152,6 +153,7 @@ class FrameworkPackagingTests(unittest.TestCase):
                     DesignerSnapshot,
                     capture_component_tree,
                 )
+                from portable_framework.designer_editing import DesignerEditSession
                 from portable_framework.documentation import DocPage, DocumentationTheme
                 from portable_framework.geometry import ContentMetrics, content_bounds, split_sizes
                 from portable_framework.data_view import DataRecord, DataView, SortDirection, SortTerm
@@ -196,6 +198,15 @@ class FrameworkPackagingTests(unittest.TestCase):
                 assert restored_designer_snapshot.root.node_id == "portable-root"
                 assert restored_designer_snapshot.node_count == 2
                 assert restored_designer_snapshot.to_descriptor() == designer_snapshot.to_descriptor()
+                designer_session = DesignerEditSession(restored_designer_snapshot)
+                designer_button = next(
+                    node for node in designer_session.snapshot.root.walk()
+                    if node.type_key == "control.button"
+                )
+                assert designer_session.set_property(designer_button.node_id, "label", "Edited") is True
+                assert designer_session.node(designer_button.node_id).properties["label"] == "Edited"
+                assert designer_session.undo() is True
+                assert designer_session.node(designer_button.node_id).properties["label"] == "Run"
                 profile = ComponentLayoutProfile("probe")
                 page = DocPage(title="Portable")
                 theme = DocumentationTheme()

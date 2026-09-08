@@ -102,6 +102,10 @@ class TkinterApplicationHost:
         self.runtime.stop()
         clear_default_renderer(self.component_renderer)
         try:
+            self.component_renderer.close()
+        except Exception:
+            pass
+        try:
             self.root.destroy()
         except Exception:
             pass

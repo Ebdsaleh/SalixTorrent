@@ -116,6 +116,8 @@ class TkinterRenderer:
         self.component_profile = component_profile or FRAMEWORK_COMPONENT_PROFILE
         self._stack: list[_ContainerState] = []
         self._tooltips: list[_TkTooltip] = []
+        self._value_items: list[_TkItem] = []
+        self._closed = False
 
     @staticmethod
     def _modules():
@@ -123,6 +125,42 @@ class TkinterRenderer:
         from tkinter import ttk
 
         return tk, ttk
+
+    @property
+    def closed(self) -> bool:
+        return bool(self._closed)
+
+    def close(self) -> None:
+        """Release Python-side Tcl/Tk references on the Tk owner thread.
+
+        Tk variables can participate in callback/object cycles.  If those
+        cycles survive until a background worker happens to trigger garbage
+        collection, CPython may finalize ``tkinter.Variable`` objects on that
+        worker and Tcl aborts with ``Tcl_AsyncDelete: async handler deleted by
+        the wrong thread``.  Application hosts and tests therefore call this
+        hook on the Tk owner thread before destroying the root.
+
+        The renderer does not destroy the root itself; root ownership remains
+        with the composition host/caller.
+        """
+        if self._closed:
+            return
+        self._closed = True
+
+        for tooltip in reversed(self._tooltips):
+            try:
+                tooltip.destroy()
+            except Exception:
+                pass
+        self._tooltips.clear()
+        self._stack.clear()
+
+        # Drop Python Variable references while Tcl is still owned by this
+        # thread.  Widget destruction/root teardown can then release any
+        # remaining callback references deterministically on the same thread.
+        for item in self._value_items:
+            item.value_var = None
+        self._value_items.clear()
 
     def set_component_profile(self, profile: ComponentLayoutProfile) -> None:
         if not isinstance(profile, ComponentLayoutProfile):
@@ -291,6 +329,8 @@ class TkinterRenderer:
             value_var=value_var,
             extra=dict(extra or {}),
         )
+        if value_var is not None:
+            self._value_items.append(item)
         self._remember_and_apply_geometry(
             item,
             width=width,
@@ -458,6 +498,8 @@ class TkinterRenderer:
                 value_var=value_var,
                 extra={"multiline": multiline, "readonly": readonly, "hint": hint},
             )
+            if value_var is not None:
+                self._value_items.append(item)
             self._remember_and_apply_geometry(
                 item,
                 width=width,
@@ -583,6 +625,7 @@ class TkinterRenderer:
                 value_var=var,
                 extra={"overlay_widget": overlay_widget},
             )
+            self._value_items.append(item)
             self._remember_and_apply_geometry(
                 item,
                 width=width,
@@ -963,6 +1006,12 @@ class TkinterRenderer:
             try:
                 target.destroy()
             except Exception:
+                pass
+        if item.value_var is not None:
+            item.value_var = None
+            try:
+                self._value_items.remove(item)
+            except ValueError:
                 pass
 
     def event_callback(
