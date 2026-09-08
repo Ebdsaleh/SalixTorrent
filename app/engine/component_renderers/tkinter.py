@@ -226,6 +226,26 @@ class TkinterRenderer:
                 mount.grid(**options)
             return
 
+        if (
+            item.kind == "split_pane"
+            and state is not None
+            and state.kind in {"row", "column"}
+            and not parent_explicit
+        ):
+            options = {
+                "side": "left" if state.kind == "row" else "top",
+                "fill": "both",
+                "expand": False,
+            }
+            if state.kind == "row" and state.horizontal_spacing:
+                gap = max(0, int(state.horizontal_spacing))
+                options["padx"] = (0, gap)
+            item.geometry_manager = "pack"
+            item.geometry_options = options
+            if show:
+                mount.pack(**options)
+            return
+
         side = "left" if state is not None and state.kind == "row" and not parent_explicit else "top"
         options = {"side": side}
         if fill_x and fill_y:
@@ -584,6 +604,64 @@ class TkinterRenderer:
         width = kwargs.pop("width", None)
         height = kwargs.pop("height", None)
 
+        if kind == "tabs":
+            callback = kwargs.pop("callback", None)
+            mount = self._new_mount(parent, width=width, height=height)
+            widget = ttk.Notebook(mount)
+            widget.pack(fill="both", expand=True)
+            item = _TkItem(
+                widget=widget,
+                kind=kind,
+                mount=mount,
+                extra={"pages": {}, "suppress_change": False},
+            )
+            self._remember_and_apply_geometry(
+                item,
+                width=width,
+                height=height,
+                parent_explicit=parent_explicit,
+                show=True,
+            )
+            if callback is not None:
+                def _tab_changed(_event=None):
+                    if item.extra.get("suppress_change"):
+                        item.extra["suppress_change"] = False
+                        return None
+                    try:
+                        selected = str(widget.select())
+                    except Exception:
+                        selected = ""
+                    return callback(item.extra.get("pages", {}).get(selected))
+
+                item.extra["tab_binding"] = widget.bind(
+                    "<<NotebookTabChanged>>", _tab_changed, add="+"
+                )
+            state = _ContainerState(kind=kind, item=item, widget=widget)
+            self._stack.append(state)
+            try:
+                yield item
+            finally:
+                self._stack.pop()
+            return
+
+        if kind == "tab_page":
+            tabs = self._stack[-1] if self._stack else None
+            if tabs is None or tabs.kind != "tabs" or not isinstance(tabs.item, _TkItem):
+                raise RuntimeError("Tkinter tab_page requires an active tabs container")
+            label = str(kwargs.pop("label", ""))
+            widget = tk.Frame(tabs.widget, borderwidth=0, highlightthickness=0)
+            item = _TkItem(widget=widget, kind=kind, mount=widget)
+            tabs.widget.add(widget, text=label)
+            item.geometry_manager = "notebook"
+            tabs.item.extra.setdefault("pages", {})[str(widget)] = item
+            state = _ContainerState(kind=kind, item=item, widget=widget)
+            self._stack.append(state)
+            try:
+                yield item
+            finally:
+                self._stack.pop()
+            return
+
         if kind == "dialog":
             widget = tk.Toplevel(parent)
             widget.title(str(kwargs.pop("label", "")))
@@ -635,7 +713,15 @@ class TkinterRenderer:
                 self._stack.pop()
             return
 
-        if kind not in {"row", "column", "grid", "panel", "positioned_panel", "positioned_slot"}:
+        if kind not in {
+            "row",
+            "column",
+            "grid",
+            "panel",
+            "positioned_panel",
+            "positioned_slot",
+            "split_pane",
+        }:
             raise ValueError(f"unsupported GUI component container: {kind!r}")
 
         border = bool(kwargs.pop("border", False))
@@ -671,6 +757,12 @@ class TkinterRenderer:
     def get_value(self, item: object):
         if not isinstance(item, _TkItem):
             return None
+        if item.kind == "tabs":
+            try:
+                selected = str(item.widget.select())
+            except Exception:
+                return None
+            return item.extra.get("pages", {}).get(selected)
         if item.kind == "text_input" and item.extra.get("multiline"):
             return item.widget.get("1.0", "end-1c")
         if item.value_var is not None:
@@ -682,6 +774,12 @@ class TkinterRenderer:
     def set_value(self, item: object, value) -> None:
         if not isinstance(item, _TkItem) or not self.exists(item):
             raise RuntimeError("Tkinter item does not exist")
+        if item.kind == "tabs":
+            if not isinstance(value, _TkItem) or value.kind != "tab_page":
+                raise TypeError("Tkinter tabs value must be a tab-page handle")
+            item.extra["suppress_change"] = True
+            item.widget.select(value.widget)
+            return
         if item.kind == "text_input" and item.extra.get("multiline"):
             widget = item.widget
             previous_state = str(widget.cget("state"))

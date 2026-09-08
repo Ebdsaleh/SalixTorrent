@@ -12,6 +12,7 @@ from app.framework.components import (
     PlacedComponent,
     Placement,
     PositionedPanel,
+    overlay,
     positioned,
 )
 from app.framework.components.profile import FRAMEWORK_COMPONENT_PROFILE
@@ -153,6 +154,25 @@ class MixedLayoutContractTests(unittest.TestCase):
         self.assertEqual(90, grid_columns[0][2]["init_width_or_weight"])
         self.assertEqual(400, grid_columns[1][2]["init_width_or_weight"])
         self.assertEqual((400, 180), wrapped.occupied_size)
+
+
+    def test_non_measuring_overlay_uses_local_coordinates_without_growing_parent(self):
+        renderer = GeometryRenderer()
+        measured = Label("Base", layout=ControlLayout(width=120, height=40))
+        badge = Button("Badge", layout=ControlLayout(width=80, height=24))
+        panel = PositionedPanel(
+            (
+                positioned(measured, x=10, y=10),
+                overlay(badge, x=500, y=300),
+            ),
+            padding=5,
+        )
+
+        panel.build(renderer=renderer)
+
+        self.assertEqual((140, 60), panel.occupied_size)
+        self.assertEqual((badge.require_item(), 505, 305), renderer.placements[-1])
+        self.assertFalse(panel.children[1].placement.affects_layout)
 
     def test_positioned_panel_can_contain_an_automatic_layout_component(self):
         renderer = GeometryRenderer()

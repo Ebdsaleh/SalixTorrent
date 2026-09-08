@@ -688,24 +688,38 @@ This tranche adds the richer semantics deliberately deferred from the read-only 
 
 The real Windows gate passed both discovery forms at **547 / 547** with one expected non-Windows shell-behavior skip. The exact pushed checkpoint is `e16e46884acc53adf54a29a35dbfd09bba40ed26` (`Extract interactive data and command models`).
 
-### A8. Command presentation, ordered items and mixed layout — current tranche prepared
+### A8. Command presentation, ordered items and mixed layout — completed/pushed
 
-The next extraction turns the semantic command model into reusable physical presentation and begins the mixed-layout foundation required by a real WYSIWYG editor:
+This extraction turns the semantic command model into reusable physical presentation and establishes the first parent-aware mixed-layout foundation required by a real WYSIWYG editor:
 
 - `CommandMenu` + `CommandMenuHost` with Dear PyGui and Tkinter implementations;
 - nested commands plus enabled/checked state rendered by either backend;
 - one shared File-priority command menu instead of one Dear PyGui popup per file row;
-- generic `OrderedItems` with `move_item_up`, `move_item_down` and explicit index movement, applied to the Active Transfers scheduler order instead of calling Dear PyGui movement primitives directly;
-- `Placement`, `PlacedComponent`, and `PositionedPanel`: local `(x, y)` placement remains parent-relative, and placed children reserve offset + margins + child size so automatic grid cells can grow around them;
-- a renderer `place(...)` contract implemented by Dear PyGui and Tkinter;
-- the blank ecosystem application expanded to prove command menus and local explicit placement through both GUI backends;
-- documentation of the long-term rule that layout strategy is container-local, so flow/grid/tab/split and explicit placement can coexist in one application.
+- generic `OrderedItems` with `move_item_up`, `move_item_down` and explicit index movement, applied to Active Transfers scheduler order instead of toolkit movement primitives;
+- `Placement`, `PlacedComponent`, and `PositionedPanel`: local `(x, y)` placement remains parent-relative, while positioned children can reserve offset + margins + child size so automatic grid cells grow around them;
+- renderer `place(...)` and `measure(...)` contracts implemented by Dear PyGui and Tkinter;
+- blank-application proof that command menus and explicit local placement coexist with structured layout through both GUI backends.
 
-Prepared source validation advances complete discovery from **547 to 563 tests**. Both display-less discovery forms pass 563 / 563 with 54 expected preparation-environment skips, while both Xvfb-backed discovery forms pass 563 / 563 with 38 platform skips and execute the live Tkinter paths. Canonical localization remains 1,337 strings.
+The real Windows gate passed both discovery forms at **563 / 563** with one expected non-Windows shell-behavior skip. The exact pushed checkpoint is `19ee1ba92826501e2061132e2a514a38862082a1` (`Add command menus and mixed layout foundation`).
 
-This tranche does **not** convert the whole SalixTorrent queue/menu system to a generic widget API, and it does not make absolute positioning the default. The existing structured layout remains valuable; explicit positioning is introduced as another local composition strategy. Anchors, percentages and non-measuring overlays remain later passes.
+### A9. Structural tabs, split regions and non-measuring overlays — current tranche prepared
 
-### A9. WYSIWYG designer prerequisites
+The next structural pass proves that mixed layout is recursive rather than a special-case positioned panel:
+
+- renderer-neutral `TabContainer` / `TabPage` with stable semantic page keys and normalized change events;
+- renderer-neutral `SplitPanel` / `SplitPane` with horizontal or vertical weighted allocation, per-pane minimums and responsive reflow through the existing `LayoutCoordinator`;
+- non-measuring overlay placement, so an explicitly positioned HUD/decoration can share local coordinates without enlarging its parent;
+- Download detail tabs migrated from direct Dear PyGui tabs to `TabContainer`;
+- Download General's three application panels migrated to a responsive `SplitPanel` while retaining SalixTorrent-owned content/wrapping semantics;
+- Help Contents/Glossary navigation migrated to `TabContainer`, and the index/document region migrated to `SplitPanel`;
+- the application menu now selects Download detail pages by semantic key instead of backend item ID;
+- the blank ecosystem application expanded to prove tabs, weighted splits, measured explicit placement and non-measuring overlays through both GUI backends.
+
+Prepared source validation advances complete discovery from **563 to 581 tests**. Both ordinary discovery forms pass 581 / 581 with the display-less GUI skips expected by the preparation environment, and the live Tkinter-focused gate remains green under Xvfb. Real-Windows acceptance additionally caught two silent Dear PyGui integration defects: split-pane geometry could collapse into one visually dominant pane, and tab callbacks could omit the selected-page handle from callback data. The corrected structural runtime now positions split panes deterministically inside a parent-local root and normalizes tab changes from the backend current value when needed. Canonical localization remains 1,337 strings.
+
+This tranche still does **not** freeze a universal designer layout API. Anchors/edge offsets, percentages, richer min/max constraints, interactive split handles, tree/detail structures and serializable designer geometry remain later passes driven by real application needs.
+
+### A10. WYSIWYG designer prerequisites
 
 After the runtime/presentation contracts are better proven, introduce the metadata needed by a future RAD editor:
 
@@ -721,7 +735,7 @@ After the runtime/presentation contracts are better proven, introduce the metada
 
 The future designer should itself use the same engine/framework wherever practical.
 
-### A10. Naming, public API and package/repository split
+### A11. Naming, public API and package/repository split
 
 This remains **after** the wider extraction.
 

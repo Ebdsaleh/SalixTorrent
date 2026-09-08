@@ -139,14 +139,43 @@ class PositionedPanel(Component):
         x: int = 0,
         y: int = 0,
         margin: Insets | int | tuple[int, int] | tuple[int, int, int, int] = 0,
+        affects_layout: bool = True,
     ) -> Component:
-        self.children.append(positioned(component, x=x, y=y, margin=margin))
+        self.children.append(
+            positioned(
+                component,
+                x=x,
+                y=y,
+                margin=margin,
+                affects_layout=affects_layout,
+            )
+        )
         return component
+
+    def add_overlay(
+        self,
+        component: Component,
+        *,
+        x: int = 0,
+        y: int = 0,
+        margin: Insets | int | tuple[int, int] | tuple[int, int, int, int] = 0,
+    ) -> Component:
+        """Add a local overlay that does not enlarge the panel's measured bounds."""
+
+        return self.add(
+            component,
+            x=x,
+            y=y,
+            margin=margin,
+            affects_layout=False,
+        )
 
     def _content_hint(self, renderer: ComponentRenderer | None) -> tuple[int, int]:
         width = self.padding.horizontal
         height = self.padding.vertical
         for entry in self.children:
+            if not entry.placement.affects_layout:
+                continue
             child_width, child_height = entry.component.layout_size_hint(renderer=renderer)
             occupied_width, occupied_height = entry.placement.occupied_size(
                 child_width or 0, child_height or 0
@@ -221,17 +250,18 @@ class PositionedPanel(Component):
                     self.padding.left + entry.placement.local_x,
                     self.padding.top + entry.placement.local_y,
                 )
-                occupied_width, occupied_height = entry.placement.occupied_size(
-                    child_width, child_height
-                )
-                max_width = max(
-                    max_width,
-                    self.padding.left + occupied_width + self.padding.right,
-                )
-                max_height = max(
-                    max_height,
-                    self.padding.top + occupied_height + self.padding.bottom,
-                )
+                if entry.placement.affects_layout:
+                    occupied_width, occupied_height = entry.placement.occupied_size(
+                        child_width, child_height
+                    )
+                    max_width = max(
+                        max_width,
+                        self.padding.left + occupied_width + self.padding.right,
+                    )
+                    max_height = max(
+                        max_height,
+                        self.padding.top + occupied_height + self.padding.bottom,
+                    )
 
             self.occupied_size = (max_width, max_height)
             resize = {}

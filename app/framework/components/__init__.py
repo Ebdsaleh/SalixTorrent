@@ -37,7 +37,14 @@ from .containers import (
     PositionedPanel,
     SectionPanel,
 )
-from .placement import Insets, Placement, PositionedChild, insets, positioned
+from .placement import Insets, Placement, PositionedChild, insets, overlay, positioned
+from .regions import (
+    SplitOrientation,
+    SplitPane,
+    SplitPanel,
+    TabContainer,
+    TabPage,
+)
 from .fields import (
     DurationEditor,
     LabeledComboField,
@@ -93,6 +100,11 @@ __all__ = [
     "SectionPanel",
     "Separator",
     "Spacer",
+    "TabPage",
+    "TabContainer",
+    "SplitPanel",
+    "SplitPane",
+    "SplitOrientation",
     "TextInput",
     "Tooltip",
     "ValueBinding",
@@ -100,6 +112,7 @@ __all__ = [
     "clear_default_renderer",
     "get_default_renderer",
     "insets",
+    "overlay",
     "positioned",
     "resolve_control_layout",
     "set_default_renderer",

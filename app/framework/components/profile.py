@@ -136,6 +136,9 @@ FRAMEWORK_COMPONENT_PROFILE = ComponentLayoutProfile(
         "control_grid": DEFAULT_CONTROL_LAYOUT,
         "placed_component": DEFAULT_CONTROL_LAYOUT,
         "positioned_panel": DEFAULT_CONTROL_LAYOUT,
+        "tab_container": DEFAULT_CONTROL_LAYOUT,
+        "tab_page": DEFAULT_CONTROL_LAYOUT,
+        "split_panel": DEFAULT_CONTROL_LAYOUT,
         # Composite-internal defaults preserve the dimensions established by
         # the first two GUI-component tranches without forcing view code to
         # repeat them.

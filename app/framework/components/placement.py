@@ -86,11 +86,18 @@ def insets(value: Insets | int | tuple[int, int] | tuple[int, int, int, int] = 0
 
 @dataclass(frozen=True)
 class Placement:
-    """Local child placement relative to its parent's assigned content origin."""
+    """Local child placement relative to its parent's assigned content origin.
+
+    ``affects_layout`` controls whether the positioned child's occupied bounds
+    contribute to parent measurement. Normal positioned content uses ``True``;
+    overlays such as badges, HUD labels and drag handles can opt out while still
+    sharing the same parent-local coordinate system.
+    """
 
     x: int = 0
     y: int = 0
     margin: Insets = Insets()
+    affects_layout: bool = True
 
     def __init__(
         self,
@@ -98,10 +105,12 @@ class Placement:
         y: object = 0,
         *,
         margin: Insets | int | tuple[int, int] | tuple[int, int, int, int] = 0,
+        affects_layout: bool = True,
     ):
         object.__setattr__(self, "x", _non_negative_int(x, field="placement x"))
         object.__setattr__(self, "y", _non_negative_int(y, field="placement y"))
         object.__setattr__(self, "margin", insets(margin))
+        object.__setattr__(self, "affects_layout", bool(affects_layout))
 
     @property
     def local_x(self) -> int:
@@ -135,6 +144,7 @@ class PositionedChild:
         y: object = 0,
         margin: Insets | int | tuple[int, int] | tuple[int, int, int, int] = 0,
         placement: Placement | None = None,
+        affects_layout: bool = True,
     ):
         from .base import Component
 
@@ -146,7 +156,9 @@ class PositionedChild:
         object.__setattr__(
             self,
             "placement",
-            placement if placement is not None else Placement(x, y, margin=margin),
+            placement if placement is not None else Placement(
+                x, y, margin=margin, affects_layout=affects_layout
+            ),
         )
 
 
@@ -156,10 +168,35 @@ def positioned(
     x: object = 0,
     y: object = 0,
     margin: Insets | int | tuple[int, int] | tuple[int, int, int, int] = 0,
+    affects_layout: bool = True,
 ) -> PositionedChild:
     """Convenience constructor for children of ``PositionedPanel``."""
 
-    return PositionedChild(component, x=x, y=y, margin=margin)
+    return PositionedChild(
+        component,
+        x=x,
+        y=y,
+        margin=margin,
+        affects_layout=affects_layout,
+    )
+
+
+def overlay(
+    component: "Component",
+    *,
+    x: object = 0,
+    y: object = 0,
+    margin: Insets | int | tuple[int, int] | tuple[int, int, int, int] = 0,
+) -> PositionedChild:
+    """Create a positioned child that does not enlarge its parent."""
+
+    return positioned(
+        component,
+        x=x,
+        y=y,
+        margin=margin,
+        affects_layout=False,
+    )
 
 
 def component_size_hint(component: "Component", renderer: "ComponentRenderer") -> tuple[int, int]:
@@ -183,6 +220,8 @@ def occupied_extent(
     for child in tuple(children):
         if not isinstance(child, PositionedChild):
             raise TypeError("occupied_extent children must be PositionedChild instances")
+        if not child.placement.affects_layout:
+            continue
         child_width, child_height = component_size_hint(child.component, renderer)
         occupied_width, occupied_height = child.placement.occupied_size(
             child_width,

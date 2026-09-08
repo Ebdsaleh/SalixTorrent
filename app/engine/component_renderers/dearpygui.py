@@ -84,6 +84,26 @@ class DearPyGuiRenderer:
             with dpg.table_row(**kwargs) as item:
                 yield item
             return
+        if kind == "tabs":
+            # Dear PyGui tab bars are content-driven and reject width/height
+            # keywords even though the framework's semantic TabContainer may
+            # carry size hints. Surrounding structured containers (groups,
+            # split panes, child windows) own the physical extent on this
+            # backend, so do not leak unsupported dimension keywords here.
+            kwargs.pop("width", None)
+            kwargs.pop("height", None)
+            with dpg.tab_bar(**kwargs) as item:
+                yield item
+            return
+        if kind == "tab_page":
+            # Dear PyGui tabs likewise do not accept direct width/height.
+            # Page contents and the containing structural region determine
+            # their extent.
+            kwargs.pop("width", None)
+            kwargs.pop("height", None)
+            with dpg.tab(**kwargs) as item:
+                yield item
+            return
         if kind == "panel":
             with dpg.child_window(**kwargs) as item:
                 yield item
@@ -92,6 +112,10 @@ class DearPyGuiRenderer:
             kwargs.setdefault("border", False)
             kwargs.setdefault("no_scrollbar", True)
             kwargs.setdefault("no_scroll_with_mouse", True)
+            with dpg.child_window(**kwargs) as item:
+                yield item
+            return
+        if kind == "split_pane":
             with dpg.child_window(**kwargs) as item:
                 yield item
             return

@@ -409,7 +409,11 @@ Explicit placement also participates in measurement in this first pass. A placed
 
 Dear PyGui translates local placement through its item-position API; Tkinter translates it through `place()` only inside the bounded positioned region. This is a foundation, not the final designer layout API.
 
-Future passes should add richer container strategies only when proved by real application surfaces: split regions, tabbed containers, tree/list/detail composition, anchoring/edge offsets, percentages, min/max constraints, overlay placements that deliberately do not contribute to parent measurement, designer resize handles and eventually serializable placement metadata. Margins/padding remain useful for structured flow, but explicit placement must always remain available locally when a design requires it.
+The next structural proof adds two more local strategies rather than inventing a global form layout. `TabContainer`/`TabPage` provide keyed tab regions, while `SplitPanel`/`SplitPane` divide one region horizontally or vertically using weights, per-pane minimums and responsive reflow through `LayoutCoordinator`. Non-measuring overlay placement is also explicit: an overlay still uses parent-local coordinates but reports no occupied extent, so HUD labels, decorations, drag handles or similar surfaces need not enlarge the surrounding structured layout.
+
+SalixTorrent itself now supplies the proof rather than relying only on the blank application: Download detail pages use the generic tab contract, Download General uses a three-pane split, and Help uses both a Contents/Glossary tab container and a two-pane index/document split. These structures remain recursively nestable with automatic controls and positioned panels.
+
+Future passes should add richer geometry only when proved by real application surfaces: tree/list/detail composition, anchoring/edge offsets, percentages, richer min/max constraints, interactive split handles, designer resize handles and eventually serializable placement/property metadata. Margins/padding remain useful for structured flow, but explicit placement must always remain available locally when a design requires it.
 
 ## 10. Branch and release discipline
 
@@ -465,7 +469,7 @@ This remains a compatibility surface, not a wholesale Tkinter rewrite of SalixTo
 
 ### Stage E — rich RAD presentation
 
-This stage is active. Tranche 4 extracted keyed live tables and categorical state grids; Tranche 5 added backend-neutral data projection, selection and command-state semantics. Tranche 6 adds physical Dear PyGui/Tkinter command-menu hosts, stable generic item-order operations and the first local explicit-placement component while preserving SalixTorrent policy at the application layer. Richer status/diagnostic surfaces, interactive table hosts and additional structural containers remain candidates only where the application demonstrates reusable semantics.
+This stage is active. Tranche 4 extracted keyed live tables and categorical state grids; Tranche 5 added backend-neutral data projection, selection and command-state semantics; Tranche 6 added physical Dear PyGui/Tkinter command-menu hosts, stable generic item-order operations and parent-aware explicit placement. Tranche 7 adds keyed tab regions, responsive weighted split regions and non-measuring overlays, and migrates real Download/Help structures onto those contracts. Richer status/diagnostic surfaces, interactive table hosts and additional structural containers remain candidates only where the application demonstrates reusable semantics.
 
 ### Stage F — designer prerequisites
 
@@ -726,8 +730,26 @@ The same presentation bundles now advertise command-menu capability explicitly. 
 
 The first mixed-layout runtime primitive is also introduced. `PositionedPanel` positions its direct children with local `(x, y)` coordinates, while `PlacedComponent` lets any component carry an offset/margins inside the content space assigned by an automatic parent. The placed wrapper reserves offset + margins + child size, and `ControlGrid` consumes that occupied size so a positioned child can grow the affected structured cell. This deliberately proves parent-aware mixed layouts rather than replacing structured layouts with absolute positioning.
 
-Prepared source validation advances complete discovery from **547 to 563 tests**. Both ordinary discovery forms pass 563 / 563 in the display-less preparation environment, and both Xvfb-backed discovery forms pass 563 / 563 while exercising the live Tkinter paths. Canonical localization remains 1,337 strings.
+The real Windows gate passed both discovery forms at **563 / 563** with one expected non-Windows shell-behavior skip, and the mixed-layout/command surfaces were exercised under both Dear PyGui and Tkinter. The exact pushed checkpoint is `19ee1ba92826501e2061132e2a514a38862082a1` (`Add command menus and mixed layout foundation`). Canonical localization remains 1,337 strings.
 
-The tranche does **not** claim a final form designer, final split/tab API, generic torrent lifecycle menu, or complete interactive-table migration. Anchors, percentages, edge constraints and overlay placements that deliberately do not affect parent measurement remain later passes after the current contracts have been exercised on Windows.
+The tranche does **not** claim a final form designer, generic torrent lifecycle menu, or complete interactive-table migration. It establishes the parent-aware geometry and command surfaces needed for later structural composition without making absolute positioning the application default.
+
+No final ecosystem/package naming, public API freeze, release tag or merge to `main` is implied.
+
+---
+
+## 20. Seventh post-v0.5.0 implementation checkpoint
+
+The seventh `dev` tranche turns the mixed-layout rule into reusable structural regions. `TabContainer`/`TabPage` own stable semantic page identity and normalized page-change events independently of the physical toolkit. `SplitPanel`/`SplitPane` own horizontal or vertical weighted allocation, pane minimums, gaps and responsive reflow through the existing `LayoutCoordinator` rather than embedding geometry arithmetic in product views.
+
+The placement model also gains an explicit non-measuring overlay mode. Overlays still use parent-local coordinates and therefore compose with `PositionedPanel`, but they do not contribute occupied bounds to parent measurement. This distinguishes ordinary positioned content—which can grow its structured parent—from overlays such as HUD labels, decorations or future designer handles that should float without changing layout size.
+
+SalixTorrent now proves the structural contracts in production surfaces. Download detail pages use a generic `TabContainer`; the General page's Transfer, Swarm Status and Torrent Info regions use a responsive three-pane `SplitPanel`; application-menu navigation selects tabs by semantic key rather than backend item ID. Help uses a generic Contents/Glossary tab container plus a two-pane index/document split, while documentation rendering and localization remain application-owned.
+
+The product-neutral blank application also nests tabs, weighted splits, automatic content, parent-aware explicit placement and a non-measuring overlay alongside its command menu, live table, state grid and realtime graph. Dear PyGui and Tkinter implement the same component contracts; the view still does not branch on toolkit name.
+
+Prepared source validation advances complete discovery from **563 to 581 tests**. The acceptance pass also tightened an important cross-backend rule: a `SplitPanel` does not delegate pane placement to whatever flow/group behavior a toolkit happens to provide. The framework computes pane sizes, then places each pane explicitly in a parent-local positioned root through the renderer contract. Likewise, tab-change semantics are normalized from either callback payload or the backend current tab value. These fixes were driven by real Dear PyGui behavior where Help/document panes and split-hosted live surfaces could silently disappear and the Speed tab could stop receiving live render updates without producing a traceback. Canonical localization remains 1,337 strings.
+
+This checkpoint still deliberately defers anchors/edge offsets, percentages, richer min/max constraints, draggable split handles, generic tree/detail structures and serializable designer geometry. Those should be introduced only as real application/designer requirements prove the contracts.
 
 No final ecosystem/package naming, public API freeze, release tag or merge to `main` is implied.

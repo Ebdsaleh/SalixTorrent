@@ -94,6 +94,7 @@ class FrameworkPackagingTests(unittest.TestCase):
                 assert "portable_framework.components" in imported
                 assert "portable_framework.documentation" in imported
                 assert "portable_framework.geometry" in imported
+                assert "portable_framework.components.regions" in imported
                 assert "portable_framework.live_data" in imported
                 assert "portable_framework.command_menu" in imported
                 assert "portable_framework.data_view" in imported
@@ -134,10 +135,15 @@ class FrameworkPackagingTests(unittest.TestCase):
                     ControlLayout,
                     PlacedComponent,
                     PositionedPanel,
+                    SplitPane,
+                    SplitPanel,
+                    TabContainer,
+                    TabPage,
+                    overlay,
                     positioned,
                 )
                 from portable_framework.documentation import DocPage, DocumentationTheme
-                from portable_framework.geometry import ContentMetrics, content_bounds
+                from portable_framework.geometry import ContentMetrics, content_bounds, split_sizes
                 from portable_framework.data_view import DataRecord, DataView, SortDirection, SortTerm
                 from portable_framework.interactions import CommandSet, CommandSpec, OrderedItems, SelectionModel
                 from portable_framework.live_data import (
@@ -196,6 +202,19 @@ class FrameworkPackagingTests(unittest.TestCase):
                     positioned(Button("Inside", layout=ControlLayout(width=80, height=24)), x=20, y=10),
                 ), layout=ControlLayout(width=120, height=60))
                 placed_panel = PlacedComponent(positioned_panel, x=30, y=15)
+                overlay_panel = PositionedPanel((
+                    positioned(Button("Base", layout=ControlLayout(width=80, height=24)), x=10, y=10),
+                    overlay(Button("Overlay", layout=ControlLayout(width=60, height=20)), x=300, y=200),
+                ), layout=ControlLayout(width=120, height=60))
+                tabs = TabContainer((
+                    TabPage("one", "One", (Button("One"),)),
+                    TabPage("two", "Two", (Button("Two"),)),
+                ))
+                split = SplitPanel((
+                    SplitPane("left", weight=1, minimum=100),
+                    SplitPane("right", weight=2, minimum=200),
+                ), coordinator=coordinator)
+                split_probe = split_sizes(1000, (1, 2), minimums=(100, 200), gap=10)
 
                 commands = CommandSet((
                     CommandSpec("open", "Open"),
@@ -332,6 +351,10 @@ class FrameworkPackagingTests(unittest.TestCase):
                 assert ordered.keys == ("row-b", "row-a")
                 assert placed_panel.placement.x == 30
                 assert positioned_panel.children[0].placement.y == 10
+                assert overlay_panel.children[1].placement.affects_layout is False
+                assert tuple(page.key for page in tabs.pages) == ("one", "two")
+                assert tuple(pane.key for pane in split.panes) == ("left", "right")
+                assert split_probe == (330, 660)
                 assert menu_seen == ["open"]
                 assert coordinator.width("panel", 320) is True
                 assert telemetry_window.statistics("value").average == 3.0

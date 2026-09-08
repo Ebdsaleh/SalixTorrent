@@ -463,18 +463,12 @@ class ApplicationMenu:
 
     def _show_detail_tab(self, tab_name: str):
         self._switch_scene("DownloadView")
-        for tab_id, name in self.download_view._detail_tab_ids.items():
-            if name != tab_name:
-                continue
+        tabs = self.download_view.detail_tabs
+        if tabs is not None:
             try:
-                dpg.set_value(self.download_view.detail_tab_bar, tab_id)
-            except Exception:
+                tabs.select(tab_name, notify=True)
+            except (KeyError, RuntimeError):
                 pass
-            self.download_view._on_detail_tab_changed(
-                sender=self.download_view.detail_tab_bar,
-                app_data=tab_id,
-            )
-            break
         self.update(force=True)
 
     # ------------------------------------------------------------------

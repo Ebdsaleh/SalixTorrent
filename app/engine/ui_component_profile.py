@@ -52,6 +52,11 @@ SALIXTORRENT_COMPONENT_PROFILE = ComponentLayoutProfile(
         "create_torrent.comment": ControlLayoutDefaults(width=FILL),
         "create_torrent.trackers_input": ControlLayoutDefaults(width=FILL, height=105),
         "create_torrent.progress_bar": ControlLayoutDefaults(width=FILL, height=22),
+        # Main transfer/help structural regions.
+        "download.detail_tabs": ControlLayoutDefaults(width=FILL, height=FILL),
+        "download.general_split": ControlLayoutDefaults(width=FILL, height=FILL),
+        "help.split": ControlLayoutDefaults(width=FILL, height=FILL),
+        "help.index_tabs": ControlLayoutDefaults(width=FILL, height=FILL),
         # Transfer utility dialogs.
         "download.magnet.dialog": ControlLayoutDefaults(width=680, height=285),
         "download.magnet.input": ControlLayoutDefaults(width=FILL, height=70),

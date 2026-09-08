@@ -22,7 +22,8 @@ from app.framework.documentation import (
 )
 from app.engine.documentation.renderer import DocumentationRenderer
 from app.engine.responsive_layout import ResponsiveLayout
-from app.framework.geometry import clamp, split_widths
+from app.framework.components import SplitPane, SplitPanel, TabContainer
+from app.framework.geometry import clamp
 from app.engine.ui_typography import UiTypography
 from app.logic.torrent_manager import TorrentManager
 from app.localization import tr
@@ -80,9 +81,11 @@ class HelpTopicsView:
         self.search_input = None
         self.search_status = None
         self.documentation_scale_combo = None
+        self.left_tabs: TabContainer | None = None
         self.left_tab_bar = None
         self.contents_tab = None
         self.glossary_tab = None
+        self.help_split: SplitPanel | None = None
         self.left_pane = None
         self.right_pane = None
         self.renderer = None
@@ -184,13 +187,29 @@ class HelpTopicsView:
         dpg.add_separator(parent=parent_tag)
         dpg.add_spacer(height=3, parent=parent_tag)
 
-        split = dpg.add_group(horizontal=True, parent=parent_tag)
-        self.left_pane = dpg.add_child_window(width=340, height=-1, border=True, parent=split)
-        self.right_pane = dpg.add_child_window(width=-1, height=-1, border=True, parent=split)
-
-        self.left_tab_bar = dpg.add_tab_bar(parent=self.left_pane)
-        self.contents_tab = dpg.add_tab(label=tr("help.contents", "Contents"), parent=self.left_tab_bar)
-        self.glossary_tab = dpg.add_tab(label=tr("help.glossary", "Glossary A-Z"), parent=self.left_tab_bar)
+        self.help_split = SplitPanel(
+            (
+                SplitPane("index", weight=0.26, minimum=260, border=True),
+                SplitPane("document", weight=0.74, minimum=520, border=True),
+            ),
+            gap=8,
+            coordinator=self.layout,
+            profile_key="help.split",
+        )
+        with self.help_split.context(parent=parent_tag):
+            with self.help_split.pane_context("index") as self.left_pane:
+                self.left_tabs = TabContainer(profile_key="help.index_tabs")
+                with self.left_tabs.context(parent=self.left_pane) as self.left_tab_bar:
+                    with self.left_tabs.page_context(
+                        "contents", tr("help.contents", "Contents")
+                    ) as self.contents_tab:
+                        pass
+                    with self.left_tabs.page_context(
+                        "glossary", tr("help.glossary", "Glossary A-Z")
+                    ) as self.glossary_tab:
+                        pass
+            with self.help_split.pane_context("document") as self.right_pane:
+                pass
 
         self._build_contents_index()
         self._build_glossary_index()
@@ -218,14 +237,11 @@ class HelpTopicsView:
         if width <= 1:
             return
 
-        left_width, right_width = split_widths(
-            width - 16,
-            (0.26, 0.74),
-            minimums=(260, 520),
-            gap=8,
-        )
-        self.layout.width(self.left_pane, left_width)
-        self.layout.width(self.right_pane, right_width)
+        if self.help_split is not None:
+            pane_widths = self.help_split.reflow()
+            right_width = pane_widths[1]
+        else:
+            right_width = max(520, width - 360)
         self.layout.width(self.search_input, clamp(width * 0.34, 260, 620))
         self.layout.wrap(self.help_intro, clamp(width - 28, 540, 1150))
         if self.renderer is not None:
@@ -509,25 +525,28 @@ class HelpTopicsView:
         if topic_key == "__open_glossary__":
             self._open_glossary_tab()
             return
-        try:
-            dpg.set_value(self.left_tab_bar, self.contents_tab)
-        except Exception:
-            pass
+        if self.left_tabs is not None:
+            try:
+                self.left_tabs.select("contents")
+            except (KeyError, RuntimeError):
+                pass
         self._show_topic(topic_key)
 
     def _open_glossary_term(self, term_key: str):
-        try:
-            dpg.set_value(self.left_tab_bar, self.glossary_tab)
-        except Exception:
-            pass
+        if self.left_tabs is not None:
+            try:
+                self.left_tabs.select("glossary")
+            except (KeyError, RuntimeError):
+                pass
         self._show_term(term_key)
 
     def _open_glossary_tab(self, sender=None, app_data=None, user_data=None):
         del sender, app_data, user_data
-        try:
-            dpg.set_value(self.left_tab_bar, self.glossary_tab)
-        except Exception:
-            pass
+        if self.left_tabs is not None:
+            try:
+                self.left_tabs.select("glossary")
+            except (KeyError, RuntimeError):
+                pass
         if self._current_term:
             self._show_term(self._current_term)
         else:

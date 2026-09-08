@@ -40,6 +40,9 @@ class EcosystemApplicationProofTests(unittest.TestCase):
         self.assertIn("PositionedPanel", source)
         self.assertIn("PlacedComponent", source)
         self.assertIn("CommandMenu", source)
+        self.assertIn("TabContainer", source)
+        self.assertIn("SplitPanel", source)
+        self.assertIn("overlay", source)
         self.assertIn('("dearpygui", "tkinter", "headless")', source)
 
     def test_blank_view_definition_does_not_branch_on_toolkit_name(self):

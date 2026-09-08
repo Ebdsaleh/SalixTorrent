@@ -34,6 +34,11 @@ from app.framework.components import (
     TextInput,
     PlacedComponent,
     PositionedPanel,
+    SplitPane,
+    SplitPanel,
+    TabContainer,
+    TabPage,
+    overlay,
     positioned,
 )
 from app.framework.command_menu import CommandMenu, CommandMenuHost
@@ -363,6 +368,70 @@ class TkinterBackendLiveTests(unittest.TestCase):
         self.assertEqual("place", panel.children[1].component.require_item().geometry_manager)
         self.assertGreaterEqual(int(panel_mount.winfo_width()), 280)
         self.assertEqual((320, 135), wrapped.occupied_size)
+
+
+    def test_tab_container_uses_same_keyed_selection_contract(self):
+        seen = []
+        tabs = TabContainer(
+            (
+                TabPage("one", "One", (Label("First"),)),
+                TabPage("two", "Two", (Label("Second"),)),
+            ),
+            callback=lambda event: seen.append(event.value),
+            layout=ControlLayout(width=FILL, height=180),
+        )
+        tabs.build(renderer=self.renderer)
+        self.root.deiconify()
+        self.root.update_idletasks()
+
+        tabs.select("two", notify=True)
+        self.root.update_idletasks()
+        self.assertEqual("two", tabs.selected_key())
+        self.assertEqual(["two"], seen)
+        tabs.select("one")
+        self.root.update_idletasks()
+        self.assertEqual("one", tabs.selected_key())
+
+    def test_split_panel_reflows_real_tkinter_panes(self):
+        coordinator = LayoutCoordinator(TkinterLayoutHost(self.renderer))
+        split = SplitPanel(
+            (
+                SplitPane("left", Label("Left"), weight=1, minimum=120, border=True),
+                SplitPane("right", Label("Right"), weight=2, minimum=180, border=True),
+            ),
+            gap=6,
+            coordinator=coordinator,
+            layout=ControlLayout(width=600, height=160),
+        )
+        split.build(renderer=self.renderer)
+        self.root.deiconify()
+        self.root.update_idletasks()
+        sizes = split.reflow()
+        self.root.update_idletasks()
+
+        self.assertEqual(2, len(sizes))
+        self.assertGreater(sizes[1], sizes[0])
+        left = self.renderer.native_widget(split.pane_item("left"))
+        right = self.renderer.native_widget(split.pane_item("right"))
+        self.assertGreaterEqual(int(left.winfo_width()), 1)
+        self.assertGreaterEqual(int(right.winfo_width()), 1)
+
+    def test_non_measuring_overlay_does_not_expand_tkinter_positioned_panel(self):
+        base = Label("Base", layout=ControlLayout(width=120, height=30))
+        badge = Button("Overlay", layout=ControlLayout(width=80, height=24))
+        panel = PositionedPanel(
+            (
+                positioned(base, x=10, y=10),
+                overlay(badge, x=500, y=300),
+            ),
+            padding=5,
+        )
+        panel.build(renderer=self.renderer)
+        self.root.deiconify()
+        self.root.update_idletasks()
+
+        self.assertEqual((140, 50), panel.occupied_size)
+        self.assertEqual("place", badge.require_item().geometry_manager)
 
     def test_tkinter_command_menu_uses_same_semantic_command_tree(self):
         seen = []

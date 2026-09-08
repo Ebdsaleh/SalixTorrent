@@ -4,6 +4,19 @@ Notable SalixTorrent changes are recorded here.
 
 ## Unreleased
 
+### Ecosystem Extraction — Structural Tabs, Split Regions and Overlays
+
+- Added renderer-neutral `TabContainer` / `TabPage` structural components with stable semantic page keys, normalized change events, declarative and incremental page composition, explicit selection, and no dependency on toolkit tab IDs.
+- Added renderer-neutral `SplitPanel` / `SplitPane` structural components for horizontal or vertical weighted regions with gaps, per-pane minimums and responsive reflow through the existing `LayoutCoordinator`. The framework geometry layer now exposes axis-neutral `split_sizes(...)`, while the historical width helper remains compatible.
+- Added non-measuring overlay placement. Overlay children keep parent-local explicit coordinates but contribute no occupied extent, allowing HUD/decorative/designer surfaces to coexist with measured positioned content without enlarging the surrounding layout.
+- Added Dear PyGui and Tkinter renderer support for tab bars/pages and split panes while preserving toolkit ownership in the engine adapters. Tkinter programmatic tab selection suppresses duplicate native change dispatch so semantic selection remains deterministic.
+- Migrated Download detail tabs to `TabContainer`, migrated the General page's Transfer / Swarm Status / Torrent Info regions to a responsive three-pane `SplitPanel`, and changed application-menu detail navigation to select pages by semantic key rather than backend item ID.
+- Migrated Help's Contents / Glossary navigation to `TabContainer` and its index/document region to `SplitPanel`, preserving localization, documentation rendering, scrolling and responsive wrap ownership at the application layer.
+- Expanded the product-neutral blank ecosystem application to prove tabs, weighted split regions, measured explicit placement and a non-measuring overlay alongside command menus, live tables, state grids and realtime graphs through Dear PyGui or Tkinter without toolkit-name branching inside the view.
+- Added focused structural-region, migration, mixed-layout, Tkinter and relocation regressions. Prepared complete discovery advances from 563 to 581 tests; canonical localization remains 1,337 strings. No application version, persistence schema, final ecosystem naming/API freeze, release tag or merge to `main` is introduced.
+- Hardened the Dear PyGui structural-tab adapter for the reference desktop backend: semantic TabContainer/TabPage width and height hints are now consumed by surrounding layout regions instead of being forwarded to Dear PyGui `tab_bar`/`tab` primitives, which do not accept those keywords. A backend-contract regression now locks this behavior.
+- Hardened the structural region runtime after real-Windows visual acceptance exposed silent backend differences that unit tests did not surface: split panes are now sized and positioned deterministically inside a parent-local positioned root instead of relying on toolkit flow/group behavior, and tab-change normalization falls back to the backend current value when callback payload data is empty. This restores the Help navigator/document split, glossary document rendering, Download Speed live rendering and split-hosted blank-app live surfaces while preserving the same renderer-neutral contracts.
+
 ### Ecosystem Extraction — Command Menus, Ordered Items and Mixed Layout
 
 - Added standard-library-only `OrderedItems` semantics for stable keyed ordering with generic `move_item_up`, `move_item_down`, explicit-index movement, boundary queries, replacement, append and removal. Active Transfers now uses that model for scheduler-order changes instead of Dear PyGui item-movement primitives while `TorrentManager` remains the durable queue-policy owner.

@@ -105,19 +105,19 @@ def clamp(value: Number, minimum: Number, maximum: Number) -> int:
     return max(lo, min(hi, int(value)))
 
 
-def split_widths(
-    total_width: Number,
+def split_sizes(
+    total_size: Number,
     weights: Sequence[Number],
     *,
     minimums: Sequence[Number] | None = None,
     gap: Number = 8,
 ) -> tuple[int, ...]:
-    """Return stable pixel widths for a horizontal responsive split.
+    """Return stable pixel extents for one axis of a responsive split.
 
-    ``weights`` describe the preferred proportions.  ``minimums`` are treated
-    as preferred lower bounds while enough space exists.  If the window is
-    narrower than the sum of those bounds, the bounds are scaled together so
-    every pane still remains visible instead of overflowing unpredictably.
+    ``weights`` describe the preferred proportions. ``minimums`` are treated
+    as preferred lower bounds while enough space exists. If the available axis
+    is narrower than the sum of those bounds, the bounds are scaled together so
+    every pane remains visible rather than overflowing unpredictably.
     """
     count = len(weights)
     if count == 0:
@@ -129,11 +129,10 @@ def split_widths(
     if len(min_values) != count:
         raise ValueError("minimums must match weights")
 
-    available = max(count, int(total_width) - max(0, count - 1) * int(gap))
+    available = max(count, int(total_size) - max(0, count - 1) * int(gap))
     min_total = sum(min_values)
 
     if min_total >= available and min_total > 0:
-        # Narrow-window fallback: preserve the intended minimum-size ratios.
         raw = [available * value / min_total for value in min_values]
     else:
         remaining = available - min_total
@@ -146,10 +145,20 @@ def split_widths(
                 for index in range(count)
             ]
 
-    widths = [max(1, int(value)) for value in raw]
-    # Allocate rounding residue deterministically to the last pane.
-    widths[-1] += available - sum(widths)
-    return tuple(widths)
+    sizes = [max(1, int(value)) for value in raw]
+    sizes[-1] += available - sum(sizes)
+    return tuple(sizes)
+
+
+def split_widths(
+    total_width: Number,
+    weights: Sequence[Number],
+    *,
+    minimums: Sequence[Number] | None = None,
+    gap: Number = 8,
+) -> tuple[int, ...]:
+    """Compatibility helper for horizontal splits."""
+    return split_sizes(total_width, weights, minimums=minimums, gap=gap)
 
 
 def fill_height(container_height: Number, reserved_height: Number, *, minimum: Number = 1) -> int:

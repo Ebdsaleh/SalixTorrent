@@ -32,6 +32,11 @@ from app.framework.components import (
     TextInput,
     PlacedComponent,
     PositionedPanel,
+    SplitPane,
+    SplitPanel,
+    TabContainer,
+    TabPage,
+    overlay,
     positioned,
 )
 from app.framework.command_menu import CommandMenu
@@ -46,6 +51,7 @@ from app.framework.live_data import (
     TableFrame,
     TableRow,
 )
+from app.framework.responsive import LayoutCoordinator
 from app.framework.telemetry import RollingTelemetry
 from app.framework.visualization import PlotFrame, PlotSeriesData, PlotSeriesSpec, RealtimeGraph
 from app.runtime.application import ApplicationSpec
@@ -57,6 +63,7 @@ class DemoView:
     def __init__(self, host):
         self.host = host
         self.renderer = host.presentation.component_renderer
+        self.layout_coordinator = LayoutCoordinator(host.presentation.layout_host)
         self.status = Label("Ready")
         self.name = TextInput(default_value="World", layout=ControlLayout(width=220))
         self.mode = ComboBox(("Desktop", "Tool", "Dashboard"), default_value="Desktop")
@@ -91,9 +98,56 @@ class DemoView:
             column_widths=(110, 180),
             layout=ControlLayout(width=FILL),
         )
+        self.overlay_panel = PositionedPanel(
+            (
+                positioned(
+                    Label("Measured content"),
+                    x=12,
+                    y=14,
+                ),
+                overlay(
+                    Label("overlay"),
+                    x=145,
+                    y=8,
+                ),
+            ),
+            padding=6,
+            border=True,
+            layout=ControlLayout(width=220, height=62),
+        )
         self.table_container = ControlColumn(layout=ControlLayout(width=FILL, height=150))
         self.grid_container = ControlColumn(layout=ControlLayout(width=FILL, height=72))
         self.plot_container = ControlColumn(layout=ControlLayout(width=FILL, height=220))
+
+        self.dashboard_split = SplitPanel(
+            (
+                SplitPane(
+                    "layout",
+                    ControlColumn((self.mixed_layout, self.overlay_panel)),
+                    weight=0.42,
+                    minimum=300,
+                    border=False,
+                ),
+                SplitPane(
+                    "live",
+                    ControlColumn((self.table_container, self.grid_container)),
+                    weight=0.58,
+                    minimum=360,
+                    border=False,
+                ),
+            ),
+            gap=8,
+            coordinator=self.layout_coordinator,
+            layout=ControlLayout(width=FILL, height=250),
+        )
+        self.workspace_tabs = TabContainer(
+            (
+                TabPage("dashboard", "Dashboard", (self.dashboard_split,)),
+                TabPage("chart", "Chart", (self.plot_container,)),
+            ),
+            callback=self._on_workspace_tab_changed,
+            layout=ControlLayout(width=FILL, height=300),
+        )
         self.root = ControlColumn(
             (
                 Label("Blank Ecosystem Application"),
@@ -104,10 +158,7 @@ class DemoView:
                 Button("Say hello", callback=self._on_greet),
                 self.progress,
                 self.status,
-                self.mixed_layout,
-                self.table_container,
-                self.grid_container,
-                self.plot_container,
+                self.workspace_tabs,
             ),
             layout=ControlLayout(width=FILL),
         )
@@ -175,6 +226,9 @@ class DemoView:
                 width=-1,
                 height=200,
             )
+
+    def _on_workspace_tab_changed(self, event):
+        self.status.set_text(f"Workspace: {event.value}")
 
     def _show_demo_menu(self):
         if self.command_menu is None:

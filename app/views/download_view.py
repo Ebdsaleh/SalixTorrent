@@ -45,6 +45,9 @@ from app.framework.components import (
     NumericStepper,
     ProgressBar,
     Separator,
+    SplitPane,
+    SplitPanel,
+    TabContainer,
     Spacer,
     TextInput,
 )
@@ -147,7 +150,8 @@ class DownloadView:
         # TRANSFER_STATS message rebuilt Peers, Pieces, Files, Sources and Speed
         # even when those tabs were hidden. That was the main UI-freeze source.
         self._active_detail_tab: str = "General"
-        self._detail_tab_ids = {}
+        self.detail_tabs: TabContainer | None = None
+        self.general_split_component: SplitPanel | None = None
         self._detail_last_render_at = {}
         self.layout = ResponsiveLayout.get_instance()
         self._layout_root = None
@@ -313,10 +317,26 @@ class DownloadView:
             # scene height; individual tabs then fill that region instead of
             # retaining a launch-time pixel height.
             with dpg.child_window(width=-1, height=-1, border=False) as self.detail_host:
-                with dpg.tab_bar(callback=self._on_detail_tab_changed) as self.detail_tab_bar:
-                    with dpg.tab(label=tr('view.download_view.general', "General")) as general_tab:
-                        with dpg.group(horizontal=True) as self.general_split:
-                            with dpg.child_window(width=410, height=-1, border=True) as self.general_transfer_panel:
+                self.detail_tabs = TabContainer(
+                    callback=self._on_detail_tab_changed,
+                    profile_key="download.detail_tabs",
+                )
+                with self.detail_tabs.context(parent=self.detail_host) as self.detail_tab_bar:
+                    with self.detail_tabs.page_context(
+                        "General", tr('view.download_view.general', "General")
+                    ) as general_tab:
+                        self.general_split_component = SplitPanel(
+                            (
+                                SplitPane("transfer", weight=0.24, minimum=300, border=True),
+                                SplitPane("swarm", weight=0.29, minimum=330, border=True),
+                                SplitPane("info", weight=0.47, minimum=400, border=True),
+                            ),
+                            gap=8,
+                            coordinator=self.layout,
+                            profile_key="download.general_split",
+                        )
+                        with self.general_split_component.context() as self.general_split:
+                            with self.general_split_component.pane_context("transfer") as self.general_transfer_panel:
                                 transfer_heading = dpg.add_text(tr('view.download_view.transfer', "TRANSFER"), color=(100, 180, 255))
                                 add_text_tooltip(transfer_heading, tr('view.download_view.transfer_metrics_live_payload_rates_byte_totals', "Transfer metrics\n\nLive payload rates, byte totals, remaining data, ETA, elapsed active time, share ratio and current connected-peer count for the selected torrent."))
                                 dpg.add_separator()
@@ -361,7 +381,7 @@ class DownloadView:
                                 )
                                 add_help_tooltip(self.retry_button, "RETRY_TORRENT")
 
-                            with dpg.child_window(width=430, height=-1, border=True) as self.general_swarm_panel:
+                            with self.general_split_component.pane_context("swarm") as self.general_swarm_panel:
                                 swarm_heading = dpg.add_text(tr('view.download_view.swarm_status', "SWARM STATUS"), color=(255, 200, 100))
                                 add_text_tooltip(swarm_heading, tr('view.download_view.swarm_status_how_the_selected_torrent_is', "Swarm status\n\nHow the selected torrent is participating in the BitTorrent swarm: lifecycle state, discovery, peers, availability, connectivity and storage mode."))
                                 dpg.add_separator()
@@ -459,7 +479,7 @@ class DownloadView:
                                 )
                                 add_help_tooltip(self.limit_status_text, "TRANSFER_LIMITS")
 
-                            with dpg.child_window(width=-1, height=-1, border=True) as self.general_info_panel:
+                            with self.general_split_component.pane_context("info") as self.general_info_panel:
                                 torrent_info_heading = dpg.add_text(tr('view.download_view.torrent_info', "TORRENT INFO"), color=(0, 255, 128))
                                 add_text_tooltip(torrent_info_heading, tr('view.download_view.torrent_metadata_descriptive_and_protocol_metadata_read', "Torrent metadata\n\nDescriptive and protocol metadata read from the .torrent or resolved magnet, plus the local storage and cached metadata paths used by SalixTorrent."))
                                 dpg.add_separator()
@@ -490,29 +510,31 @@ class DownloadView:
                                     properties_button = dpg.add_button(label=tr('view.download_view.properties_7c12bbf6', " Properties... "), callback=self._on_properties_clicked)
                                     add_help_tooltip(properties_button, "PROPERTIES")
 
-                    with dpg.tab(label=tr('view.download_view.peers', "Peers")) as peers_tab:
+                    with self.detail_tabs.page_context(
+                        "Peers", tr('view.download_view.peers', "Peers")
+                    ) as peers_tab:
                         self.peer_view.build_view(parent_tag=peers_tab)
 
-                    with dpg.tab(label=tr('view.download_view.pieces_cfb369a5', "Pieces")) as pieces_tab:
+                    with self.detail_tabs.page_context(
+                        "Pieces", tr('view.download_view.pieces_cfb369a5', "Pieces")
+                    ) as pieces_tab:
                         self.piece_view.build_view(parent_tag=pieces_tab)
 
-                    with dpg.tab(label=tr('view.download_view.files_6ce6c512', "Files")) as files_tab:
+                    with self.detail_tabs.page_context(
+                        "Files", tr('view.download_view.files_6ce6c512', "Files")
+                    ) as files_tab:
                         self.file_view.build_view(parent_tag=files_tab)
 
-                    with dpg.tab(label=tr('view.download_view.sources', "Sources")) as sources_tab:
+                    with self.detail_tabs.page_context(
+                        "Sources", tr('view.download_view.sources', "Sources")
+                    ) as sources_tab:
                         self.source_view.build_view(parent_tag=sources_tab)
 
-                    with dpg.tab(label=tr('view.download_view.speed', "Speed")) as speed_tab:
+                    with self.detail_tabs.page_context(
+                        "Speed", tr('view.download_view.speed', "Speed")
+                    ) as speed_tab:
                         self.speed_view.build_view(parent_tag=speed_tab)
 
-                self._detail_tab_ids = {
-                    general_tab: "General",
-                    peers_tab: "Peers",
-                    pieces_tab: "Pieces",
-                    files_tab: "Files",
-                    sources_tab: "Sources",
-                    speed_tab: "Speed",
-                }
                 add_text_tooltip(general_tab, tr('view.download_view.general_overall_transfer_swarm_connectivity_and_torrent', "General\n\nOverall transfer, swarm, connectivity and torrent metadata for the selected torrent."))
                 add_text_tooltip(peers_tab, tr('view.download_view.peers_live_bittorrent_peer_connections_client_identity', "Peers\n\nLive BitTorrent peer connections: client identity, discovery source, direction, piece completion, per-peer rates and protocol state."))
                 add_text_tooltip(pieces_tab, tr('view.download_view.pieces_a_compact_map_and_focused_table', "Pieces\n\nA compact map and focused table showing piece verification, requests, blocks and current swarm availability."))
@@ -934,17 +956,15 @@ class DownloadView:
         # fills all remaining height after these fixed/controlled regions.
         self.layout.height(self.queue_panel, clamp(height * 0.20, 125, 235))
 
-        panel_widths = split_widths(
-            width - 20,
-            (0.24, 0.29, 0.47),
-            minimums=(300, 330, 400),
-            gap=8,
-        )
-        for item, panel_width in zip(
-            (self.general_transfer_panel, self.general_swarm_panel, self.general_info_panel),
-            panel_widths,
-        ):
-            self.layout.width(item, panel_width)
+        if self.general_split_component is not None:
+            panel_widths = self.general_split_component.reflow()
+        else:
+            panel_widths = split_widths(
+                width - 20,
+                (0.24, 0.29, 0.47),
+                minimums=(300, 330, 400),
+                gap=8,
+            )
 
         transfer_wrap = max(240, panel_widths[0] - 28)
         swarm_wrap = max(260, panel_widths[1] - 28)
@@ -987,25 +1007,10 @@ class DownloadView:
             wrap_items=(self.properties_text,),
         )
 
-    def _on_detail_tab_changed(self, sender=None, app_data=None, user_data=None):
+    def _on_detail_tab_changed(self, event):
         """Render a detail view only when the user actually selects that tab."""
-        del user_data
-
-        selected = app_data
-        if selected not in self._detail_tab_ids and sender is not None:
-            try:
-                selected = dpg.get_value(sender)
-            except Exception:
-                selected = app_data
-
-        tab_name = self._detail_tab_ids.get(selected)
-        if tab_name is None and isinstance(selected, str):
-            # Defensive fallback for Dear PyGui builds that return a label.
-            candidate = selected.strip()
-            if candidate in self.DETAIL_RENDER_INTERVALS:
-                tab_name = candidate
-
-        if not tab_name:
+        tab_name = str(getattr(event, "value", event) or "").strip()
+        if tab_name not in self.DETAIL_RENDER_INTERVALS:
             return
 
         self._active_detail_tab = tab_name
