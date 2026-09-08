@@ -10,7 +10,7 @@ SalixTorrent is a desktop BitTorrent client written in Python with a custom asyn
 
 **Post-v0.5.0 direction — modular application ecosystem:** SalixTorrent remains the reference application while reusable behavior is extracted downward into two cooperating layers: an application engine/runtime and an optional RAD/application framework. Dear PyGui is the current reference desktop backend, Tkinter is now the validated compatibility implementation for the common GUI surface, and headless/CLI operation remains first-class. Realtime telemetry/graphs, generic network/runtime awareness, lifecycle/presentation-host boundaries and rich live-data views are explicit extraction candidates before final framework naming or API freeze. See `SalixTorrent-Ecosystem-Architecture.md`.
 
-**Current `dev` extraction — first snapshot-to-preview reconstruction boundary:** Tranche 12 is now real-Windows accepted and committed locally as `688bcff` (`Add designer snapshot preview reconstruction`), with publication to `origin/dev` intentionally pending this documentation closure. The standard-library-only `designer_preview` registry reconstructs supported `DesignerSnapshot` trees into new backend-neutral `Component` objects while preserving designer node IDs and container-local grid/tab/split/placement semantics. The product-neutral blank application is fully previewable and descriptor-round-trips through the bridge; a reconstructed copy builds through the real Tkinter renderer. Windows acceptance passed the 12-test preview gate, 56-test designer/relocation gate, 64 GUI-component tests, 22 Tkinter tests and both complete **643 / 643** discovery forms with one expected skip; manual Dear PyGui/Tkinter/SalixTorrent regression smoke and pre-commit checks also passed. Runtime callbacks, application bindings, specialized semantic-field reconstruction, live synchronization, copy/paste, drag/drop handles, persistent project documents and final ecosystem naming/API freeze remain deferred.
+**Current `dev` extraction — transactional preview ownership:** Tranche 12 snapshot reconstruction is fully published on `dev` at `8d05ca8b059cef0ba386f324c215f2e80a9bfa83` after real-Windows acceptance at 643 / 643 tests with one expected skip. The current prepared tranche adds an optional designer-preview host above the existing code-first component framework: it owns one reconstructed preview, prepares replacement trees transactionally, disposes the previous rendered tree only after a candidate succeeds, and couples property/structural edits plus undo/redo to preview replacement without teaching the core component/runtime layer about a designer. This preserves two equal application-construction paths: applications may continue to compose framework components directly in Python, as SalixTorrent does, or future tooling may author the same semantic component hierarchy through metadata/documents and reconstruct it through the preview bridge. Preparation advances complete discovery to **655 tests**. Incremental toolkit mutation, callback/service serialization, specialized semantic-field reconstruction, project persistence, drag/drop handles and final ecosystem naming/API freeze remain deferred.
 
 **v0.4.0 milestone — durability and transfer lifecycle:** SalixTorrent built on the v0.3.0 protocol/network foundation with an offline-first localization system, semantic Help/Glossary content, provider-neutral translation tooling, backend-neutral application settings and session-state persistence, optional SalixORM/SQLite adapters, a fully tracked `unittest` regression suite, and durable per-torrent seeding goals. Timed goals use an instanced baseline so a newly requested duration starts from the moment it is applied, while cumulative Seed Time remains available as historical telemetry.
 
@@ -407,6 +407,7 @@ SalixTorrent/
 │   │   ├── test_designer_editing.py
 │   │   ├── test_designer_structure.py
 │   │   ├── test_designer_preview.py
+│   │   ├── test_designer_preview_host.py
 │   │   ├── test_realtime_visualization.py
 │   │   ├── test_live_data.py
 │   │   ├── test_interactive_data_migration.py
@@ -454,6 +455,7 @@ SalixTorrent/
 │   │   ├── designer_editing.py
 │   │   ├── designer_structure.py
 │   │   ├── designer_preview.py
+│   │   ├── designer_preview_host.py
 │   │   ├── property_cascade.py
 │   │   ├── geometry.py
 │   │   ├── responsive.py

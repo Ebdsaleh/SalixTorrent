@@ -2,9 +2,9 @@
 
 **Current application version string:** `0.5.0`
 **Roadmap status:** v0.5.0 released; post-v0.5.0 ecosystem extraction on `dev`
-**Current implementation checkpoint:** Tranche 12 snapshot-to-preview reconstruction is Windows-accepted and committed locally as `688bcff`; publication to `origin/dev` is pending the post-acceptance documentation closure
-**Current real Windows regression baseline:** 643 / 643 for accepted Tranche 12 with one expected non-Windows shell-behavior skip; Dear PyGui, Tkinter and SalixTorrent visual smoke checks pass
-**Accepted Tranche 12 baseline:** 643 / 643 in both real-Windows discovery forms with one expected skip; preview 12 / 12, designer/relocation 56 / 56, GUI components 64 / 64, Tkinter 22 / 22, visuals and pre-commit passed
+**Current implementation checkpoint:** Tranche 12 is published at `8d05ca8b059cef0ba386f324c215f2e80a9bfa83`; Tranche 13 transactional designer-preview ownership/rebuild is prepared
+**Current real Windows regression baseline:** 643 / 643 for published Tranche 12 with one expected non-Windows shell-behavior skip; Tranche 13 preparation baseline is 655 / 655 on Linux
+**Accepted Tranche 12 baseline:** 643 / 643 in both real-Windows discovery forms with one expected skip; preview 12 / 12, designer/relocation 56 / 56, GUI components 64 / 64, Tkinter 22 / 22, visuals and pre-commit passed; closure/push checkpoint `8d05ca8b059cef0ba386f324c215f2e80a9bfa83`
 
 This roadmap records intended engineering direction rather than promising dates or release numbers. Changes should remain incremental, testable, reviewable, and compatible with SalixTorrent's existing protocol, persistence, packaging, localization, and cross-platform boundaries.
 
@@ -768,7 +768,7 @@ Preparation advanced canonical discovery from 602 to **616 tests** on display-le
 
 This tranche deliberately stops before reconstructing executable components from edited snapshots, mutating a live preview tree, structural insert/remove/reparent commands, copy/paste, drag/drop/resize handles, persisted command history, a final project schema or API/package naming freeze. Whole immutable snapshots are retained in history for correctness while the design contract is still provisional; later storage optimization must preserve the same explicit command semantics.
 
-### A13. WYSIWYG designer prerequisites — structural hierarchy mutation/reparenting prepared
+### A13. WYSIWYG designer prerequisites — structural hierarchy mutation/reparenting complete
 
 This Stage-F slice makes the serialized hierarchy editable without creating live preview objects:
 
@@ -781,11 +781,25 @@ This Stage-F slice makes the serialized hierarchy editable without creating live
 - the relocated-framework proof performs a structural insertion/undo after package rename, and the blank application reparents its captured `Actions` node as document data while the live component tree remains unchanged;
 - tracked validation records `origin/dev` as well as local `HEAD` and adds the dedicated structural gate.
 
-Preparation advances complete discovery from 616 to **630 tests**. Structural tests pass 14 / 14, the combined designer/relocation gate passes 44 / 44, the real Tkinter backend passes 21 / 21 under Xvfb, canonical and plain display-less discovery pass 630 / 630 with 58 expected GUI/platform skips, Xvfb canonical discovery passes 630 / 630 with 38 expected skips, localization remains 1,337/current, and headless/compileall/Git checks remain clean. Real-Windows automated and visual acceptance remain required.
+Preparation advanced complete discovery from 616 to **630 tests**. Structural tests passed 14 / 14, the combined designer/relocation gate passed 44 / 44, the real Tkinter backend passed 21 / 21 under Xvfb, and real-Windows acceptance then passed both complete discovery forms at 630 / 630 with one expected skip. Manual Dear PyGui/Tkinter/SalixTorrent visual smoke and pre-commit checks passed, and the tranche was published at `79edec6cb4531759992b4f7fdb2d63ac8f122907`.
 
 This tranche deliberately does not instantiate live components from snapshots, synchronize a preview tree, add copy/paste or duplication, implement pointer-driven drag/drop/resize handles, persist history, or freeze a project schema/public API.
 
-### A14. Naming, public API and package/repository split
+### A14. WYSIWYG designer prerequisites — snapshot-to-preview reconstruction complete
+
+Tranche 12 added the first reconstruction path from supported immutable `DesignerSnapshot` documents back into fresh framework `Component` trees. `DesignerPreviewCatalog` remains backend-neutral, preserves stable designer IDs, restores semantic grid/tab/split/fixed/anchored relationships, and intentionally leaves callbacks/application services inert. The blank ecosystem application round-trips through this bridge and a reconstructed copy builds through the real Tkinter renderer.
+
+Real-Windows acceptance passed the 12-test preview gate, 56-test designer/relocation gate, 64 GUI-component tests, 22 Tkinter tests and both complete **643 / 643** discovery forms with one expected skip. Manual visual smoke and pre-commit passed. The implementation commit `688bcff` plus its Windows-acceptance documentation closure were published together at `8d05ca8b059cef0ba386f324c215f2e80a9bfa83`.
+
+### A15. WYSIWYG designer prerequisites — transactional preview ownership/rebuild prepared
+
+Tranche 13 adds an optional `DesignerPreviewHost` above the code-first component framework. It owns one reconstructed preview for a `DesignerEditSession`, prepares candidate trees transactionally, and replaces the accepted preview only after reconstruction/build succeeds. Generic checked execute/undo/redo gates keep preview validation outside the editing core, so ordinary component applications remain independent of designer tooling.
+
+The architecture explicitly preserves two equal authoring paths: direct Python composition and future designer-authored documents both converge on the same semantic `Component` tree, application runtime and backend adapters. SalixTorrent remains the primary code-first reference application; the future RAD editor is an additional authoring surface rather than a required runtime dependency.
+
+Preparation advances complete discovery to **655 tests**. Preview-host tests pass 11 / 11, combined designer/relocation focus passes 67 / 67, Tkinter passes 23 / 23 under Xvfb, canonical and plain display-less discovery pass 655 / 655 with 60 expected GUI/platform skips, Xvfb canonical discovery passes 655 / 655 with 38 expected skips, localization remains 1,337/current, and headless/compileall/Git checks remain clean. Real-Windows automated and visual acceptance remain required.
+
+### A16. Naming, public API and package/repository split
 
 This remains **after** the wider extraction.
 

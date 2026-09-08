@@ -97,6 +97,7 @@ class FrameworkPackagingTests(unittest.TestCase):
                 assert "portable_framework.designer_editing" in imported
                 assert "portable_framework.designer_structure" in imported
                 assert "portable_framework.designer_preview" in imported
+                assert "portable_framework.designer_preview_host" in imported
                 assert "portable_framework.geometry" in imported
                 assert "portable_framework.components.regions" in imported
                 assert "portable_framework.live_data" in imported
@@ -120,7 +121,7 @@ class FrameworkPackagingTests(unittest.TestCase):
                 check=False,
             )
             self.assertEqual(0, result.returncode, result.stderr or result.stdout)
-            self.assertGreaterEqual(int(result.stdout.strip()), 24)
+            self.assertGreaterEqual(int(result.stdout.strip()), 25)
 
     def test_relocated_framework_contracts_are_usable_without_application_package(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -159,6 +160,7 @@ class FrameworkPackagingTests(unittest.TestCase):
                 from portable_framework.designer_editing import DesignerEditSession
                 from portable_framework.designer_structure import locate_designer_node
                 from portable_framework.designer_preview import reconstruct_designer_snapshot
+                from portable_framework.designer_preview_host import DesignerPreviewHost
                 from portable_framework.documentation import DocPage, DocumentationTheme
                 from portable_framework.geometry import ContentMetrics, content_bounds, split_sizes
                 from portable_framework.data_view import DataRecord, DataView, SortDirection, SortTerm
@@ -215,6 +217,11 @@ class FrameworkPackagingTests(unittest.TestCase):
                 assert designer_session.node(designer_button.node_id).properties["label"] == "Edited"
                 assert designer_session.undo() is True
                 assert designer_session.node(designer_button.node_id).properties["label"] == "Run"
+                preview_host = DesignerPreviewHost(designer_session)
+                assert preview_host.set_property(designer_button.node_id, "label", "Hosted") is True
+                assert preview_host.component(designer_button.node_id).label == "Hosted"
+                assert preview_host.undo() is True
+                assert preview_host.component(designer_button.node_id).label == "Run"
                 added_node = DesignerNode("portable-added", "control.button", {{"label": "Added"}})
                 assert designer_session.insert_child(
                     "portable-root",

@@ -174,6 +174,27 @@ The goal is not to copy those modules unchanged. The goal is to separate their r
 
 The framework sits above the runtime and describes reusable application construction and presentation.
 
+### 6.1 Dual-entry application construction
+
+The RAD/designer work is an **optional authoring layer**, not a replacement for code-first application construction. Both paths must remain first-class:
+
+```text
+code-first application                     designer-authored application
+Python component composition                metadata/project document
+          \                                  /
+           +-------- semantic Component tree --------+
+                              |
+                              v
+                    framework/runtime contracts
+                              |
+                              v
+                     presentation backend
+```
+
+A developer must always be able to create and wire an application directly in Python using the framework, just as SalixTorrent and the blank ecosystem application were originally built. A future visual designer may produce equivalent hierarchy/property/relationship data and reconstruct the same framework components, but ordinary runtime components must not depend on the designer modules to function. Designer metadata, editing, structural commands and preview ownership therefore remain in an optional tooling layer above the reusable component/runtime contracts.
+
+The architecture should avoid two incompatible UI systems. The designer path and code path converge on the same semantic components, layout contracts, application runtime and backend adapters. Where designer metadata reveals a missing runtime semantic, the runtime contract should be improved first rather than embedding designer-only behavior into production components.
+
 v0.5.0 already proved a substantial foundation:
 
 - backend-neutral component primitives and composites;
@@ -477,7 +498,7 @@ This stage is substantially proven. Tranche 4 extracted keyed live tables and ca
 
 ### Stage F — designer prerequisites
 
-This stage is now active. Tranche 8 established geometry that a future designer can describe faithfully: parent-local start/centre/end/stretch anchors, minimum/maximum size constraints, optional split-pane maximums and JSON-safe fixed/anchored placement descriptors. Tranche 9 added provisional component metadata, stable identities and JSON-safe component-tree snapshots. Tranche 10 added accepted property-level document editing with typed validation, undo/redo and dirty tracking, closed at checkpoint `df675e89bf025b570a339c7b3fb3c3518262d72a`. Tranche 11 added accepted child-slot metadata plus immutable insert/remove/reorder/reparent commands and was pushed at full checkpoint `79edec6cb4531759992b4f7fdb2d63ac8f122907`. Tranche 12 adds the first snapshot-to-preview reconstruction bridge for the component/layout subset proven by the blank application; it is real-Windows accepted and committed locally as `688bcff`, with publication intentionally pending its documentation closure. The mixed-layout rule remains fundamental: reconstruction restores semantic grid/tab/split/placement relationships instead of flattening a whole form into toolkit coordinates. Live preview synchronization, application callback resolution, specialized field factories, copy/paste, pointer-driven drag/drop handles and the final project schema remain later Stage-F work.
+This stage is now active. Tranche 8 established geometry that a future designer can describe faithfully: parent-local start/centre/end/stretch anchors, minimum/maximum size constraints, optional split-pane maximums and JSON-safe fixed/anchored placement descriptors. Tranche 9 added provisional component metadata, stable identities and JSON-safe component-tree snapshots. Tranche 10 added accepted property-level document editing with typed validation, undo/redo and dirty tracking, closed at checkpoint `df675e89bf025b570a339c7b3fb3c3518262d72a`. Tranche 11 added accepted child-slot metadata plus immutable insert/remove/reorder/reparent commands and was pushed at full checkpoint `79edec6cb4531759992b4f7fdb2d63ac8f122907`. Tranche 12 added and published the first snapshot-to-preview reconstruction bridge at `8d05ca8b059cef0ba386f324c215f2e80a9bfa83`. Tranche 13 prepares optional transactional preview ownership: a designer edit session can prepare/rebuild one preview safely while code-first applications remain completely independent of designer tooling. The mixed-layout rule remains fundamental: reconstruction restores semantic grid/tab/split/placement relationships instead of flattening a whole form into toolkit coordinates. Incremental live mutation, application callback resolution, specialized field factories, copy/paste, pointer-driven drag/drop handles and the final project schema remain later Stage-F work.
 
 ### Stage G — naming, API and package boundaries
 

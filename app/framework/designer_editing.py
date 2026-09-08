@@ -18,7 +18,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 import json
 import math
-from typing import Protocol
+from typing import Callable, Protocol
 
 from .designer import (
     DesignerChild,
@@ -590,7 +590,20 @@ class DesignerEditSession:
             states.append(self.property_state(node.node_id, descriptor.get("key")))
         return tuple(states)
 
-    def execute(self, command: DesignerEditCommand) -> bool:
+    def execute_checked(
+        self,
+        command: DesignerEditCommand,
+        check: Callable[[DesignerSnapshot], object],
+    ) -> bool:
+        """Apply *command* only after ``check(candidate_snapshot)`` succeeds.
+
+        The check runs before current snapshot/history state is mutated.  This
+        gives higher layers such as preview hosts a generic transaction gate
+        without making the editing core depend on renderers or toolkits.
+        """
+
+        if not callable(check):
+            raise TypeError("designer checked edit requires a callable check")
         apply = getattr(command, "apply", None)
         if not callable(apply):
             raise TypeError("designer edit session requires a command with apply(snapshot)")
@@ -601,10 +614,14 @@ class DesignerEditSession:
             raise TypeError("designer edit command must return DesignerSnapshot")
         if after == before:
             return False
+        check(after)
         self._snapshot = after
         self._undo.append(_DesignerHistoryEntry(label, before, after))
         self._redo.clear()
         return True
+
+    def execute(self, command: DesignerEditCommand) -> bool:
+        return self.execute_checked(command, lambda _snapshot: None)
 
     def set_property(self, node_id: object, property_key: object, value: object) -> bool:
         return self.execute(SetDesignerProperty(node_id, property_key, value))
@@ -664,21 +681,39 @@ class DesignerEditSession:
             )
         return self.execute(command)
 
-    def undo(self) -> bool:
+    def undo_checked(self, check: Callable[[DesignerSnapshot], object]) -> bool:
+        """Undo only after ``check`` accepts the prospective snapshot."""
+
+        if not callable(check):
+            raise TypeError("designer checked undo requires a callable check")
         if not self._undo:
             return False
-        entry = self._undo.pop()
+        entry = self._undo[-1]
+        check(entry.before)
+        self._undo.pop()
         self._snapshot = entry.before
         self._redo.append(entry)
         return True
 
-    def redo(self) -> bool:
+    def undo(self) -> bool:
+        return self.undo_checked(lambda _snapshot: None)
+
+    def redo_checked(self, check: Callable[[DesignerSnapshot], object]) -> bool:
+        """Redo only after ``check`` accepts the prospective snapshot."""
+
+        if not callable(check):
+            raise TypeError("designer checked redo requires a callable check")
         if not self._redo:
             return False
-        entry = self._redo.pop()
+        entry = self._redo[-1]
+        check(entry.after)
+        self._redo.pop()
         self._snapshot = entry.after
         self._undo.append(entry)
         return True
+
+    def redo(self) -> bool:
+        return self.redo_checked(lambda _snapshot: None)
 
     def history_commands(self) -> CommandSet:
         undo_label = "Undo" if not self.undo_label else f"Undo {self.undo_label}"

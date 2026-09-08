@@ -367,34 +367,45 @@ class JsonSessionStatePersistenceTests(_ManagerEnvironmentMixin, unittest.TestCa
                     break
 
             manager.start_engine()
-            self.assertEqual(
-                manager.apply_seeding_goal_to_all_existing(SEEDING_GOAL_TIME, 4.0, 17),
-                2,
-            )
+            try:
+                self.assertEqual(
+                    manager.apply_seeding_goal_to_all_existing(
+                        SEEDING_GOAL_TIME, 4.0, 17
+                    ),
+                    2,
+                )
 
-            deadline = time.monotonic() + 3.0
-            while time.monotonic() < deadline:
-                if all(
-                    session.seeding_goal_mode == SEEDING_GOAL_TIME
-                    and session.seeding_time_limit_minutes == 17
-                    for session in manager.sessions.values()
-                ):
-                    break
-                time.sleep(0.01)
-            else:
-                self.fail("Timed out waiting for bulk seeding-goal command")
-
-            update_hashes = set()
-            deadline = time.monotonic() + 1.0
-            while time.monotonic() < deadline and len(update_hashes) < 2:
-                try:
-                    event = manager.ui_queue.get_nowait()
-                except Exception:
+                deadline = time.monotonic() + 3.0
+                while time.monotonic() < deadline:
+                    if all(
+                        session.seeding_goal_mode == SEEDING_GOAL_TIME
+                        and session.seeding_time_limit_minutes == 17
+                        for session in manager.sessions.values()
+                    ):
+                        break
                     time.sleep(0.01)
-                    continue
-                if event.get("type") == "SEEDING_GOAL_UPDATED":
-                    update_hashes.add(event.get("info_hash"))
-            self.assertEqual(update_hashes, set(manager.sessions))
+                else:
+                    self.fail("Timed out waiting for bulk seeding-goal command")
+
+                update_hashes = set()
+                deadline = time.monotonic() + 1.0
+                while time.monotonic() < deadline and len(update_hashes) < 2:
+                    try:
+                        event = manager.ui_queue.get_nowait()
+                    except Exception:
+                        time.sleep(0.01)
+                        continue
+                    if event.get("type") == "SEEDING_GOAL_UPDATED":
+                        update_hashes.add(event.get("info_hash"))
+                self.assertEqual(update_hashes, set(manager.sessions))
+            finally:
+                # The async manager owns writers rooted inside this temporary
+                # directory. Stop it before TemporaryDirectory.__exit__ removes
+                # that directory; otherwise Windows can observe a late writer
+                # recreating a file between rmtree's scan and final rmdir.
+                manager.shutdown()
+                if TorrentManager._instance is manager:
+                    TorrentManager._instance = None
 
     def test_historical_v8_timed_goal_starts_a_fresh_instance_window(self):
         with tempfile.TemporaryDirectory() as td:
