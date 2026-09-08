@@ -792,7 +792,7 @@ Relationship metadata is structural rather than flattened: grid children retain 
 
 The product-neutral blank application exposes a snapshot of its existing nested component tree through `DemoView.capture_designer_snapshot()`. Repeated captures use one identity map, so IDs remain stable without consulting Dear PyGui or Tkinter. The framework relocation test copies/renames the package and round-trips a designer snapshot there as well. A SalixTorrent source-audit regression checks that every framework `Component` class currently imported by `app/views` is represented by the provisional catalog.
 
-Preparation advances complete discovery from 591 to **602 tests**; display-less canonical Linux discovery passes 602 / 602 with 58 expected GUI/platform skips. Canonical localization remains 1,337 strings. Real-Windows acceptance is still required before this tranche is committed or pushed.
+Preparation advanced complete discovery from 591 to **602 tests**; display-less canonical Linux discovery passed 602 / 602 with 58 expected GUI/platform skips. Real-Windows acceptance then passed both complete discovery forms at **602 / 602** with one expected skip. Dear PyGui and Tkinter resize/structure smoke checks passed, including reinforced minimum window geometry, and the accepted implementation commit is `5b54084f2d21dc331deb4614c15119ad94cab374`. Canonical localization remains 1,337 strings and `APP_VERSION` remains `0.5.0`.
 
 This checkpoint does **not** reconstruct executable components from snapshots, mutate live properties, implement command-based design mutations, undo/redo, copy/paste, drag/drop/reparenting, a final project schema, preview restoration, percentages or draggable split handles. Those remain later Stage-F work.
 
