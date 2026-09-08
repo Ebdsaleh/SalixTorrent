@@ -34,6 +34,7 @@ class StructuralMigrationTests(unittest.TestCase):
     def test_help_index_uses_generic_split_and_tabs(self):
         source = (PROJECT_ROOT / "app" / "views" / "help_topics_view.py").read_text(encoding="utf-8")
         self.assertIn("self.help_split = SplitPanel", source)
+        self.assertIn('SplitPane("index", weight=0.26, minimum=260, maximum=480', source)
         self.assertIn("self.left_tabs = TabContainer", source)
         self.assertNotIn("dpg.add_tab_bar", source)
         self.assertNotIn("dpg.add_tab(", source)

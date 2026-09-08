@@ -8,8 +8,19 @@ from contextlib import contextmanager
 from .base import Component
 from .controls import Label, Separator
 from .layout import AUTO, FILL, ControlLayout, ControlLayoutTheme
-from .placement import Insets, Placement, PositionedChild, insets, positioned
+from .placement import (
+    AnchoredChild,
+    AxisAnchor,
+    Insets,
+    Placement,
+    PositionedChild,
+    SizeConstraints,
+    anchored,
+    insets,
+    positioned,
+)
 from .renderer import ComponentRenderer, get_default_renderer
+from ..responsive import LayoutCoordinator
 
 
 
@@ -94,22 +105,25 @@ class PlacedComponent(Component):
 
 
 class PositionedPanel(Component):
-    """Container whose direct children use explicit local coordinates.
+    """Container whose direct children use parent-local placement strategies.
 
-    The panel remains an ordinary component to its own parent.  This permits
-    recursive mixed layouts: a grid can contain a positioned panel, and that
-    panel can itself contain another automatic row/grid/column.
+    Fixed ``PositionedChild`` entries retain explicit local x/y semantics.
+    ``AnchoredChild`` entries can pin, centre or stretch against the panel's
+    current content rectangle and reflow through ``LayoutCoordinator``. This
+    keeps responsive geometry local to the container instead of making it a
+    global application layout mode.
     """
 
     profile_key = "positioned_panel"
 
     def __init__(
         self,
-        children: Iterable[PositionedChild | tuple[Component, int, int]] = (),
+        children: Iterable[PositionedChild | AnchoredChild | tuple[Component, int, int]] = (),
         *,
         padding: Insets | int | tuple[int, int] | tuple[int, int, int, int] = 0,
         border: bool = False,
         fit_content: bool = True,
+        coordinator: LayoutCoordinator | None = None,
         theme: ControlLayoutTheme | None = None,
         layout: ControlLayout | None = None,
         profile_key: str | None = None,
@@ -118,17 +132,22 @@ class PositionedPanel(Component):
         self.padding = insets(padding)
         self.border = bool(border)
         self.fit_content = bool(fit_content)
-        self.children: list[PositionedChild] = []
+        if coordinator is not None and not isinstance(coordinator, LayoutCoordinator):
+            raise TypeError("positioned panel coordinator must be a LayoutCoordinator")
+        self.coordinator = coordinator
+        self.children: list[PositionedChild | AnchoredChild] = []
         self.occupied_size: tuple[int, int] = (self.padding.horizontal, self.padding.vertical)
+        self._child_sizes: dict[int, tuple[int, int]] = {}
+        self._watch_key = ("positioned_panel", id(self))
         for child in children:
-            if isinstance(child, PositionedChild):
+            if isinstance(child, (PositionedChild, AnchoredChild)):
                 self.children.append(child)
                 continue
             try:
                 component, x, y = child
             except (TypeError, ValueError) as exc:
                 raise TypeError(
-                    "PositionedPanel children must be PositionedChild or (Component, x, y)"
+                    "PositionedPanel children must be positioned/anchored children or (Component, x, y)"
                 ) from exc
             self.children.append(positioned(component, x=x, y=y))
 
@@ -160,13 +179,47 @@ class PositionedPanel(Component):
         y: int = 0,
         margin: Insets | int | tuple[int, int] | tuple[int, int, int, int] = 0,
     ) -> Component:
-        """Add a local overlay that does not enlarge the panel's measured bounds."""
+        """Add a fixed local overlay that does not enlarge measured bounds."""
 
-        return self.add(
+        return self.add(component, x=x, y=y, margin=margin, affects_layout=False)
+
+    def add_anchored(
+        self,
+        component: Component,
+        *,
+        horizontal: AxisAnchor | str = AxisAnchor.START,
+        vertical: AxisAnchor | str = AxisAnchor.START,
+        margin: Insets | int | tuple[int, int] | tuple[int, int, int, int] = 0,
+        constraints: SizeConstraints | None = None,
+        affects_layout: bool = True,
+    ) -> Component:
+        self.children.append(
+            anchored(
+                component,
+                horizontal=horizontal,
+                vertical=vertical,
+                margin=margin,
+                constraints=constraints,
+                affects_layout=affects_layout,
+            )
+        )
+        return component
+
+    def add_anchored_overlay(
+        self,
+        component: Component,
+        *,
+        horizontal: AxisAnchor | str = AxisAnchor.END,
+        vertical: AxisAnchor | str = AxisAnchor.START,
+        margin: Insets | int | tuple[int, int] | tuple[int, int, int, int] = 0,
+        constraints: SizeConstraints | None = None,
+    ) -> Component:
+        return self.add_anchored(
             component,
-            x=x,
-            y=y,
+            horizontal=horizontal,
+            vertical=vertical,
             margin=margin,
+            constraints=constraints,
             affects_layout=False,
         )
 
@@ -177,17 +230,16 @@ class PositionedPanel(Component):
             if not entry.placement.affects_layout:
                 continue
             child_width, child_height = entry.component.layout_size_hint(renderer=renderer)
-            occupied_width, occupied_height = entry.placement.occupied_size(
-                child_width or 0, child_height or 0
-            )
-            width = max(
-                width,
-                self.padding.left + occupied_width + self.padding.right,
-            )
-            height = max(
-                height,
-                self.padding.top + occupied_height + self.padding.bottom,
-            )
+            if isinstance(entry, AnchoredChild):
+                occupied_width, occupied_height = entry.placement.minimum_size(
+                    child_width or 0, child_height or 0
+                )
+            else:
+                occupied_width, occupied_height = entry.placement.occupied_size(
+                    child_width or 0, child_height or 0
+                )
+            width = max(width, self.padding.left + occupied_width + self.padding.right)
+            height = max(height, self.padding.top + occupied_height + self.padding.bottom)
         return width, height
 
     def layout_size_hint(
@@ -204,6 +256,61 @@ class PositionedPanel(Component):
             width = max(int(width or 0), content_width) or None
             height = max(int(height or 0), content_height) or None
         return width, height
+
+    def _rendered_panel_size(self, renderer: ComponentRenderer) -> tuple[int, int]:
+        if self.item is None:
+            return (0, 0)
+        if self.coordinator is not None:
+            width, height = self.coordinator.item_size(self.item)
+            if width <= 1 or height <= 1:
+                measured_width, measured_height = renderer.measure(self.item)
+                width = max(width, measured_width)
+                height = max(height, measured_height)
+        else:
+            width, height = renderer.measure(self.item)
+        if width > 1 and height > 1:
+            return width, height
+        hint_width, hint_height = self.layout_size_hint(renderer=renderer)
+        return max(width, int(hint_width or 0)), max(height, int(hint_height or 0))
+
+    def reflow(self) -> tuple[tuple[int, int, int, int], ...]:
+        """Re-resolve anchored children from the panel's current rendered size."""
+
+        if self.item is None:
+            return ()
+        renderer = self._renderer or get_default_renderer()
+        panel_width, panel_height = self._rendered_panel_size(renderer)
+        content_width = max(0, panel_width - self.padding.horizontal)
+        content_height = max(0, panel_height - self.padding.vertical)
+        resolved_rects = []
+        for entry in self.children:
+            if not isinstance(entry, AnchoredChild):
+                continue
+            child_item = entry.component.require_item()
+            natural_width, natural_height = self._child_sizes.get(id(entry), (0, 0))
+            measured_width, measured_height = renderer.measure(child_item)
+            if measured_width > 0:
+                natural_width = measured_width
+            if measured_height > 0:
+                natural_height = measured_height
+            self._child_sizes[id(entry)] = (natural_width, natural_height)
+            rect = entry.placement.resolve(
+                content_width, content_height, natural_width, natural_height
+            )
+            resize = {}
+            if entry.placement.controls_width:
+                resize["width"] = max(1, rect.width)
+            if entry.placement.controls_height:
+                resize["height"] = max(1, rect.height)
+            if resize:
+                renderer.configure(child_item, **resize)
+            renderer.place(
+                child_item,
+                self.padding.left + rect.x,
+                self.padding.top + rect.y,
+            )
+            resolved_rects.append((rect.x, rect.y, rect.width, rect.height))
+        return tuple(resolved_rects)
 
     def build(self, *, renderer=None, parent=None) -> object:
         renderer = renderer or get_default_renderer()
@@ -236,6 +343,7 @@ class PositionedPanel(Component):
 
         max_width = self.padding.horizontal
         max_height = self.padding.vertical
+        self._child_sizes.clear()
         with renderer.container("positioned_panel", **kwargs) as item:
             self._bind(renderer, item)
             for entry in self.children:
@@ -245,15 +353,29 @@ class PositionedPanel(Component):
                 hint_width, hint_height = entry.component.layout_size_hint(renderer=renderer)
                 child_width = max(measured_width, int(hint_width or 0))
                 child_height = max(measured_height, int(hint_height or 0))
-                renderer.place(
-                    child_item,
-                    self.padding.left + entry.placement.local_x,
-                    self.padding.top + entry.placement.local_y,
-                )
-                if entry.placement.affects_layout:
-                    occupied_width, occupied_height = entry.placement.occupied_size(
-                        child_width, child_height
+                self._child_sizes[id(entry)] = (child_width, child_height)
+
+                if isinstance(entry, AnchoredChild):
+                    if entry.placement.affects_layout:
+                        occupied_width, occupied_height = entry.placement.minimum_size(
+                            child_width, child_height
+                        )
+                    else:
+                        occupied_width = occupied_height = 0
+                else:
+                    renderer.place(
+                        child_item,
+                        self.padding.left + entry.placement.local_x,
+                        self.padding.top + entry.placement.local_y,
                     )
+                    if entry.placement.affects_layout:
+                        occupied_width, occupied_height = entry.placement.occupied_size(
+                            child_width, child_height
+                        )
+                    else:
+                        occupied_width = occupied_height = 0
+
+                if entry.placement.affects_layout:
                     max_width = max(
                         max_width,
                         self.padding.left + occupied_width + self.padding.right,
@@ -271,7 +393,18 @@ class PositionedPanel(Component):
                 resize["height"] = max(1, max_height, int(height) if isinstance(height, int) else 0)
             if resize:
                 renderer.configure(item, **resize)
+
+            self.reflow()
+            if self.coordinator is not None and any(isinstance(entry, AnchoredChild) for entry in self.children):
+                self.coordinator.watch_item(item, self._watch_key, self.reflow)
+                self.reflow()
         return self.require_item()
+
+    def dispose(self) -> bool:
+        if self.coordinator is not None:
+            self.coordinator.unwatch_item(self._watch_key)
+        self._child_sizes.clear()
+        return super().dispose()
 
 class ControlRow(Component):
     """Arbitrary components constrained to one horizontal layout row."""

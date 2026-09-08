@@ -876,7 +876,7 @@ class ApplicationMenu:
             f"Session backend: {self.manager.session_backend}\n"
             f"Session storage healthy: {'Yes' if self.manager.session_storage_healthy else 'No'}\n"
             f"Session state: {self.manager.session_state_path}\n"
-            f"UI error log: {self.gui._ui_error_log_path()}\n"
+            f"UI error log: {self.gui.ui_error_log_path()}\n"
         )
 
     def _show_diagnostics(self):

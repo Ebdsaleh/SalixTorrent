@@ -130,16 +130,20 @@ class FrameworkPackagingTests(unittest.TestCase):
 
                 from portable_framework.command_menu import CommandMenu, CommandMenuBinding
                 from portable_framework.components import (
+                    AxisAnchor,
                     Button,
                     ComponentLayoutProfile,
                     ControlLayout,
                     PlacedComponent,
                     PositionedPanel,
+                    SizeConstraints,
                     SplitPane,
                     SplitPanel,
                     TabContainer,
                     TabPage,
+                    anchored,
                     overlay,
+                    placement_from_descriptor,
                     positioned,
                 )
                 from portable_framework.documentation import DocPage, DocumentationTheme
@@ -206,6 +210,15 @@ class FrameworkPackagingTests(unittest.TestCase):
                     positioned(Button("Base", layout=ControlLayout(width=80, height=24)), x=10, y=10),
                     overlay(Button("Overlay", layout=ControlLayout(width=60, height=20)), x=300, y=200),
                 ), layout=ControlLayout(width=120, height=60))
+                anchor_metadata = anchored(
+                    Button("Pinned", layout=ControlLayout(width=80, height=24)),
+                    horizontal=AxisAnchor.END,
+                    vertical=AxisAnchor.START,
+                    margin=8,
+                    constraints=SizeConstraints(minimum_width=60, maximum_width=120),
+                ).placement.to_descriptor()
+                restored_anchor = placement_from_descriptor(anchor_metadata)
+                assert restored_anchor.horizontal is AxisAnchor.END
                 tabs = TabContainer((
                     TabPage("one", "One", (Button("One"),)),
                     TabPage("two", "Two", (Button("Two"),)),

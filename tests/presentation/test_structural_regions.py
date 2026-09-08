@@ -322,6 +322,41 @@ class StructuralRegionContractTests(unittest.TestCase):
         self.assertTrue(split.dispose())
         self.assertEqual({}, host.watches)
 
+    def test_split_sizes_honor_finite_maximums_while_uncapped_panes_absorb_space(self):
+        self.assertEqual(
+            (420, 972),
+            split_sizes(1400, (1, 1), minimums=(260, 520), maximums=(420, None), gap=8),
+        )
+        self.assertEqual(
+            (200, 250),
+            split_sizes(1400, (1, 1), minimums=(100, 100), maximums=(200, 250), gap=8),
+        )
+
+    def test_split_pane_rejects_maximum_below_minimum(self):
+        with self.assertRaises(ValueError):
+            SplitPane("bad", minimum=200, maximum=199)
+
+    def test_split_panel_reflow_applies_pane_maximum(self):
+        renderer = RegionRenderer()
+        host = RegionLayoutHost()
+        coordinator = LayoutCoordinator(host)
+        split = SplitPanel(
+            (
+                SplitPane("index", weight=1, minimum=260, maximum=420),
+                SplitPane("document", weight=1, minimum=520),
+            ),
+            gap=8,
+            coordinator=coordinator,
+        )
+        split.build(renderer=renderer)
+        root = split.require_item()
+        host.sizes[root] = (1400, 500)
+        sizes = split.reflow()
+        self.assertEqual((420, 972), sizes)
+        self.assertEqual(420, host.configured[split.pane_item("index")]["width"])
+        self.assertEqual(972, host.configured[split.pane_item("document")]["width"])
+
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

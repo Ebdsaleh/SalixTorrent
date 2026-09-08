@@ -189,7 +189,7 @@ class HelpTopicsView:
 
         self.help_split = SplitPanel(
             (
-                SplitPane("index", weight=0.26, minimum=260, border=True),
+                SplitPane("index", weight=0.26, minimum=260, maximum=480, border=True),
                 SplitPane("document", weight=0.74, minimum=520, border=True),
             ),
             gap=8,

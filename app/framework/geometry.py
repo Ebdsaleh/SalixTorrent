@@ -110,19 +110,23 @@ def split_sizes(
     weights: Sequence[Number],
     *,
     minimums: Sequence[Number] | None = None,
+    maximums: Sequence[Number | None] | None = None,
     gap: Number = 8,
 ) -> tuple[int, ...]:
     """Return stable pixel extents for one axis of a responsive split.
 
-    ``weights`` describe the preferred proportions. ``minimums`` are treated
-    as preferred lower bounds while enough space exists. If the available axis
-    is narrower than the sum of those bounds, the bounds are scaled together so
-    every pane remains visible rather than overflowing unpredictably.
+    ``weights`` describe preferred proportions. ``minimums`` are preferred
+    lower bounds while enough space exists. Optional ``maximums`` cap panes
+    while another pane can still absorb remaining space; if every pane reaches
+    a finite maximum the unused tail remains available to the parent instead of
+    silently violating the declared cap. When the parent is narrower than the
+    sum of minimums, minimums scale together so every pane remains visible.
     """
     count = len(weights)
     if count == 0:
         return ()
-    if any(float(weight) < 0 for weight in weights):
+    numeric_weights = [float(weight) for weight in weights]
+    if any(weight < 0 for weight in numeric_weights):
         raise ValueError("split weights must be non-negative")
 
     min_values = [0] * count if minimums is None else [max(0, int(v)) for v in minimums]
@@ -132,22 +136,91 @@ def split_sizes(
     available = max(count, int(total_size) - max(0, count - 1) * int(gap))
     min_total = sum(min_values)
 
+    # Preserve the established unconstrained allocation exactly.
+    if maximums is None:
+        if min_total >= available and min_total > 0:
+            raw = [available * value / min_total for value in min_values]
+        else:
+            remaining = available - min_total
+            weight_total = sum(numeric_weights)
+            if weight_total <= 0:
+                raw = [value + remaining / count for value in min_values]
+            else:
+                raw = [
+                    min_values[index] + remaining * numeric_weights[index] / weight_total
+                    for index in range(count)
+                ]
+        sizes = [max(1, int(value)) for value in raw]
+        sizes[-1] += available - sum(sizes)
+        return tuple(sizes)
+
+    if len(maximums) != count:
+        raise ValueError("maximums must match weights")
+    max_values: list[int | None] = []
+    for index, value in enumerate(maximums):
+        if value is None:
+            max_values.append(None)
+            continue
+        maximum = max(0, int(value))
+        if maximum < min_values[index]:
+            raise ValueError("split maximums must be >= minimums")
+        max_values.append(maximum)
+
     if min_total >= available and min_total > 0:
         raw = [available * value / min_total for value in min_values]
-    else:
-        remaining = available - min_total
-        weight_total = sum(float(weight) for weight in weights)
-        if weight_total <= 0:
-            raw = [value + remaining / count for value in min_values]
-        else:
-            raw = [
-                min_values[index] + remaining * float(weights[index]) / weight_total
-                for index in range(count)
-            ]
+        sizes = [max(1, int(value)) for value in raw]
+        sizes[-1] += available - sum(sizes)
+        return tuple(sizes)
 
-    sizes = [max(1, int(value)) for value in raw]
-    sizes[-1] += available - sum(sizes)
-    return tuple(sizes)
+    sizes = list(min_values)
+    remaining = available - sum(sizes)
+    while remaining > 0:
+        active = [
+            index
+            for index in range(count)
+            if max_values[index] is None or sizes[index] < int(max_values[index])
+        ]
+        if not active:
+            break
+        weight_total = sum(numeric_weights[index] for index in active)
+        if weight_total <= 0:
+            shares = {index: remaining / len(active) for index in active}
+        else:
+            shares = {
+                index: remaining * numeric_weights[index] / weight_total
+                for index in active
+            }
+
+        additions = {}
+        for index in active:
+            capacity = remaining if max_values[index] is None else max_values[index] - sizes[index]
+            additions[index] = min(capacity, int(shares[index]))
+        applied = sum(additions.values())
+
+        if applied == 0:
+            ranked = sorted(
+                active,
+                key=lambda index: (
+                    shares[index] - int(shares[index]),
+                    numeric_weights[index],
+                    -index,
+                ),
+                reverse=True,
+            )
+            for index in ranked:
+                if remaining <= 0:
+                    break
+                if max_values[index] is not None and sizes[index] >= max_values[index]:
+                    continue
+                sizes[index] += 1
+                remaining -= 1
+            continue
+
+        for index, addition in additions.items():
+            sizes[index] += addition
+        remaining -= applied
+
+    return tuple(max(1, int(value)) for value in sizes)
 
 
 def split_widths(
@@ -155,10 +228,17 @@ def split_widths(
     weights: Sequence[Number],
     *,
     minimums: Sequence[Number] | None = None,
+    maximums: Sequence[Number | None] | None = None,
     gap: Number = 8,
 ) -> tuple[int, ...]:
     """Compatibility helper for horizontal splits."""
-    return split_sizes(total_width, weights, minimums=minimums, gap=gap)
+    return split_sizes(
+        total_width,
+        weights,
+        minimums=minimums,
+        maximums=maximums,
+        gap=gap,
+    )
 
 
 def fill_height(container_height: Number, reserved_height: Number, *, minimum: Number = 1) -> int:

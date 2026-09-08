@@ -20,6 +20,7 @@ if __package__ in {None, ""}:
 
 from app.engine.application_hosts.headless import HeadlessApplicationHost
 from app.framework.components import (
+    AxisAnchor,
     Button,
     CheckBox,
     ComboBox,
@@ -32,10 +33,13 @@ from app.framework.components import (
     TextInput,
     PlacedComponent,
     PositionedPanel,
+    SizeConstraints,
     SplitPane,
     SplitPanel,
     TabContainer,
     TabPage,
+    anchored,
+    anchored_overlay,
     overlay,
     positioned,
 )
@@ -59,6 +63,21 @@ from app.runtime.lifecycle import ApplicationRuntime, CallbackService
 from app.runtime.presentation import PresentationCapability
 
 
+# Keep the deliberately fixed-positioned proof inside the left split pane even
+# at the application's declared minimum width.  These are demo composition
+# metrics rather than framework defaults.
+DEMO_WINDOW_MINIMUM_WIDTH = 680
+DEMO_SPLIT_GAP = 8
+DEMO_LAYOUT_PANE_MINIMUM = 300
+DEMO_LIVE_PANE_MINIMUM = 360
+DEMO_MIXED_LABEL_COLUMN_WIDTH = 100
+DEMO_MIXED_CONTENT_COLUMN_WIDTH = 190
+DEMO_POSITIONED_PANEL_WIDTH = 180
+DEMO_POSITIONED_PANEL_X = 8
+DEMO_ACTION_X = 84
+DEMO_ACTION_WIDTH = 80
+
+
 class DemoView:
     def __init__(self, host):
         self.host = host
@@ -80,22 +99,22 @@ class DemoView:
                     Button(
                         "Actions",
                         callback=lambda _event: self._show_demo_menu(),
-                        layout=ControlLayout(width=100, height=28),
+                        layout=ControlLayout(width=DEMO_ACTION_WIDTH, height=28),
                     ),
-                    x=135,
+                    x=DEMO_ACTION_X,
                     y=42,
                 ),
             ),
             padding=6,
             border=True,
-            layout=ControlLayout(width=250, height=90),
+            layout=ControlLayout(width=DEMO_POSITIONED_PANEL_WIDTH, height=90),
         )
         self.mixed_layout = ControlGrid(
             ((
                 Label("Mixed layout"),
-                PlacedComponent(self.positioned_panel, x=24, y=12),
+                PlacedComponent(self.positioned_panel, x=DEMO_POSITIONED_PANEL_X, y=12),
             ),),
-            column_widths=(110, 180),
+            column_widths=(DEMO_MIXED_LABEL_COLUMN_WIDTH, DEMO_MIXED_CONTENT_COLUMN_WIDTH),
             layout=ControlLayout(width=FILL),
         )
         self.overlay_panel = PositionedPanel(
@@ -115,6 +134,34 @@ class DemoView:
             border=True,
             layout=ControlLayout(width=220, height=62),
         )
+        self.anchored_panel = PositionedPanel(
+            (
+                anchored(
+                    Label("Anchored start"),
+                    horizontal=AxisAnchor.START,
+                    vertical=AxisAnchor.START,
+                    margin=(10, 8, 10, 8),
+                ),
+                anchored_overlay(
+                    Label("Pinned end"),
+                    horizontal=AxisAnchor.END,
+                    vertical=AxisAnchor.START,
+                    margin=(10, 8, 10, 8),
+                ),
+                anchored(
+                    Button("Stretch", layout=ControlLayout(height=26)),
+                    horizontal=AxisAnchor.STRETCH,
+                    vertical=AxisAnchor.END,
+                    margin=(10, 8, 10, 8),
+                    constraints=SizeConstraints(minimum_width=140, maximum_width=360),
+                ),
+            ),
+            padding=4,
+            border=True,
+            fit_content=False,
+            coordinator=self.layout_coordinator,
+            layout=ControlLayout(width=FILL, height=92),
+        )
         self.table_container = ControlColumn(layout=ControlLayout(width=FILL, height=150))
         self.grid_container = ControlColumn(layout=ControlLayout(width=FILL, height=72))
         self.plot_container = ControlColumn(layout=ControlLayout(width=FILL, height=220))
@@ -123,20 +170,20 @@ class DemoView:
             (
                 SplitPane(
                     "layout",
-                    ControlColumn((self.mixed_layout, self.overlay_panel)),
+                    ControlColumn((self.mixed_layout, self.overlay_panel, self.anchored_panel)),
                     weight=0.42,
-                    minimum=300,
+                    minimum=DEMO_LAYOUT_PANE_MINIMUM,
                     border=False,
                 ),
                 SplitPane(
                     "live",
                     ControlColumn((self.table_container, self.grid_container)),
                     weight=0.58,
-                    minimum=360,
+                    minimum=DEMO_LIVE_PANE_MINIMUM,
                     border=False,
                 ),
             ),
-            gap=8,
+            gap=DEMO_SPLIT_GAP,
             coordinator=self.layout_coordinator,
             layout=ControlLayout(width=FILL, height=250),
         )
@@ -339,7 +386,7 @@ def _run_graphical(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
         title="Blank Ecosystem Application",
         width=820,
         height=780,
-        minimum_width=560,
+        minimum_width=DEMO_WINDOW_MINIMUM_WIDTH,
         minimum_height=560,
     )
     runtime = _make_runtime()

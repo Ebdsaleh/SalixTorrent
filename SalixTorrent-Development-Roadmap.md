@@ -2,8 +2,8 @@
 
 **Current application version string:** `0.5.0`
 **Roadmap status:** v0.5.0 released; post-v0.5.0 ecosystem extraction on `dev`
-**Current implementation checkpoint:** interactive data/selection/command semantics are pushed on `dev` at `e16e46884acc53adf54a29a35dbfd09bba40ed26`; the next tranche adds multi-backend command-menu presentation, generic ordered-item movement, and the first mixed-layout explicit-placement primitive
-**Current real Windows regression baseline:** 547 / 547 at the pushed interactive-data checkpoint with one expected non-Windows shell-behavior skip
+**Current implementation checkpoint:** structural tabs, split regions and overlays are Windows-validated and pushed on `dev` at `731303d847a46c1e7e250d34d8b78a9e51f485ef`; prepared Tranche 8 begins designer geometry with parent-local anchors, size constraints, serializable placement descriptors and split-pane maximums
+**Current real Windows regression baseline:** 581 / 581 at the pushed structural-region checkpoint with one expected non-Windows shell-behavior skip; Tranche 8 initially passed 589 / 589 on Windows, then received two acceptance repairs and now has a 591-test prepared gate awaiting final Windows visual recheck
 
 This roadmap records intended engineering direction rather than promising dates or release numbers. Changes should remain incremental, testable, reviewable, and compatible with SalixTorrent's existing protocol, persistence, packaging, localization, and cross-platform boundaries.
 
@@ -702,9 +702,9 @@ This extraction turns the semantic command model into reusable physical presenta
 
 The real Windows gate passed both discovery forms at **563 / 563** with one expected non-Windows shell-behavior skip. The exact pushed checkpoint is `19ee1ba92826501e2061132e2a514a38862082a1` (`Add command menus and mixed layout foundation`).
 
-### A9. Structural tabs, split regions and non-measuring overlays — current tranche prepared
+### A9. Structural tabs, split regions and non-measuring overlays — completed/pushed
 
-The next structural pass proves that mixed layout is recursive rather than a special-case positioned panel:
+This structural pass proves that mixed layout is recursive rather than a special-case positioned panel:
 
 - renderer-neutral `TabContainer` / `TabPage` with stable semantic page keys and normalized change events;
 - renderer-neutral `SplitPanel` / `SplitPane` with horizontal or vertical weighted allocation, per-pane minimums and responsive reflow through the existing `LayoutCoordinator`;
@@ -715,23 +715,31 @@ The next structural pass proves that mixed layout is recursive rather than a spe
 - the application menu now selects Download detail pages by semantic key instead of backend item ID;
 - the blank ecosystem application expanded to prove tabs, weighted splits, measured explicit placement and non-measuring overlays through both GUI backends.
 
-Prepared source validation advances complete discovery from **563 to 581 tests**. Both ordinary discovery forms pass 581 / 581 with the display-less GUI skips expected by the preparation environment, and the live Tkinter-focused gate remains green under Xvfb. Real-Windows acceptance additionally caught two silent Dear PyGui integration defects: split-pane geometry could collapse into one visually dominant pane, and tab callbacks could omit the selected-page handle from callback data. The corrected structural runtime now positions split panes deterministically inside a parent-local root and normalizes tab changes from the backend current value when needed. Canonical localization remains 1,337 strings.
+The real-Windows gate passed both complete discovery forms at **581 / 581** with one expected non-Windows shell-behavior skip. Visual acceptance additionally caught and repaired two silent Dear PyGui integration differences: split-pane geometry could collapse into one visually dominant pane, and tab callbacks could omit the selected-page handle from callback data. The exact pushed checkpoint is `731303d847a46c1e7e250d34d8b78a9e51f485ef` (`Add structural tabs, split regions and overlays`). Canonical localization remains 1,337 strings.
 
-This tranche still does **not** freeze a universal designer layout API. Anchors/edge offsets, percentages, richer min/max constraints, interactive split handles, tree/detail structures and serializable designer geometry remain later passes driven by real application needs.
+### A10. WYSIWYG designer prerequisites — first geometry tranche prepared
 
-### A10. WYSIWYG designer prerequisites
+The first designer-preparation tranche extends the proven mixed-layout runtime without introducing a complete designer model:
 
-After the runtime/presentation contracts are better proven, introduce the metadata needed by a future RAD editor:
+- `AxisAnchor` provides start / centre / end / stretch semantics on each parent-local axis;
+- `AnchoredPlacement` and `AnchoredChild` resolve against the current `PositionedPanel` content rectangle and reflow through `LayoutCoordinator`;
+- `SizeConstraints` provides reusable minimum/maximum width and height bounds;
+- fixed and anchored placement metadata round-trips through JSON-safe descriptors without importing a GUI toolkit;
+- `SplitPane.maximum` plus `split_sizes(..., maximums=...)` adds richer structural constraints while preserving historical behavior when maximums are omitted;
+- Help proves a real application use by capping the index/navigation pane at 480 px on ultrawide layouts;
+- the blank ecosystem application proves anchored start/end/stretch geometry and constrained responsive sizing through the shared GUI contracts.
 
-- component/type registry;
-- property metadata;
-- serializable hierarchy;
-- stable object identity;
-- command-based mutations;
-- undo/redo;
-- copy/paste;
-- project document/schema;
-- preview/runtime bridge.
+Initial prepared canonical discovery advanced from **581 to 589 tests**. Real-Windows validation passed both 589-test discovery forms with the expected single skip, but live acceptance exposed two pre-commit issues: the Diagnostics menu still referenced a removed private UI-error-log helper, and the product-neutral blank application's fixed-position proof could clip inside its left split pane at narrower supported widths. Both are repaired in the tranche: the diagnostics path now uses a public engine contract and the blank demo's minimum/composition geometry is internally consistent. Regression coverage is now **591 tests**; display-less Linux canonical discovery passes 591 / 591 with expected GUI skips. Canonical localization remains 1,337 strings. Final Dear PyGui/Tkinter visual recheck remains required before commit/push.
+
+This tranche intentionally stops before a full designer document model. Still deferred:
+
+- component/type registry and property metadata;
+- serializable component hierarchy and stable designer object identity;
+- command-based mutations and undo/redo;
+- copy/paste and drag/drop/reparent operations;
+- percentages and richer relationship constraints;
+- interactive split/resize handles;
+- project document/schema and preview/runtime bridge.
 
 The future designer should itself use the same engine/framework wherever practical.
 
@@ -898,11 +906,15 @@ main:                            stable v0.5.0 release line
 dev documentation checkpoint:   eb906e45f7b9f62403dc7887b36aae81a1818b6f
 dev realtime/plot checkpoint:   ef8b4be998a714a86455940d8642fdd926a6609d
 dev runtime/network checkpoint: 8e707efeb0cda162ee038a028a39a77663c2fa4e
-current pushed Windows dev gate: 547 / 547 OK, skipped=1
-dev:                             tracks origin/dev
+current pushed Windows dev gate: 581 / 581 OK, skipped=1
+current pushed dev checkpoint:   731303d847a46c1e7e250d34d8b78a9e51f485ef
+dev:                             tracks origin/dev before applying prepared Tranche 8
 committed Tkinter/blank-app baseline: 516 / 516, Windows skipped=1
 committed live-data/state-grid baseline: 529 / 529, Windows skipped=1
 committed interactive-data baseline: 547 / 547, Windows skipped=1
+committed command/mixed-layout baseline: 563 / 563, Windows skipped=1
+committed structural-region baseline: 581 / 581, Windows skipped=1
+prepared designer-geometry baseline: 591 / 591 canonical Linux after Windows acceptance repairs; final Windows visual recheck pending
 
 Localization:
 canonical catalog:               1337 entries

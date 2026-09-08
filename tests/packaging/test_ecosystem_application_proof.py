@@ -45,6 +45,28 @@ class EcosystemApplicationProofTests(unittest.TestCase):
         self.assertIn("overlay", source)
         self.assertIn('("dearpygui", "tkinter", "headless")', source)
 
+    def test_blank_demo_minimum_geometry_contains_fixed_position_proof(self):
+        from examples import ecosystem_blank_app as example
+
+        self.assertGreaterEqual(
+            example.DEMO_MIXED_CONTENT_COLUMN_WIDTH,
+            example.DEMO_POSITIONED_PANEL_X + example.DEMO_POSITIONED_PANEL_WIDTH,
+        )
+        self.assertGreaterEqual(
+            example.DEMO_LAYOUT_PANE_MINIMUM,
+            example.DEMO_MIXED_LABEL_COLUMN_WIDTH + example.DEMO_MIXED_CONTENT_COLUMN_WIDTH,
+        )
+        self.assertGreaterEqual(
+            example.DEMO_POSITIONED_PANEL_WIDTH,
+            example.DEMO_ACTION_X + example.DEMO_ACTION_WIDTH,
+        )
+        self.assertGreaterEqual(
+            example.DEMO_WINDOW_MINIMUM_WIDTH,
+            example.DEMO_LAYOUT_PANE_MINIMUM
+            + example.DEMO_LIVE_PANE_MINIMUM
+            + example.DEMO_SPLIT_GAP,
+        )
+
     def test_blank_view_definition_does_not_branch_on_toolkit_name(self):
         source = EXAMPLE.read_text(encoding="utf-8")
         start = source.index("class DemoView:")

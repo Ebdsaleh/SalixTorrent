@@ -41,6 +41,7 @@ class SplitPane:
     child: Component | None = None
     weight: float = 1.0
     minimum: int = 1
+    maximum: int | None = None
     border: bool = False
 
     def __post_init__(self) -> None:
@@ -62,6 +63,14 @@ class SplitPane:
         if minimum < 1:
             raise ValueError("split pane minimum must be at least one")
         object.__setattr__(self, "minimum", minimum)
+        maximum = self.maximum
+        if maximum is not None:
+            if isinstance(maximum, bool):
+                raise TypeError("split pane maximum must be an integer or None")
+            maximum = int(maximum)
+            if maximum < minimum:
+                raise ValueError("split pane maximum must be >= minimum")
+        object.__setattr__(self, "maximum", maximum)
         object.__setattr__(self, "border", bool(self.border))
 
 
@@ -398,6 +407,7 @@ class SplitPanel(Component):
             total,
             tuple(pane.weight for pane in self.panes),
             minimums=tuple(pane.minimum for pane in self.panes),
+            maximums=tuple(pane.maximum for pane in self.panes),
             gap=self.gap,
         )
         self.current_sizes = sizes

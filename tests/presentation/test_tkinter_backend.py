@@ -17,6 +17,7 @@ from app.engine.scene_hosts import TkinterSceneHost
 from app.engine.state_grid_hosts import TkinterStateGridHost
 from app.engine.table_hosts import TkinterTableHost
 from app.framework.components import (
+    AxisAnchor,
     Button,
     CheckBox,
     ComboBox,
@@ -34,10 +35,13 @@ from app.framework.components import (
     TextInput,
     PlacedComponent,
     PositionedPanel,
+    SizeConstraints,
     SplitPane,
     SplitPanel,
     TabContainer,
     TabPage,
+    anchored,
+    anchored_overlay,
     overlay,
     positioned,
 )
@@ -432,6 +436,46 @@ class TkinterBackendLiveTests(unittest.TestCase):
 
         self.assertEqual((140, 50), panel.occupied_size)
         self.assertEqual("place", badge.require_item().geometry_manager)
+
+
+    def test_anchored_positioned_panel_reflows_real_tkinter_children(self):
+        coordinator = LayoutCoordinator(TkinterLayoutHost(self.renderer))
+        pinned = Button("Pinned", layout=ControlLayout(width=80, height=24))
+        stretched = Button("Stretch", layout=ControlLayout(height=26))
+        panel = PositionedPanel(
+            (
+                anchored_overlay(
+                    pinned,
+                    horizontal=AxisAnchor.END,
+                    vertical=AxisAnchor.START,
+                    margin=10,
+                ),
+                anchored(
+                    stretched,
+                    horizontal=AxisAnchor.STRETCH,
+                    vertical=AxisAnchor.END,
+                    margin=(18, 8, 18, 8),
+                    constraints=SizeConstraints(minimum_width=120, maximum_width=320),
+                ),
+            ),
+            padding=5,
+            fit_content=False,
+            coordinator=coordinator,
+            layout=ControlLayout(width=420, height=150),
+        )
+        panel.build(renderer=self.renderer)
+        self.root.deiconify()
+        self.root.update_idletasks()
+        panel.reflow()
+        self.root.update_idletasks()
+
+        pinned_mount = pinned.require_item().mount
+        stretched_mount = stretched.require_item().mount
+        self.assertEqual("place", pinned.require_item().geometry_manager)
+        self.assertEqual("place", stretched.require_item().geometry_manager)
+        self.assertGreaterEqual(int(pinned_mount.winfo_x()), 250)
+        self.assertGreaterEqual(int(stretched_mount.winfo_width()), 120)
+        self.assertLessEqual(int(stretched_mount.winfo_width()), 320)
 
     def test_tkinter_command_menu_uses_same_semantic_command_tree(self):
         seen = []

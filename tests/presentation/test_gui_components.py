@@ -1223,6 +1223,14 @@ class GuiComponentFoundationTests(unittest.TestCase):
         self.assertIn("self.status_component.set_text", source)
 
 
+    def test_application_diagnostics_uses_public_engine_error_log_contract(self):
+        engine_source = (PROJECT_ROOT / "app" / "engine" / "gui_engine.py").read_text(encoding="utf-8")
+        menu_source = (PROJECT_ROOT / "app" / "views" / "application_menu.py").read_text(encoding="utf-8")
+
+        self.assertIn("def ui_error_log_path(self):", engine_source)
+        self.assertIn("self.gui.ui_error_log_path()", menu_source)
+        self.assertNotIn("self.gui._ui_error_log_path()", menu_source)
+
 
 if __name__ == "__main__":
     unittest.main()

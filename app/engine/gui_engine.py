@@ -184,6 +184,10 @@ class GuiEngine:
         """Register the viewport-level menu for lightweight state refreshes."""
         self.application_menu = application_menu
 
+    def ui_error_log_path(self):
+        """Return the append-only UI exception log used by diagnostics."""
+        return self._ui_error_reporter.log_path
+
     def _report_ui_exception(self, context: str, exc: BaseException):
         self._ui_error_reporter.report(context, exc)
 

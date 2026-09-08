@@ -413,7 +413,9 @@ The next structural proof adds two more local strategies rather than inventing a
 
 SalixTorrent itself now supplies the proof rather than relying only on the blank application: Download detail pages use the generic tab contract, Download General uses a three-pane split, and Help uses both a Contents/Glossary tab container and a two-pane index/document split. These structures remain recursively nestable with automatic controls and positioned panels.
 
-Future passes should add richer geometry only when proved by real application surfaces: tree/list/detail composition, anchoring/edge offsets, percentages, richer min/max constraints, interactive split handles, designer resize handles and eventually serializable placement/property metadata. Margins/padding remain useful for structured flow, but explicit placement must always remain available locally when a design requires it.
+The first designer-geometry pass now adds parent-local anchors and constraints without changing that rule. `AxisAnchor` selects start/centre/end/stretch independently per axis, `AnchoredPlacement` resolves edge offsets from its margins, and `SizeConstraints` bounds the resulting width/height. A `PositionedPanel` can watch its rendered size through `LayoutCoordinator` and reflow anchored children without exposing toolkit resize callbacks. Fixed and anchored placement objects also emit JSON-safe descriptors that can be restored without a GUI backend.
+
+Future passes should add richer geometry only when proved by real application/editor surfaces: percentages and relationship constraints, tree/list/detail composition, interactive split handles, designer resize handles, and eventually full component/property/hierarchy documents. Margins/padding remain useful for structured flow, but explicit placement must always remain available locally when a design requires it.
 
 ## 10. Branch and release discipline
 
@@ -469,11 +471,11 @@ This remains a compatibility surface, not a wholesale Tkinter rewrite of SalixTo
 
 ### Stage E — rich RAD presentation
 
-This stage is active. Tranche 4 extracted keyed live tables and categorical state grids; Tranche 5 added backend-neutral data projection, selection and command-state semantics; Tranche 6 added physical Dear PyGui/Tkinter command-menu hosts, stable generic item-order operations and parent-aware explicit placement. Tranche 7 adds keyed tab regions, responsive weighted split regions and non-measuring overlays, and migrates real Download/Help structures onto those contracts. Richer status/diagnostic surfaces, interactive table hosts and additional structural containers remain candidates only where the application demonstrates reusable semantics.
+This stage is substantially proven. Tranche 4 extracted keyed live tables and categorical state grids; Tranche 5 added backend-neutral data projection, selection and command-state semantics; Tranche 6 added physical Dear PyGui/Tkinter command-menu hosts, stable generic item-order operations and parent-aware explicit placement; Tranche 7 added keyed tab regions, responsive weighted split regions and non-measuring overlays and migrated real Download/Help structures onto those contracts. Richer status/diagnostic surfaces, interactive table hosts and additional structural containers remain candidates only where the application demonstrates reusable semantics.
 
 ### Stage F — designer prerequisites
 
-Introduce component/property metadata, serialization and command/undo infrastructure needed for WYSIWYG editing. The mixed-layout rule above is a prerequisite: designer geometry metadata must be local to a container strategy rather than assuming that a whole form uses one universal table/grid or one universal absolute-coordinate plane.
+This stage is now active. Tranche 8 begins with geometry that a future designer can describe faithfully: parent-local start/centre/end/stretch anchors, minimum/maximum size constraints, optional split-pane maximums and JSON-safe fixed/anchored placement descriptors. The mixed-layout rule remains fundamental: designer geometry metadata is local to a container strategy rather than assuming that a whole form uses one universal table/grid or one universal absolute-coordinate plane. Component/property metadata, hierarchy documents, command-based edits and undo/redo remain later Stage-F work.
 
 ### Stage G — naming, API and package boundaries
 
@@ -748,8 +750,28 @@ SalixTorrent now proves the structural contracts in production surfaces. Downloa
 
 The product-neutral blank application also nests tabs, weighted splits, automatic content, parent-aware explicit placement and a non-measuring overlay alongside its command menu, live table, state grid and realtime graph. Dear PyGui and Tkinter implement the same component contracts; the view still does not branch on toolkit name.
 
-Prepared source validation advances complete discovery from **563 to 581 tests**. The acceptance pass also tightened an important cross-backend rule: a `SplitPanel` does not delegate pane placement to whatever flow/group behavior a toolkit happens to provide. The framework computes pane sizes, then places each pane explicitly in a parent-local positioned root through the renderer contract. Likewise, tab-change semantics are normalized from either callback payload or the backend current tab value. These fixes were driven by real Dear PyGui behavior where Help/document panes and split-hosted live surfaces could silently disappear and the Speed tab could stop receiving live render updates without producing a traceback. Canonical localization remains 1,337 strings.
+Real-Windows acceptance passed both complete discovery forms at **581 / 581** with one expected non-Windows shell-behavior skip. The acceptance pass also tightened an important cross-backend rule: a `SplitPanel` does not delegate pane placement to whatever flow/group behavior a toolkit happens to provide. The framework computes pane sizes, then places each pane explicitly in a parent-local positioned root through the renderer contract. Likewise, tab-change semantics are normalized from either callback payload or the backend current tab value. These fixes were driven by real Dear PyGui behavior where Help/document panes and split-hosted live surfaces could silently disappear and the Speed tab could stop receiving live render updates without producing a traceback. Canonical localization remains 1,337 strings. The exact pushed checkpoint is `731303d847a46c1e7e250d34d8b78a9e51f485ef` (`Add structural tabs, split regions and overlays`).
 
-This checkpoint still deliberately defers anchors/edge offsets, percentages, richer min/max constraints, draggable split handles, generic tree/detail structures and serializable designer geometry. Those should be introduced only as real application/designer requirements prove the contracts.
+This checkpoint deliberately left anchors/edge offsets, percentages, richer min/max constraints, draggable split handles, generic tree/detail structures and serializable designer geometry to later passes.
+
+No final ecosystem/package naming, public API freeze, release tag or merge to `main` is implied.
+
+---
+
+## 21. Eighth post-v0.5.0 implementation checkpoint
+
+The eighth `dev` tranche begins Stage F with geometry rather than prematurely inventing a complete editor document model. `AxisAnchor` defines start, centre, end and stretch semantics independently for each parent-local axis. `AnchoredPlacement` combines those semantics with edge offsets represented by `Insets`, optional `SizeConstraints`, and the existing layout-participation flag. `AnchoredChild` lets ordinary components use that policy inside `PositionedPanel`.
+
+When a positioned panel is supplied a `LayoutCoordinator`, it watches the rendered parent size and re-resolves anchored children through the existing renderer-neutral `configure(...)` and `place(...)` contracts. Fixed `(x, y)` children remain unchanged. Non-measuring anchored overlays are supported for future badges, HUD decorations and designer handles. Only axes whose anchor/constraints actually control size are configured, so simple edge-pinned labels do not require backend-specific size properties.
+
+The geometry metadata is deliberately serializable before a full designer schema exists. `Placement.to_descriptor()` and `AnchoredPlacement.to_descriptor()` return JSON-safe data, while `placement_from_descriptor(...)` restores the corresponding backend-neutral object. This proves a small persistence seam without claiming stable component-type names, a project format or an external public API.
+
+Structural sizing also gains optional maximums. `SplitPane.maximum` flows through `split_sizes(..., maximums=...)`; callers that omit maximums retain the historical allocation behavior. Help is the first real SalixTorrent proof: its Contents/Glossary index pane keeps a 260 px minimum but is capped at 480 px, allowing the documentation pane to consume additional ultrawide space.
+
+The blank ecosystem application adds anchored start/end/stretch content with a constrained stretch control and continues to use one toolkit-neutral `DemoView`. The live Tkinter backend proves resize reflow through the same contracts.
+
+Initial prepared validation advanced canonical discovery from **581 to 589 tests**. Real-Windows validation passed both 589-test discovery forms, then live acceptance identified two pre-commit integration repairs: a stale private Diagnostics error-log accessor and a blank-demo minimum-geometry mismatch that could clip the fixed-position Actions proof. The diagnostics seam is now public through `GuiEngine.ui_error_log_path()`, and the product-neutral demo's composition metrics fit its declared minimum split/window geometry. Regression coverage is now **591 tests**; display-less canonical Linux discovery passes 591 / 591 with 58 expected GUI/platform skips, and relocation/package-boundary proof remains green. Final real-Windows Dear PyGui/Tkinter visual recheck remains the commit gate. Canonical localization remains 1,337 strings and `APP_VERSION` remains `0.5.0`.
+
+This checkpoint does **not** yet introduce component/type registry metadata, a serializable component hierarchy, stable designer-object identity, command-based mutations, undo/redo, copy/paste, project schema, preview bridge, percentages or draggable split handles. Those remain later Stage-F work.
 
 No final ecosystem/package naming, public API freeze, release tag or merge to `main` is implied.
