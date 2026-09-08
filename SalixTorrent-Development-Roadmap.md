@@ -2,8 +2,8 @@
 
 **Current application version string:** `0.5.0`
 **Roadmap status:** v0.5.0 released; post-v0.5.0 ecosystem extraction on `dev`
-**Current implementation checkpoint:** Tranche 9 designer metadata and hierarchy snapshots are Windows-validated and pushed through acceptance-documentation checkpoint `d939f6443a95490881925ca8bdb93e5e94f7ec2c` (implementation commit `5b54084f2d21dc331deb4614c15119ad94cab374`); Tranche 10 snapshot property commands and undo/redo are prepared on top of that checkpoint
-**Current real Windows regression baseline:** 602 / 602 for accepted Tranche 9 with one expected non-Windows shell-behavior skip; Dear PyGui and Tkinter resize/structure smoke checks pass
+**Current implementation checkpoint:** Tranche 10 designer property commands and undo/redo are Windows-validated at implementation commit `3968bd2`, built on pushed Tranche 9 checkpoint `d939f6443a95490881925ca8bdb93e5e94f7ec2c`
+**Current real Windows regression baseline:** 616 / 616 for accepted Tranche 10 with one expected non-Windows shell-behavior skip; Dear PyGui, Tkinter and SalixTorrent visual smoke checks pass
 
 This roadmap records intended engineering direction rather than promising dates or release numbers. Changes should remain incremental, testable, reviewable, and compatible with SalixTorrent's existing protocol, persistence, packaging, localization, and cross-platform boundaries.
 
@@ -749,7 +749,7 @@ This tranche intentionally stopped before executable reconstruction/factories, l
 
 The future designer should itself use the same engine/framework wherever practical.
 
-### A12. WYSIWYG designer prerequisites — snapshot property commands and undo/redo prepared
+### A12. WYSIWYG designer prerequisites — snapshot property commands and undo/redo complete
 
 The next Stage-F slice adds editing semantics without pretending that a serialized snapshot is already an executable application project:
 
@@ -763,7 +763,7 @@ The next Stage-F slice adds editing semantics without pretending that a serializ
 - the relocation proof edits and undoes a snapshot after the framework package is copied/renamed, while the blank-application regression proves the real demo hierarchy can be edited as document data without changing its live components;
 - tracked `validate_tranche.bat` now automates non-visual tranche validation into `%USERPROFILE%\Desktop\console_output.txt` while leaving Dear PyGui/Tkinter visual inspection manual.
 
-Preparation advances canonical discovery from 602 to **616 tests** on display-less Linux with 58 expected GUI/platform skips. Real-Windows acceptance remains required before commit/push. Canonical localization remains 1,337 strings and `APP_VERSION` remains `0.5.0`.
+Preparation advanced canonical discovery from 602 to **616 tests** on display-less Linux with 58 expected GUI/platform skips. After validator-launch and Tk/Tcl lifecycle repairs, real-Windows acceptance passes both complete discovery forms at **616 / 616** with one expected skip. The focused designer-editing, relocation, GUI-component and Tkinter gates pass, canonical localization remains 1,337 strings, manual Dear PyGui/Tkinter/SalixTorrent visual smoke passes, and the accepted implementation commit is `3968bd2`. `APP_VERSION` remains `0.5.0`.
 
 This tranche deliberately stops before reconstructing executable components from edited snapshots, mutating a live preview tree, structural insert/remove/reparent commands, copy/paste, drag/drop/resize handles, persisted command history, a final project schema or API/package naming freeze. Whole immutable snapshots are retained in history for correctness while the design contract is still provisional; later storage optimization must preserve the same explicit command semantics.
 
@@ -935,7 +935,8 @@ previous pushed dev checkpoint:   5cef12f534dfc44a8536f504d1aa7773644f5428
 accepted Tranche-9 Windows gate:  602 / 602 OK, skipped=1
 accepted Tranche-9 implementation: 5b54084f2d21dc331deb4614c15119ad94cab374
 pushed Tranche-9 closure:        d939f6443a95490881925ca8bdb93e5e94f7ec2c
-prepared Tranche-10 Linux gate:   616 / 616 OK, skipped=58
+accepted Tranche-10 implementation: 3968bd2
+accepted Tranche-10 Windows gate: 616 / 616 OK, skipped=1
 committed Tkinter/blank-app baseline: 516 / 516, Windows skipped=1
 committed live-data/state-grid baseline: 529 / 529, Windows skipped=1
 committed interactive-data baseline: 547 / 547, Windows skipped=1
@@ -943,7 +944,7 @@ committed command/mixed-layout baseline: 563 / 563, Windows skipped=1
 committed structural-region baseline: 581 / 581, Windows skipped=1
 committed designer-geometry baseline: 591 / 591, Windows skipped=1
 accepted designer-metadata baseline: 602 / 602 Windows, skipped=1; display-less Linux preparation also passed 602 / 602 with expected GUI/platform skips
-prepared designer-editing baseline: 616 / 616 display-less Linux, skipped=58; Windows acceptance pending
+accepted designer-editing baseline: 616 / 616 Windows, skipped=1; display-less Linux preparation also passed 616 / 616 with expected GUI/platform skips
 
 Localization:
 canonical catalog:               1337 entries
@@ -964,7 +965,7 @@ The v0.5.0 live/release smoke covered startup/navigation, repeated resizing, ord
 Post-v0.5.0 development should preserve this release boundary while accounting explicitly for every intentional test-count or behavior change introduced on `dev`.
 ---
 
-## 23. Tenth post-v0.5.0 implementation checkpoint — prepared
+## 23. Tenth post-v0.5.0 implementation checkpoint — Windows validated
 
 The tenth `dev` tranche adds the first explicit editing/history layer above the designer metadata snapshots accepted in Tranche 9. `app/framework/designer_editing.py` remains backend-neutral and standard-library-only. Its command objects transform immutable `DesignerSnapshot` values; they do not reach into Dear PyGui, Tkinter, SalixTorrent models or live `Component` instances.
 
@@ -976,4 +977,4 @@ The relocation gate now edits and undoes a copied/renamed framework snapshot, an
 
 The tranche also introduces tracked `validate_tranche.bat`, which runs the focused designer gates, component/Tkinter regressions, localization extraction, both complete discovery forms, headless proof, compileall and Git whitespace/status checks and writes one complete report to `%USERPROFILE%\Desktop\console_output.txt`. Visual GUI checks intentionally remain manual.
 
-Preparation canonical discovery passes **616 / 616** on display-less Linux with 58 expected GUI/platform skips. Real-Windows acceptance is pending. No version bump, tag, merge to `main`, public API freeze or final project schema is implied. Structural hierarchy editing/reparenting, copy/paste, live preview reconstruction/mutation and draggable designer handles remain later Stage-F work.
+Preparation canonical discovery passes **616 / 616** on display-less Linux with 58 expected GUI/platform skips. After the Windows validator-launch repair and Tk/Tcl owner-thread lifecycle repair, both complete real-Windows discovery forms pass **616 / 616** with one expected skip; the one-command validator ends in `TRANCHE VALIDATION PASSED`, and manual Dear PyGui/Tkinter/SalixTorrent visual smoke passes. The accepted implementation commit is `3968bd2`. No version bump, tag, merge to `main`, public API freeze or final project schema is implied. Structural hierarchy editing/reparenting, copy/paste, live preview reconstruction/mutation and draggable designer handles remain later Stage-F work.

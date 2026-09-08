@@ -477,7 +477,7 @@ This stage is substantially proven. Tranche 4 extracted keyed live tables and ca
 
 ### Stage F — designer prerequisites
 
-This stage is now active. Tranche 8 established geometry that a future designer can describe faithfully: parent-local start/centre/end/stretch anchors, minimum/maximum size constraints, optional split-pane maximums and JSON-safe fixed/anchored placement descriptors. Tranche 9 added the metadata/hierarchy layer with provisional component type/property descriptions, stable live designer identities and JSON-safe component-tree snapshots, and was pushed through acceptance-documentation checkpoint `d939f6443a95490881925ca8bdb93e5e94f7ec2c`. Tranche 10 now prepares the first document-editing layer: typed snapshot property commands, explicit reset-to-unset semantics, inspector-facing property state, deterministic undo/redo and clean/dirty tracking, all without mutating live GUI objects. The mixed-layout rule remains fundamental: designer metadata records each container relationship rather than assuming that a whole form uses one universal table/grid or one universal absolute-coordinate plane. Executable reconstruction/live preview mutation, structural reparenting, copy/paste, drag/drop handles and the final project schema remain later Stage-F work.
+This stage is now active. Tranche 8 established geometry that a future designer can describe faithfully: parent-local start/centre/end/stretch anchors, minimum/maximum size constraints, optional split-pane maximums and JSON-safe fixed/anchored placement descriptors. Tranche 9 added the metadata/hierarchy layer with provisional component type/property descriptions, stable live designer identities and JSON-safe component-tree snapshots, and was pushed through acceptance-documentation checkpoint `d939f6443a95490881925ca8bdb93e5e94f7ec2c`. Tranche 10 adds the first accepted document-editing layer: typed snapshot property commands, explicit reset-to-unset semantics, inspector-facing property state, deterministic undo/redo and clean/dirty tracking, all without mutating live GUI objects. The mixed-layout rule remains fundamental: designer metadata records each container relationship rather than assuming that a whole form uses one universal table/grid or one universal absolute-coordinate plane. Executable reconstruction/live preview mutation, structural reparenting, copy/paste, drag/drop handles and the final project schema remain later Stage-F work.
 
 ### Stage G — naming, API and package boundaries
 
@@ -800,7 +800,7 @@ No final ecosystem/package naming, public API freeze, release tag or merge to `m
 
 ---
 
-## 23. Tenth post-v0.5.0 implementation checkpoint — prepared
+## 23. Tenth post-v0.5.0 implementation checkpoint — Windows validated
 
 The tenth `dev` tranche introduces the first explicit editing/history layer above the designer metadata snapshot. `app/framework/designer_editing.py` remains standard-library-only and portable with the rest of `app/framework`. It accepts and returns immutable `DesignerSnapshot` values and therefore cannot accidentally reach into Dear PyGui/Tkinter handles or SalixTorrent application models.
 
@@ -812,6 +812,6 @@ The tenth `dev` tranche introduces the first explicit editing/history layer abov
 
 The framework relocation proof now edits and undoes a snapshot after the package is copied and renamed. A product-neutral regression edits the blank application's real captured `Actions` node and proves the live `Button` object remains unchanged. This keeps the editing layer clearly document-oriented until a deliberate reconstruction/preview bridge is implemented.
 
-Tracked `validate_tranche.bat` now automates the non-visual acceptance sequence and writes a complete report to `%USERPROFILE%\Desktop\console_output.txt`; Dear PyGui/Tkinter/SalixTorrent visual smoke remains a human gate. Preparation canonical discovery passes **616 / 616** on display-less Linux with 58 expected GUI/platform skips. Real-Windows acceptance remains pending.
+Tracked `validate_tranche.bat` now automates the non-visual acceptance sequence and writes a complete report to `%USERPROFILE%\Desktop\console_output.txt`; Dear PyGui/Tkinter/SalixTorrent visual smoke remains a human gate. Preparation canonical discovery passes **616 / 616** on display-less Linux with 58 expected GUI/platform skips. After repairing the Windows validator launch path and Tk/Tcl owner-thread teardown, both complete real-Windows discovery forms pass **616 / 616** with one expected skip, the validator ends in `TRANCHE VALIDATION PASSED`, manual visual smoke passes, and the accepted implementation commit is `3968bd2`.
 
 This checkpoint deliberately does not implement executable reconstruction, live preview mutation, hierarchy insert/remove/reparent commands, copy/paste, drag/drop or resize handles, persistent history, a final project document/schema or API/package naming freeze.
