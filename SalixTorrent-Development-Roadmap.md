@@ -2,9 +2,10 @@
 
 **Current application version string:** `0.5.0`
 **Roadmap status:** v0.5.0 released; post-v0.5.0 ecosystem extraction on `dev`
-**Current implementation checkpoint:** Tranche 12 is published at `8d05ca8b059cef0ba386f324c215f2e80a9bfa83`; Tranche 13 transactional designer-preview ownership/rebuild is prepared
-**Current real Windows regression baseline:** 643 / 643 for published Tranche 12 with one expected non-Windows shell-behavior skip; Tranche 13 preparation baseline is 655 / 655 on Linux
+**Current implementation checkpoint:** Tranche 12 is published at `8d05ca8b059cef0ba386f324c215f2e80a9bfa83`; Tranche 13 transactional designer-preview ownership/rebuild is Windows-accepted and committed locally at `ddfb3ef2269acb33484cd6fe2f99af47fa40140f`, with publication pending this documentation closure
+**Current real Windows regression baseline:** 655 / 655 for accepted Tranche 13 in both discovery forms with one expected non-Windows shell-behavior skip
 **Accepted Tranche 12 baseline:** 643 / 643 in both real-Windows discovery forms with one expected skip; preview 12 / 12, designer/relocation 56 / 56, GUI components 64 / 64, Tkinter 22 / 22, visuals and pre-commit passed; closure/push checkpoint `8d05ca8b059cef0ba386f324c215f2e80a9bfa83`
+**Accepted Tranche 13 baseline:** 655 / 655 in both real-Windows discovery forms with one expected skip; preview host 11 / 11, designer/relocation 67 / 67, GUI components 64 / 64, Tkinter 23 / 23, localization current, visuals and pre-commit passed; implementation commit `ddfb3ef2269acb33484cd6fe2f99af47fa40140f`, publication pending documentation closure
 
 This roadmap records intended engineering direction rather than promising dates or release numbers. Changes should remain incremental, testable, reviewable, and compatible with SalixTorrent's existing protocol, persistence, packaging, localization, and cross-platform boundaries.
 
@@ -791,9 +792,9 @@ Tranche 12 added the first reconstruction path from supported immutable `Designe
 
 Real-Windows acceptance passed the 12-test preview gate, 56-test designer/relocation gate, 64 GUI-component tests, 22 Tkinter tests and both complete **643 / 643** discovery forms with one expected skip. Manual visual smoke and pre-commit passed. The implementation commit `688bcff` plus its Windows-acceptance documentation closure were published together at `8d05ca8b059cef0ba386f324c215f2e80a9bfa83`.
 
-### A15. WYSIWYG designer prerequisites — transactional preview ownership/rebuild prepared
+### A15. WYSIWYG designer prerequisites — transactional preview ownership/rebuild Windows accepted; publication pending
 
-Tranche 13 adds an optional `DesignerPreviewHost` above the code-first component framework. It owns one reconstructed preview for a `DesignerEditSession`, prepares candidate trees transactionally, and replaces the accepted preview only after reconstruction/build succeeds. Generic checked execute/undo/redo gates keep preview validation outside the editing core, so ordinary component applications remain independent of designer tooling.
+Tranche 13 adds an optional `DesignerPreviewHost` above the code-first component framework. It owns one reconstructed preview for a `DesignerEditSession`, prepares candidate trees transactionally, and replaces the accepted preview only after reconstruction/build succeeds. Generic checked execute/undo/redo gates keep preview validation outside the editing core, so ordinary component applications remain independent of designer tooling. Real-Windows acceptance passed 11 / 11 preview-host tests, 67 / 67 designer/relocation tests, 64 GUI-component tests, 23 Tkinter tests and both complete **655 / 655** discovery forms with one expected skip after repairing a pre-existing temporary-directory lifetime race in a persistence regression. Manual visual smoke and pre-commit passed; the accepted implementation commit is `ddfb3ef2269acb33484cd6fe2f99af47fa40140f`, with publication paused only for the documentation closure.
 
 The architecture explicitly preserves two equal authoring paths: direct Python composition and future designer-authored documents both converge on the same semantic `Component` tree, application runtime and backend adapters. SalixTorrent remains the primary code-first reference application; the future RAD editor is an additional authoring surface rather than a required runtime dependency.
 
