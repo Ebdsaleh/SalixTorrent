@@ -47,6 +47,7 @@ from app.framework.components import (
     positioned,
 )
 from app.framework.command_menu import CommandMenu, CommandMenuHost
+from app.framework.designer_preview import DesignerPreviewContext, reconstruct_designer_snapshot
 from app.framework.interactions import CommandSet, CommandSpec
 from app.framework.live_data import (
     LiveTable,
@@ -165,6 +166,30 @@ class TkinterBackendLiveTests(unittest.TestCase):
             PresentationCapability.COMMAND_MENUS,
         ):
             self.assertTrue(backend.supports(capability))
+
+    def test_reconstructed_blank_snapshot_builds_through_real_tkinter_renderer(self):
+        from app.engine.presentation_backends import create_dearpygui_backend
+        from examples.ecosystem_blank_app import DemoView
+
+        class SnapshotHost:
+            presentation = create_dearpygui_backend()
+
+        snapshot = DemoView(SnapshotHost()).capture_designer_snapshot()
+        preview = reconstruct_designer_snapshot(
+            snapshot,
+            context=DesignerPreviewContext(
+                layout_coordinator=LayoutCoordinator(TkinterLayoutHost(self.renderer))
+            ),
+        )
+        preview.root.build(renderer=self.renderer)
+        self.root.update_idletasks()
+        self.assertTrue(preview.root.exists())
+        actions = next(
+            node
+            for node in snapshot.root.walk()
+            if node.type_key == "control.button" and node.properties.get("label") == "Actions"
+        )
+        self.assertTrue(preview.component(actions.node_id).exists())
 
     def test_common_component_tree_builds_and_round_trips_values(self):
         name = TextInput(default_value="Ada", layout=ControlLayout(width=180))

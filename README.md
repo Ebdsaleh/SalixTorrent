@@ -10,7 +10,7 @@ SalixTorrent is a desktop BitTorrent client written in Python with a custom asyn
 
 **Post-v0.5.0 direction — modular application ecosystem:** SalixTorrent remains the reference application while reusable behavior is extracted downward into two cooperating layers: an application engine/runtime and an optional RAD/application framework. Dear PyGui is the current reference desktop backend, Tkinter is now the validated compatibility implementation for the common GUI surface, and headless/CLI operation remains first-class. Realtime telemetry/graphs, generic network/runtime awareness, lifecycle/presentation-host boundaries and rich live-data views are explicit extraction candidates before final framework naming or API freeze. See `SalixTorrent-Ecosystem-Architecture.md`.
 
-**Current `dev` extraction — structural designer hierarchy commands:** Tranche 10 designer property editing/undo history is Windows-validated at implementation commit `3968bd2` and closed at documentation checkpoint `df675e89bf025b570a339c7b3fb3c3518262d72a`. The current prepared tranche adds explicit child-slot/cardinality/relationship metadata plus immutable snapshot insert/remove/reorder/reparent commands. Structural edits preserve stable designer IDs, validate grid/tab/split/placement relationship semantics, share the existing `DesignerEditSession` undo/redo/dirty history, and remain document-only: the blank-application proof moves the real captured `Actions` node without mutating its live component tree. The validator now records both `HEAD` and `origin/dev`, targets **630 tests** for this tranche, and `validate_tranche.bat` is explicitly exempted from the repository's generic `*.bat` ignore rule so the launcher is actually version-controlled. Executable component reconstruction, live preview synchronization, copy/paste, drag/drop handles, persistent project documents and final ecosystem naming/API freeze remain deferred.
+**Current `dev` extraction — first snapshot-to-preview reconstruction boundary:** Tranche 11 structural hierarchy editing passed both real-Windows 630-test discovery forms with one expected skip, passed manual Dear PyGui/Tkinter/SalixTorrent regression smoke, and was committed/pushed as `79edec6` (`Add designer structural hierarchy editing`). The current prepared tranche adds a standard-library-only `designer_preview` registry that reconstructs supported `DesignerSnapshot` trees into new backend-neutral `Component` objects while preserving designer node IDs and container-local grid/tab/split/placement semantics. The product-neutral blank application is fully previewable and descriptor-round-trips through the new bridge; a reconstructed copy also builds through the real Tkinter renderer under Xvfb. Runtime callbacks, application bindings, specialized semantic-field reconstruction, live synchronization, copy/paste, drag/drop handles, persistent project documents and final ecosystem naming/API freeze remain deferred. The validator now targets **643 tests** for this tranche.
 
 **v0.4.0 milestone — durability and transfer lifecycle:** SalixTorrent built on the v0.3.0 protocol/network foundation with an offline-first localization system, semantic Help/Glossary content, provider-neutral translation tooling, backend-neutral application settings and session-state persistence, optional SalixORM/SQLite adapters, a fully tracked `unittest` regression suite, and durable per-torrent seeding goals. Timed goals use an instanced baseline so a newly requested duration starts from the moment it is applied, while cumulative Seed Time remains available as historical telemetry.
 
@@ -343,7 +343,7 @@ The engine/runtime should eventually provide the intact machinery needed to spin
 
 Dear PyGui remains the current reference SalixTorrent desktop backend. Tkinter is now the validated compatibility implementation for the common GUI surface: it implements the same component, layout, scene, and realtime-plot contracts but is not required to reproduce Dear PyGui-specific capabilities or presentation pixel-for-pixel. Headless/CLI operation remains first-class and does not require a graphical toolkit. A future GLFW/OpenGL path is permitted by the architecture where a real project justifies it, but it is not a current dependency or parity requirement.
 
-The realtime Speed, runtime/network, second-backend blank-application, live-data/interaction, command-menu/mixed-layout, structural-region, responsive-anchor, designer-metadata and designer-editing tranches are committed on `dev`. The current prepared structural-designer layer adds explicit hierarchy mutation commands and parent-slot constraints on immutable snapshots while remaining independent of Dear PyGui/Tkinter runtime objects and deliberately avoiding live-preview reconstruction.
+The realtime Speed, runtime/network, second-backend blank-application, live-data/interaction, command-menu/mixed-layout, structural-region, responsive-anchor, designer-metadata, designer-editing and structural-hierarchy tranches are committed on `dev`. The current prepared preview layer reconstructs supported immutable designer snapshots into fresh backend-neutral component trees while remaining independent of Dear PyGui/Tkinter imports and deliberately avoiding application callbacks or live synchronization.
 
 Final ecosystem naming, component vocabulary, public API freeze and external repository/package splits remain deliberately deferred until the wider engine/framework boundary has been proven with more than one presentation backend and at least one small non-SalixTorrent application.
 
@@ -405,6 +405,8 @@ SalixTorrent/
 │   │   ├── test_gui_components.py
 │   │   ├── test_designer_model.py
 │   │   ├── test_designer_editing.py
+│   │   ├── test_designer_structure.py
+│   │   ├── test_designer_preview.py
 │   │   ├── test_realtime_visualization.py
 │   │   ├── test_live_data.py
 │   │   ├── test_interactive_data_migration.py
@@ -450,6 +452,8 @@ SalixTorrent/
 │   ├── framework/
 │   │   ├── designer.py
 │   │   ├── designer_editing.py
+│   │   ├── designer_structure.py
+│   │   ├── designer_preview.py
 │   │   ├── property_cascade.py
 │   │   ├── geometry.py
 │   │   ├── responsive.py

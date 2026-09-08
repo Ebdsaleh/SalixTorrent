@@ -477,7 +477,7 @@ This stage is substantially proven. Tranche 4 extracted keyed live tables and ca
 
 ### Stage F — designer prerequisites
 
-This stage is now active. Tranche 8 established geometry that a future designer can describe faithfully: parent-local start/centre/end/stretch anchors, minimum/maximum size constraints, optional split-pane maximums and JSON-safe fixed/anchored placement descriptors. Tranche 9 added provisional component metadata, stable identities and JSON-safe component-tree snapshots. Tranche 10 added accepted property-level document editing with typed validation, undo/redo and dirty tracking, closed at checkpoint `df675e89bf025b570a339c7b3fb3c3518262d72a`. The current prepared Tranche 11 adds explicit child-slot metadata plus immutable insert/remove/reorder/reparent commands while preserving relationship semantics and stable node IDs. The mixed-layout rule remains fundamental: designer metadata records each container relationship rather than assuming that a whole form uses one universal table/grid or one universal absolute-coordinate plane. Executable reconstruction/live preview synchronization, copy/paste, pointer-driven drag/drop handles and the final project schema remain later Stage-F work.
+This stage is now active. Tranche 8 established geometry that a future designer can describe faithfully: parent-local start/centre/end/stretch anchors, minimum/maximum size constraints, optional split-pane maximums and JSON-safe fixed/anchored placement descriptors. Tranche 9 added provisional component metadata, stable identities and JSON-safe component-tree snapshots. Tranche 10 added accepted property-level document editing with typed validation, undo/redo and dirty tracking, closed at checkpoint `df675e89bf025b570a339c7b3fb3c3518262d72a`. Tranche 11 added accepted child-slot metadata plus immutable insert/remove/reorder/reparent commands and was pushed as `79edec6`. The current prepared Tranche 12 adds the first snapshot-to-preview reconstruction bridge for the component/layout subset proven by the blank application. The mixed-layout rule remains fundamental: reconstruction restores semantic grid/tab/split/placement relationships instead of flattening a whole form into toolkit coordinates. Live preview synchronization, application callback resolution, specialized field factories, copy/paste, pointer-driven drag/drop handles and the final project schema remain later Stage-F work.
 
 ### Stage G — naming, API and package boundaries
 
@@ -816,7 +816,7 @@ Tracked `validate_tranche.bat` now automates the non-visual acceptance sequence 
 
 This checkpoint deliberately did not implement executable reconstruction, live preview mutation, hierarchy insert/remove/reparent commands, copy/paste, drag/drop or resize handles, persistent history, a final project document/schema or API/package naming freeze.
 
-### Structural snapshot editing — Tranche 11 prepared
+### Structural snapshot editing — Tranche 11 accepted
 
 `DesignerChildSlotSpec` extends provisional type metadata with explicit structural relationship rules. A type can now describe named child slots, whether a slot accepts one or many children, which relationship metadata fields are required, and which fields form a sibling-unique identity. Current framework metadata covers ordinary children, grid cells, placed/positioned children, tab pages, split panes and semantic composite-field slots.
 
@@ -824,6 +824,18 @@ This checkpoint deliberately did not implement executable reconstruction, live p
 
 The existing `DesignerEditSession` is the only history owner: structural helper methods route through the same command execution path as property edits, so undo/redo, dirty-state and redo-branch invalidation remain consistent. No live component is mutated. The blank application proves this by moving the captured `Actions` node while its real runtime component tree stays unchanged, and the relocation proof exercises insertion/undo after package rename.
 
-Preparation passes 630 / 630 complete tests on display-less Linux, including a 14-test structural gate and 44-test combined designer/relocation gate; Xvfb canonical discovery also passes 630 / 630. Real-Windows acceptance remains the publication gate.
+Preparation passed 630 / 630 complete tests on display-less Linux, including a 14-test structural gate and 44-test combined designer/relocation gate; Xvfb canonical discovery also passed 630 / 630. Real-Windows acceptance then passed both complete discovery forms at 630 / 630 with one expected skip, manual Dear PyGui/Tkinter/SalixTorrent smoke passed, pre-commit passed, and the tranche was committed/pushed as `79edec6` (`Add designer structural hierarchy editing`).
 
 This layer still does not define component factories, preview synchronization, copy/paste, drag/drop gestures, selection overlays, persistent undo history, project storage/versioning or a final public framework API.
+
+### Snapshot-to-preview reconstruction — Tranche 12 prepared
+
+`app/framework/designer_preview.py` introduces a separate provisional reconstruction registry rather than teaching snapshots about a concrete GUI toolkit. `DesignerPreviewCatalog` maps internal type keys to backend-neutral builders, `DesignerPreviewContext` carries only optional `LayoutCoordinator` support, and `DesignerPreviewBuild` returns a fresh root plus stable node-ID/component bindings. The module stays inside the relocatable framework and imports no SalixTorrent product or engine backend.
+
+The first registry reconstructs the primitive controls and structural/layout containers exercised by the blank application, including local fixed/anchored placement, dense grids, semantic tab pages and weighted split panes. Application callbacks and bindings are deliberately omitted, making the result an inert preview tree rather than a second running application. Specialized semantic field composites are explicitly reported as unsupported before partial reconstruction until their constructor-specific document contracts are proven.
+
+The blank application can rebuild its own captured 31-node designer hierarchy through this bridge and recapture it descriptor-for-descriptor with the same designer IDs. Property edits and hierarchy edits feed the same reconstruction path without touching the original live components. A real Tkinter/Xvfb test builds the reconstructed blank hierarchy through the existing renderer after injecting a Tkinter-backed `LayoutCoordinator`, proving the bridge is not merely a JSON transformation.
+
+Preparation advances complete discovery to **643 tests**. The preview gate passes 12 / 12, combined designer/relocation focus passes 56 / 56, the real Tkinter backend passes 22 / 22 under Xvfb, display-less canonical and plain discovery pass 643 / 643 with expected GUI/platform skips, localization remains 1,337/current and headless/compileall/Git checks remain clean. Real-Windows automation and visual regression acceptance remain required before publication.
+
+This tranche does not synchronize an already-rendered preview after every edit, resolve application callbacks/services, reconstruct the four specialized semantic-field composites, implement copy/paste/duplicate or drag/drop/resize handles, persist project documents/history, or freeze public package/type names.

@@ -96,6 +96,7 @@ class FrameworkPackagingTests(unittest.TestCase):
                 assert "portable_framework.designer" in imported
                 assert "portable_framework.designer_editing" in imported
                 assert "portable_framework.designer_structure" in imported
+                assert "portable_framework.designer_preview" in imported
                 assert "portable_framework.geometry" in imported
                 assert "portable_framework.components.regions" in imported
                 assert "portable_framework.live_data" in imported
@@ -119,7 +120,7 @@ class FrameworkPackagingTests(unittest.TestCase):
                 check=False,
             )
             self.assertEqual(0, result.returncode, result.stderr or result.stdout)
-            self.assertGreaterEqual(int(result.stdout.strip()), 23)
+            self.assertGreaterEqual(int(result.stdout.strip()), 24)
 
     def test_relocated_framework_contracts_are_usable_without_application_package(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -157,6 +158,7 @@ class FrameworkPackagingTests(unittest.TestCase):
                 )
                 from portable_framework.designer_editing import DesignerEditSession
                 from portable_framework.designer_structure import locate_designer_node
+                from portable_framework.designer_preview import reconstruct_designer_snapshot
                 from portable_framework.documentation import DocPage, DocumentationTheme
                 from portable_framework.geometry import ContentMetrics, content_bounds, split_sizes
                 from portable_framework.data_view import DataRecord, DataView, SortDirection, SortTerm
@@ -201,6 +203,9 @@ class FrameworkPackagingTests(unittest.TestCase):
                 assert restored_designer_snapshot.root.node_id == "portable-root"
                 assert restored_designer_snapshot.node_count == 2
                 assert restored_designer_snapshot.to_descriptor() == designer_snapshot.to_descriptor()
+                designer_preview = reconstruct_designer_snapshot(restored_designer_snapshot)
+                assert designer_preview.component("portable-root") is designer_preview.root
+                assert designer_preview.recapture().to_descriptor() == restored_designer_snapshot.to_descriptor()
                 designer_session = DesignerEditSession(restored_designer_snapshot)
                 designer_button = next(
                     node for node in designer_session.snapshot.root.walk()

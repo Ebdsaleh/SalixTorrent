@@ -2,9 +2,9 @@
 
 **Current application version string:** `0.5.0`
 **Roadmap status:** v0.5.0 released; post-v0.5.0 ecosystem extraction on `dev`
-**Current implementation checkpoint:** Tranche 11 structural hierarchy mutation/reparenting is prepared on accepted Tranche 10 closure checkpoint `df675e89bf025b570a339c7b3fb3c3518262d72a`
-**Current real Windows regression baseline:** 616 / 616 for accepted Tranche 10 with one expected non-Windows shell-behavior skip; Dear PyGui, Tkinter and SalixTorrent visual smoke checks pass
-**Prepared Tranche 11 baseline:** 630 / 630 on display-less Linux with 58 expected GUI/platform skips; real-Windows acceptance pending
+**Current implementation checkpoint:** Tranche 11 structural hierarchy editing is Windows-accepted and pushed as `79edec6`; Tranche 12 snapshot-to-preview reconstruction is prepared on that checkpoint
+**Current real Windows regression baseline:** 630 / 630 for accepted Tranche 11 with one expected non-Windows shell-behavior skip; Dear PyGui, Tkinter and SalixTorrent visual smoke checks pass
+**Prepared Tranche 12 baseline:** 643 / 643 on display-less Linux with expected GUI/platform skips; real-Windows acceptance pending
 
 This roadmap records intended engineering direction rather than promising dates or release numbers. Changes should remain incremental, testable, reviewable, and compatible with SalixTorrent's existing protocol, persistence, packaging, localization, and cross-platform boundaries.
 
@@ -956,7 +956,8 @@ pushed Tranche-9 closure:        d939f6443a95490881925ca8bdb93e5e94f7ec2c
 accepted Tranche-10 implementation: 3968bd2
 accepted Tranche-10 closure:       df675e89bf025b570a339c7b3fb3c3518262d72a
 accepted Tranche-10 Windows gate: 616 / 616 OK, skipped=1
-prepared Tranche-11 baseline:     630 / 630 Linux, Windows acceptance pending
+accepted Tranche-11 baseline:     630 / 630 Windows, skipped=1; pushed as 79edec6
+prepared Tranche-12 baseline:     643 / 643 Linux, Windows acceptance pending
 committed Tkinter/blank-app baseline: 516 / 516, Windows skipped=1
 committed live-data/state-grid baseline: 529 / 529, Windows skipped=1
 committed interactive-data baseline: 547 / 547, Windows skipped=1
@@ -965,6 +966,8 @@ committed structural-region baseline: 581 / 581, Windows skipped=1
 committed designer-geometry baseline: 591 / 591, Windows skipped=1
 accepted designer-metadata baseline: 602 / 602 Windows, skipped=1; display-less Linux preparation also passed 602 / 602 with expected GUI/platform skips
 accepted designer-editing baseline: 616 / 616 Windows, skipped=1; display-less Linux preparation also passed 616 / 616 with expected GUI/platform skips
+accepted designer-structure baseline: 630 / 630 Windows, skipped=1
+prepared designer-preview baseline: 643 / 643 Linux; Windows acceptance pending
 
 Localization:
 canonical catalog:               1337 entries
@@ -1001,7 +1004,7 @@ Preparation canonical discovery passes **616 / 616** on display-less Linux with 
 
 ---
 
-## 24. Eleventh post-v0.5.0 implementation checkpoint — prepared
+## 24. Eleventh post-v0.5.0 implementation checkpoint — accepted
 
 The eleventh `dev` tranche adds structural document editing above the accepted property/history layer. Component type descriptors now include provisional child-slot metadata through `DesignerChildSlotSpec`, recording relationship names, cardinality, required metadata and sibling identity fields. This makes hierarchy mutation rules inspectable rather than burying them inside future editor widgets.
 
@@ -1011,6 +1014,24 @@ The eleventh `dev` tranche adds structural document editing above the accepted p
 
 The blank ecosystem application proves the boundary by reparenting its captured `Actions` node between positioned panels while the original live component hierarchy remains untouched. The copied/renamed framework proof also performs and undoes a structural insertion without importing SalixTorrent or a GUI toolkit.
 
-Preparation advances the complete suite from 616 to **630 tests**. The structural gate passes 14 / 14, combined designer/relocation focus passes 44 / 44, display-less canonical and plain discovery pass 630 / 630 with 58 expected skips, Xvfb canonical discovery passes 630 / 630 with 38 expected skips, and the Tkinter live backend remains 21 / 21. Real-Windows `validate_tranche.bat` plus manual Dear PyGui/Tkinter/SalixTorrent visual smoke are still required before commit/push.
+Preparation advanced the complete suite from 616 to **630 tests**. The structural gate passed 14 / 14, combined designer/relocation focus passed 44 / 44, display-less canonical and plain discovery passed 630 / 630 with 58 expected skips, Xvfb canonical discovery passed 630 / 630 with 38 expected skips, and the Tkinter live backend remained 21 / 21. Real-Windows `validate_tranche.bat` then passed both complete discovery forms at **630 / 630** with one expected skip; manual Dear PyGui/Tkinter/SalixTorrent visual smoke and `pre_commit_check.bat` also passed. The tranche was committed and pushed as `79edec6` (`Add designer structural hierarchy editing`).
 
-The accepted Tranche-10 base for this work is closure commit `df675e89bf025b570a339c7b3fb3c3518262d72a`; `APP_VERSION` remains `0.5.0`. No release tag, merge to `main`, live preview reconstruction, drag/drop UI, copy/paste, persistent project schema or public API freeze is introduced.
+The accepted Tranche-10 base for this work is closure commit `df675e89bf025b570a339c7b3fb3c3518262d72a`; `APP_VERSION` remains `0.5.0`. No release tag, merge to `main`, live preview synchronization, drag/drop UI, copy/paste, persistent project schema or public API freeze is introduced.
+
+---
+
+## 25. Twelfth post-v0.5.0 implementation checkpoint — prepared
+
+The twelfth `dev` tranche introduces the first deliberate reconstruction boundary from immutable designer documents back into executable framework components. `app/framework/designer_preview.py` remains standard-library-only and backend-neutral: it does not import Dear PyGui, Tkinter adapters, SalixTorrent views or application models.
+
+`DesignerPreviewCatalog` maps provisional designer type keys to reconstruction builders. `DesignerPreviewContext` supplies only reusable layout coordination, while `DesignerPreviewBuild` owns the new root plus a stable mapping from every designer node ID to its reconstructed `Component`. `reconstruct_designer_snapshot(...)` first reports unsupported types before constructing any partial tree, then rebuilds children and parents through the registry. `DesignerPreviewBuild.recapture()` rebinds the original node IDs and produces a canonical snapshot of the reconstructed tree.
+
+The initial framework preview registry covers the primitive controls and container/structure types used by the product-neutral blank application: labels/buttons/value controls, rows/columns/grids, sections/dialogs, placed/positioned containers, tab pages/tabs, split panels and generic labeled fields. Fixed/anchored placement metadata is restored through `placement_from_descriptor(...)`; grids remain semantic row/column relationships and require a dense rectangular shape for current runtime `ControlGrid`; tabs and split panes retain keys and sizing metadata.
+
+Callbacks are intentionally not reconstructed. A preview button or value control is inert unless a later runtime/application layer explicitly binds behavior. The four specialized semantic-field composites (`field.labeled_combo`, `field.labeled_numeric`, `field.numeric_unit`, `field.duration`) are also intentionally reported as unsupported in this pass because their constructors synthesize internal children; supporting them should be based on an explicit semantic reconstruction contract rather than hidden object surgery. Custom preview catalogs can extend support without mutating the framework default.
+
+`DemoView.reconstruct_designer_preview()` proves the real blank-application snapshot is fully supported and descriptor-round-trips with the same 31 designer IDs. Tests also edit a property and reparent a node through `DesignerEditSession`, reconstruct the edited document, and verify the original live component tree remains untouched. The framework relocation proof reconstructs/recaptures after package rename, and a real Tkinter/Xvfb regression builds the reconstructed blank hierarchy using an injected `LayoutCoordinator`.
+
+Preparation advances complete discovery from 630 to **643 tests**. Preview tests pass 12 / 12, combined designer/relocation focus passes 56 / 56, Tkinter live tests pass 22 / 22 under Xvfb, canonical and plain display-less discovery pass 643 / 643, localization remains 1,337/current, the headless blank application remains green, and compile/whitespace checks remain clean. Real-Windows `validate_tranche.bat` plus manual Dear PyGui/Tkinter/SalixTorrent visual regression smoke remain required before publication.
+
+The accepted/pushed Tranche-11 base identified in the supplied Git evidence is `79edec6`; the next Windows validator report will record its full 40-character `HEAD`/`origin/dev` identity. `APP_VERSION` remains `0.5.0`. This tranche does not add live preview synchronization, callback/service resolution, specialized semantic-field factories, copy/paste/duplicate, pointer-driven drag/drop/resize handles, project persistence/versioning or a public API freeze.

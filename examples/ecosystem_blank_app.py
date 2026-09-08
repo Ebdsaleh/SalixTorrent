@@ -49,6 +49,10 @@ from app.framework.designer import (
     FRAMEWORK_DESIGNER_CATALOG,
     capture_component_tree,
 )
+from app.framework.designer_preview import (
+    DesignerPreviewContext,
+    reconstruct_designer_snapshot,
+)
 from app.framework.interactions import CommandSet, CommandSpec
 from app.framework.live_data import (
     LiveTable,
@@ -235,6 +239,14 @@ class DemoView:
             self.root,
             catalog=FRAMEWORK_DESIGNER_CATALOG,
             identities=self.designer_identities,
+        )
+
+    def reconstruct_designer_preview(self):
+        """Rebuild the captured designer document as a new component tree."""
+
+        return reconstruct_designer_snapshot(
+            self.capture_designer_snapshot(),
+            context=DesignerPreviewContext(layout_coordinator=self.layout_coordinator),
         )
 
     def build(self):
