@@ -2,9 +2,9 @@
 
 **Current application version string:** `0.5.0`
 **Roadmap status:** v0.5.0 released; post-v0.5.0 ecosystem extraction on `dev`
-**Current implementation checkpoint:** Tranche 11 structural hierarchy editing is Windows-accepted and pushed as `79edec6`; Tranche 12 snapshot-to-preview reconstruction is prepared on that checkpoint
-**Current real Windows regression baseline:** 630 / 630 for accepted Tranche 11 with one expected non-Windows shell-behavior skip; Dear PyGui, Tkinter and SalixTorrent visual smoke checks pass
-**Prepared Tranche 12 baseline:** 643 / 643 on display-less Linux with expected GUI/platform skips; real-Windows acceptance pending
+**Current implementation checkpoint:** Tranche 12 snapshot-to-preview reconstruction is Windows-accepted and committed locally as `688bcff`; publication to `origin/dev` is pending the post-acceptance documentation closure
+**Current real Windows regression baseline:** 643 / 643 for accepted Tranche 12 with one expected non-Windows shell-behavior skip; Dear PyGui, Tkinter and SalixTorrent visual smoke checks pass
+**Accepted Tranche 12 baseline:** 643 / 643 in both real-Windows discovery forms with one expected skip; preview 12 / 12, designer/relocation 56 / 56, GUI components 64 / 64, Tkinter 22 / 22, visuals and pre-commit passed
 
 This roadmap records intended engineering direction rather than promising dates or release numbers. Changes should remain incremental, testable, reviewable, and compatible with SalixTorrent's existing protocol, persistence, packaging, localization, and cross-platform boundaries.
 
@@ -957,7 +957,7 @@ accepted Tranche-10 implementation: 3968bd2
 accepted Tranche-10 closure:       df675e89bf025b570a339c7b3fb3c3518262d72a
 accepted Tranche-10 Windows gate: 616 / 616 OK, skipped=1
 accepted Tranche-11 baseline:     630 / 630 Windows, skipped=1; pushed as 79edec6
-prepared Tranche-12 baseline:     643 / 643 Linux, Windows acceptance pending
+accepted Tranche-12 baseline:     643 / 643 Windows, skipped=1; local commit 688bcff, push pending
 committed Tkinter/blank-app baseline: 516 / 516, Windows skipped=1
 committed live-data/state-grid baseline: 529 / 529, Windows skipped=1
 committed interactive-data baseline: 547 / 547, Windows skipped=1
@@ -967,7 +967,7 @@ committed designer-geometry baseline: 591 / 591, Windows skipped=1
 accepted designer-metadata baseline: 602 / 602 Windows, skipped=1; display-less Linux preparation also passed 602 / 602 with expected GUI/platform skips
 accepted designer-editing baseline: 616 / 616 Windows, skipped=1; display-less Linux preparation also passed 616 / 616 with expected GUI/platform skips
 accepted designer-structure baseline: 630 / 630 Windows, skipped=1
-prepared designer-preview baseline: 643 / 643 Linux; Windows acceptance pending
+accepted designer-preview baseline: 643 / 643 Windows, skipped=1; local commit 688bcff, push pending
 
 Localization:
 canonical catalog:               1337 entries
@@ -1020,7 +1020,7 @@ The accepted Tranche-10 base for this work is closure commit `df675e89bf025b570a
 
 ---
 
-## 25. Twelfth post-v0.5.0 implementation checkpoint — prepared
+## 25. Twelfth post-v0.5.0 implementation checkpoint — Windows accepted; publication pending
 
 The twelfth `dev` tranche introduces the first deliberate reconstruction boundary from immutable designer documents back into executable framework components. `app/framework/designer_preview.py` remains standard-library-only and backend-neutral: it does not import Dear PyGui, Tkinter adapters, SalixTorrent views or application models.
 
@@ -1032,6 +1032,6 @@ Callbacks are intentionally not reconstructed. A preview button or value control
 
 `DemoView.reconstruct_designer_preview()` proves the real blank-application snapshot is fully supported and descriptor-round-trips with the same 31 designer IDs. Tests also edit a property and reparent a node through `DesignerEditSession`, reconstruct the edited document, and verify the original live component tree remains untouched. The framework relocation proof reconstructs/recaptures after package rename, and a real Tkinter/Xvfb regression builds the reconstructed blank hierarchy using an injected `LayoutCoordinator`.
 
-Preparation advances complete discovery from 630 to **643 tests**. Preview tests pass 12 / 12, combined designer/relocation focus passes 56 / 56, Tkinter live tests pass 22 / 22 under Xvfb, canonical and plain display-less discovery pass 643 / 643, localization remains 1,337/current, the headless blank application remains green, and compile/whitespace checks remain clean. Real-Windows `validate_tranche.bat` plus manual Dear PyGui/Tkinter/SalixTorrent visual regression smoke remain required before publication.
+Preparation advanced complete discovery from 630 to **643 tests**. Real-Windows acceptance then passed the 12 / 12 preview gate, 56 / 56 combined designer/relocation focus, 64 / 64 GUI-component regression and 22 / 22 Tkinter regression. Both complete discovery forms passed **643 / 643** with one expected skip, canonical localization remained 1,337/current, the one-command validator ended in `TRANCHE VALIDATION PASSED`, manual Dear PyGui/Tkinter/SalixTorrent visual regression smoke passed, and `pre_commit_check.bat` passed. The exact 12-file implementation boundary was committed locally as `688bcff` (`Add designer snapshot preview reconstruction`).
 
-The accepted/pushed Tranche-11 base identified in the supplied Git evidence is `79edec6`; the next Windows validator report will record its full 40-character `HEAD`/`origin/dev` identity. `APP_VERSION` remains `0.5.0`. This tranche does not add live preview synchronization, callback/service resolution, specialized semantic-field factories, copy/paste/duplicate, pointer-driven drag/drop/resize handles, project persistence/versioning or a public API freeze.
+The Windows validator captured the published Tranche-11 base as `79edec6cb4531759992b4f7fdb2d63ac8f122907` for both `HEAD` and `origin/dev` before the Tranche-12 commit. Publication of `688bcff` remains intentionally pending this post-acceptance documentation closure. `APP_VERSION` remains `0.5.0`. This tranche does not add live preview synchronization, callback/service resolution, specialized semantic-field factories, copy/paste/duplicate, pointer-driven drag/drop/resize handles, project persistence/versioning or a public API freeze. The next narrow Stage-F candidate is preview rebuild/ownership semantics driven by the current `DesignerEditSession.snapshot`.
