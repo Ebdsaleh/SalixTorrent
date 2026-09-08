@@ -93,6 +93,7 @@ class FrameworkPackagingTests(unittest.TestCase):
 
                 assert "portable_framework.components" in imported
                 assert "portable_framework.documentation" in imported
+                assert "portable_framework.designer" in imported
                 assert "portable_framework.geometry" in imported
                 assert "portable_framework.components.regions" in imported
                 assert "portable_framework.live_data" in imported
@@ -116,7 +117,7 @@ class FrameworkPackagingTests(unittest.TestCase):
                 check=False,
             )
             self.assertEqual(0, result.returncode, result.stderr or result.stdout)
-            self.assertGreaterEqual(int(result.stdout.strip()), 21)
+            self.assertGreaterEqual(int(result.stdout.strip()), 22)
 
     def test_relocated_framework_contracts_are_usable_without_application_package(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -145,6 +146,11 @@ class FrameworkPackagingTests(unittest.TestCase):
                     overlay,
                     placement_from_descriptor,
                     positioned,
+                )
+                from portable_framework.designer import (
+                    DesignerIdentityMap,
+                    DesignerSnapshot,
+                    capture_component_tree,
                 )
                 from portable_framework.documentation import DocPage, DocumentationTheme
                 from portable_framework.geometry import ContentMetrics, content_bounds, split_sizes
@@ -176,6 +182,20 @@ class FrameworkPackagingTests(unittest.TestCase):
                 )
 
                 button = Button("Run")
+                designer_root = PositionedPanel((
+                    positioned(button, x=12, y=8),
+                ), layout=ControlLayout(width=140, height=70))
+                designer_ids = DesignerIdentityMap(prefix="portable")
+                designer_ids.bind(designer_root, "portable-root")
+                designer_snapshot = capture_component_tree(
+                    designer_root, identities=designer_ids
+                )
+                restored_designer_snapshot = DesignerSnapshot.from_json(
+                    designer_snapshot.to_json()
+                )
+                assert restored_designer_snapshot.root.node_id == "portable-root"
+                assert restored_designer_snapshot.node_count == 2
+                assert restored_designer_snapshot.to_descriptor() == designer_snapshot.to_descriptor()
                 profile = ComponentLayoutProfile("probe")
                 page = DocPage(title="Portable")
                 theme = DocumentationTheme()

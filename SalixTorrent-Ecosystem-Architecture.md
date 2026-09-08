@@ -415,7 +415,9 @@ SalixTorrent itself now supplies the proof rather than relying only on the blank
 
 The first designer-geometry pass now adds parent-local anchors and constraints without changing that rule. `AxisAnchor` selects start/centre/end/stretch independently per axis, `AnchoredPlacement` resolves edge offsets from its margins, and `SizeConstraints` bounds the resulting width/height. A `PositionedPanel` can watch its rendered size through `LayoutCoordinator` and reflow anchored children without exposing toolkit resize callbacks. Fixed and anchored placement objects also emit JSON-safe descriptors that can be restored without a GUI backend.
 
-Future passes should add richer geometry only when proved by real application/editor surfaces: percentages and relationship constraints, tree/list/detail composition, interactive split handles, designer resize handles, and eventually full component/property/hierarchy documents. Margins/padding remain useful for structured flow, but explicit placement must always remain available locally when a design requires it.
+The next metadata pass overlays provisional component/type/property descriptions and self-describing JSON-safe hierarchy snapshots on that proven geometry. Grid cells, tab pages, split panes, and fixed/anchored placement remain explicit relationship metadata rather than being flattened into backend coordinates, while `DesignerIdentityMap` keeps stable identities for live component objects during inspection. The blank ecosystem application captures its real nested component tree through this same metadata path; it does not maintain a second designer-only mock hierarchy.
+
+Future passes should add richer geometry and editing behavior only when proved by real application/editor surfaces: percentages and relationship constraints, tree/list/detail composition, interactive split handles, designer resize handles, property mutation/reconstruction, selection/reparenting commands, and undo/redo. Margins/padding remain useful for structured flow, but explicit placement must always remain available locally when a design requires it.
 
 ## 10. Branch and release discipline
 
@@ -475,7 +477,7 @@ This stage is substantially proven. Tranche 4 extracted keyed live tables and ca
 
 ### Stage F — designer prerequisites
 
-This stage is now active. Tranche 8 begins with geometry that a future designer can describe faithfully: parent-local start/centre/end/stretch anchors, minimum/maximum size constraints, optional split-pane maximums and JSON-safe fixed/anchored placement descriptors. The mixed-layout rule remains fundamental: designer geometry metadata is local to a container strategy rather than assuming that a whole form uses one universal table/grid or one universal absolute-coordinate plane. Component/property metadata, hierarchy documents, command-based edits and undo/redo remain later Stage-F work.
+This stage is now active. Tranche 8 established geometry that a future designer can describe faithfully: parent-local start/centre/end/stretch anchors, minimum/maximum size constraints, optional split-pane maximums and JSON-safe fixed/anchored placement descriptors. Tranche 9 begins the metadata/hierarchy layer with provisional component type/property descriptions, stable live designer identities and JSON-safe component-tree snapshots. The mixed-layout rule remains fundamental: designer metadata records each container relationship rather than assuming that a whole form uses one universal table/grid or one universal absolute-coordinate plane. Executable reconstruction, command-based edits, undo/redo, copy/paste, drag/drop/reparenting and the final project schema remain later Stage-F work.
 
 ### Stage G — naming, API and package boundaries
 
@@ -770,8 +772,28 @@ Structural sizing also gains optional maximums. `SplitPane.maximum` flows throug
 
 The blank ecosystem application adds anchored start/end/stretch content with a constrained stretch control and continues to use one toolkit-neutral `DemoView`. The live Tkinter backend proves resize reflow through the same contracts.
 
-Initial prepared validation advanced canonical discovery from **581 to 589 tests**. Real-Windows validation passed both 589-test discovery forms, then live acceptance identified two pre-commit integration repairs: a stale private Diagnostics error-log accessor and a blank-demo minimum-geometry mismatch that could clip the fixed-position Actions proof. The diagnostics seam is now public through `GuiEngine.ui_error_log_path()`, and the product-neutral demo's composition metrics fit its declared minimum split/window geometry. Regression coverage is now **591 tests**; display-less canonical Linux discovery passes 591 / 591 with 58 expected GUI/platform skips, and relocation/package-boundary proof remains green. Final real-Windows Dear PyGui/Tkinter visual recheck remains the commit gate. Canonical localization remains 1,337 strings and `APP_VERSION` remains `0.5.0`.
+Real-Windows acceptance ultimately passed both complete discovery forms at **591 / 591** with one expected skip after two pre-commit integration repairs: the Diagnostics error-log path moved behind the public `GuiEngine.ui_error_log_path()` seam, and the blank demo's fixed-position proof was brought inside its declared minimum split/window geometry. Dear PyGui and Tkinter visual rechecks passed. Canonical localization remained 1,337 strings and `APP_VERSION` remained `0.5.0`. The exact pushed checkpoint is `5cef12f534dfc44a8536f504d1aa7773644f5428` (`Add responsive anchors and designer geometry constraints`).
 
-This checkpoint does **not** yet introduce component/type registry metadata, a serializable component hierarchy, stable designer-object identity, command-based mutations, undo/redo, copy/paste, project schema, preview bridge, percentages or draggable split handles. Those remain later Stage-F work.
+This checkpoint deliberately stopped before component/type registry metadata, a serializable component hierarchy, stable designer-object identity, command-based mutations, undo/redo, copy/paste, project schema, preview bridge, percentages or draggable split handles.
+
+No final ecosystem/package naming, public API freeze, release tag or merge to `main` is implied.
+
+---
+
+## 22. Ninth post-v0.5.0 implementation checkpoint
+
+The ninth `dev` tranche begins the metadata side of Stage F without turning the previous geometry descriptors into a premature application-project format. `app/framework/designer.py` is standard-library-only and remains inside the relocatable provisional framework boundary.
+
+`DesignerValueKind`, `DesignerPropertySpec` and `DesignerComponentSpec` describe editor-facing component types and properties. `DesignerCatalog` validates unique provisional type keys and component-class bindings; `FRAMEWORK_DESIGNER_CATALOG` covers the framework `Component` classes currently imported by SalixTorrent views. Common layout width/height/spacing metadata is described alongside control/container/field properties. The keys are internal working identities, not a frozen public namespace.
+
+`DesignerIdentityMap` gives live component instances stable IDs for repeated inspection and permits an explicit persisted key to be rebound by a later preview/runtime bridge. `capture_component_tree(...)` converts the live hierarchy into `DesignerNode` / `DesignerChild` objects and a self-describing `DesignerSnapshot`. The snapshot includes only JSON-safe values, validates unique node IDs/type metadata, and rejects cycles or one component object being owned from multiple tree locations.
+
+Relationship metadata is structural rather than flattened: grid children retain row/column coordinates, tabs retain semantic page keys, split children retain pane key/weight/minimum/maximum/border values, and placed/positioned/anchored children reuse the JSON-safe placement descriptors proven in Tranche 8. This lets a future hierarchy/property inspector distinguish where a component lives from the component's own properties.
+
+The product-neutral blank application exposes a snapshot of its existing nested component tree through `DemoView.capture_designer_snapshot()`. Repeated captures use one identity map, so IDs remain stable without consulting Dear PyGui or Tkinter. The framework relocation test copies/renames the package and round-trips a designer snapshot there as well. A SalixTorrent source-audit regression checks that every framework `Component` class currently imported by `app/views` is represented by the provisional catalog.
+
+Preparation advances complete discovery from 591 to **602 tests**; display-less canonical Linux discovery passes 602 / 602 with 58 expected GUI/platform skips. Canonical localization remains 1,337 strings. Real-Windows acceptance is still required before this tranche is committed or pushed.
+
+This checkpoint does **not** reconstruct executable components from snapshots, mutate live properties, implement command-based design mutations, undo/redo, copy/paste, drag/drop/reparenting, a final project schema, preview restoration, percentages or draggable split handles. Those remain later Stage-F work.
 
 No final ecosystem/package naming, public API freeze, release tag or merge to `main` is implied.

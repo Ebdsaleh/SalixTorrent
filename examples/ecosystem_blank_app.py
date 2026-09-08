@@ -44,6 +44,11 @@ from app.framework.components import (
     positioned,
 )
 from app.framework.command_menu import CommandMenu
+from app.framework.designer import (
+    DesignerIdentityMap,
+    FRAMEWORK_DESIGNER_CATALOG,
+    capture_component_tree,
+)
 from app.framework.interactions import CommandSet, CommandSpec
 from app.framework.live_data import (
     LiveTable,
@@ -209,6 +214,8 @@ class DemoView:
             ),
             layout=ControlLayout(width=FILL),
         )
+        self.designer_identities = DesignerIdentityMap(prefix="demo")
+        self.designer_identities.bind(self.root, "demo-root")
         self.telemetry = RollingTelemetry(
             ("activity",),
             history_seconds=12.0,
@@ -220,6 +227,15 @@ class DemoView:
         self.command_menu = None
         self.elapsed = 0.0
         self._last_sample = -1.0
+
+    def capture_designer_snapshot(self):
+        """Describe this component hierarchy without consulting the GUI backend."""
+
+        return capture_component_tree(
+            self.root,
+            catalog=FRAMEWORK_DESIGNER_CATALOG,
+            identities=self.designer_identities,
+        )
 
     def build(self):
         self.host.build(self.root)

@@ -10,7 +10,7 @@ SalixTorrent is a desktop BitTorrent client written in Python with a custom asyn
 
 **Post-v0.5.0 direction — modular application ecosystem:** SalixTorrent remains the reference application while reusable behavior is extracted downward into two cooperating layers: an application engine/runtime and an optional RAD/application framework. Dear PyGui is the current reference desktop backend, Tkinter is now the validated compatibility implementation for the common GUI surface, and headless/CLI operation remains first-class. Realtime telemetry/graphs, generic network/runtime awareness, lifecycle/presentation-host boundaries and rich live-data views are explicit extraction candidates before final framework naming or API freeze. See `SalixTorrent-Ecosystem-Architecture.md`.
 
-**Current `dev` extraction — first designer-geometry prerequisites:** the structural tabs/split-regions/overlay tranche is Windows-validated and pushed at `731303d847a46c1e7e250d34d8b78a9e51f485ef` after passing 581 / 581 tests with one expected skip. The current prepared tranche adds renderer-neutral start/centre/end/stretch anchoring, minimum/maximum size constraints, JSON-safe fixed/anchored placement descriptors, and optional split-pane maximums. Help now caps its navigation pane at 480 px on very wide layouts while the document pane absorbs the remaining space, and the product-neutral blank application proves responsive anchored placement through the shared component/layout contracts. Initial Windows acceptance passed both 589-test discovery forms but exposed a stale Diagnostics error-log accessor and a narrow-window clipping case in the blank proof; both are repaired before commit, with canonical discovery now **591 tests** and the repaired Windows visual recheck pending. This remains a geometry/designer prerequisite only: percentages, draggable split handles, component/type metadata, project documents, command-based mutations/undo and final ecosystem naming/API freeze remain deferred.
+**Current `dev` extraction — designer metadata and hierarchy prerequisites:** the responsive-anchor/constraint tranche is Windows-validated and pushed at `5cef12f534dfc44a8536f504d1aa7773644f5428` after passing 591 / 591 tests with one expected skip. The current prepared tranche adds a standard-library-only provisional designer catalog for the framework component classes already used by SalixTorrent, editor-facing property metadata, stable live designer IDs, and JSON-safe component hierarchy snapshots. Grid cells, tab pages, split panes and fixed/anchored placement relationships retain their structural metadata, while the product-neutral blank application snapshots its actual nested component tree without consulting a GUI backend. Preparation discovery is **602 tests** on display-less Linux; real-Windows acceptance remains required before commit. This is still a designer prerequisite rather than a final RAD document/runtime bridge: component reconstruction, project schemas, mutation commands, drag/drop/reparenting, copy/paste, undo/redo and final ecosystem naming/API freeze remain deferred.
 
 **v0.4.0 milestone — durability and transfer lifecycle:** SalixTorrent built on the v0.3.0 protocol/network foundation with an offline-first localization system, semantic Help/Glossary content, provider-neutral translation tooling, backend-neutral application settings and session-state persistence, optional SalixORM/SQLite adapters, a fully tracked `unittest` regression suite, and durable per-torrent seeding goals. Timed goals use an instanced baseline so a newly requested duration starts from the moment it is applied, while cumulative Seed Time remains available as historical telemetry.
 
@@ -335,7 +335,7 @@ The engine/runtime should eventually provide the intact machinery needed to spin
 
 Dear PyGui remains the current reference SalixTorrent desktop backend. Tkinter is now the validated compatibility implementation for the common GUI surface: it implements the same component, layout, scene, and realtime-plot contracts but is not required to reproduce Dear PyGui-specific capabilities or presentation pixel-for-pixel. Headless/CLI operation remains first-class and does not require a graphical toolkit. A future GLFW/OpenGL path is permitted by the architecture where a real project justifies it, but it is not a current dependency or parity requirement.
 
-The realtime Speed, runtime/network, second-backend blank-application, live-table/state-grid, and interactive data/command-semantic tranches are now committed on `dev`. The current prepared tranche adds a physical command-menu host contract with Dear PyGui and Tkinter implementations, generic ordered-item movement, and the first parent-aware local explicit-placement model. This establishes a deliberate mixed-layout rule: row/column/grid/tab/split-style regions and local `(x, y)` regions may be nested together rather than forcing one geometry model across the whole window.
+The realtime Speed, runtime/network, second-backend blank-application, live-data/interaction, command-menu/mixed-layout, structural-region and responsive-anchor tranches are now committed on `dev`. The current prepared work begins the metadata side of the designer boundary: provisional component type/property descriptions and serializable hierarchy snapshots sit above the already-proven mixed-layout geometry while remaining independent of Dear PyGui/Tkinter runtime objects.
 
 Final ecosystem naming, component vocabulary, public API freeze and external repository/package splits remain deliberately deferred until the wider engine/framework boundary has been proven with more than one presentation backend and at least one small non-SalixTorrent application.
 
@@ -391,6 +391,7 @@ SalixTorrent/
 │   │   ├── test_responsive_layout.py
 │   │   ├── test_documentation.py
 │   │   ├── test_gui_components.py
+│   │   ├── test_designer_model.py
 │   │   ├── test_realtime_visualization.py
 │   │   ├── test_live_data.py
 │   │   ├── test_interactive_data_migration.py
@@ -434,6 +435,7 @@ SalixTorrent/
 │   │   ├── paths.py
 │   │   └── network.py
 │   ├── framework/
+│   │   ├── designer.py
 │   │   ├── property_cascade.py
 │   │   ├── geometry.py
 │   │   ├── responsive.py
