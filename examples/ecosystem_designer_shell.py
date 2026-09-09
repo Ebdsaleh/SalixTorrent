@@ -1,9 +1,10 @@
 """Visible cross-backend proof of the optional designer shell surfaces.
 
-This is intentionally a small editor-shell proof rather than a full RAD IDE.
+This is intentionally a compact editor-shell proof rather than a full RAD IDE.
 It renders one reconstructed semantic component document, exposes the accepted
-semantic command tree, and presents the current stable-ID hierarchy through the
-same workspace ownership on Dear PyGui and Tkinter.
+semantic command tree, presents the stable-ID hierarchy and now adds a concrete
+selected-node property inspector/editor through the same workspace ownership on
+Dear PyGui and Tkinter.
 """
 
 from __future__ import annotations
@@ -28,6 +29,7 @@ from app.framework.components import (
 )
 from app.framework.designer import DesignerIdentityMap, capture_component_tree
 from app.framework.designer_hierarchy_panel import DesignerHierarchyPanel
+from app.framework.designer_inspector_panel import DesignerInspectorPanel
 from app.framework.designer_preview import DesignerPreviewContext
 from app.framework.designer_shell import DesignerShellCommands
 from app.framework.designer_shell_menu import DesignerShellMenu
@@ -56,10 +58,10 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
     spec = ApplicationSpec(
         "EcosystemDesignerShell",
         title="Ecosystem Designer Shell",
-        width=900,
-        height=620,
-        minimum_width=720,
-        minimum_height=500,
+        width=1240,
+        height=720,
+        minimum_width=980,
+        minimum_height=560,
     )
     runtime = ApplicationRuntime()
     if backend_name == "dearpygui":
@@ -73,9 +75,10 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
 
     layout_coordinator = LayoutCoordinator(host.presentation.layout_host)
     holder = {}
-    status = Label("Select a hierarchy row or open Designer Commands.")
+    status = Label("Select a hierarchy row, edit its properties, or open Designer Commands.")
     hierarchy_parent = ControlColumn(layout=ControlLayout(width=FILL, height=FILL))
     preview_parent = ControlColumn(layout=ControlLayout(width=FILL, height=FILL))
+    inspector_parent = ControlColumn(layout=ControlLayout(width=FILL, height=FILL))
 
     def show_commands(_event=None):
         holder["menu"].show()
@@ -85,24 +88,31 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
             SplitPane(
                 "hierarchy",
                 hierarchy_parent,
-                weight=0.34,
-                minimum=230,
+                weight=0.25,
+                minimum=250,
                 border=False,
             ),
             SplitPane(
                 "preview",
                 ControlColumn((Label("Preview"), preview_parent)),
-                weight=0.66,
-                minimum=360,
+                weight=0.46,
+                minimum=380,
+                border=False,
+            ),
+            SplitPane(
+                "inspector",
+                inspector_parent,
+                weight=0.29,
+                minimum=300,
                 border=False,
             ),
         ),
         gap=8,
         coordinator=layout_coordinator,
-        layout=ControlLayout(width=FILL, height=430),
+        layout=ControlLayout(width=FILL, height=520),
     )
     chrome = ControlColumn((
-        Label("Designer Shell Surface — post-v0.5.1 Tranche 2"),
+        Label("Designer Shell Surface — post-v0.5.1 Tranche 3"),
         Button("Designer Commands", callback=show_commands),
         status,
         workspace_split,
@@ -127,22 +137,50 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
         from app.engine.designer_hierarchy_panel_hosts import (
             DearPyGuiDesignerHierarchyPanelHost,
         )
+        from app.engine.designer_inspector_panel_hosts import (
+            DearPyGuiDesignerInspectorPanelHost,
+        )
 
-        hierarchy_host = DearPyGuiDesignerHierarchyPanelHost(height=390)
+        hierarchy_host = DearPyGuiDesignerHierarchyPanelHost(height=500)
+        inspector_host = DearPyGuiDesignerInspectorPanelHost(height=500)
     else:
         from app.engine.designer_hierarchy_panel_hosts import (
             TkinterDesignerHierarchyPanelHost,
         )
+        from app.engine.designer_inspector_panel_hosts import (
+            TkinterDesignerInspectorPanelHost,
+        )
 
         hierarchy_host = TkinterDesignerHierarchyPanelHost(
             host.presentation.component_renderer,
-            height_rows=16,
+            height_rows=20,
         )
+        inspector_host = TkinterDesignerInspectorPanelHost(
+            host.presentation.component_renderer,
+            height=470,
+        )
+
+    def on_inspector_change(state):
+        status.set_text(f"Property edit: {state.type_label} [{state.node_id}]")
+
+    def on_inspector_error(property_key, exc):
+        status.set_text(f"Inspector error ({property_key}): {exc}")
+
+    inspector_panel = DesignerInspectorPanel(
+        workspace,
+        inspector_host,
+        title="Inspector",
+        on_change=on_inspector_change,
+        on_error=on_inspector_error,
+    )
+    inspector_panel.build(parent=inspector_parent.require_item())
+    holder["inspector"] = inspector_panel
 
     hierarchy_panel = DesignerHierarchyPanel(
         workspace,
         hierarchy_host,
         title="Hierarchy",
+        on_change=inspector_panel.refresh,
     )
     hierarchy_panel.build(parent=hierarchy_parent.require_item())
     holder["hierarchy"] = hierarchy_panel
@@ -153,6 +191,7 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
 
     def on_result(key, result):
         hierarchy_panel.refresh()
+        inspector_panel.refresh()
         if result is not None and not hasattr(result, "kind"):
             status.set_text(f"Command: {key}")
 
@@ -172,6 +211,7 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
             on_stop=lambda: (
                 menu.dispose(),
                 hierarchy_panel.dispose(),
+                inspector_panel.dispose(),
                 workspace.close(),
             )
         ),

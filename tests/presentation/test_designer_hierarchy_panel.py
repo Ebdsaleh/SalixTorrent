@@ -76,6 +76,8 @@ class DesignerHierarchyPanelTests(unittest.TestCase):
             DesignerHierarchyPanel(object(), FakeHierarchyPanelHost())
         with self.assertRaisesRegex(TypeError, "DesignerHierarchyPanelHost"):
             DesignerHierarchyPanel(workspace, object())
+        with self.assertRaisesRegex(TypeError, "change handler"):
+            DesignerHierarchyPanel(workspace, FakeHierarchyPanelHost(), on_change=object())
         workspace.close()
 
     def test_build_projects_current_visible_rows_and_title(self):
@@ -124,6 +126,23 @@ class DesignerHierarchyPanelTests(unittest.TestCase):
         self.assertTrue(host.on_toggle("inner"))
         self.assertEqual(("root",), workspace.state.expanded_ids)
         self.assertFalse(panel.toggle("first"))
+        panel.dispose()
+        workspace.close()
+
+    def test_change_handler_observes_direct_panel_interactions(self):
+        _, snapshot = self._fixture()
+        workspace = DesignerWorkspace.create(snapshot)
+        host = FakeHierarchyPanelHost()
+        seen = []
+        panel = DesignerHierarchyPanel(workspace, host, on_change=lambda: seen.append(workspace.state))
+        panel.build(parent="panel")
+        self.assertTrue(panel.select("inner"))
+        self.assertEqual("inner", seen[-1].selected_id)
+        self.assertTrue(panel.toggle("inner"))
+        self.assertIn("inner", seen[-1].expanded_ids)
+        workspace.select_and_focus_node("run")
+        panel.reveal_selected()
+        self.assertEqual("run", seen[-1].selected_id)
         panel.dispose()
         workspace.close()
 

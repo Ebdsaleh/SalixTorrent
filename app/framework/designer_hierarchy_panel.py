@@ -21,6 +21,9 @@ from .designer_navigation import DesignerHierarchyReveal
 from .designer_workspace import DesignerWorkspace
 
 
+DesignerHierarchyPanelChangeHandler = Callable[[], object]
+
+
 @dataclass
 class DesignerHierarchyPanelBinding:
     """Opaque host-owned hierarchy panel plus visible stable-ID row bindings."""
@@ -87,6 +90,7 @@ class DesignerHierarchyPanel:
         host: DesignerHierarchyPanelHost,
         *,
         title: str = "Hierarchy",
+        on_change: DesignerHierarchyPanelChangeHandler | None = None,
     ):
         if not isinstance(workspace, DesignerWorkspace):
             raise TypeError("designer hierarchy panel requires DesignerWorkspace")
@@ -96,9 +100,12 @@ class DesignerHierarchyPanel:
                 "designer hierarchy panel host does not satisfy "
                 "DesignerHierarchyPanelHost; missing: " + ", ".join(missing)
             )
+        if on_change is not None and not callable(on_change):
+            raise TypeError("designer hierarchy panel change handler must be callable")
         self._workspace = workspace
         self._host = host
         self._title = str(title)
+        self._on_change = on_change
         self._parent: object | None = None
         self._binding: DesignerHierarchyPanelBinding | None = None
 
@@ -177,12 +184,17 @@ class DesignerHierarchyPanel:
                 return row
         raise KeyError(f"designer hierarchy panel row is not visible: {resolved}")
 
+    def _notify_change(self) -> None:
+        if self._on_change is not None:
+            self._on_change()
+
     def select(self, node_id: object) -> bool:
         """Select/focus one currently visible row through the workspace owner."""
 
         row = self._visible_row(node_id)
         changed = self._workspace.select_and_focus_node(row.node_id)
         self.refresh()
+        self._notify_change()
         return changed
 
     def toggle(self, node_id: object) -> bool:
@@ -193,6 +205,7 @@ class DesignerHierarchyPanel:
             return False
         changed = self._workspace.toggle_hierarchy_node(row.node_id)
         self.refresh()
+        self._notify_change()
         return changed
 
     def reveal_selected(self) -> DesignerHierarchyReveal | None:
@@ -200,6 +213,7 @@ class DesignerHierarchyPanel:
 
         reveal = self._workspace.reveal_selected_in_hierarchy()
         self.refresh()
+        self._notify_change()
         return reveal
 
     def dispose(self) -> bool:
@@ -217,6 +231,7 @@ class DesignerHierarchyPanel:
 
 __all__ = [
     "DesignerHierarchyPanel",
+    "DesignerHierarchyPanelChangeHandler",
     "DesignerHierarchyPanelBinding",
     "DesignerHierarchyPanelHost",
 ]

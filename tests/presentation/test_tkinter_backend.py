@@ -14,6 +14,7 @@ from app.engine.application_hosts.tkinter import TkinterApplicationHost
 from app.engine.command_menu_hosts import TkinterCommandMenuHost
 from app.engine.component_renderers import TkinterRenderer
 from app.engine.designer_hierarchy_panel_hosts import TkinterDesignerHierarchyPanelHost
+from app.engine.designer_inspector_panel_hosts import TkinterDesignerInspectorPanelHost
 from app.engine.layout_hosts import TkinterLayoutHost
 from app.engine.plot_hosts import TkinterPlotHost
 from app.engine.presentation_backends import create_tkinter_backend
@@ -52,6 +53,7 @@ from app.framework.components import (
 from app.framework.command_menu import CommandMenu, CommandMenuHost
 from app.framework.designer_editing import DesignerEditSession
 from app.framework.designer_hierarchy_panel import DesignerHierarchyPanel, DesignerHierarchyPanelHost
+from app.framework.designer_inspector_panel import DesignerInspectorPanel, DesignerInspectorPanelHost
 from app.framework.designer_preview import DesignerPreviewContext, reconstruct_designer_snapshot
 from app.framework.designer_preview_host import DesignerPreviewHost
 from app.framework.designer_project import DesignerProjectFile
@@ -103,6 +105,7 @@ class TkinterSourceBoundaryTests(unittest.TestCase):
             PROJECT_ROOT / "app" / "engine" / "application_hosts" / "tkinter.py",
             PROJECT_ROOT / "app" / "engine" / "command_menu_hosts" / "tkinter.py",
             PROJECT_ROOT / "app" / "engine" / "designer_hierarchy_panel_hosts" / "tkinter.py",
+            PROJECT_ROOT / "app" / "engine" / "designer_inspector_panel_hosts" / "tkinter.py",
         )
         forbidden = ("dearpygui", "app.logic", "app.views", "app.localization")
         for path in paths:
@@ -162,6 +165,7 @@ class TkinterBackendLiveTests(unittest.TestCase):
         state_grid_host = TkinterStateGridHost(self.renderer)
         command_menu_host = TkinterCommandMenuHost(self.root)
         hierarchy_panel_host = TkinterDesignerHierarchyPanelHost(self.renderer)
+        inspector_panel_host = TkinterDesignerInspectorPanelHost(self.renderer)
         self.assertIsInstance(self.renderer, ComponentRenderer)
         self.assertIsInstance(layout_host, LayoutHost)
         self.assertIsInstance(scene_host, SceneHost)
@@ -170,6 +174,7 @@ class TkinterBackendLiveTests(unittest.TestCase):
         self.assertIsInstance(state_grid_host, StateGridHost)
         self.assertIsInstance(command_menu_host, CommandMenuHost)
         self.assertIsInstance(hierarchy_panel_host, DesignerHierarchyPanelHost)
+        self.assertIsInstance(inspector_panel_host, DesignerInspectorPanelHost)
 
     def test_backend_factory_exposes_common_capabilities(self):
         backend = create_tkinter_backend(self.root)
@@ -624,6 +629,109 @@ class TkinterBackendLiveTests(unittest.TestCase):
         self.assertNotIn("run", binding.rows)
         self.assertEqual(("root",), workspace.state.expanded_ids)
         self.assertTrue(panel.dispose())
+        self.assertTrue(workspace.close())
+
+    def test_designer_inspector_panel_presents_real_tkinter_editors_and_dispatches(self):
+        from app.framework.designer import DesignerIdentityMap, capture_component_tree
+
+        action = Button("Run", layout=ControlLayout(width=120, height=30, spacing=4))
+        root = ControlColumn((Label("Status"), action))
+        identities = DesignerIdentityMap(prefix="tk-inspector")
+        identities.bind(root, "root")
+        identities.bind(action, "action")
+        snapshot = capture_component_tree(root, identities=identities)
+        workspace = DesignerWorkspace(
+            DesignerProjectFile.create(snapshot),
+            context=DesignerPreviewContext(
+                layout_coordinator=LayoutCoordinator(TkinterLayoutHost(self.renderer))
+            ),
+            renderer=self.renderer,
+        )
+        workspace.select_and_focus_node("action")
+        parent = ControlColumn(layout=ControlLayout(width=FILL, height=260))
+        parent.build(renderer=self.renderer)
+        panel = DesignerInspectorPanel(
+            workspace,
+            TkinterDesignerInspectorPanelHost(self.renderer, height=220),
+        )
+        binding = panel.build(parent=parent.require_item())
+        self.root.update_idletasks()
+        generation = workspace.state.preview_generation
+        self.assertIn("label", binding.rows)
+        self.assertIn("layout.width", binding.rows)
+        self.assertIn("enabled", binding.rows)
+
+        binding.metadata["variables"]["label"].set("Tk Inspector")
+        binding.metadata["apply_buttons"]["label"].invoke()
+        self.root.update()
+        self.assertEqual("Tk Inspector", workspace.state.inspector.row("label").value)
+        self.assertEqual(generation + 1, workspace.state.preview_generation)
+        self.assertEqual("Tk Inspector", workspace.preview_host.selected_component.label)
+
+        binding.metadata["clear_buttons"]["layout.width"].invoke()
+        self.root.update()
+        self.assertFalse(workspace.state.inspector.row("layout.width").is_set)
+
+        enabled_var = binding.metadata["variables"]["enabled"]
+        self.assertTrue(bool(enabled_var.get()))
+        binding.rows["enabled"].invoke()
+        self.root.update()
+        self.assertFalse(workspace.state.inspector.row("enabled").value)
+        self.assertTrue(panel.dispose())
+        self.assertTrue(workspace.close())
+
+    def test_designer_hierarchy_selection_retargets_real_tkinter_inspector_panel(self):
+        from app.framework.designer import DesignerIdentityMap, capture_component_tree
+
+        first = Label("First")
+        run = Button("Run")
+        inner = ControlColumn((run,))
+        root = ControlColumn((first, inner))
+        identities = DesignerIdentityMap(prefix="tk-surface-sync")
+        identities.bind(root, "root")
+        identities.bind(first, "first")
+        identities.bind(inner, "inner")
+        identities.bind(run, "run")
+        snapshot = capture_component_tree(root, identities=identities)
+        workspace = DesignerWorkspace(
+            DesignerProjectFile.create(snapshot),
+            context=DesignerPreviewContext(
+                layout_coordinator=LayoutCoordinator(TkinterLayoutHost(self.renderer))
+            ),
+            renderer=self.renderer,
+        )
+        workspace.select_and_focus_node("first")
+        left = ControlColumn(layout=ControlLayout(width=280, height=240))
+        right = ControlColumn(layout=ControlLayout(width=320, height=240))
+        left.build(renderer=self.renderer)
+        right.build(renderer=self.renderer)
+        inspector = DesignerInspectorPanel(
+            workspace,
+            TkinterDesignerInspectorPanelHost(self.renderer, height=200),
+        )
+        inspector_binding = inspector.build(parent=right.require_item())
+        hierarchy = DesignerHierarchyPanel(
+            workspace,
+            TkinterDesignerHierarchyPanelHost(self.renderer, height_rows=8),
+            on_change=inspector.refresh,
+        )
+        hierarchy_binding = hierarchy.build(parent=left.require_item())
+        tree = hierarchy_binding.metadata["tree"]
+        self.root.update_idletasks()
+        self.assertEqual("first", inspector.state.node_id)
+        self.assertIn("text", inspector_binding.rows)
+
+        tree.focus(hierarchy_binding.rows["inner"])
+        tree.event_generate("<<TreeviewOpen>>")
+        self.root.update()
+        tree.selection_set(hierarchy_binding.rows["run"])
+        tree.event_generate("<<TreeviewSelect>>")
+        self.root.update()
+        self.assertEqual("run", inspector.state.node_id)
+        self.assertIn("label", inspector_binding.rows)
+        self.assertNotIn("text", inspector_binding.rows)
+        self.assertTrue(hierarchy.dispose())
+        self.assertTrue(inspector.dispose())
         self.assertTrue(workspace.close())
 
     def test_designer_shell_example_runs_tkinter_backend_and_auto_closes(self):

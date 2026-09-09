@@ -106,6 +106,7 @@ class FrameworkPackagingTests(unittest.TestCase):
                 assert "portable_framework.designer_shell" in imported
                 assert "portable_framework.designer_shell_menu" in imported
                 assert "portable_framework.designer_hierarchy_panel" in imported
+                assert "portable_framework.designer_inspector_panel" in imported
                 assert "portable_framework.designer_navigation" in imported
                 assert "portable_framework.designer_selection" in imported
                 assert "portable_framework.geometry" in imported
@@ -195,6 +196,10 @@ class FrameworkPackagingTests(unittest.TestCase):
                 from portable_framework.designer_hierarchy_panel import (
                     DesignerHierarchyPanel,
                     DesignerHierarchyPanelBinding,
+                )
+                from portable_framework.designer_inspector_panel import (
+                    DesignerInspectorPanel,
+                    DesignerInspectorPanelBinding,
                 )
                 from portable_framework.documentation import DocPage, DocumentationTheme
                 from portable_framework.geometry import ContentMetrics, content_bounds, split_sizes
@@ -327,6 +332,43 @@ class FrameworkPackagingTests(unittest.TestCase):
                 portable_shell = DesignerShellCommands(portable_workspace)
                 assert portable_shell.command(DESIGNER_COPY_COMMAND).enabled is True
 
+                class PortableInspectorHost:
+                    def __init__(self):
+                        self.on_set = None
+                        self.on_clear = None
+                        self.on_error = None
+                    def build(self, state, *, parent, title="", on_set=None, on_clear=None, on_error=None):
+                        self.on_set = on_set
+                        self.on_clear = on_clear
+                        self.on_error = on_error
+                        return DesignerInspectorPanelBinding(
+                            panel={{"alive": True, "parent": parent, "title": title}},
+                            rows={{row.key: row.key for row in state.rows}},
+                        )
+                    def update(self, binding, state):
+                        binding.rows.clear()
+                        binding.rows.update({{row.key: row.key for row in state.rows}})
+                    def exists(self, binding):
+                        return bool(binding.panel["alive"])
+                    def dispose(self, binding):
+                        binding.panel["alive"] = False
+
+                portable_inspector_host = PortableInspectorHost()
+                portable_inspector_panel = DesignerInspectorPanel(
+                    portable_workspace, portable_inspector_host
+                )
+                portable_inspector_binding = portable_inspector_panel.build(parent="inspector")
+                assert "label" in portable_inspector_binding.rows
+                inspector_generation = preview_host.generation
+                assert portable_inspector_host.on_set(
+                    designer_button.node_id, "label", "Panel"
+                ) is True
+                assert preview_host.component(designer_button.node_id).label == "Panel"
+                assert preview_host.generation == inspector_generation + 1
+                assert portable_workspace.undo() is True
+                portable_inspector_panel.refresh()
+                assert portable_inspector_panel.state.row("label").value == "Run"
+
                 class PortableHierarchyHost:
                     def __init__(self):
                         self.on_select = None
@@ -348,7 +390,9 @@ class FrameworkPackagingTests(unittest.TestCase):
 
                 portable_hierarchy_host = PortableHierarchyHost()
                 portable_hierarchy_panel = DesignerHierarchyPanel(
-                    portable_workspace, portable_hierarchy_host
+                    portable_workspace,
+                    portable_hierarchy_host,
+                    on_change=portable_inspector_panel.refresh,
                 )
                 portable_hierarchy_binding = portable_hierarchy_panel.build(parent="hierarchy")
                 assert tuple(portable_hierarchy_binding.rows) == (
@@ -394,6 +438,7 @@ class FrameworkPackagingTests(unittest.TestCase):
                 assert portable_menu_host.callback(DESIGNER_UNDO_COMMAND) is True
                 assert portable_menu.dispose() is True
                 assert portable_hierarchy_panel.dispose() is True
+                assert portable_inspector_panel.dispose() is True
                 portable_payload = copy_designer_subtree(
                     designer_session.snapshot, designer_button.node_id
                 )

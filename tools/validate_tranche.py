@@ -21,7 +21,7 @@ from typing import Iterable, Sequence, TextIO
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DISCOVERY_TEST_COUNT = 786
+DISCOVERY_TEST_COUNT = 807
 
 
 @dataclass(frozen=True)
@@ -34,7 +34,7 @@ class ValidationCommand:
 
 
 def validation_commands(python_executable: str | Path) -> tuple[ValidationCommand, ...]:
-    """Return the ordered post-v0.5.1 Tranche-2 validation sequence."""
+    """Return the ordered post-v0.5.1 Tranche-3 validation sequence."""
 
     python = str(python_executable)
     return (
@@ -43,9 +43,9 @@ def validation_commands(python_executable: str | Path) -> tuple[ValidationComman
         ValidationCommand("Published dev", ("git", "rev-parse", "origin/dev")),
         ValidationCommand("Application version", (python, "main.py", "--version")),
         ValidationCommand(
-            "Post-v0.5.1 Tranche 2 designer hierarchy-panel surface",
-            (python, "-m", "unittest", "tests.presentation.test_designer_hierarchy_panel", "-v"),
-            expected_test_count=12,
+            "Post-v0.5.1 Tranche 3 designer property-inspector/editor surface",
+            (python, "-m", "unittest", "tests.presentation.test_designer_inspector_panel", "-v"),
+            expected_test_count=18,
         ),
         ValidationCommand(
             "Designer and relocation focus",
@@ -65,6 +65,7 @@ def validation_commands(python_executable: str | Path) -> tuple[ValidationComman
                 "tests.presentation.test_designer_hierarchy",
                 "tests.presentation.test_designer_hierarchy_panel",
                 "tests.presentation.test_designer_inspector",
+                "tests.presentation.test_designer_inspector_panel",
                 "tests.presentation.test_designer_workspace",
                 "tests.presentation.test_designer_shell",
                 "tests.presentation.test_designer_shell_menu",
@@ -72,7 +73,7 @@ def validation_commands(python_executable: str | Path) -> tuple[ValidationComman
                 "tests.packaging.test_tranche_validation",
                 "-v",
             ),
-            expected_test_count=187,
+            expected_test_count=206,
         ),
         ValidationCommand(
             "GUI component regression",
@@ -82,7 +83,7 @@ def validation_commands(python_executable: str | Path) -> tuple[ValidationComman
         ValidationCommand(
             "Tkinter live backend regression",
             (python, "-m", "unittest", "tests.presentation.test_tkinter_backend", "-v"),
-            expected_test_count=34,
+            expected_test_count=36,
         ),
         ValidationCommand(
             "Localization extraction check",
@@ -215,9 +216,9 @@ def run_validation(report_path: Path) -> int:
         _write_line(report, r"  python examples\ecosystem_blank_app.py --ui-backend dearpygui")
         _write_line(report, "Tkinter blank app:")
         _write_line(report, r"  python examples\ecosystem_blank_app.py --ui-backend tkinter")
-        _write_line(report, "Designer shell + hierarchy surface Dear PyGui smoke:")
+        _write_line(report, "Designer shell + hierarchy + inspector Dear PyGui smoke:")
         _write_line(report, r"  python examples\ecosystem_designer_shell.py --ui-backend dearpygui")
-        _write_line(report, "Designer shell + hierarchy surface Tkinter smoke:")
+        _write_line(report, "Designer shell + hierarchy + inspector Tkinter smoke:")
         _write_line(report, r"  python examples\ecosystem_designer_shell.py --ui-backend tkinter")
         _write_line(report, "SalixTorrent Dear PyGui smoke:")
         _write_line(report, "  python main.py")
