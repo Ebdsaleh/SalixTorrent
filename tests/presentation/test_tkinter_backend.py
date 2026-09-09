@@ -209,6 +209,46 @@ class TkinterBackendLiveTests(unittest.TestCase):
         self.assertEqual(3, preview_host.generation)
         preview_host.close()
 
+    def test_preview_host_duplicate_rebuilds_real_tkinter_tree_with_fresh_identity(self):
+        from app.engine.presentation_backends import create_dearpygui_backend
+        from examples.ecosystem_blank_app import DemoView
+
+        class SnapshotHost:
+            presentation = create_dearpygui_backend()
+
+        snapshot = DemoView(SnapshotHost()).capture_designer_snapshot()
+        actions = next(
+            node
+            for node in snapshot.root.walk()
+            if node.type_key == "control.button" and node.properties.get("label") == "Actions"
+        )
+        session = DesignerEditSession(snapshot)
+        preview_host = DesignerPreviewHost(
+            session,
+            context=DesignerPreviewContext(
+                layout_coordinator=LayoutCoordinator(TkinterLayoutHost(self.renderer))
+            ),
+            renderer=self.renderer,
+        )
+        self.root.update_idletasks()
+        old_root = preview_host.preview.root
+        self.assertTrue(old_root.exists())
+
+        self.assertTrue(preview_host.duplicate_node(actions.node_id))
+        self.root.update_idletasks()
+        clone_id = f"{actions.node_id}-copy"
+        self.assertFalse(old_root.exists())
+        self.assertTrue(preview_host.component(clone_id).exists())
+        self.assertEqual("Actions", preview_host.component(clone_id).label)
+        self.assertEqual(2, preview_host.generation)
+
+        self.assertTrue(preview_host.undo())
+        self.root.update_idletasks()
+        with self.assertRaises(KeyError):
+            preview_host.component(clone_id)
+        self.assertEqual(3, preview_host.generation)
+        preview_host.close()
+
     def test_reconstructed_blank_snapshot_builds_through_real_tkinter_renderer(self):
         from app.engine.presentation_backends import create_dearpygui_backend
         from examples.ecosystem_blank_app import DemoView

@@ -94,6 +94,7 @@ class FrameworkPackagingTests(unittest.TestCase):
                 assert "portable_framework.components" in imported
                 assert "portable_framework.documentation" in imported
                 assert "portable_framework.designer" in imported
+                assert "portable_framework.designer_clipboard" in imported
                 assert "portable_framework.designer_editing" in imported
                 assert "portable_framework.designer_structure" in imported
                 assert "portable_framework.designer_preview" in imported
@@ -157,6 +158,7 @@ class FrameworkPackagingTests(unittest.TestCase):
                     DesignerSnapshot,
                     capture_component_tree,
                 )
+                from portable_framework.designer_clipboard import copy_designer_subtree
                 from portable_framework.designer_editing import DesignerEditSession
                 from portable_framework.designer_structure import locate_designer_node
                 from portable_framework.designer_preview import reconstruct_designer_snapshot
@@ -222,6 +224,20 @@ class FrameworkPackagingTests(unittest.TestCase):
                 assert preview_host.component(designer_button.node_id).label == "Hosted"
                 assert preview_host.undo() is True
                 assert preview_host.component(designer_button.node_id).label == "Run"
+                portable_payload = copy_designer_subtree(
+                    designer_session.snapshot, designer_button.node_id
+                )
+                preview_generation = preview_host.generation
+                assert preview_host.copy_node(designer_button.node_id).root.node_id == designer_button.node_id
+                assert preview_host.generation == preview_generation
+                assert preview_host.paste("portable-root", payload=portable_payload) is True
+                portable_clone_id = designer_button.node_id + "-copy"
+                assert preview_host.component(portable_clone_id).label == "Run"
+                assert preview_host.undo() is True
+                assert all(
+                    node.node_id != portable_clone_id
+                    for node in designer_session.snapshot.root.walk()
+                )
                 added_node = DesignerNode("portable-added", "control.button", {{"label": "Added"}})
                 assert designer_session.insert_child(
                     "portable-root",

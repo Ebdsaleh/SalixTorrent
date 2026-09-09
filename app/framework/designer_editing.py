@@ -6,10 +6,12 @@ RAD prerequisite: explicit commands that edit *snapshot data* plus deterministic
 undo/redo history.
 
 The editing boundary intentionally does not rebuild or mutate live component
-objects. Property commands and structural hierarchy commands share the same
-immutable-snapshot history. A future preview/runtime bridge can consume the
-resulting snapshot, but toolkit objects, callbacks, application models, drag/drop
-behavior and the final project-document schema remain outside this module.
+objects. Property commands, structural hierarchy commands and optional
+copy/paste/duplicate document commands share the same immutable-snapshot history.
+Clipboard state is ephemeral editor state rather than project persistence. Preview
+hosts may consume checked candidate snapshots, but toolkit objects, callbacks,
+application models, drag/drop behavior and the final project-document schema
+remain outside this module.
 """
 
 from __future__ import annotations
@@ -25,6 +27,12 @@ from .designer import (
     DesignerNode,
     DesignerSnapshot,
     DesignerValueKind,
+)
+from .designer_clipboard import (
+    DesignerClipboardPayload,
+    DuplicateDesignerNode,
+    PasteDesignerSubtree,
+    copy_designer_subtree,
 )
 from .designer_structure import (
     DesignerNodeLocation,
@@ -504,6 +512,7 @@ class DesignerEditSession:
         self._clean = snapshot
         self._undo: list[_DesignerHistoryEntry] = []
         self._redo: list[_DesignerHistoryEntry] = []
+        self._clipboard: DesignerClipboardPayload | None = None
 
     @property
     def snapshot(self) -> DesignerSnapshot:
@@ -520,6 +529,14 @@ class DesignerEditSession:
     @property
     def can_redo(self) -> bool:
         return bool(self._redo)
+
+    @property
+    def has_clipboard(self) -> bool:
+        return self._clipboard is not None
+
+    @property
+    def clipboard(self) -> DesignerClipboardPayload | None:
+        return self._clipboard
 
     @property
     def undo_depth(self) -> int:
@@ -654,6 +671,88 @@ class DesignerEditSession:
     def remove_node(self, node_id: object) -> bool:
         return self.execute(RemoveDesignerNode(node_id))
 
+    def copy_node(self, node_id: object) -> DesignerClipboardPayload:
+        """Copy one subtree into ephemeral session clipboard state.
+
+        Copying never mutates the document, dirty state, undo depth or redo
+        branch.  The returned payload can also be transferred explicitly to a
+        different compatible ``DesignerEditSession``.
+        """
+
+        payload = copy_designer_subtree(self._snapshot, node_id)
+        self._clipboard = payload
+        return payload
+
+    def clear_clipboard(self) -> bool:
+        if self._clipboard is None:
+            return False
+        self._clipboard = None
+        return True
+
+    def paste(
+        self,
+        parent_id: object,
+        *,
+        payload: DesignerClipboardPayload | None = None,
+        index: int | None = None,
+        slot: object | None = None,
+        metadata: Mapping[str, object] | None = None,
+        preserve_relationship: bool = True,
+        suffix: object = "copy",
+    ) -> bool:
+        source = payload if payload is not None else self._clipboard
+        if source is None:
+            raise RuntimeError("designer clipboard is empty")
+        if preserve_relationship:
+            if metadata is not None:
+                raise ValueError("explicit metadata requires preserve_relationship=False")
+            command = PasteDesignerSubtree(
+                parent_id,
+                source,
+                index=index,
+                slot=slot,
+                suffix=suffix,
+            )
+        else:
+            command = PasteDesignerSubtree(
+                parent_id,
+                source,
+                index=index,
+                slot=slot,
+                metadata=metadata,
+                suffix=suffix,
+            )
+        return self.execute(command)
+
+    def duplicate_node(
+        self,
+        node_id: object,
+        *,
+        index: int | None = None,
+        slot: object | None = None,
+        metadata: Mapping[str, object] | None = None,
+        preserve_relationship: bool = True,
+        suffix: object = "copy",
+    ) -> bool:
+        if preserve_relationship:
+            if metadata is not None:
+                raise ValueError("explicit metadata requires preserve_relationship=False")
+            command = DuplicateDesignerNode(
+                node_id,
+                index=index,
+                slot=slot,
+                suffix=suffix,
+            )
+        else:
+            command = DuplicateDesignerNode(
+                node_id,
+                index=index,
+                slot=slot,
+                metadata=metadata,
+                suffix=suffix,
+            )
+        return self.execute(command)
+
     def move_node(self, node_id: object, index: object) -> bool:
         return self.execute(MoveDesignerNode(node_id, index))
 
@@ -742,6 +841,7 @@ __all__ = [
     "DESIGNER_REDO_COMMAND",
     "DESIGNER_UNDO_COMMAND",
     "ClearDesignerProperty",
+    "DesignerClipboardPayload",
     "CompositeDesignerEdit",
     "DesignerEditCommand",
     "DesignerEditSession",

@@ -10,6 +10,9 @@ Preview replacement is deliberately whole-tree and transactional.  A candidate
 preview is reconstructed (and, when a renderer is supplied, built) before the
 currently accepted preview is disposed.  Failed candidates are cleaned up and
 never advance edit history, so document and preview state remain aligned.
+Optional copy/paste/duplicate helpers stay at the document boundary: copy only
+updates ephemeral session clipboard state, while paste/duplicate use the same
+checked replacement transaction as property and structural edits.
 """
 
 from __future__ import annotations
@@ -20,6 +23,11 @@ from dataclasses import dataclass
 from .components.base import Component
 from .components.renderer import ComponentRenderer
 from .designer import DesignerNode, DesignerSnapshot
+from .designer_clipboard import (
+    DesignerClipboardPayload,
+    DuplicateDesignerNode,
+    PasteDesignerSubtree,
+)
 from .designer_editing import (
     ClearDesignerProperty,
     DesignerEditCommand,
@@ -224,6 +232,80 @@ class DesignerPreviewHost:
 
     def remove_node(self, node_id: object) -> bool:
         return self.execute(RemoveDesignerNode(node_id))
+
+    def copy_node(self, node_id: object) -> DesignerClipboardPayload:
+        """Copy document data without rebuilding the current preview."""
+
+        self._require_open()
+        return self.session.copy_node(node_id)
+
+    def clear_clipboard(self) -> bool:
+        self._require_open()
+        return self.session.clear_clipboard()
+
+    def paste(
+        self,
+        parent_id: object,
+        *,
+        payload: DesignerClipboardPayload | None = None,
+        index: int | None = None,
+        slot: object | None = None,
+        metadata: Mapping[str, object] | None = None,
+        preserve_relationship: bool = True,
+        suffix: object = "copy",
+    ) -> bool:
+        source = payload if payload is not None else self.session.clipboard
+        if source is None:
+            raise RuntimeError("designer clipboard is empty")
+        if preserve_relationship:
+            if metadata is not None:
+                raise ValueError("explicit metadata requires preserve_relationship=False")
+            command = PasteDesignerSubtree(
+                parent_id,
+                source,
+                index=index,
+                slot=slot,
+                suffix=suffix,
+            )
+        else:
+            command = PasteDesignerSubtree(
+                parent_id,
+                source,
+                index=index,
+                slot=slot,
+                metadata=metadata,
+                suffix=suffix,
+            )
+        return self.execute(command)
+
+    def duplicate_node(
+        self,
+        node_id: object,
+        *,
+        index: int | None = None,
+        slot: object | None = None,
+        metadata: Mapping[str, object] | None = None,
+        preserve_relationship: bool = True,
+        suffix: object = "copy",
+    ) -> bool:
+        if preserve_relationship:
+            if metadata is not None:
+                raise ValueError("explicit metadata requires preserve_relationship=False")
+            command = DuplicateDesignerNode(
+                node_id,
+                index=index,
+                slot=slot,
+                suffix=suffix,
+            )
+        else:
+            command = DuplicateDesignerNode(
+                node_id,
+                index=index,
+                slot=slot,
+                metadata=metadata,
+                suffix=suffix,
+            )
+        return self.execute(command)
 
     def move_node(self, node_id: object, index: object) -> bool:
         return self.execute(MoveDesignerNode(node_id, index))
