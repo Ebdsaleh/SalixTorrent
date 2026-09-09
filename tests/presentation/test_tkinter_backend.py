@@ -15,6 +15,7 @@ from app.engine.command_menu_hosts import TkinterCommandMenuHost
 from app.engine.component_renderers import TkinterRenderer
 from app.engine.designer_hierarchy_panel_hosts import TkinterDesignerHierarchyPanelHost
 from app.engine.designer_inspector_panel_hosts import TkinterDesignerInspectorPanelHost
+from app.engine.designer_preview_selection_hosts import TkinterDesignerPreviewSelectionHost
 from app.engine.layout_hosts import TkinterLayoutHost
 from app.engine.plot_hosts import TkinterPlotHost
 from app.engine.presentation_backends import create_tkinter_backend
@@ -55,6 +56,10 @@ from app.framework.designer_editing import DesignerEditSession
 from app.framework.designer_hierarchy_panel import DesignerHierarchyPanel, DesignerHierarchyPanelHost
 from app.framework.designer_inspector_panel import DesignerInspectorPanel, DesignerInspectorPanelHost
 from app.framework.designer_preview import DesignerPreviewContext, reconstruct_designer_snapshot
+from app.framework.designer_preview_selection import (
+    DesignerPreviewSelectionHost,
+    DesignerPreviewSelectionSurface,
+)
 from app.framework.designer_preview_host import DesignerPreviewHost
 from app.framework.designer_project import DesignerProjectFile
 from app.framework.designer_workspace import DesignerWorkspace
@@ -106,6 +111,7 @@ class TkinterSourceBoundaryTests(unittest.TestCase):
             PROJECT_ROOT / "app" / "engine" / "command_menu_hosts" / "tkinter.py",
             PROJECT_ROOT / "app" / "engine" / "designer_hierarchy_panel_hosts" / "tkinter.py",
             PROJECT_ROOT / "app" / "engine" / "designer_inspector_panel_hosts" / "tkinter.py",
+            PROJECT_ROOT / "app" / "engine" / "designer_preview_selection_hosts" / "tkinter.py",
         )
         forbidden = ("dearpygui", "app.logic", "app.views", "app.localization")
         for path in paths:
@@ -166,6 +172,7 @@ class TkinterBackendLiveTests(unittest.TestCase):
         command_menu_host = TkinterCommandMenuHost(self.root)
         hierarchy_panel_host = TkinterDesignerHierarchyPanelHost(self.renderer)
         inspector_panel_host = TkinterDesignerInspectorPanelHost(self.renderer)
+        preview_selection_host = TkinterDesignerPreviewSelectionHost(self.renderer)
         self.assertIsInstance(self.renderer, ComponentRenderer)
         self.assertIsInstance(layout_host, LayoutHost)
         self.assertIsInstance(scene_host, SceneHost)
@@ -175,6 +182,7 @@ class TkinterBackendLiveTests(unittest.TestCase):
         self.assertIsInstance(command_menu_host, CommandMenuHost)
         self.assertIsInstance(hierarchy_panel_host, DesignerHierarchyPanelHost)
         self.assertIsInstance(inspector_panel_host, DesignerInspectorPanelHost)
+        self.assertIsInstance(preview_selection_host, DesignerPreviewSelectionHost)
 
     def test_backend_factory_exposes_common_capabilities(self):
         backend = create_tkinter_backend(self.root)
@@ -629,6 +637,101 @@ class TkinterBackendLiveTests(unittest.TestCase):
         self.assertNotIn("run", binding.rows)
         self.assertEqual(("root",), workspace.state.expanded_ids)
         self.assertTrue(panel.dispose())
+        self.assertTrue(workspace.close())
+
+    def test_designer_preview_selection_clicks_real_tkinter_preview_and_highlights(self):
+        from app.framework.designer import DesignerIdentityMap, capture_component_tree
+
+        first = Label("First")
+        run = Button("Run")
+        inner = ControlColumn((run,))
+        root = ControlColumn((first, inner))
+        identities = DesignerIdentityMap(prefix="tk-preview-select")
+        identities.bind(root, "root")
+        identities.bind(first, "first")
+        identities.bind(inner, "inner")
+        identities.bind(run, "run")
+        snapshot = capture_component_tree(root, identities=identities)
+        preview_parent = ControlColumn(layout=ControlLayout(width=FILL, height=220))
+        preview_parent.build(renderer=self.renderer)
+        workspace = DesignerWorkspace(
+            DesignerProjectFile.create(snapshot),
+            context=DesignerPreviewContext(
+                layout_coordinator=LayoutCoordinator(TkinterLayoutHost(self.renderer))
+            ),
+            renderer=self.renderer,
+            parent=preview_parent.require_item(),
+        )
+        workspace.select_and_focus_node("first")
+        surface = DesignerPreviewSelectionSurface(
+            workspace,
+            TkinterDesignerPreviewSelectionHost(self.renderer),
+        )
+        binding = surface.build(parent=preview_parent.require_item())
+        self.root.deiconify()
+        self.root.update_idletasks()
+        generation = workspace.state.preview_generation
+
+        run_item = binding.targets["run"]
+        run_widget = self.renderer.native_widget(run_item)
+        run_widget.event_generate("<Button-1>")
+        self.root.update()
+        self.assertEqual("run", workspace.state.selected_id)
+        self.assertEqual("run", workspace.state.focused_id)
+        self.assertIn("inner", workspace.state.expanded_ids)
+        self.assertEqual(generation, workspace.state.preview_generation)
+        self.assertEqual(2, int(run_item.mount.cget("highlightthickness")))
+
+        first_item = binding.targets["first"]
+        self.assertEqual(0, int(first_item.mount.cget("highlightthickness")))
+        self.assertTrue(surface.dispose())
+        self.assertEqual(0, int(run_item.mount.cget("highlightthickness")))
+        self.assertTrue(workspace.close())
+
+    def test_designer_preview_selection_rebinds_after_real_tkinter_replacement(self):
+        from app.framework.designer import DesignerIdentityMap, capture_component_tree
+
+        action = Button("Run")
+        root = ControlColumn((Label("Status"), action))
+        identities = DesignerIdentityMap(prefix="tk-preview-rebind")
+        identities.bind(root, "root")
+        identities.bind(action, "action")
+        snapshot = capture_component_tree(root, identities=identities)
+        preview_parent = ControlColumn(layout=ControlLayout(width=FILL, height=220))
+        preview_parent.build(renderer=self.renderer)
+        workspace = DesignerWorkspace(
+            DesignerProjectFile.create(snapshot),
+            context=DesignerPreviewContext(
+                layout_coordinator=LayoutCoordinator(TkinterLayoutHost(self.renderer))
+            ),
+            renderer=self.renderer,
+            parent=preview_parent.require_item(),
+        )
+        workspace.select_and_focus_node("action")
+        surface = DesignerPreviewSelectionSurface(
+            workspace,
+            TkinterDesignerPreviewSelectionHost(self.renderer),
+        )
+        binding = surface.build(parent=preview_parent.require_item())
+        self.root.deiconify()
+        self.root.update_idletasks()
+        old_item = binding.targets["action"]
+        old_generation = workspace.state.preview_generation
+
+        self.assertTrue(workspace.set_selected_property("label", "Changed"))
+        self.root.update_idletasks()
+        self.assertGreater(workspace.state.preview_generation, old_generation)
+        surface.refresh()
+        new_item = binding.targets["action"]
+        self.assertIsNot(old_item, new_item)
+        self.assertFalse(self.renderer.exists(old_item))
+        self.assertTrue(self.renderer.exists(new_item))
+        self.assertEqual(2, int(new_item.mount.cget("highlightthickness")))
+
+        self.renderer.native_widget(new_item).event_generate("<Button-1>")
+        self.root.update()
+        self.assertEqual("action", workspace.state.selected_id)
+        self.assertTrue(surface.dispose())
         self.assertTrue(workspace.close())
 
     def test_designer_inspector_panel_presents_real_tkinter_editors_and_dispatches(self):

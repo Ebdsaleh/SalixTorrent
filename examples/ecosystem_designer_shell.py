@@ -2,9 +2,9 @@
 
 This is intentionally a compact editor-shell proof rather than a full RAD IDE.
 It renders one reconstructed semantic component document, exposes the accepted
-semantic command tree, presents the stable-ID hierarchy and now adds a concrete
-selected-node property inspector/editor through the same workspace ownership on
-Dear PyGui and Tkinter.
+semantic command tree, presents the stable-ID hierarchy and property inspector, and now makes the
+reconstructed preview itself selectable with a transient visual outline through
+the same workspace ownership on Dear PyGui and Tkinter.
 """
 
 from __future__ import annotations
@@ -31,6 +31,7 @@ from app.framework.designer import DesignerIdentityMap, capture_component_tree
 from app.framework.designer_hierarchy_panel import DesignerHierarchyPanel
 from app.framework.designer_inspector_panel import DesignerInspectorPanel
 from app.framework.designer_preview import DesignerPreviewContext
+from app.framework.designer_preview_selection import DesignerPreviewSelectionSurface
 from app.framework.designer_shell import DesignerShellCommands
 from app.framework.designer_shell_menu import DesignerShellMenu
 from app.framework.designer_workspace import DesignerWorkspace
@@ -75,7 +76,7 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
 
     layout_coordinator = LayoutCoordinator(host.presentation.layout_host)
     holder = {}
-    status = Label("Select a hierarchy row, edit its properties, or open Designer Commands.")
+    status = Label("Select a hierarchy row or click the preview, edit properties, or open Designer Commands.")
     hierarchy_parent = ControlColumn(layout=ControlLayout(width=FILL, height=FILL))
     preview_parent = ControlColumn(layout=ControlLayout(width=FILL, height=FILL))
     inspector_parent = ControlColumn(layout=ControlLayout(width=FILL, height=FILL))
@@ -112,7 +113,7 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
         layout=ControlLayout(width=FILL, height=520),
     )
     chrome = ControlColumn((
-        Label("Designer Shell Surface — post-v0.5.1 Tranche 3"),
+        Label("Designer Shell Surface — post-v0.5.1 Tranche 4"),
         Button("Designer Commands", callback=show_commands),
         status,
         workspace_split,
@@ -140,15 +141,22 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
         from app.engine.designer_inspector_panel_hosts import (
             DearPyGuiDesignerInspectorPanelHost,
         )
+        from app.engine.designer_preview_selection_hosts import (
+            DearPyGuiDesignerPreviewSelectionHost,
+        )
 
         hierarchy_host = DearPyGuiDesignerHierarchyPanelHost(height=500)
         inspector_host = DearPyGuiDesignerInspectorPanelHost(height=500)
+        preview_selection_host = DearPyGuiDesignerPreviewSelectionHost()
     else:
         from app.engine.designer_hierarchy_panel_hosts import (
             TkinterDesignerHierarchyPanelHost,
         )
         from app.engine.designer_inspector_panel_hosts import (
             TkinterDesignerInspectorPanelHost,
+        )
+        from app.engine.designer_preview_selection_hosts import (
+            TkinterDesignerPreviewSelectionHost,
         )
 
         hierarchy_host = TkinterDesignerHierarchyPanelHost(
@@ -159,8 +167,14 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
             host.presentation.component_renderer,
             height=470,
         )
+        preview_selection_host = TkinterDesignerPreviewSelectionHost(
+            host.presentation.component_renderer
+        )
 
     def on_inspector_change(state):
+        preview_selection = holder.get("preview_selection")
+        if preview_selection is not None:
+            preview_selection.refresh()
         status.set_text(f"Property edit: {state.type_label} [{state.node_id}]")
 
     def on_inspector_error(property_key, exc):
@@ -176,14 +190,33 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
     inspector_panel.build(parent=inspector_parent.require_item())
     holder["inspector"] = inspector_panel
 
+    def on_hierarchy_change():
+        inspector_panel.refresh()
+        preview_selection = holder.get("preview_selection")
+        if preview_selection is not None:
+            preview_selection.refresh()
+
     hierarchy_panel = DesignerHierarchyPanel(
         workspace,
         hierarchy_host,
         title="Hierarchy",
-        on_change=inspector_panel.refresh,
+        on_change=on_hierarchy_change,
     )
     hierarchy_panel.build(parent=hierarchy_parent.require_item())
     holder["hierarchy"] = hierarchy_panel
+
+    def on_preview_select(node_id):
+        hierarchy_panel.refresh()
+        inspector_panel.refresh()
+        status.set_text(f"Preview selection: {node_id}")
+
+    preview_selection = DesignerPreviewSelectionSurface(
+        workspace,
+        preview_selection_host,
+        on_change=on_preview_select,
+    )
+    preview_selection.build(parent=preview_parent.require_item())
+    holder["preview_selection"] = preview_selection
 
     def on_request(request):
         status.set_text(f"Shell request: {request.kind.value}")
@@ -192,6 +225,7 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
     def on_result(key, result):
         hierarchy_panel.refresh()
         inspector_panel.refresh()
+        preview_selection.refresh()
         if result is not None and not hasattr(result, "kind"):
             status.set_text(f"Command: {key}")
 
@@ -210,11 +244,17 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
         CallbackService(
             on_stop=lambda: (
                 menu.dispose(),
+                preview_selection.dispose(),
                 hierarchy_panel.dispose(),
                 inspector_panel.dispose(),
                 workspace.close(),
             )
         ),
+    )
+
+    runtime.services.register(
+        "designer preview selection initial refresh",
+        CallbackService(on_start=preview_selection.refresh),
     )
 
     if smoke_seconds > 0.0:

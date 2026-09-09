@@ -99,6 +99,7 @@ class FrameworkPackagingTests(unittest.TestCase):
                 assert "portable_framework.designer_structure" in imported
                 assert "portable_framework.designer_preview" in imported
                 assert "portable_framework.designer_preview_host" in imported
+                assert "portable_framework.designer_preview_selection" in imported
                 assert "portable_framework.designer_project" in imported
                 assert "portable_framework.designer_hierarchy" in imported
                 assert "portable_framework.designer_inspector" in imported
@@ -174,6 +175,10 @@ class FrameworkPackagingTests(unittest.TestCase):
                 from portable_framework.designer_structure import locate_designer_node
                 from portable_framework.designer_preview import reconstruct_designer_snapshot
                 from portable_framework.designer_preview_host import DesignerPreviewHost
+                from portable_framework.designer_preview_selection import (
+                    DesignerPreviewSelectionBinding,
+                    DesignerPreviewSelectionSurface,
+                )
                 from portable_framework.designer_project import DesignerProjectFile
                 from portable_framework.designer_hierarchy import DesignerHierarchyProjection
                 from portable_framework.designer_inspector import (
@@ -406,6 +411,36 @@ class FrameworkPackagingTests(unittest.TestCase):
                 assert portable_hierarchy_panel.toggle("portable-root") is True
                 assert designer_button.node_id in portable_hierarchy_binding.rows
 
+                class PortablePreviewSelectionHost:
+                    def __init__(self):
+                        self.on_select = None
+                    def build(self, targets, *, parent, on_select=None):
+                        self.on_select = on_select
+                        return DesignerPreviewSelectionBinding(
+                            surface={{"alive": True, "parent": parent}},
+                            targets={{target.node_id: target.component for target in targets}},
+                        )
+                    def update(self, binding, targets):
+                        binding.targets.clear()
+                        binding.targets.update({{
+                            target.node_id: target.component for target in targets
+                        }})
+                    def exists(self, binding):
+                        return bool(binding.surface["alive"])
+                    def dispose(self, binding):
+                        binding.surface["alive"] = False
+
+                portable_preview_selection_host = PortablePreviewSelectionHost()
+                portable_preview_selection = DesignerPreviewSelectionSurface(
+                    portable_workspace, portable_preview_selection_host
+                )
+                portable_preview_binding = portable_preview_selection.build(parent="preview")
+                assert designer_button.node_id in portable_preview_binding.targets
+                click_generation = preview_host.generation
+                assert portable_preview_selection_host.on_select(designer_button.node_id) is False
+                assert designer_session.selected_node_id == designer_button.node_id
+                assert preview_host.generation == click_generation
+
                 class PortableMenuHost:
                     def __init__(self):
                         self.callback = None
@@ -437,6 +472,7 @@ class FrameworkPackagingTests(unittest.TestCase):
                 assert portable_shell.command(DESIGNER_UNDO_COMMAND).enabled is True
                 assert portable_menu_host.callback(DESIGNER_UNDO_COMMAND) is True
                 assert portable_menu.dispose() is True
+                assert portable_preview_selection.dispose() is True
                 assert portable_hierarchy_panel.dispose() is True
                 assert portable_inspector_panel.dispose() is True
                 portable_payload = copy_designer_subtree(
