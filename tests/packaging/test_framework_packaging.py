@@ -105,6 +105,7 @@ class FrameworkPackagingTests(unittest.TestCase):
                 assert "portable_framework.designer_workspace" in imported
                 assert "portable_framework.designer_shell" in imported
                 assert "portable_framework.designer_shell_menu" in imported
+                assert "portable_framework.designer_hierarchy_panel" in imported
                 assert "portable_framework.designer_navigation" in imported
                 assert "portable_framework.designer_selection" in imported
                 assert "portable_framework.geometry" in imported
@@ -191,6 +192,10 @@ class FrameworkPackagingTests(unittest.TestCase):
                     DesignerShellCommands,
                 )
                 from portable_framework.designer_shell_menu import DesignerShellMenu
+                from portable_framework.designer_hierarchy_panel import (
+                    DesignerHierarchyPanel,
+                    DesignerHierarchyPanelBinding,
+                )
                 from portable_framework.documentation import DocPage, DocumentationTheme
                 from portable_framework.geometry import ContentMetrics, content_bounds, split_sizes
                 from portable_framework.data_view import DataRecord, DataView, SortDirection, SortTerm
@@ -322,6 +327,41 @@ class FrameworkPackagingTests(unittest.TestCase):
                 portable_shell = DesignerShellCommands(portable_workspace)
                 assert portable_shell.command(DESIGNER_COPY_COMMAND).enabled is True
 
+                class PortableHierarchyHost:
+                    def __init__(self):
+                        self.on_select = None
+                        self.on_toggle = None
+                    def build(self, rows, *, parent, title="", on_select=None, on_toggle=None):
+                        self.on_select = on_select
+                        self.on_toggle = on_toggle
+                        return DesignerHierarchyPanelBinding(
+                            panel={{"alive": True, "parent": parent, "title": title}},
+                            rows={{row.node_id: row.node_id for row in rows}},
+                        )
+                    def update(self, binding, rows):
+                        binding.rows.clear()
+                        binding.rows.update({{row.node_id: row.node_id for row in rows}})
+                    def exists(self, binding):
+                        return bool(binding.panel["alive"])
+                    def dispose(self, binding):
+                        binding.panel["alive"] = False
+
+                portable_hierarchy_host = PortableHierarchyHost()
+                portable_hierarchy_panel = DesignerHierarchyPanel(
+                    portable_workspace, portable_hierarchy_host
+                )
+                portable_hierarchy_binding = portable_hierarchy_panel.build(parent="hierarchy")
+                assert tuple(portable_hierarchy_binding.rows) == (
+                    "portable-root", designer_button.node_id
+                )
+                hierarchy_generation = preview_host.generation
+                assert portable_hierarchy_host.on_select(designer_button.node_id) is False
+                assert preview_host.generation == hierarchy_generation
+                assert portable_hierarchy_panel.toggle("portable-root") is True
+                assert tuple(portable_hierarchy_binding.rows) == ("portable-root",)
+                assert portable_hierarchy_panel.toggle("portable-root") is True
+                assert designer_button.node_id in portable_hierarchy_binding.rows
+
                 class PortableMenuHost:
                     def __init__(self):
                         self.callback = None
@@ -353,6 +393,7 @@ class FrameworkPackagingTests(unittest.TestCase):
                 assert portable_shell.command(DESIGNER_UNDO_COMMAND).enabled is True
                 assert portable_menu_host.callback(DESIGNER_UNDO_COMMAND) is True
                 assert portable_menu.dispose() is True
+                assert portable_hierarchy_panel.dispose() is True
                 portable_payload = copy_designer_subtree(
                     designer_session.snapshot, designer_button.node_id
                 )
