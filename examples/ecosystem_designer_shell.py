@@ -2,11 +2,12 @@
 
 This is intentionally a compact editor-shell proof rather than a full RAD IDE.
 It renders one reconstructed semantic component document, exposes the accepted
-semantic command tree, presents a catalog-backed component palette, the stable-ID hierarchy and property
-inspector, and keeps the reconstructed preview selectable with a transient visual
-outline through the same workspace ownership on Dear PyGui and Tkinter. Palette
-activation is intentionally request-only: this proof does not guess insertion
-parent/slot/relationship policy.
+semantic command tree, presents a catalog-backed component palette plus explicit
+placement resolver, the stable-ID hierarchy and property inspector, and keeps the
+reconstructed preview selectable with a transient visual outline through the same
+workspace ownership on Dear PyGui and Tkinter. Palette activation opens a
+backend-neutral placement form; only explicit parent/slot/index/metadata confirmation
+may create a node through the existing checked structural transaction.
 """
 
 from __future__ import annotations
@@ -31,6 +32,7 @@ from app.framework.components import (
 )
 from app.framework.designer import DesignerIdentityMap, capture_component_tree
 from app.framework.designer_component_palette import DesignerComponentPalette
+from app.framework.designer_component_placement import DesignerComponentPlacementSurface
 from app.framework.designer_hierarchy_panel import DesignerHierarchyPanel
 from app.framework.designer_inspector_panel import DesignerInspectorPanel
 from app.framework.designer_preview import DesignerPreviewContext
@@ -79,10 +81,11 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
 
     layout_coordinator = LayoutCoordinator(host.presentation.layout_host)
     holder = {}
-    status = Label("Select/click the preview, edit properties, or activate a Component tool to request placement.")
-    palette_parent = ControlColumn(layout=ControlLayout(width=FILL, height=190))
+    status = Label("Select/click the preview, edit properties, or activate a Component tool and confirm Placement.")
+    palette_parent = ControlColumn(layout=ControlLayout(width=FILL, height=155))
+    placement_parent = ControlColumn(layout=ControlLayout(width=FILL, height=220))
     hierarchy_parent = ControlColumn(layout=ControlLayout(width=FILL, height=FILL))
-    left_sidebar = ControlColumn((palette_parent, hierarchy_parent), layout=ControlLayout(width=FILL, height=FILL))
+    left_sidebar = ControlColumn((palette_parent, placement_parent, hierarchy_parent), layout=ControlLayout(width=FILL, height=FILL))
     preview_parent = ControlColumn(layout=ControlLayout(width=FILL, height=FILL))
     inspector_parent = ControlColumn(layout=ControlLayout(width=FILL, height=FILL))
 
@@ -118,7 +121,7 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
         layout=ControlLayout(width=FILL, height=520),
     )
     chrome = ControlColumn((
-        Label("Designer Shell Surface — post-v0.5.1 Tranche 5"),
+        Label("Designer Shell Surface — post-v0.5.1 Tranche 6"),
         Button("Designer Commands", callback=show_commands),
         status,
         workspace_split,
@@ -143,6 +146,9 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
         from app.engine.designer_component_palette_hosts import (
             DearPyGuiDesignerComponentPaletteHost,
         )
+        from app.engine.designer_component_placement_hosts import (
+            DearPyGuiDesignerComponentPlacementHost,
+        )
         from app.engine.designer_hierarchy_panel_hosts import (
             DearPyGuiDesignerHierarchyPanelHost,
         )
@@ -153,13 +159,17 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
             DearPyGuiDesignerPreviewSelectionHost,
         )
 
-        palette_host = DearPyGuiDesignerComponentPaletteHost(height=180)
-        hierarchy_host = DearPyGuiDesignerHierarchyPanelHost(height=300)
+        palette_host = DearPyGuiDesignerComponentPaletteHost(height=145)
+        placement_host = DearPyGuiDesignerComponentPlacementHost(height=210)
+        hierarchy_host = DearPyGuiDesignerHierarchyPanelHost(height=190)
         inspector_host = DearPyGuiDesignerInspectorPanelHost(height=500)
         preview_selection_host = DearPyGuiDesignerPreviewSelectionHost()
     else:
         from app.engine.designer_component_palette_hosts import (
             TkinterDesignerComponentPaletteHost,
+        )
+        from app.engine.designer_component_placement_hosts import (
+            TkinterDesignerComponentPlacementHost,
         )
         from app.engine.designer_hierarchy_panel_hosts import (
             TkinterDesignerHierarchyPanelHost,
@@ -173,7 +183,10 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
 
         palette_host = TkinterDesignerComponentPaletteHost(
             host.presentation.component_renderer,
-            height_rows=7,
+            height_rows=5,
+        )
+        placement_host = TkinterDesignerComponentPlacementHost(
+            host.presentation.component_renderer
         )
         hierarchy_host = TkinterDesignerHierarchyPanelHost(
             host.presentation.component_renderer,
@@ -187,11 +200,56 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
             host.presentation.component_renderer
         )
 
+    placement_activity = {"was_active": False}
+
+    def on_placement_change(state):
+        if state.request is None:
+            if placement_activity["was_active"]:
+                hierarchy = holder.get("hierarchy")
+                inspector = holder.get("inspector")
+                preview_selection = holder.get("preview_selection")
+                if hierarchy is not None:
+                    hierarchy.refresh()
+                if inspector is not None:
+                    inspector.refresh()
+                if preview_selection is not None:
+                    preview_selection.refresh()
+                palette_ref = holder.get("palette")
+                if palette_ref is not None:
+                    palette_ref.refresh()
+                status.set_text(f"Inserted component: {workspace.state.selected_id}")
+            placement_activity["was_active"] = False
+            return
+        placement_activity["was_active"] = True
+        if state.creation_error:
+            status.set_text(f"Placement unavailable: {state.creation_error}")
+        else:
+            status.set_text(
+                f"Placement: {state.request.label} -> {state.parent_id or '(choose parent)'} / {state.slot_key or '(choose slot)'}"
+            )
+
+    def on_placement_error(exc):
+        status.set_text(f"Placement error: {exc}")
+
+    placement = DesignerComponentPlacementSurface(
+        workspace,
+        placement_host,
+        title="Placement",
+        on_change=on_placement_change,
+        on_error=on_placement_error,
+    )
+    placement.build(parent=placement_parent.require_item())
+    holder["placement"] = placement
+
     def on_palette_request(request):
+        state = placement.begin(request)
         target = request.target_hint or "(no selection)"
-        status.set_text(
-            f"Insert request: {request.label} -> {target} (placement required)"
-        )
+        if state.creation_error:
+            status.set_text(f"Insert request: {request.label} -> {target}; {state.creation_error}")
+        else:
+            status.set_text(
+                f"Insert request: {request.label} -> {target}; confirm Placement"
+            )
         return request
 
     palette = DesignerComponentPalette(
@@ -277,6 +335,7 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
             on_stop=lambda: (
                 menu.dispose(),
                 preview_selection.dispose(),
+                placement.dispose(),
                 palette.dispose(),
                 hierarchy_panel.dispose(),
                 inspector_panel.dispose(),

@@ -101,6 +101,7 @@ class FrameworkPackagingTests(unittest.TestCase):
                 assert "portable_framework.designer_preview_host" in imported
                 assert "portable_framework.designer_preview_selection" in imported
                 assert "portable_framework.designer_component_palette" in imported
+                assert "portable_framework.designer_component_placement" in imported
                 assert "portable_framework.designer_project" in imported
                 assert "portable_framework.designer_hierarchy" in imported
                 assert "portable_framework.designer_inspector" in imported
@@ -175,6 +176,10 @@ class FrameworkPackagingTests(unittest.TestCase):
                 from portable_framework.designer_component_palette import (
                     DesignerComponentPalette,
                     DesignerComponentPaletteBinding,
+                )
+                from portable_framework.designer_component_placement import (
+                    DesignerComponentPlacementBinding,
+                    DesignerComponentPlacementSurface,
                 )
                 from portable_framework.designer_editing import DesignerEditSession
                 from portable_framework.designer_structure import locate_designer_node
@@ -353,6 +358,48 @@ class FrameworkPackagingTests(unittest.TestCase):
                 assert palette_request.target_hint == designer_button.node_id
                 assert palette_request.requires_placement is True
                 assert preview_host.generation == palette_generation
+
+                class PortablePlacementHost:
+                    def __init__(self):
+                        self.callbacks = {{}}
+                    def build(
+                        self, state, *, parent, title="", on_parent=None, on_slot=None,
+                        on_index=None, on_metadata=None, on_commit=None, on_cancel=None
+                    ):
+                        self.callbacks = {{
+                            "parent": on_parent,
+                            "slot": on_slot,
+                            "index": on_index,
+                            "metadata": on_metadata,
+                            "commit": on_commit,
+                            "cancel": on_cancel,
+                        }}
+                        return DesignerComponentPlacementBinding(
+                            panel={{"alive": True, "parent": parent, "title": title}},
+                            fields={{"state": state}},
+                        )
+                    def update(self, binding, state):
+                        binding.fields["state"] = state
+                    def exists(self, binding):
+                        return bool(binding.panel["alive"])
+                    def dispose(self, binding):
+                        binding.panel["alive"] = False
+
+                portable_placement_host = PortablePlacementHost()
+                portable_placement = DesignerComponentPlacementSurface(
+                    portable_workspace, portable_placement_host
+                )
+                portable_placement.build(parent="placement")
+                placement_state = portable_placement.begin(palette_request)
+                assert placement_state.parent_id == "portable-root"
+                assert placement_state.slot_key == "children"
+                inserted_id = portable_placement.commit()
+                assert portable_workspace.state.selected_id == inserted_id
+                assert preview_host.component(inserted_id).label == "Button"
+                assert portable_workspace.state.is_dirty is True
+                assert portable_workspace.undo() is True
+                assert portable_workspace.select_and_focus_node(designer_button.node_id) is True
+                selected_generation = preview_host.generation
 
                 workspace_state = portable_workspace.state
                 assert workspace_state.selected_id == designer_button.node_id

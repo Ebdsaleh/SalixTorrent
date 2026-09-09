@@ -339,6 +339,32 @@ class DesignerWorkspace:
         self._require_open()
         return self._preview.clear_selected_property(property_key)
 
+    # Generic checked editing ----------------------------------------------
+    def execute(self, command) -> bool:
+        """Execute one backend-neutral designer command through preview validation."""
+
+        self._require_open()
+        return self._preview.execute(command)
+
+    # Structural insertion --------------------------------------------------
+    def insert_child(
+        self,
+        parent_id: object,
+        node,
+        *,
+        slot: object = "children",
+        metadata=None,
+        index: int | None = None,
+    ) -> bool:
+        self._require_open()
+        return self._preview.insert_child(
+            parent_id,
+            node,
+            slot=slot,
+            metadata=metadata,
+            index=index,
+        )
+
     # History / clipboard ---------------------------------------------------
     def undo(self) -> bool:
         self._require_open()

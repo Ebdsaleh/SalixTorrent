@@ -14,6 +14,7 @@ from app.engine.application_hosts.tkinter import TkinterApplicationHost
 from app.engine.command_menu_hosts import TkinterCommandMenuHost
 from app.engine.component_renderers import TkinterRenderer
 from app.engine.designer_component_palette_hosts import TkinterDesignerComponentPaletteHost
+from app.engine.designer_component_placement_hosts import TkinterDesignerComponentPlacementHost
 from app.engine.designer_hierarchy_panel_hosts import TkinterDesignerHierarchyPanelHost
 from app.engine.designer_inspector_panel_hosts import TkinterDesignerInspectorPanelHost
 from app.engine.designer_preview_selection_hosts import TkinterDesignerPreviewSelectionHost
@@ -53,7 +54,8 @@ from app.framework.components import (
     positioned,
 )
 from app.framework.command_menu import CommandMenu, CommandMenuHost
-from app.framework.designer_component_palette import DesignerComponentPalette, DesignerComponentPaletteHost
+from app.framework.designer_component_palette import DesignerComponentInsertRequest, DesignerComponentPalette, DesignerComponentPaletteHost
+from app.framework.designer_component_placement import DesignerComponentPlacementHost, DesignerComponentPlacementSurface
 from app.framework.designer_editing import DesignerEditSession
 from app.framework.designer_hierarchy_panel import DesignerHierarchyPanel, DesignerHierarchyPanelHost
 from app.framework.designer_inspector_panel import DesignerInspectorPanel, DesignerInspectorPanelHost
@@ -112,6 +114,7 @@ class TkinterSourceBoundaryTests(unittest.TestCase):
             PROJECT_ROOT / "app" / "engine" / "application_hosts" / "tkinter.py",
             PROJECT_ROOT / "app" / "engine" / "command_menu_hosts" / "tkinter.py",
             PROJECT_ROOT / "app" / "engine" / "designer_component_palette_hosts" / "tkinter.py",
+            PROJECT_ROOT / "app" / "engine" / "designer_component_placement_hosts" / "tkinter.py",
             PROJECT_ROOT / "app" / "engine" / "designer_hierarchy_panel_hosts" / "tkinter.py",
             PROJECT_ROOT / "app" / "engine" / "designer_inspector_panel_hosts" / "tkinter.py",
             PROJECT_ROOT / "app" / "engine" / "designer_preview_selection_hosts" / "tkinter.py",
@@ -174,6 +177,7 @@ class TkinterBackendLiveTests(unittest.TestCase):
         state_grid_host = TkinterStateGridHost(self.renderer)
         command_menu_host = TkinterCommandMenuHost(self.root)
         palette_host = TkinterDesignerComponentPaletteHost(self.renderer)
+        placement_host = TkinterDesignerComponentPlacementHost(self.renderer)
         hierarchy_panel_host = TkinterDesignerHierarchyPanelHost(self.renderer)
         inspector_panel_host = TkinterDesignerInspectorPanelHost(self.renderer)
         preview_selection_host = TkinterDesignerPreviewSelectionHost(self.renderer)
@@ -185,6 +189,7 @@ class TkinterBackendLiveTests(unittest.TestCase):
         self.assertIsInstance(state_grid_host, StateGridHost)
         self.assertIsInstance(command_menu_host, CommandMenuHost)
         self.assertIsInstance(palette_host, DesignerComponentPaletteHost)
+        self.assertIsInstance(placement_host, DesignerComponentPlacementHost)
         self.assertIsInstance(hierarchy_panel_host, DesignerHierarchyPanelHost)
         self.assertIsInstance(inspector_panel_host, DesignerInspectorPanelHost)
         self.assertIsInstance(preview_selection_host, DesignerPreviewSelectionHost)
@@ -622,6 +627,44 @@ class TkinterBackendLiveTests(unittest.TestCase):
         self.assertEqual("run", requests[0].target_hint)
         self.assertFalse(workspace.state.can_undo)
         self.assertTrue(palette.dispose())
+        self.assertTrue(workspace.close())
+
+    def test_designer_component_placement_presents_real_tkinter_form_and_commits(self):
+        from app.framework.designer import DesignerIdentityMap, capture_component_tree
+
+        source = ControlColumn((Label("Status"), Button("Run")))
+        identities = DesignerIdentityMap(prefix="tk-placement")
+        identities.bind(source, "root")
+        identities.bind(source.children[0], "status")
+        identities.bind(source.children[1], "run")
+        workspace = DesignerWorkspace(
+            DesignerProjectFile.create(capture_component_tree(source, identities=identities)),
+            context=DesignerPreviewContext(
+                layout_coordinator=LayoutCoordinator(TkinterLayoutHost(self.renderer))
+            ),
+            renderer=self.renderer,
+        )
+        workspace.select_and_focus_node("run")
+        parent = ControlColumn(layout=ControlLayout(width=360, height=220))
+        parent.build(renderer=self.renderer)
+        surface = DesignerComponentPlacementSurface(
+            workspace,
+            TkinterDesignerComponentPlacementHost(self.renderer),
+        )
+        binding = surface.build(parent=parent.require_item())
+        state = surface.begin(
+            DesignerComponentInsertRequest("control.label", "Label", "control", "run")
+        )
+        self.root.update_idletasks()
+        self.assertEqual("root", state.parent_id)
+        self.assertEqual("children", state.slot_key)
+        self.assertEqual("normal", str(binding.fields["commit"].cget("state")))
+        inserted_id = surface.commit()
+        self.root.update()
+        self.assertEqual(inserted_id, workspace.state.selected_id)
+        self.assertEqual("Label", workspace.preview_host.preview.component(inserted_id).text)
+        self.assertEqual(1, workspace.session.undo_depth)
+        self.assertTrue(surface.dispose())
         self.assertTrue(workspace.close())
 
     def test_designer_hierarchy_panel_presents_real_tkinter_rows_and_dispatches(self):

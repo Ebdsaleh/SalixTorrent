@@ -1,6 +1,6 @@
 # SalixTorrent Ecosystem Architecture Direction
 
-**Status:** v0.5.1 released; post-v0.5.1 Tranches 1 through 4 published and Tranche 5 component-palette requests are the current full-commit Windows-acceptance boundary on `dev`
+**Status:** v0.5.1 released; post-v0.5.1 Tranches 1 through 5 are published and Tranche 6 explicit component placement is the current full-commit Windows-acceptance boundary on `dev`
 **Reference release:** SalixTorrent v0.5.1
 **Development branch:** `dev`
 **Purpose:** guide reverse-pyramid extraction from the working SalixTorrent application into a modular application ecosystem without freezing names or public APIs before the boundaries are proven.
@@ -995,12 +995,21 @@ Real-Windows acceptance passes 12 / 12 preview-selection tests, 218 / 218 design
 
 Drag/drop/reparent/resize gestures, multi-selection/mixed-value editing, specialized callback/service/binding editors, file-dialog/template/paste policy, multi-document/autosave/recovery, incremental native-widget mutation and final public package/project-schema naming remain deferred. The permanent architecture remains dual-entry: code-first Python composition and designer/RAD authoring continue to converge on the same semantic component/runtime/backend contracts.
 
-### Designer component palette and explicit placement requests — post-v0.5.1 Tranche 5 full-commit gate
+### Designer component palette and explicit placement requests — post-v0.5.1 Tranche 5 Windows-accepted / published
 
 The next surface adds a renderer-neutral component/tool palette over the already accepted `DesignerCatalog`. `DesignerComponentPalette` projects stable catalog metadata into `DesignerComponentPaletteState`; activating a tool produces a `DesignerComponentInsertRequest` carrying the requested component type plus the current selection as a non-authoritative hint. It does not allocate a designer node, infer a parent, choose a child slot, create relationship metadata, dirty the project, add history or rebuild the preview. This keeps insertion placement as an explicit future editor interaction rather than hidden policy.
 
 Dear PyGui and Tkinter hosts are isolated under `app/engine/designer_component_palette_hosts/` and own only disposable palette widgets. The shell proof now presents Components + Hierarchy in the left region, Preview in the centre and Inspector on the right. Selection, property editing, preview click-selection and Designer Commands retain their previous owners.
 
-Tranche 5 also includes a narrow SalixTorrent product maintenance repair: the `View -> Torrent Details` submenu now carries each semantic tab key through Dear PyGui `user_data`, fixing the empty-key exception reproduced on Windows while preserving the generic `TabContainer.select(...)` route. The tracked validation adds an explicit structural/menu-routing gate. Preparation passes 14 / 14 palette tests, 6 / 6 menu/structural tests, 232 / 232 designer/relocation tests, 64 / 64 GUI-component tests, 39 / 39 Tkinter tests and complete discovery at **837 / 837**.
+Tranche 5 also includes a narrow SalixTorrent product maintenance repair: the `View -> Torrent Details` submenu now carries each semantic tab key through Dear PyGui `user_data`, fixing the empty-key exception reproduced on Windows while preserving the generic `TabContainer.select(...)` route. Real-Windows acceptance passes 14 / 14 palette tests, 6 / 6 menu/structural tests, 232 / 232 designer/relocation tests, 64 / 64 GUI-component tests, 39 / 39 Tkinter tests and both complete discovery forms at **837 / 837** with one expected skip; the tranche is published at `0b821dd1ec9e7b59ba6838ca8ede2dfdd4e1e323`.
 
 The next designer step should resolve one `DesignerComponentInsertRequest` through an explicit placement chooser/contract before introducing drag/drop. This keeps parent/slot/relationship decisions visible, testable and backend-neutral.
+
+
+### Explicit designer component placement — post-v0.5.1 Tranche 6 full-commit gate
+
+The sixth post-v0.5.1 surface tranche consumes `DesignerComponentInsertRequest` through `DesignerComponentPlacementSurface` rather than embedding insertion semantics in the palette or toolkit. The surface derives candidate parents and child slots from the current snapshot/catalog, keeps parent/slot/index/relationship metadata as explicit ephemeral form state, allocates a stable node ID and commits through the existing checked preview transaction. Missing type metadata is added to the self-describing snapshot in that same command so an insertion can introduce a catalog type that was not already present in the document.
+
+Creation is intentionally sparse and conservative. Primitive controls and empty containers that the preview bridge can reconstruct are insertable; types requiring mandatory nested children/templates are reported as not yet directly creatable. Relationship metadata suggestions are backend-neutral conveniences, never validation bypasses. Dear PyGui/Tkinter placement hosts only render and dispatch the form. The accepted ownership remains `palette request -> placement resolver -> DesignerWorkspace/DesignerPreviewHost checked command -> immutable snapshot/history -> reconstructed preview`.
+
+The designer-shell proof now stacks Components / Placement / Hierarchy beside Preview and Inspector. Preparation passes 16 / 16 placement tests, 248 / 248 designer/relocation tests, 64 / 64 GUI-component tests, 40 / 40 Tkinter tests and complete discovery at **854 / 854**. Drag/drop, resize handles, richer creation templates, multi-selection/mixed values, callback/service/binding editors and final public package/schema naming remain deferred.
