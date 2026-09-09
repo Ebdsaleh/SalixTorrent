@@ -2,10 +2,11 @@
 
 **Current application version string:** `0.5.0`
 **Roadmap status:** v0.5.0 released; post-v0.5.0 ecosystem extraction on `dev`
-**Current implementation checkpoint:** Tranche 13 transactional designer-preview ownership/rebuild is published at `4b0968bfdf91ce040eeefd641b1e315244a325e6`; Tranche 14 document copy/paste/duplicate is prepared for Windows acceptance
-**Current real Windows regression baseline:** 655 / 655 for accepted Tranche 13 in both discovery forms with one expected non-Windows shell-behavior skip
+**Current implementation checkpoint:** Tranche 14 document copy/paste/duplicate is real-Windows accepted and committed locally as `450c12a`; the documentation-only acceptance closure and push are pending
+**Current real Windows regression baseline:** 668 / 668 for accepted Tranche 14 in both discovery forms with one expected non-Windows shell-behavior skip
 **Accepted Tranche 12 baseline:** 643 / 643 in both real-Windows discovery forms with one expected skip; preview 12 / 12, designer/relocation 56 / 56, GUI components 64 / 64, Tkinter 22 / 22, visuals and pre-commit passed; closure/push checkpoint `8d05ca8b059cef0ba386f324c215f2e80a9bfa83`
 **Accepted Tranche 13 baseline:** 655 / 655 in both real-Windows discovery forms with one expected skip; preview host 11 / 11, designer/relocation 67 / 67, GUI components 64 / 64, Tkinter 23 / 23, localization current, visuals and pre-commit passed; implementation `ddfb3ef2269acb33484cd6fe2f99af47fa40140f`, closure/push checkpoint `4b0968bfdf91ce040eeefd641b1e315244a325e6`
+**Accepted Tranche 14 baseline:** 668 / 668 in both real-Windows discovery forms with one expected skip; clipboard 12 / 12, designer/relocation 79 / 79, GUI components 64 / 64, Tkinter 24 / 24, localization current, visuals and pre-commit passed; implementation `450c12a`, documentation closure/push pending
 
 This roadmap records intended engineering direction rather than promising dates or release numbers. Changes should remain incremental, testable, reviewable, and compatible with SalixTorrent's existing protocol, persistence, packaging, localization, and cross-platform boundaries.
 
@@ -800,7 +801,7 @@ The architecture explicitly preserves two equal authoring paths: direct Python c
 
 The accepted Tranche-13 publication checkpoint is `4b0968bfdf91ce040eeefd641b1e315244a325e6`.
 
-### A16. WYSIWYG designer prerequisites — document copy/paste/duplicate prepared
+### A16. WYSIWYG designer prerequisites — document copy/paste/duplicate accepted
 
 Tranche 14 keeps clipboard behavior in document/tooling space. `DesignerClipboardPayload` captures a detached immutable subtree plus its source child-slot/relationship metadata; `remap_designer_subtree_ids(...)` deterministically creates fresh IDs in preorder; and `PasteDesignerSubtree` / `DuplicateDesignerNode` route the cloned tree back through the existing structural validation boundary. Repeated paste uses predictable `-copy`, `-copy-2`, ... identities without reusing source IDs.
 
@@ -808,7 +809,7 @@ Tranche 14 keeps clipboard behavior in document/tooling space. `DesignerClipboar
 
 The blank application's code-first hierarchy remains untouched while its captured `Actions` node is duplicated in document/preview space. A real Tkinter regression proves the duplicate receives a fresh stable designer ID in the replacement preview and disappears again after undo. The copied/renamed framework probe also exercises subtree capture/paste with no SalixTorrent or GUI dependency.
 
-Preparation advances complete discovery to **668 tests**. Clipboard tests pass 12 / 12, combined designer/relocation focus passes 79 / 79, Tkinter passes 24 / 24 under Xvfb, canonical display-less discovery passes 668 / 668, and localization/headless/compileall/Git checks remain clean. Real-Windows automated and visual acceptance remain required.
+Real-Windows acceptance advances the baseline to **668 tests** in both complete discovery forms with one expected skip. Clipboard tests pass 12 / 12, combined designer/relocation focus 79 / 79, GUI components 64 / 64 and Tkinter 24 / 24; localization remains current, headless/compileall/Git checks pass, manual Dear PyGui/Tkinter/SalixTorrent smoke passes, and `pre_commit_check.bat` passes. The accepted implementation commit is `450c12a` (`Add designer copy paste and duplicate commands`); only the documentation closure and push remain pending.
 
 This tranche does not introduce an operating-system clipboard, cut/multi-selection semantics, drag/drop or resize gestures, incremental live toolkit mutation, project persistence/schema, callback/service serialization or a final public API freeze.
 
