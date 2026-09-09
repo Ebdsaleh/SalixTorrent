@@ -321,6 +321,50 @@ class TkinterBackendLiveTests(unittest.TestCase):
         self.assertEqual(generation, preview_host.generation)
         preview_host.close()
 
+    def test_preview_host_hierarchy_projection_tracks_real_tkinter_selection_without_rebuild(self):
+        from app.engine.presentation_backends import create_dearpygui_backend
+        from examples.ecosystem_blank_app import DemoView
+
+        class SnapshotHost:
+            presentation = create_dearpygui_backend()
+
+        snapshot = DemoView(SnapshotHost()).capture_designer_snapshot()
+        actions = next(
+            node
+            for node in snapshot.root.walk()
+            if node.type_key == "control.button" and node.properties.get("label") == "Actions"
+        )
+        session = DesignerEditSession(snapshot)
+        preview_host = DesignerPreviewHost(
+            session,
+            context=DesignerPreviewContext(
+                layout_coordinator=LayoutCoordinator(TkinterLayoutHost(self.renderer))
+            ),
+            renderer=self.renderer,
+        )
+        self.root.update_idletasks()
+        generation = preview_host.generation
+        selected_component = preview_host.component(actions.node_id)
+        self.assertTrue(selected_component.exists())
+        self.assertTrue(preview_host.select_and_focus_node(actions.node_id))
+        reveal = preview_host.reveal_selected_in_hierarchy()
+        self.assertEqual(actions.node_id, reveal.node_id)
+        self.assertEqual(snapshot.root.node_id, reveal.path_ids[0])
+        row = next(
+            row for row in preview_host.hierarchy_rows()
+            if row.node_id == actions.node_id
+        )
+        self.assertTrue(row.selected)
+        self.assertTrue(row.focused)
+        self.assertIs(selected_component, preview_host.selected_component)
+        self.assertEqual(generation, preview_host.generation)
+        parent_id = reveal.ancestor_ids[-1]
+        self.assertTrue(preview_host.collapse_hierarchy_node(parent_id))
+        self.assertNotIn(actions.node_id, preview_host.visible_hierarchy_ids())
+        self.assertTrue(preview_host.selected_component.exists())
+        self.assertEqual(generation, preview_host.generation)
+        preview_host.close()
+
     def test_preview_host_duplicate_rebuilds_real_tkinter_tree_with_fresh_identity(self):
         from app.engine.presentation_backends import create_dearpygui_backend
         from examples.ecosystem_blank_app import DemoView

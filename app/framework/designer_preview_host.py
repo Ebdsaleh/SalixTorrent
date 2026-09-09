@@ -12,9 +12,10 @@ currently accepted preview is disposed.  Failed candidates are cleaned up and
 never advance edit history, so document and preview state remain aligned.
 Optional copy/paste/duplicate helpers stay at the document boundary: copy only
 updates ephemeral session clipboard state, while paste/duplicate use the same
-checked replacement transaction as property and structural edits. Stable-ID selection/focus and hierarchy-navigation state are delegated to the
-edit session and never retain live component or toolkit references across
-preview replacement.
+checked replacement transaction as property and structural edits. Stable-ID
+selection/focus, hierarchy navigation and hierarchy expansion/projection state
+are delegated to the edit session and never retain live component or toolkit
+references across preview replacement.
 """
 
 from __future__ import annotations
@@ -29,6 +30,10 @@ from .designer_clipboard import (
     DesignerClipboardPayload,
     DuplicateDesignerNode,
     PasteDesignerSubtree,
+)
+from .designer_hierarchy import (
+    DesignerHierarchyProjectionState,
+    DesignerHierarchyRow,
 )
 from .designer_navigation import DesignerHierarchyReveal, DesignerNavigationDirection
 from .designer_editing import (
@@ -167,6 +172,48 @@ class DesignerPreviewHost:
     def clear_focus(self) -> bool:
         self._require_open()
         return self.session.clear_focus()
+
+    @property
+    def hierarchy_projection_state(self) -> DesignerHierarchyProjectionState:
+        self._require_open()
+        return self.session.hierarchy_projection_state
+
+    @property
+    def hierarchy_expanded_ids(self) -> tuple[str, ...]:
+        self._require_open()
+        return self.session.hierarchy_expanded_ids
+
+    def hierarchy_rows(self) -> tuple[DesignerHierarchyRow, ...]:
+        self._require_open()
+        return self.session.hierarchy_rows()
+
+    def visible_hierarchy_ids(self) -> tuple[str, ...]:
+        self._require_open()
+        return self.session.visible_hierarchy_ids()
+
+    def expand_hierarchy_node(self, node_id: object) -> bool:
+        self._require_open()
+        return self.session.expand_hierarchy_node(node_id)
+
+    def collapse_hierarchy_node(self, node_id: object) -> bool:
+        self._require_open()
+        return self.session.collapse_hierarchy_node(node_id)
+
+    def toggle_hierarchy_node(self, node_id: object) -> bool:
+        self._require_open()
+        return self.session.toggle_hierarchy_node(node_id)
+
+    def reveal_hierarchy_node(self, node_id: object) -> DesignerHierarchyReveal:
+        self._require_open()
+        return self.session.reveal_hierarchy_node(node_id)
+
+    def reveal_selected_in_hierarchy(self) -> DesignerHierarchyReveal | None:
+        self._require_open()
+        return self.session.reveal_selected_in_hierarchy()
+
+    def reveal_focused_in_hierarchy(self) -> DesignerHierarchyReveal | None:
+        self._require_open()
+        return self.session.reveal_focused_in_hierarchy()
 
     def selection_navigation_target(
         self,

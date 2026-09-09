@@ -8,11 +8,11 @@ undo/redo history.
 The editing boundary intentionally does not rebuild or mutate live component
 objects. Property commands, structural hierarchy commands and optional
 copy/paste/duplicate document commands share the same immutable-snapshot history.
-Clipboard, stable-ID selection/focus state and hierarchy navigation are ephemeral
-editor state rather than project persistence or undoable document data. Preview
-hosts may consume checked candidate snapshots, but toolkit objects, callbacks,
-application models, drag/drop behavior and the final project-document schema
-remain outside this module.
+Clipboard, stable-ID selection/focus state, hierarchy navigation and hierarchy
+expansion/projection are ephemeral editor state rather than project persistence
+or undoable document data. Preview hosts may consume checked candidate snapshots,
+but toolkit objects, callbacks, application models, drag/drop behavior and the
+final project-document schema remain outside this module.
 """
 
 from __future__ import annotations
@@ -34,6 +34,11 @@ from .designer_clipboard import (
     DuplicateDesignerNode,
     PasteDesignerSubtree,
     copy_designer_subtree,
+)
+from .designer_hierarchy import (
+    DesignerHierarchyProjection,
+    DesignerHierarchyProjectionState,
+    DesignerHierarchyRow,
 )
 from .designer_navigation import (
     DesignerHierarchyNavigator,
@@ -521,6 +526,7 @@ class DesignerEditSession:
         self._redo: list[_DesignerHistoryEntry] = []
         self._clipboard: DesignerClipboardPayload | None = None
         self._selection = DesignerSelectionModel()
+        self._hierarchy = DesignerHierarchyProjection(snapshot)
 
     @property
     def snapshot(self) -> DesignerSnapshot:
@@ -565,6 +571,14 @@ class DesignerEditSession:
     @property
     def has_focus(self) -> bool:
         return self._selection.has_focus
+
+    @property
+    def hierarchy_projection_state(self) -> DesignerHierarchyProjectionState:
+        return self._hierarchy.state
+
+    @property
+    def hierarchy_expanded_ids(self) -> tuple[str, ...]:
+        return self._hierarchy.expanded_ids
 
     @property
     def undo_depth(self) -> int:
@@ -619,6 +633,42 @@ class DesignerEditSession:
         """Return a read-only navigator bound to the current immutable snapshot."""
 
         return DesignerHierarchyNavigator(self._snapshot)
+
+    def hierarchy_projection(self) -> DesignerHierarchyProjection:
+        """Return the session-owned ephemeral hierarchy expansion/projection model."""
+
+        return self._hierarchy
+
+    def hierarchy_rows(self) -> tuple[DesignerHierarchyRow, ...]:
+        return self._hierarchy.rows(self.selection_state)
+
+    def visible_hierarchy_ids(self) -> tuple[str, ...]:
+        return self._hierarchy.visible_ids(self.selection_state)
+
+    def is_hierarchy_expanded(self, node_id: object) -> bool:
+        return self._hierarchy.is_expanded(node_id)
+
+    def expand_hierarchy_node(self, node_id: object) -> bool:
+        return self._hierarchy.expand(node_id)
+
+    def collapse_hierarchy_node(self, node_id: object) -> bool:
+        return self._hierarchy.collapse(node_id)
+
+    def toggle_hierarchy_node(self, node_id: object) -> bool:
+        return self._hierarchy.toggle(node_id)
+
+    def reveal_hierarchy_node(self, node_id: object) -> DesignerHierarchyReveal:
+        return self._hierarchy.reveal(node_id)
+
+    def reveal_selected_in_hierarchy(self) -> DesignerHierarchyReveal | None:
+        if not self.selected_node_id:
+            return None
+        return self.reveal_hierarchy_node(self.selected_node_id)
+
+    def reveal_focused_in_hierarchy(self) -> DesignerHierarchyReveal | None:
+        if not self.focused_node_id:
+            return None
+        return self.reveal_hierarchy_node(self.focused_node_id)
 
     def selection_navigation_target(
         self,
@@ -752,6 +802,7 @@ class DesignerEditSession:
         check(after)
         self._snapshot = after
         self._selection.reconcile(before, after)
+        self._hierarchy.reconcile(after)
         self._undo.append(_DesignerHistoryEntry(label, before, after))
         self._redo.clear()
         return True
@@ -912,6 +963,7 @@ class DesignerEditSession:
         self._undo.pop()
         self._snapshot = entry.before
         self._selection.reconcile(current, entry.before)
+        self._hierarchy.reconcile(entry.before)
         self._redo.append(entry)
         return True
 
@@ -931,6 +983,7 @@ class DesignerEditSession:
         self._redo.pop()
         self._snapshot = entry.after
         self._selection.reconcile(current, entry.after)
+        self._hierarchy.reconcile(entry.after)
         self._undo.append(entry)
         return True
 
