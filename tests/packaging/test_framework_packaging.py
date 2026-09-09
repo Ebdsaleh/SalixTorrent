@@ -100,6 +100,7 @@ class FrameworkPackagingTests(unittest.TestCase):
                 assert "portable_framework.designer_preview" in imported
                 assert "portable_framework.designer_preview_host" in imported
                 assert "portable_framework.designer_project" in imported
+                assert "portable_framework.designer_navigation" in imported
                 assert "portable_framework.designer_selection" in imported
                 assert "portable_framework.geometry" in imported
                 assert "portable_framework.components.regions" in imported
@@ -167,6 +168,10 @@ class FrameworkPackagingTests(unittest.TestCase):
                 from portable_framework.designer_preview import reconstruct_designer_snapshot
                 from portable_framework.designer_preview_host import DesignerPreviewHost
                 from portable_framework.designer_project import DesignerProjectFile
+                from portable_framework.designer_navigation import (
+                    DesignerHierarchyNavigator,
+                    DesignerNavigationDirection,
+                )
                 from portable_framework.designer_selection import DesignerSelectionModel
                 from portable_framework.documentation import DocPage, DocumentationTheme
                 from portable_framework.geometry import ContentMetrics, content_bounds, split_sizes
@@ -238,10 +243,23 @@ class FrameworkPackagingTests(unittest.TestCase):
                     focused=designer_button.node_id,
                 )
                 assert portable_selection.selected_node(designer_session.snapshot).node_id == designer_button.node_id
+                portable_nav = DesignerHierarchyNavigator(designer_session.snapshot)
+                assert portable_nav.parent_id(designer_button.node_id) == "portable-root"
+                assert portable_nav.target(
+                    "portable-root", DesignerNavigationDirection.FIRST_CHILD
+                ) == designer_button.node_id
+                assert portable_nav.reveal(designer_button.node_id).path_ids == (
+                    "portable-root", designer_button.node_id
+                )
                 assert preview_host.select_and_focus_node(designer_button.node_id) is True
                 selected_generation = preview_host.generation
                 assert preview_host.selected_component is preview_host.component(designer_button.node_id)
                 assert preview_host.generation == selected_generation
+                assert preview_host.navigate_selection("parent", focus=True) is True
+                assert designer_session.selected_node_id == "portable-root"
+                assert preview_host.reveal_selected().path_ids == ("portable-root",)
+                assert preview_host.generation == selected_generation
+                assert preview_host.select_and_focus_node(designer_button.node_id) is True
                 assert preview_host.set_property(designer_button.node_id, "label", "Hosted") is True
                 assert preview_host.component(designer_button.node_id).label == "Hosted"
                 assert preview_host.selected_component is preview_host.component(designer_button.node_id)

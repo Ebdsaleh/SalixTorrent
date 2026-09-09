@@ -2,13 +2,13 @@
 
 **Current application version string:** `0.5.0`
 **Roadmap status:** v0.5.0 released; post-v0.5.0 ecosystem extraction on `dev`
-**Current implementation checkpoint:** Tranche 16 designer project-file ownership/save-load is Windows-accepted and locally committed as `a86acae` on top of published `dev@a0d621a8266cdf42b5b1355c417ec7d6d03bb297`; documentation closure/push is pending
-**Current real Windows regression baseline:** 694 / 694 in both accepted Tranche-16 discovery forms with one expected non-Windows shell-behavior skip; project-file gate 12 / 12, designer/relocation 103 / 103, GUI components 64 / 64 and Tkinter 26 / 26
+**Current implementation checkpoint:** Tranche 17 stable-ID designer hierarchy navigation is prepared on published `dev@d95f6a1987aaff1bda9fb270c6219b36b8ee2080`
+**Current real Windows regression baseline:** 694 / 694 in both accepted Tranche-16 discovery forms with one expected non-Windows shell-behavior skip; Tranche 17 preparation advances expected discovery to 707 with navigation 12 / 12, designer/relocation 115 / 115, GUI components 64 / 64 and Tkinter 27 / 27
 **Accepted Tranche 12 baseline:** 643 / 643 in both real-Windows discovery forms with one expected skip; preview 12 / 12, designer/relocation 56 / 56, GUI components 64 / 64, Tkinter 22 / 22, visuals and pre-commit passed; closure/push checkpoint `8d05ca8b059cef0ba386f324c215f2e80a9bfa83`
 **Accepted Tranche 13 baseline:** 655 / 655 in both real-Windows discovery forms with one expected skip; preview host 11 / 11, designer/relocation 67 / 67, GUI components 64 / 64, Tkinter 23 / 23, localization current, visuals and pre-commit passed; implementation `ddfb3ef2269acb33484cd6fe2f99af47fa40140f`, closure/push checkpoint `4b0968bfdf91ce040eeefd641b1e315244a325e6`
 **Accepted Tranche 14 baseline:** 668 / 668 in both real-Windows discovery forms with one expected skip; clipboard 12 / 12, designer/relocation 79 / 79, GUI components 64 / 64, Tkinter 24 / 24, localization current, visuals and pre-commit passed; implementation `450c12a`, closure/push checkpoint `f59a9a392bf64820f59787b9449d6b7ca9b3e634`
 **Accepted Tranche 15 baseline:** 681 / 681 in both real-Windows discovery forms with one expected skip; selection/focus 12 / 12, designer/relocation 91 / 91, GUI components 64 / 64, Tkinter 25 / 25, localization current, visuals and pre-commit passed; published closure checkpoint `a0d621a8266cdf42b5b1355c417ec7d6d03bb297`
-**Accepted Tranche 16 baseline:** 694 / 694 in both real-Windows discovery forms with one expected skip; project-file gate 12 / 12, designer/relocation 103 / 103, GUI components 64 / 64, Tkinter 26 / 26, localization current, visuals and pre-commit passed; implementation `a86acae`, publication pending documentation closure/push
+**Accepted Tranche 16 baseline:** 694 / 694 in both real-Windows discovery forms with one expected skip; project-file gate 12 / 12, designer/relocation 103 / 103, GUI components 64 / 64, Tkinter 26 / 26, localization current, visuals and pre-commit passed; implementation `a86acae`, closure/push checkpoint `d95f6a1987aaff1bda9fb270c6219b36b8ee2080`
 
 This roadmap records intended engineering direction rather than promising dates or release numbers. Changes should remain incremental, testable, reviewable, and compatible with SalixTorrent's existing protocol, persistence, packaging, localization, and cross-platform boundaries.
 
@@ -833,11 +833,21 @@ Tranche 16 adds the first on-disk ownership boundary around the existing immutab
 
 Load validation is intentionally strict: duplicate JSON keys, non-finite numeric tokens, missing or unexpected envelope fields, unsupported project versions and invalid embedded snapshots are rejected. Serialization is deterministic sorted UTF-8 JSON with one terminal newline. No file extension is mandated while naming remains provisional. Selection/focus, clipboard and undo/redo history are fresh editor state after reopen rather than serialized project content.
 
-The blank code-first application's captured hierarchy round-trips descriptor-identically through this project layer without mutating the live source tree. Reopened project sessions feed the existing `DesignerPreviewHost`, and a real Tkinter proof renders a reopened blank-application project through the same preview/backend path. Framework relocation exercises the same save/open contract after package rename. Real-Windows acceptance passes 12 / 12 project-file tests, 103 / 103 combined designer/relocation tests, 64 / 64 GUI-component tests and 26 / 26 Tkinter tests; both complete discovery forms pass **694 / 694** with one expected skip. Localization remains current, headless/compileall/Git checks and manual visual smoke pass, and `pre_commit_check.bat` passes. The accepted implementation commit is `a86acae`; publication is pending the documentation closure and push.
+The blank code-first application's captured hierarchy round-trips descriptor-identically through this project layer without mutating the live source tree. Reopened project sessions feed the existing `DesignerPreviewHost`, and a real Tkinter proof renders a reopened blank-application project through the same preview/backend path. Framework relocation exercises the same save/open contract after package rename. Real-Windows acceptance passes 12 / 12 project-file tests, 103 / 103 combined designer/relocation tests, 64 / 64 GUI-component tests and 26 / 26 Tkinter tests; both complete discovery forms pass **694 / 694** with one expected skip. Localization remains current, headless/compileall/Git checks and manual visual smoke pass, and `pre_commit_check.bat` passes. The accepted implementation commit is `a86acae`; implementation and documentation closure were published together at `d95f6a1987aaff1bda9fb270c6219b36b8ee2080`.
 
 This remains a narrow designer-tooling prerequisite. The project envelope stores no callbacks, services, bindings, assets, application runtime state, selection/focus, clipboard or undo history. Multi-document editors, migrations, autosave/recovery, resource manifests, recent-project UI, final extension/schema naming and pointer-driven canvas gestures remain later work. Code-first applications remain equal and independent.
 
-### A18. Naming, public API and package/repository split
+### A19. WYSIWYG designer prerequisites — stable-ID hierarchy navigation prepared
+
+Tranche 17 adds a read-only hierarchy navigation model above the immutable snapshot and stable selection contracts. `DesignerHierarchyNavigator` computes parent, first/last child, previous/next sibling and previous/next preorder targets directly from snapshot child order. `DesignerHierarchyReveal` reports the root-to-parent ancestor IDs a future hierarchy widget must expand to reveal a target without making expansion state part of the project document.
+
+`DesignerEditSession` exposes relative selection/focus navigation and reveal helpers as ephemeral interaction operations. They do not edit the snapshot, dirty the project, create undo entries, clear redo history or trigger preview replacement. `DesignerPreviewHost` delegates the same operations, allowing a rendered preview to resolve the newly selected component by stable ID while its generation remains unchanged.
+
+The copied/renamed framework probe exercises navigation after package relocation, and a real Tkinter regression navigates from the blank application's rendered `Actions` control to its parent/child hierarchy without rebuilding the preview. Prepared validation is 12 / 12 dedicated navigation tests, 115 / 115 combined designer/relocation tests, 64 / 64 GUI-component tests, 27 / 27 Tkinter tests and **707 / 707** complete discovery on the preparation environment.
+
+This tranche does not introduce a concrete hierarchy tree widget, persistent expansion state, toolkit keyboard bindings, multi-selection, pointer hit-testing, visual overlays, drag/drop/reparent gestures or resize handles. Those remain later Stage-F surfaces built on these stable semantic targets.
+
+### A20. Naming, public API and package/repository split
 
 This remains **after** the wider extraction.
 

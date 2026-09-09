@@ -12,9 +12,9 @@ currently accepted preview is disposed.  Failed candidates are cleaned up and
 never advance edit history, so document and preview state remain aligned.
 Optional copy/paste/duplicate helpers stay at the document boundary: copy only
 updates ephemeral session clipboard state, while paste/duplicate use the same
-checked replacement transaction as property and structural edits. Stable-ID
-selection/focus state is delegated to the edit session and never retains live
-component or toolkit references across preview replacement.
+checked replacement transaction as property and structural edits. Stable-ID selection/focus and hierarchy-navigation state are delegated to the
+edit session and never retain live component or toolkit references across
+preview replacement.
 """
 
 from __future__ import annotations
@@ -30,6 +30,7 @@ from .designer_clipboard import (
     DuplicateDesignerNode,
     PasteDesignerSubtree,
 )
+from .designer_navigation import DesignerHierarchyReveal, DesignerNavigationDirection
 from .designer_editing import (
     ClearDesignerProperty,
     DesignerEditCommand,
@@ -166,6 +167,50 @@ class DesignerPreviewHost:
     def clear_focus(self) -> bool:
         self._require_open()
         return self.session.clear_focus()
+
+    def selection_navigation_target(
+        self,
+        direction: DesignerNavigationDirection | str,
+    ) -> str | None:
+        self._require_open()
+        return self.session.selection_navigation_target(direction)
+
+    def focus_navigation_target(
+        self,
+        direction: DesignerNavigationDirection | str,
+    ) -> str | None:
+        self._require_open()
+        return self.session.focus_navigation_target(direction)
+
+    def navigate_selection(
+        self,
+        direction: DesignerNavigationDirection | str,
+        *,
+        focus: bool = False,
+    ) -> bool:
+        self._require_open()
+        return self.session.navigate_selection(direction, focus=focus)
+
+    def navigate_focus(
+        self,
+        direction: DesignerNavigationDirection | str,
+        *,
+        select: bool = False,
+    ) -> bool:
+        self._require_open()
+        return self.session.navigate_focus(direction, select=select)
+
+    def reveal_node(self, node_id: object) -> DesignerHierarchyReveal:
+        self._require_open()
+        return self.session.reveal_node(node_id)
+
+    def reveal_selected(self) -> DesignerHierarchyReveal | None:
+        self._require_open()
+        return self.session.reveal_selected()
+
+    def reveal_focused(self) -> DesignerHierarchyReveal | None:
+        self._require_open()
+        return self.session.reveal_focused()
 
     def _require_open(self) -> None:
         if self._closed:

@@ -8,9 +8,9 @@ undo/redo history.
 The editing boundary intentionally does not rebuild or mutate live component
 objects. Property commands, structural hierarchy commands and optional
 copy/paste/duplicate document commands share the same immutable-snapshot history.
-Clipboard and stable-ID selection/focus state are ephemeral editor state rather
-than project persistence or undoable document data. Preview hosts may consume
-checked candidate snapshots, but toolkit objects, callbacks,
+Clipboard, stable-ID selection/focus state and hierarchy navigation are ephemeral
+editor state rather than project persistence or undoable document data. Preview
+hosts may consume checked candidate snapshots, but toolkit objects, callbacks,
 application models, drag/drop behavior and the final project-document schema
 remain outside this module.
 """
@@ -34,6 +34,11 @@ from .designer_clipboard import (
     DuplicateDesignerNode,
     PasteDesignerSubtree,
     copy_designer_subtree,
+)
+from .designer_navigation import (
+    DesignerHierarchyNavigator,
+    DesignerHierarchyReveal,
+    DesignerNavigationDirection,
 )
 from .designer_selection import DesignerSelectionModel, DesignerSelectionState
 from .designer_structure import (
@@ -609,6 +614,66 @@ class DesignerEditSession:
 
     def focused_location(self) -> DesignerNodeLocation | None:
         return self._selection.focused_location(self._snapshot)
+
+    def hierarchy_navigation(self) -> DesignerHierarchyNavigator:
+        """Return a read-only navigator bound to the current immutable snapshot."""
+
+        return DesignerHierarchyNavigator(self._snapshot)
+
+    def selection_navigation_target(
+        self,
+        direction: DesignerNavigationDirection | str,
+    ) -> str | None:
+        if not self.selected_node_id:
+            return None
+        return self.hierarchy_navigation().target(self.selected_node_id, direction)
+
+    def focus_navigation_target(
+        self,
+        direction: DesignerNavigationDirection | str,
+    ) -> str | None:
+        if not self.focused_node_id:
+            return None
+        return self.hierarchy_navigation().target(self.focused_node_id, direction)
+
+    def navigate_selection(
+        self,
+        direction: DesignerNavigationDirection | str,
+        *,
+        focus: bool = False,
+    ) -> bool:
+        """Move selection to a relative hierarchy target without editing history."""
+
+        target = self.selection_navigation_target(direction)
+        if target is None:
+            return False
+        return self.select_node(target, focus=focus)
+
+    def navigate_focus(
+        self,
+        direction: DesignerNavigationDirection | str,
+        *,
+        select: bool = False,
+    ) -> bool:
+        """Move focus to a relative hierarchy target without editing history."""
+
+        target = self.focus_navigation_target(direction)
+        if target is None:
+            return False
+        return self.focus_node(target, select=select)
+
+    def reveal_node(self, node_id: object) -> DesignerHierarchyReveal:
+        return self.hierarchy_navigation().reveal(node_id)
+
+    def reveal_selected(self) -> DesignerHierarchyReveal | None:
+        if not self.selected_node_id:
+            return None
+        return self.reveal_node(self.selected_node_id)
+
+    def reveal_focused(self) -> DesignerHierarchyReveal | None:
+        if not self.focused_node_id:
+            return None
+        return self.reveal_node(self.focused_node_id)
 
     def node(self, node_id: object) -> DesignerNode:
         return _find_node(self._snapshot, node_id)

@@ -31,6 +31,7 @@ class TrancheValidationScriptTests(unittest.TestCase):
         self.assertIn("tests.presentation.test_designer_clipboard", self.runner_source)
         self.assertIn("tests.presentation.test_designer_selection", self.runner_source)
         self.assertIn("tests.presentation.test_designer_project", self.runner_source)
+        self.assertIn("tests.presentation.test_designer_navigation", self.runner_source)
         self.assertIn("tests.presentation.test_tkinter_backend", self.runner_source)
         self.assertIn("tools/localization/build_locales.py", self.runner_source)
         self.assertIn('"discover", "-s", "tests", "-t", "."', self.runner_source)
@@ -39,7 +40,7 @@ class TrancheValidationScriptTests(unittest.TestCase):
         self.assertIn('"compileall", "-q", "app", "tests", "examples"', self.runner_source)
         self.assertIn('("git", "rev-parse", "origin/dev")', self.runner_source)
         self.assertIn('("git", "diff", "--check")', self.runner_source)
-        self.assertIn("DISCOVERY_TEST_COUNT = 694", self.runner_source)
+        self.assertIn("DISCOVERY_TEST_COUNT = 707", self.runner_source)
         self.assertIn("TRANCHE VALIDATION PASSED", self.runner_source)
         self.assertIn("TRANCHE VALIDATION FAILED", self.runner_source)
 
