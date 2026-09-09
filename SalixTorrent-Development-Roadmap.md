@@ -2,11 +2,12 @@
 
 **Current application version string:** `0.5.0`
 **Roadmap status:** v0.5.0 released; post-v0.5.0 ecosystem extraction on `dev`
-**Current implementation checkpoint:** Tranche 14 document copy/paste/duplicate is accepted/published at `f59a9a392bf64820f59787b9449d6b7ca9b3e634`; Tranche 15 stable-ID designer selection/focus is prepared and awaiting real-Windows acceptance
-**Current real Windows regression baseline:** 668 / 668 for accepted/published Tranche 14 in both discovery forms with one expected non-Windows shell-behavior skip; Tranche 15 preparation expects 681 after adding 12 selection tests and one Tkinter proof
+**Current implementation checkpoint:** Tranche 15 stable-ID designer selection/focus is Windows-accepted and locally committed as `98f64e2`; its documentation closure is prepared before publication
+**Current real Windows regression baseline:** 681 / 681 in both Tranche-15 discovery forms with one expected non-Windows shell-behavior skip; selection/focus 12 / 12, designer/relocation 91 / 91, GUI components 64 / 64 and Tkinter 25 / 25
 **Accepted Tranche 12 baseline:** 643 / 643 in both real-Windows discovery forms with one expected skip; preview 12 / 12, designer/relocation 56 / 56, GUI components 64 / 64, Tkinter 22 / 22, visuals and pre-commit passed; closure/push checkpoint `8d05ca8b059cef0ba386f324c215f2e80a9bfa83`
 **Accepted Tranche 13 baseline:** 655 / 655 in both real-Windows discovery forms with one expected skip; preview host 11 / 11, designer/relocation 67 / 67, GUI components 64 / 64, Tkinter 23 / 23, localization current, visuals and pre-commit passed; implementation `ddfb3ef2269acb33484cd6fe2f99af47fa40140f`, closure/push checkpoint `4b0968bfdf91ce040eeefd641b1e315244a325e6`
 **Accepted Tranche 14 baseline:** 668 / 668 in both real-Windows discovery forms with one expected skip; clipboard 12 / 12, designer/relocation 79 / 79, GUI components 64 / 64, Tkinter 24 / 24, localization current, visuals and pre-commit passed; implementation `450c12a`, closure/push checkpoint `f59a9a392bf64820f59787b9449d6b7ca9b3e634`
+**Accepted Tranche 15 baseline:** 681 / 681 in both real-Windows discovery forms with one expected skip; selection/focus 12 / 12, designer/relocation 91 / 91, GUI components 64 / 64, Tkinter 25 / 25, localization current, visuals and pre-commit passed; accepted local implementation `98f64e2`, publication closure pending
 
 This roadmap records intended engineering direction rather than promising dates or release numbers. Changes should remain incremental, testable, reviewable, and compatible with SalixTorrent's existing protocol, persistence, packaging, localization, and cross-platform boundaries.
 
@@ -813,7 +814,7 @@ Real-Windows acceptance advances the baseline to **668 tests** in both complete 
 
 This tranche does not introduce an operating-system clipboard, cut/multi-selection semantics, drag/drop or resize gestures, incremental live toolkit mutation, project persistence/schema, callback/service serialization or a final public API freeze.
 
-### A17. WYSIWYG designer prerequisites — stable-ID selection/focus prepared
+### A17. WYSIWYG designer prerequisites — stable-ID selection/focus accepted
 
 Tranche 15 introduces explicit designer interaction state without turning editor state into project data. `DesignerSelectionModel` keeps one selected node ID and one focused node ID, validates them against the current immutable snapshot, and resolves current nodes/locations without retaining preview components or toolkit handles. Selection and focus can move independently or be coupled explicitly.
 
@@ -821,7 +822,7 @@ Tranche 15 introduces explicit designer interaction state without turning editor
 
 `DesignerPreviewHost` exposes the same selection/focus operations without rebuilding. `selected_component` and `focused_component` resolve the stable IDs against the current preview generation, so transactional whole-tree replacement can dispose old component objects while editor selection remains anchored to the same designer identity. A real Tkinter regression proves this against the blank application's `Actions` control.
 
-Preparation advances the dedicated selection gate to 12 tests, combined designer/relocation to 91 tests, Tkinter to 25 tests and complete discovery to **681 tests**. Real-Windows acceptance, manual visual smoke and pre-commit remain required before publication.
+Real-Windows acceptance passed the dedicated selection gate 12 / 12, combined designer/relocation 91 / 91, GUI components 64 / 64 and Tkinter 25 / 25. Both complete discovery forms passed **681 / 681** with one expected skip; localization remained 1,337/current, headless/compileall/Git checks passed, manual Dear PyGui/Tkinter/SalixTorrent smoke passed and `pre_commit_check.bat` passed. The accepted local implementation is `98f64e2` (`Add stable designer selection and focus state`); publication remains pending until the documentation closure is committed and both commits are pushed.
 
 This tranche intentionally stops before multi-selection/range selection, keyboard traversal policy, visual selection overlays, pointer hit-testing, drag/drop/resize handles, persistent project documents, callback/service serialization, incremental in-place toolkit mutation or final public API/package naming.
 
@@ -1060,7 +1061,7 @@ The accepted Tranche-10 base for this work is closure commit `df675e89bf025b570a
 
 ---
 
-## 25. Twelfth post-v0.5.0 implementation checkpoint — Windows accepted; publication pending
+## 25. Twelfth post-v0.5.0 implementation checkpoint — accepted and published
 
 The twelfth `dev` tranche introduces the first deliberate reconstruction boundary from immutable designer documents back into executable framework components. `app/framework/designer_preview.py` remains standard-library-only and backend-neutral: it does not import Dear PyGui, Tkinter adapters, SalixTorrent views or application models.
 
@@ -1074,4 +1075,4 @@ Callbacks are intentionally not reconstructed. A preview button or value control
 
 Preparation advanced complete discovery from 630 to **643 tests**. Real-Windows acceptance then passed the 12 / 12 preview gate, 56 / 56 combined designer/relocation focus, 64 / 64 GUI-component regression and 22 / 22 Tkinter regression. Both complete discovery forms passed **643 / 643** with one expected skip, canonical localization remained 1,337/current, the one-command validator ended in `TRANCHE VALIDATION PASSED`, manual Dear PyGui/Tkinter/SalixTorrent visual regression smoke passed, and `pre_commit_check.bat` passed. The exact 12-file implementation boundary was committed locally as `688bcff` (`Add designer snapshot preview reconstruction`).
 
-The Windows validator captured the published Tranche-11 base as `79edec6cb4531759992b4f7fdb2d63ac8f122907` for both `HEAD` and `origin/dev` before the Tranche-12 commit. Publication of `688bcff` remains intentionally pending this post-acceptance documentation closure. `APP_VERSION` remains `0.5.0`. This tranche does not add live preview synchronization, callback/service resolution, specialized semantic-field factories, copy/paste/duplicate, pointer-driven drag/drop/resize handles, project persistence/versioning or a public API freeze. The next narrow Stage-F candidate is preview rebuild/ownership semantics driven by the current `DesignerEditSession.snapshot`.
+The Windows validator captured the published Tranche-11 base as `79edec6cb4531759992b4f7fdb2d63ac8f122907` for both `HEAD` and `origin/dev` before the Tranche-12 commit. Implementation `688bcff` and its documentation closure were subsequently published together at `8d05ca8b059cef0ba386f324c215f2e80a9bfa83`. `APP_VERSION` remains `0.5.0`. This tranche does not add live preview synchronization, callback/service resolution, specialized semantic-field factories, copy/paste/duplicate, pointer-driven drag/drop/resize handles, project persistence/versioning or a public API freeze. The next narrow Stage-F candidate is preview rebuild/ownership semantics driven by the current `DesignerEditSession.snapshot`.
