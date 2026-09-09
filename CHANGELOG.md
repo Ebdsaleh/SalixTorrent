@@ -4,6 +4,18 @@ Notable SalixTorrent changes are recorded here.
 
 ## Unreleased
 
+### Ecosystem Extraction — Designer Property Inspector Presentation
+
+- Added standard-library/framework-only `app/framework/designer_inspector.py` as a backend-neutral property-inspector presentation layer over the existing stable selection and `DesignerPropertyState` contracts. `DesignerPropertyInspector` projects the currently selected node into immutable `DesignerInspectorState` / `DesignerInspectorRow` records without retaining toolkit widgets, preview items or a second copy of selection state.
+- Added `DesignerInspectorEditorKind` semantic editor hints for text, toggle, integer, number, choice, string-list, number-list, dimension and insets values. These are presentation hints rather than concrete Dear PyGui/Tkinter widget choices; property value validation remains owned by the existing designer editing metadata and normalizer.
+- Inspector rows preserve editable/serializable/nullable/unsettable/current-value/choice/bounds metadata and derive `can_edit` / `can_clear` affordances. Read-only filtering changes only the projection and never mutates the document.
+- Integrated selection-driven inspector access with `DesignerEditSession`. Inspector projection itself is history-neutral; selected-property set/clear helpers delegate to the existing validated command/history path, so dirty-state and undo/redo behavior are unchanged.
+- Extended `DesignerPreviewHost` with inspector projection and selected-property editing helpers. Inspecting or changing selection never rebuilds the preview; an accepted selected-property edit still uses the Tranche-13 checked transaction and therefore replaces the preview only after the candidate is buildable. A real Tkinter regression covers this stable-ID replacement path.
+- Project save/load continues to persist only the designer snapshot envelope. Selection and inspector target state remain ephemeral, so reopening a project starts with an empty property inspector until a node is selected. The copied/renamed framework probe imports and exercises the inspector without SalixTorrent or Dear PyGui dependencies.
+- Real-Windows acceptance passes 12 / 12 inspector tests, 139 / 139 combined designer/relocation tests, 64 / 64 GUI-component tests and 29 / 29 Tkinter tests. Both complete discovery forms pass **733 / 733** with one expected skip; localization remains 1,337/current, headless/compileall/Git checks pass, the manual Dear PyGui/Tkinter/SalixTorrent smoke was completed before automated validation, and `pre_commit_check.bat` passes.
+- Tranche 18 hierarchy projection/expansion is published at `9bd56a7e4a758529a54bbf45c3cc98bc061fa58c`; `HEAD` and `origin/dev` matched there with a clean tree before this tranche.
+- This tranche deliberately stops before concrete toolkit property editors, inline validation-message UI, multi-selection/mixed-value editing, property categories/search/favorites, pointer hit-testing, drag/drop/resize handles, callback/service/binding serialization or final public package/API naming. Code-first Python applications remain independent of designer inspector tooling.
+
 ### Ecosystem Extraction — Designer Hierarchy Projection / Expansion
 
 - Added standard-library-only `app/framework/designer_hierarchy.py` as the presentation-model layer above stable-ID hierarchy navigation. `DesignerHierarchyProjection` owns only ephemeral expanded node IDs and projects deterministic visible rows; `DesignerHierarchyRow` exposes stable ID, type key, depth, parent, child count, expandability/expanded state, and selected/focused markers without retaining toolkit tree items or live components.

@@ -365,6 +365,47 @@ class TkinterBackendLiveTests(unittest.TestCase):
         self.assertEqual(generation, preview_host.generation)
         preview_host.close()
 
+    def test_preview_host_property_inspector_tracks_real_tkinter_replacement(self):
+        from app.engine.presentation_backends import create_dearpygui_backend
+        from examples.ecosystem_blank_app import DemoView
+
+        class SnapshotHost:
+            presentation = create_dearpygui_backend()
+
+        snapshot = DemoView(SnapshotHost()).capture_designer_snapshot()
+        actions = next(
+            node
+            for node in snapshot.root.walk()
+            if node.type_key == "control.button" and node.properties.get("label") == "Actions"
+        )
+        session = DesignerEditSession(snapshot)
+        preview_host = DesignerPreviewHost(
+            session,
+            context=DesignerPreviewContext(
+                layout_coordinator=LayoutCoordinator(TkinterLayoutHost(self.renderer))
+            ),
+            renderer=self.renderer,
+        )
+        self.root.update_idletasks()
+        self.assertTrue(preview_host.select_and_focus_node(actions.node_id))
+        generation = preview_host.generation
+        old_actions = preview_host.selected_component
+        self.assertTrue(old_actions.exists())
+        state = preview_host.inspector_state()
+        self.assertEqual(actions.node_id, state.node_id)
+        self.assertEqual("Button", state.type_label)
+        self.assertEqual("Actions", state.row("label").value)
+        self.assertEqual(generation, preview_host.generation)
+
+        self.assertTrue(preview_host.set_selected_property("label", "Inspector"))
+        self.root.update_idletasks()
+        self.assertFalse(old_actions.exists())
+        self.assertEqual(generation + 1, preview_host.generation)
+        self.assertEqual("Inspector", preview_host.inspector_state().row("label").value)
+        self.assertEqual("Inspector", preview_host.selected_component.label)
+        self.assertTrue(preview_host.selected_component.exists())
+        preview_host.close()
+
     def test_preview_host_duplicate_rebuilds_real_tkinter_tree_with_fresh_identity(self):
         from app.engine.presentation_backends import create_dearpygui_backend
         from examples.ecosystem_blank_app import DemoView

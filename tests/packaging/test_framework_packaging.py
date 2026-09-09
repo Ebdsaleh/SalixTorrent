@@ -101,6 +101,7 @@ class FrameworkPackagingTests(unittest.TestCase):
                 assert "portable_framework.designer_preview_host" in imported
                 assert "portable_framework.designer_project" in imported
                 assert "portable_framework.designer_hierarchy" in imported
+                assert "portable_framework.designer_inspector" in imported
                 assert "portable_framework.designer_navigation" in imported
                 assert "portable_framework.designer_selection" in imported
                 assert "portable_framework.geometry" in imported
@@ -170,6 +171,10 @@ class FrameworkPackagingTests(unittest.TestCase):
                 from portable_framework.designer_preview_host import DesignerPreviewHost
                 from portable_framework.designer_project import DesignerProjectFile
                 from portable_framework.designer_hierarchy import DesignerHierarchyProjection
+                from portable_framework.designer_inspector import (
+                    DesignerInspectorEditorKind,
+                    DesignerPropertyInspector,
+                )
                 from portable_framework.designer_navigation import (
                     DesignerHierarchyNavigator,
                     DesignerNavigationDirection,
@@ -273,6 +278,14 @@ class FrameworkPackagingTests(unittest.TestCase):
                 )
                 assert hierarchy_row.selected is True
                 assert hierarchy_row.focused is True
+                portable_inspector = DesignerPropertyInspector(designer_session)
+                inspector_state = portable_inspector.state()
+                assert inspector_state.node_id == designer_button.node_id
+                assert inspector_state.type_label == "Button"
+                label_row = portable_inspector.row("label")
+                assert label_row.value == "Run"
+                assert label_row.editor is DesignerInspectorEditorKind.TEXT
+                assert preview_host.inspected_property("label").value == "Run"
                 assert preview_host.generation == selected_generation
                 assert preview_host.navigate_selection("parent", focus=True) is True
                 assert designer_session.selected_node_id == "portable-root"

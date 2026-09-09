@@ -13,15 +13,16 @@ never advance edit history, so document and preview state remain aligned.
 Optional copy/paste/duplicate helpers stay at the document boundary: copy only
 updates ephemeral session clipboard state, while paste/duplicate use the same
 checked replacement transaction as property and structural edits. Stable-ID
-selection/focus, hierarchy navigation and hierarchy expansion/projection state
-are delegated to the edit session and never retain live component or toolkit
-references across preview replacement.
+selection/focus, hierarchy navigation, hierarchy expansion/projection and
+property-inspector presentation state are delegated to the edit session and
+never retain live component or toolkit references across preview replacement.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from .components.base import Component
 from .components.renderer import ComponentRenderer
@@ -55,6 +56,9 @@ from .designer_structure import (
     RemoveDesignerNode,
     ReparentDesignerNode,
 )
+
+if TYPE_CHECKING:
+    from .designer_inspector import DesignerInspectorRow, DesignerInspectorState
 
 
 class DesignerPreviewHostError(RuntimeError):
@@ -214,6 +218,34 @@ class DesignerPreviewHost:
     def reveal_focused_in_hierarchy(self) -> DesignerHierarchyReveal | None:
         self._require_open()
         return self.session.reveal_focused_in_hierarchy()
+
+    def inspector_state(
+        self, *, include_read_only: bool = True
+    ) -> "DesignerInspectorState":
+        self._require_open()
+        return self.session.inspector_state(include_read_only=include_read_only)
+
+    def inspector_rows(
+        self, *, include_read_only: bool = True
+    ) -> tuple["DesignerInspectorRow", ...]:
+        self._require_open()
+        return self.session.inspector_rows(include_read_only=include_read_only)
+
+    def inspected_property(self, property_key: object) -> "DesignerInspectorRow | None":
+        self._require_open()
+        return self.session.inspected_property(property_key)
+
+    def set_selected_property(self, property_key: object, value: object) -> bool:
+        self._require_open()
+        if not self.session.selected_node_id:
+            raise RuntimeError("designer property inspector has no selected node")
+        return self.set_property(self.session.selected_node_id, property_key, value)
+
+    def clear_selected_property(self, property_key: object) -> bool:
+        self._require_open()
+        if not self.session.selected_node_id:
+            raise RuntimeError("designer property inspector has no selected node")
+        return self.clear_property(self.session.selected_node_id, property_key)
 
     def selection_navigation_target(
         self,

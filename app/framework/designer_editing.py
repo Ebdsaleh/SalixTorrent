@@ -8,9 +8,9 @@ undo/redo history.
 The editing boundary intentionally does not rebuild or mutate live component
 objects. Property commands, structural hierarchy commands and optional
 copy/paste/duplicate document commands share the same immutable-snapshot history.
-Clipboard, stable-ID selection/focus state, hierarchy navigation and hierarchy
-expansion/projection are ephemeral editor state rather than project persistence
-or undoable document data. Preview hosts may consume checked candidate snapshots,
+Clipboard, stable-ID selection/focus state, hierarchy navigation, hierarchy
+expansion/projection and property-inspector presentation are ephemeral editor
+state rather than project persistence or undoable document data. Preview hosts may consume checked candidate snapshots,
 but toolkit objects, callbacks, application models, drag/drop behavior and the
 final project-document schema remain outside this module.
 """
@@ -21,7 +21,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 import json
 import math
-from typing import Callable, Protocol
+from typing import TYPE_CHECKING, Callable, Protocol
 
 from .designer import (
     DesignerChild,
@@ -55,6 +55,13 @@ from .designer_structure import (
     locate_designer_node,
 )
 from .interactions import CommandSet, CommandSpec
+
+if TYPE_CHECKING:
+    from .designer_inspector import (
+        DesignerInspectorRow,
+        DesignerInspectorState,
+        DesignerPropertyInspector,
+    )
 
 
 DESIGNER_UNDO_COMMAND = "designer.undo"
@@ -774,6 +781,42 @@ class DesignerEditSession:
                 continue
             states.append(self.property_state(node.node_id, descriptor.get("key")))
         return tuple(states)
+
+    def property_inspector(self) -> "DesignerPropertyInspector":
+        """Return a selection-driven backend-neutral inspector projection."""
+
+        from .designer_inspector import DesignerPropertyInspector
+
+        return DesignerPropertyInspector(self)
+
+    def inspector_state(
+        self, *, include_read_only: bool = True
+    ) -> "DesignerInspectorState":
+        return self.property_inspector().state(include_read_only=include_read_only)
+
+    def inspector_rows(
+        self, *, include_read_only: bool = True
+    ) -> tuple["DesignerInspectorRow", ...]:
+        return self.property_inspector().rows(include_read_only=include_read_only)
+
+    def inspected_property(self, property_key: object) -> "DesignerInspectorRow | None":
+        """Return one selected-node inspector row, or ``None`` without selection."""
+
+        return self.property_inspector().row(property_key)
+
+    def set_selected_property(self, property_key: object, value: object) -> bool:
+        """Edit one property on the currently selected stable designer node."""
+
+        if not self.selected_node_id:
+            raise RuntimeError("designer property inspector has no selected node")
+        return self.set_property(self.selected_node_id, property_key, value)
+
+    def clear_selected_property(self, property_key: object) -> bool:
+        """Clear one unsettable property on the currently selected node."""
+
+        if not self.selected_node_id:
+            raise RuntimeError("designer property inspector has no selected node")
+        return self.clear_property(self.selected_node_id, property_key)
 
     def execute_checked(
         self,
