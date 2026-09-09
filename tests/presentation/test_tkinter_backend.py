@@ -53,6 +53,7 @@ from app.framework.designer_editing import DesignerEditSession
 from app.framework.designer_preview import DesignerPreviewContext, reconstruct_designer_snapshot
 from app.framework.designer_preview_host import DesignerPreviewHost
 from app.framework.designer_project import DesignerProjectFile
+from app.framework.designer_workspace import DesignerWorkspace
 from app.framework.interactions import CommandSet, CommandSpec
 from app.framework.live_data import (
     LiveTable,
@@ -405,6 +406,63 @@ class TkinterBackendLiveTests(unittest.TestCase):
         self.assertEqual("Inspector", preview_host.selected_component.label)
         self.assertTrue(preview_host.selected_component.exists())
         preview_host.close()
+
+    def test_designer_workspace_composes_real_tkinter_preview_and_shell_state(self):
+        from app.engine.presentation_backends import create_dearpygui_backend
+        from examples.ecosystem_blank_app import DemoView
+
+        class SnapshotHost:
+            presentation = create_dearpygui_backend()
+
+        snapshot = DemoView(SnapshotHost()).capture_designer_snapshot()
+        actions = next(
+            node
+            for node in snapshot.root.walk()
+            if node.type_key == "control.button" and node.properties.get("label") == "Actions"
+        )
+        project = DesignerProjectFile.create(snapshot)
+        workspace = DesignerWorkspace(
+            project,
+            context=DesignerPreviewContext(
+                layout_coordinator=LayoutCoordinator(TkinterLayoutHost(self.renderer))
+            ),
+            renderer=self.renderer,
+        )
+        self.root.update_idletasks()
+        initial = workspace.state
+        self.assertTrue(initial.preview_available)
+        self.assertTrue(initial.preview_rendered)
+        self.assertTrue(initial.is_dirty)
+        self.assertTrue(initial.requires_save_as)
+
+        self.assertTrue(workspace.select_and_focus_node(actions.node_id))
+        workspace.reveal_selected_in_hierarchy()
+        selected = workspace.state
+        generation = selected.preview_generation
+        old_actions = workspace.preview_host.selected_component
+        self.assertEqual(actions.node_id, selected.inspector.node_id)
+        self.assertEqual("Actions", selected.inspector.row("label").value)
+        self.assertTrue(old_actions.exists())
+
+        self.assertTrue(workspace.set_selected_property("label", "Workspace"))
+        self.root.update_idletasks()
+        edited = workspace.state
+        self.assertFalse(old_actions.exists())
+        self.assertEqual(generation + 1, edited.preview_generation)
+        self.assertTrue(edited.can_undo)
+        self.assertTrue(edited.is_dirty)
+        self.assertEqual("Workspace", edited.inspector.row("label").value)
+        self.assertEqual("Workspace", workspace.preview_host.selected_component.label)
+
+        with tempfile.TemporaryDirectory() as td:
+            target = Path(td) / "workspace.project"
+            workspace.save(target)
+            saved = workspace.state
+            self.assertFalse(saved.is_dirty)
+            self.assertEqual(target.absolute(), saved.path)
+            self.assertEqual(edited.preview_generation, saved.preview_generation)
+
+        self.assertTrue(workspace.close())
 
     def test_preview_host_duplicate_rebuilds_real_tkinter_tree_with_fresh_identity(self):
         from app.engine.presentation_backends import create_dearpygui_backend

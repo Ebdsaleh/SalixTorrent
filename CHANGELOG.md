@@ -4,6 +4,17 @@ Notable SalixTorrent changes are recorded here.
 
 ## Unreleased
 
+### Ecosystem Extraction — Designer Workspace Coordination
+
+- Added standard-library/framework-only `app/framework/designer_workspace.py` as a backend-neutral coordinator over the already-authoritative designer project, edit-session, preview-host, hierarchy, selection and inspector models. `DesignerWorkspace` does not introduce a second document/history/selection/preview owner; it composes those owners for a future editor shell.
+- Added immutable `DesignerWorkspaceState` as one shell-facing snapshot of project path/persisted/dirty/save requirements, undo/redo availability and labels, clipboard availability, stable selected/focused IDs, expanded hierarchy IDs/visible rows, inspector state and preview generation/rendered availability. Its descriptor is presentation data only and is not a project persistence schema.
+- Workspace project Save/Save-As delegates to `DesignerProjectFile` and never rebuilds the preview. Selection, hierarchy reveal/expand/collapse and inspector reads remain ephemeral/history-neutral. Selected-property edits, duplicate/paste and undo/redo continue through `DesignerPreviewHost` checked transactions.
+- Added explicit coordinator lifetime and preview synchronization helpers. A workspace may create/open a project or adopt an existing preview host only when both share the exact same `DesignerEditSession`; mismatched ownership is rejected. Closing the workspace closes its preview host without adding a new project-file close contract.
+- Added a real Tkinter workspace regression and copied/renamed framework relocation proof. The code-first blank application remains descriptor-identical while optional workspace tooling coordinates only its captured designer document.
+- Tranche 19 property-inspector presentation is published at `35d0d4c0966aa9a3a6aafbe263edfbe8b383d7aa`; Tranche 20 is real-Windows accepted on top of that clean `dev` checkpoint and is the current implementation boundary.
+- Real-Windows acceptance passes 12 / 12 workspace tests, 151 / 151 combined designer/relocation tests, 64 / 64 GUI-component tests and 30 / 30 Tkinter tests. Both complete discovery forms pass **746 / 746** with one expected skip; localization remains 1,337/current, the headless blank app reports 3 updates, compileall/Git checks pass, the manual Dear PyGui/Tkinter/SalixTorrent smoke was completed before automated validation, and `pre_commit_check.bat` passes.
+- This tranche deliberately stops before concrete Dear PyGui/Tkinter editor-shell widgets, multi-document ownership, autosave/recovery, pointer hit-testing/click-to-select, drag/drop/resize gestures, mixed-value multi-selection, callback/service/binding serialization or final public package/API naming. Code-first Python composition remains first-class and independent of designer workspace tooling.
+
 ### Ecosystem Extraction — Designer Property Inspector Presentation
 
 - Added standard-library/framework-only `app/framework/designer_inspector.py` as a backend-neutral property-inspector presentation layer over the existing stable selection and `DesignerPropertyState` contracts. `DesignerPropertyInspector` projects the currently selected node into immutable `DesignerInspectorState` / `DesignerInspectorRow` records without retaining toolkit widgets, preview items or a second copy of selection state.

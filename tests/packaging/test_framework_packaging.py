@@ -102,6 +102,7 @@ class FrameworkPackagingTests(unittest.TestCase):
                 assert "portable_framework.designer_project" in imported
                 assert "portable_framework.designer_hierarchy" in imported
                 assert "portable_framework.designer_inspector" in imported
+                assert "portable_framework.designer_workspace" in imported
                 assert "portable_framework.designer_navigation" in imported
                 assert "portable_framework.designer_selection" in imported
                 assert "portable_framework.geometry" in imported
@@ -180,6 +181,7 @@ class FrameworkPackagingTests(unittest.TestCase):
                     DesignerNavigationDirection,
                 )
                 from portable_framework.designer_selection import DesignerSelectionModel
+                from portable_framework.designer_workspace import DesignerWorkspace
                 from portable_framework.documentation import DocPage, DocumentationTheme
                 from portable_framework.geometry import ContentMetrics, content_bounds, split_sizes
                 from portable_framework.data_view import DataRecord, DataView, SortDirection, SortTerm
@@ -287,13 +289,23 @@ class FrameworkPackagingTests(unittest.TestCase):
                 assert label_row.editor is DesignerInspectorEditorKind.TEXT
                 assert preview_host.inspected_property("label").value == "Run"
                 assert preview_host.generation == selected_generation
+                portable_workspace = DesignerWorkspace(
+                    portable_loaded, preview_host=preview_host
+                )
+                workspace_state = portable_workspace.state
+                assert workspace_state.selected_id == designer_button.node_id
+                assert workspace_state.inspector.row("label").value == "Run"
+                assert workspace_state.preview_generation == selected_generation
+                assert workspace_state.is_dirty is False
                 assert preview_host.navigate_selection("parent", focus=True) is True
                 assert designer_session.selected_node_id == "portable-root"
                 assert preview_host.reveal_selected().path_ids == ("portable-root",)
                 assert preview_host.generation == selected_generation
                 assert preview_host.select_and_focus_node(designer_button.node_id) is True
-                assert preview_host.set_property(designer_button.node_id, "label", "Hosted") is True
+                assert portable_workspace.set_selected_property("label", "Hosted") is True
                 assert preview_host.component(designer_button.node_id).label == "Hosted"
+                assert portable_workspace.state.is_dirty is True
+                assert portable_workspace.state.can_undo is True
                 assert preview_host.selected_component is preview_host.component(designer_button.node_id)
                 assert designer_session.selected_node_id == designer_button.node_id
                 assert preview_host.undo() is True
