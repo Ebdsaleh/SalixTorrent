@@ -10,7 +10,7 @@ SalixTorrent is a desktop BitTorrent client written in Python with a custom asyn
 
 **Post-v0.5.0 direction — modular application ecosystem:** SalixTorrent remains the reference application while reusable behavior is extracted downward into two cooperating layers: an application engine/runtime and an optional RAD/application framework. Dear PyGui is the current reference desktop backend, Tkinter is now the validated compatibility implementation for the common GUI surface, and headless/CLI operation remains first-class. Realtime telemetry/graphs, generic network/runtime awareness, lifecycle/presentation-host boundaries and rich live-data views are explicit extraction candidates before final framework naming or API freeze. See `SalixTorrent-Ecosystem-Architecture.md`.
 
-**Current `dev` extraction — document copy/paste/duplicate:** Tranche 14 is now real-Windows accepted and committed locally as `450c12a` (`Add designer copy paste and duplicate commands`), with the documentation-only acceptance closure and push still pending. Immutable designer subtrees can be copied into ephemeral session clipboard data, pasted or duplicated with deterministic fresh node IDs, validated through the existing structural relationship rules, recorded in the same undo/redo history, and rebuilt transactionally through `DesignerPreviewHost`; copy alone never mutates the document or preview. Windows acceptance passed 12 / 12 clipboard tests, 79 / 79 designer/relocation tests, 64 / 64 GUI-component tests, 24 / 24 Tkinter tests and **668 / 668** in both complete discovery forms with one expected skip; localization, headless/compileall/Git checks, manual Dear PyGui/Tkinter/SalixTorrent smoke and `pre_commit_check.bat` also passed. The code-first path remains equal and independent: ordinary applications still compose the same semantic `Component` tree directly and do not need designer modules. Operating-system clipboard integration, cut/multi-selection, pointer-driven designer gestures, incremental toolkit mutation, callback/service serialization, project persistence/schema and final ecosystem naming/API freeze remain deferred; selection/focus state over stable designer IDs is the next narrow candidate.
+**Current `dev` extraction — designer selection/focus state:** Tranche 14 copy/paste/duplicate is accepted and published at `f59a9a392bf64820f59787b9449d6b7ca9b3e634`. Tranche 15 now prepares the next optional designer interaction boundary: one selected node ID and one focused node ID are tracked independently from document/history state, retained across property edits, moves, reparenting and whole-preview replacement, and reconciled to the nearest surviving ancestor when a selected/focused subtree is removed. Selection/focus never stores toolkit objects, dirties a project, creates undo history or forces a preview rebuild; `DesignerPreviewHost` resolves the current selected/focused IDs against whichever reconstructed preview generation it currently owns. Preparation passes 12 / 12 selection tests, 91 / 91 designer/relocation tests, 64 / 64 GUI-component tests, 25 / 25 Tkinter tests and **681 / 681** complete discovery on the preparation environment. The code-first path remains equal and independent: ordinary applications compose the same semantic `Component` tree directly and never need designer modules. Multi-selection, visual overlays, hit-testing, pointer drag/drop/resize gestures, project persistence/schema and final ecosystem naming/API freeze remain deferred.
 
 **v0.4.0 milestone — durability and transfer lifecycle:** SalixTorrent built on the v0.3.0 protocol/network foundation with an offline-first localization system, semantic Help/Glossary content, provider-neutral translation tooling, backend-neutral application settings and session-state persistence, optional SalixORM/SQLite adapters, a fully tracked `unittest` regression suite, and durable per-torrent seeding goals. Timed goals use an instanced baseline so a newly requested duration starts from the moment it is applied, while cumulative Seed Time remains available as historical telemetry.
 
@@ -408,6 +408,7 @@ SalixTorrent/
 │   │   ├── test_designer_structure.py
 │   │   ├── test_designer_preview.py
 │   │   ├── test_designer_preview_host.py
+│   │   ├── test_designer_selection.py
 │   │   ├── test_realtime_visualization.py
 │   │   ├── test_live_data.py
 │   │   ├── test_interactive_data_migration.py
@@ -456,6 +457,7 @@ SalixTorrent/
 │   │   ├── designer_structure.py
 │   │   ├── designer_preview.py
 │   │   ├── designer_preview_host.py
+│   │   ├── designer_selection.py
 │   │   ├── property_cascade.py
 │   │   ├── geometry.py
 │   │   ├── responsive.py

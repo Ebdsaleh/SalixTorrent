@@ -8,8 +8,9 @@ undo/redo history.
 The editing boundary intentionally does not rebuild or mutate live component
 objects. Property commands, structural hierarchy commands and optional
 copy/paste/duplicate document commands share the same immutable-snapshot history.
-Clipboard state is ephemeral editor state rather than project persistence. Preview
-hosts may consume checked candidate snapshots, but toolkit objects, callbacks,
+Clipboard and stable-ID selection/focus state are ephemeral editor state rather
+than project persistence or undoable document data. Preview hosts may consume
+checked candidate snapshots, but toolkit objects, callbacks,
 application models, drag/drop behavior and the final project-document schema
 remain outside this module.
 """
@@ -34,6 +35,7 @@ from .designer_clipboard import (
     PasteDesignerSubtree,
     copy_designer_subtree,
 )
+from .designer_selection import DesignerSelectionModel, DesignerSelectionState
 from .designer_structure import (
     DesignerNodeLocation,
     InsertDesignerChild,
@@ -513,6 +515,7 @@ class DesignerEditSession:
         self._undo: list[_DesignerHistoryEntry] = []
         self._redo: list[_DesignerHistoryEntry] = []
         self._clipboard: DesignerClipboardPayload | None = None
+        self._selection = DesignerSelectionModel()
 
     @property
     def snapshot(self) -> DesignerSnapshot:
@@ -539,6 +542,26 @@ class DesignerEditSession:
         return self._clipboard
 
     @property
+    def selection_state(self) -> DesignerSelectionState:
+        return self._selection.state
+
+    @property
+    def selected_node_id(self) -> str:
+        return self._selection.selected_id
+
+    @property
+    def focused_node_id(self) -> str:
+        return self._selection.focused_id
+
+    @property
+    def has_selection(self) -> bool:
+        return self._selection.has_selection
+
+    @property
+    def has_focus(self) -> bool:
+        return self._selection.has_focus
+
+    @property
     def undo_depth(self) -> int:
         return len(self._undo)
 
@@ -556,6 +579,36 @@ class DesignerEditSession:
 
     def mark_clean(self) -> None:
         self._clean = self._snapshot
+
+    def select_node(self, node_id: object, *, focus: bool = False) -> bool:
+        return self._selection.select(self._snapshot, node_id, focus=focus)
+
+    def focus_node(self, node_id: object, *, select: bool = False) -> bool:
+        return self._selection.focus(self._snapshot, node_id, select=select)
+
+    def select_and_focus_node(self, node_id: object) -> bool:
+        return self._selection.select_and_focus(self._snapshot, node_id)
+
+    def clear_selection(self) -> bool:
+        return self._selection.clear_selection()
+
+    def clear_focus(self) -> bool:
+        return self._selection.clear_focus()
+
+    def clear_selection_and_focus(self) -> bool:
+        return self._selection.clear()
+
+    def selected_node(self) -> DesignerNode | None:
+        return self._selection.selected_node(self._snapshot)
+
+    def focused_node(self) -> DesignerNode | None:
+        return self._selection.focused_node(self._snapshot)
+
+    def selected_location(self) -> DesignerNodeLocation | None:
+        return self._selection.selected_location(self._snapshot)
+
+    def focused_location(self) -> DesignerNodeLocation | None:
+        return self._selection.focused_location(self._snapshot)
 
     def node(self, node_id: object) -> DesignerNode:
         return _find_node(self._snapshot, node_id)
@@ -633,6 +686,7 @@ class DesignerEditSession:
             return False
         check(after)
         self._snapshot = after
+        self._selection.reconcile(before, after)
         self._undo.append(_DesignerHistoryEntry(label, before, after))
         self._redo.clear()
         return True
@@ -789,8 +843,10 @@ class DesignerEditSession:
             return False
         entry = self._undo[-1]
         check(entry.before)
+        current = self._snapshot
         self._undo.pop()
         self._snapshot = entry.before
+        self._selection.reconcile(current, entry.before)
         self._redo.append(entry)
         return True
 
@@ -806,8 +862,10 @@ class DesignerEditSession:
             return False
         entry = self._redo[-1]
         check(entry.after)
+        current = self._snapshot
         self._redo.pop()
         self._snapshot = entry.after
+        self._selection.reconcile(current, entry.after)
         self._undo.append(entry)
         return True
 

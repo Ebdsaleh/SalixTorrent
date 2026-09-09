@@ -12,7 +12,9 @@ currently accepted preview is disposed.  Failed candidates are cleaned up and
 never advance edit history, so document and preview state remain aligned.
 Optional copy/paste/duplicate helpers stay at the document boundary: copy only
 updates ephemeral session clipboard state, while paste/duplicate use the same
-checked replacement transaction as property and structural edits.
+checked replacement transaction as property and structural edits. Stable-ID
+selection/focus state is delegated to the edit session and never retains live
+component or toolkit references across preview replacement.
 """
 
 from __future__ import annotations
@@ -122,6 +124,48 @@ class DesignerPreviewHost:
 
     def component(self, node_id: object) -> Component:
         return self.preview.component(node_id)
+
+    @property
+    def selected_component(self) -> Component | None:
+        node_id = self.session.selected_node_id
+        if not node_id:
+            return None
+        try:
+            return self.preview.component(node_id)
+        except KeyError:
+            # External session edits may temporarily put the document ahead of
+            # this host until ``sync()`` is called.
+            return None
+
+    @property
+    def focused_component(self) -> Component | None:
+        node_id = self.session.focused_node_id
+        if not node_id:
+            return None
+        try:
+            return self.preview.component(node_id)
+        except KeyError:
+            return None
+
+    def select_node(self, node_id: object, *, focus: bool = False) -> bool:
+        self._require_open()
+        return self.session.select_node(node_id, focus=focus)
+
+    def focus_node(self, node_id: object, *, select: bool = False) -> bool:
+        self._require_open()
+        return self.session.focus_node(node_id, select=select)
+
+    def select_and_focus_node(self, node_id: object) -> bool:
+        self._require_open()
+        return self.session.select_and_focus_node(node_id)
+
+    def clear_selection(self) -> bool:
+        self._require_open()
+        return self.session.clear_selection()
+
+    def clear_focus(self) -> bool:
+        self._require_open()
+        return self.session.clear_focus()
 
     def _require_open(self) -> None:
         if self._closed:

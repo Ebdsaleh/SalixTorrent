@@ -2,11 +2,11 @@
 
 **Current application version string:** `0.5.0`
 **Roadmap status:** v0.5.0 released; post-v0.5.0 ecosystem extraction on `dev`
-**Current implementation checkpoint:** Tranche 14 document copy/paste/duplicate is real-Windows accepted and committed locally as `450c12a`; the documentation-only acceptance closure and push are pending
-**Current real Windows regression baseline:** 668 / 668 for accepted Tranche 14 in both discovery forms with one expected non-Windows shell-behavior skip
+**Current implementation checkpoint:** Tranche 14 document copy/paste/duplicate is accepted/published at `f59a9a392bf64820f59787b9449d6b7ca9b3e634`; Tranche 15 stable-ID designer selection/focus is prepared and awaiting real-Windows acceptance
+**Current real Windows regression baseline:** 668 / 668 for accepted/published Tranche 14 in both discovery forms with one expected non-Windows shell-behavior skip; Tranche 15 preparation expects 681 after adding 12 selection tests and one Tkinter proof
 **Accepted Tranche 12 baseline:** 643 / 643 in both real-Windows discovery forms with one expected skip; preview 12 / 12, designer/relocation 56 / 56, GUI components 64 / 64, Tkinter 22 / 22, visuals and pre-commit passed; closure/push checkpoint `8d05ca8b059cef0ba386f324c215f2e80a9bfa83`
 **Accepted Tranche 13 baseline:** 655 / 655 in both real-Windows discovery forms with one expected skip; preview host 11 / 11, designer/relocation 67 / 67, GUI components 64 / 64, Tkinter 23 / 23, localization current, visuals and pre-commit passed; implementation `ddfb3ef2269acb33484cd6fe2f99af47fa40140f`, closure/push checkpoint `4b0968bfdf91ce040eeefd641b1e315244a325e6`
-**Accepted Tranche 14 baseline:** 668 / 668 in both real-Windows discovery forms with one expected skip; clipboard 12 / 12, designer/relocation 79 / 79, GUI components 64 / 64, Tkinter 24 / 24, localization current, visuals and pre-commit passed; implementation `450c12a`, documentation closure/push pending
+**Accepted Tranche 14 baseline:** 668 / 668 in both real-Windows discovery forms with one expected skip; clipboard 12 / 12, designer/relocation 79 / 79, GUI components 64 / 64, Tkinter 24 / 24, localization current, visuals and pre-commit passed; implementation `450c12a`, closure/push checkpoint `f59a9a392bf64820f59787b9449d6b7ca9b3e634`
 
 This roadmap records intended engineering direction rather than promising dates or release numbers. Changes should remain incremental, testable, reviewable, and compatible with SalixTorrent's existing protocol, persistence, packaging, localization, and cross-platform boundaries.
 
@@ -809,11 +809,23 @@ Tranche 14 keeps clipboard behavior in document/tooling space. `DesignerClipboar
 
 The blank application's code-first hierarchy remains untouched while its captured `Actions` node is duplicated in document/preview space. A real Tkinter regression proves the duplicate receives a fresh stable designer ID in the replacement preview and disappears again after undo. The copied/renamed framework probe also exercises subtree capture/paste with no SalixTorrent or GUI dependency.
 
-Real-Windows acceptance advances the baseline to **668 tests** in both complete discovery forms with one expected skip. Clipboard tests pass 12 / 12, combined designer/relocation focus 79 / 79, GUI components 64 / 64 and Tkinter 24 / 24; localization remains current, headless/compileall/Git checks pass, manual Dear PyGui/Tkinter/SalixTorrent smoke passes, and `pre_commit_check.bat` passes. The accepted implementation commit is `450c12a` (`Add designer copy paste and duplicate commands`); only the documentation closure and push remain pending.
+Real-Windows acceptance advances the baseline to **668 tests** in both complete discovery forms with one expected skip. Clipboard tests pass 12 / 12, combined designer/relocation focus 79 / 79, GUI components 64 / 64 and Tkinter 24 / 24; localization remains current, headless/compileall/Git checks pass, manual Dear PyGui/Tkinter/SalixTorrent smoke passes, and `pre_commit_check.bat` passes. The accepted implementation commit is `450c12a` (`Add designer copy paste and duplicate commands`); implementation and documentation closure were published together at `f59a9a392bf64820f59787b9449d6b7ca9b3e634`.
 
 This tranche does not introduce an operating-system clipboard, cut/multi-selection semantics, drag/drop or resize gestures, incremental live toolkit mutation, project persistence/schema, callback/service serialization or a final public API freeze.
 
-### A17. Naming, public API and package/repository split
+### A17. WYSIWYG designer prerequisites — stable-ID selection/focus prepared
+
+Tranche 15 introduces explicit designer interaction state without turning editor state into project data. `DesignerSelectionModel` keeps one selected node ID and one focused node ID, validates them against the current immutable snapshot, and resolves current nodes/locations without retaining preview components or toolkit handles. Selection and focus can move independently or be coupled explicitly.
+
+`DesignerEditSession` owns the ephemeral selection model alongside its existing clipboard state. Selection/focus changes do not dirty the document, add undo/redo entries or alter redo branches. Accepted document edits reconcile stable IDs: property edits, moves and reparenting retain identity; removal falls back to the nearest surviving ancestor; undo/redo restores document state without reviving historical selection as though it were serialized project data.
+
+`DesignerPreviewHost` exposes the same selection/focus operations without rebuilding. `selected_component` and `focused_component` resolve the stable IDs against the current preview generation, so transactional whole-tree replacement can dispose old component objects while editor selection remains anchored to the same designer identity. A real Tkinter regression proves this against the blank application's `Actions` control.
+
+Preparation advances the dedicated selection gate to 12 tests, combined designer/relocation to 91 tests, Tkinter to 25 tests and complete discovery to **681 tests**. Real-Windows acceptance, manual visual smoke and pre-commit remain required before publication.
+
+This tranche intentionally stops before multi-selection/range selection, keyboard traversal policy, visual selection overlays, pointer hit-testing, drag/drop/resize handles, persistent project documents, callback/service serialization, incremental in-place toolkit mutation or final public API/package naming.
+
+### A18. Naming, public API and package/repository split
 
 This remains **after** the wider extraction.
 

@@ -99,6 +99,7 @@ class FrameworkPackagingTests(unittest.TestCase):
                 assert "portable_framework.designer_structure" in imported
                 assert "portable_framework.designer_preview" in imported
                 assert "portable_framework.designer_preview_host" in imported
+                assert "portable_framework.designer_selection" in imported
                 assert "portable_framework.geometry" in imported
                 assert "portable_framework.components.regions" in imported
                 assert "portable_framework.live_data" in imported
@@ -163,6 +164,7 @@ class FrameworkPackagingTests(unittest.TestCase):
                 from portable_framework.designer_structure import locate_designer_node
                 from portable_framework.designer_preview import reconstruct_designer_snapshot
                 from portable_framework.designer_preview_host import DesignerPreviewHost
+                from portable_framework.designer_selection import DesignerSelectionModel
                 from portable_framework.documentation import DocPage, DocumentationTheme
                 from portable_framework.geometry import ContentMetrics, content_bounds, split_sizes
                 from portable_framework.data_view import DataRecord, DataView, SortDirection, SortTerm
@@ -220,8 +222,20 @@ class FrameworkPackagingTests(unittest.TestCase):
                 assert designer_session.undo() is True
                 assert designer_session.node(designer_button.node_id).properties["label"] == "Run"
                 preview_host = DesignerPreviewHost(designer_session)
+                portable_selection = DesignerSelectionModel(
+                    designer_session.snapshot,
+                    selected=designer_button.node_id,
+                    focused=designer_button.node_id,
+                )
+                assert portable_selection.selected_node(designer_session.snapshot).node_id == designer_button.node_id
+                assert preview_host.select_and_focus_node(designer_button.node_id) is True
+                selected_generation = preview_host.generation
+                assert preview_host.selected_component is preview_host.component(designer_button.node_id)
+                assert preview_host.generation == selected_generation
                 assert preview_host.set_property(designer_button.node_id, "label", "Hosted") is True
                 assert preview_host.component(designer_button.node_id).label == "Hosted"
+                assert preview_host.selected_component is preview_host.component(designer_button.node_id)
+                assert designer_session.selected_node_id == designer_button.node_id
                 assert preview_host.undo() is True
                 assert preview_host.component(designer_button.node_id).label == "Run"
                 portable_payload = copy_designer_subtree(

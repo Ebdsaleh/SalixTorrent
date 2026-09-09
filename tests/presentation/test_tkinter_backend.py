@@ -209,6 +209,44 @@ class TkinterBackendLiveTests(unittest.TestCase):
         self.assertEqual(3, preview_host.generation)
         preview_host.close()
 
+    def test_preview_host_selection_survives_real_tkinter_replacement_by_stable_id(self):
+        from app.engine.presentation_backends import create_dearpygui_backend
+        from examples.ecosystem_blank_app import DemoView
+
+        class SnapshotHost:
+            presentation = create_dearpygui_backend()
+
+        snapshot = DemoView(SnapshotHost()).capture_designer_snapshot()
+        actions = next(
+            node
+            for node in snapshot.root.walk()
+            if node.type_key == "control.button" and node.properties.get("label") == "Actions"
+        )
+        session = DesignerEditSession(snapshot)
+        preview_host = DesignerPreviewHost(
+            session,
+            context=DesignerPreviewContext(
+                layout_coordinator=LayoutCoordinator(TkinterLayoutHost(self.renderer))
+            ),
+            renderer=self.renderer,
+        )
+        self.root.update_idletasks()
+        self.assertTrue(preview_host.select_and_focus_node(actions.node_id))
+        old_selected = preview_host.selected_component
+        self.assertTrue(old_selected.exists())
+        generation = preview_host.generation
+
+        self.assertTrue(preview_host.set_property(actions.node_id, "label", "Selected"))
+        self.root.update_idletasks()
+        self.assertFalse(old_selected.exists())
+        self.assertEqual(actions.node_id, session.selected_node_id)
+        self.assertEqual(actions.node_id, session.focused_node_id)
+        self.assertIs(preview_host.selected_component, preview_host.focused_component)
+        self.assertTrue(preview_host.selected_component.exists())
+        self.assertEqual("Selected", preview_host.selected_component.label)
+        self.assertEqual(generation + 1, preview_host.generation)
+        preview_host.close()
+
     def test_preview_host_duplicate_rebuilds_real_tkinter_tree_with_fresh_identity(self):
         from app.engine.presentation_backends import create_dearpygui_backend
         from examples.ecosystem_blank_app import DemoView
