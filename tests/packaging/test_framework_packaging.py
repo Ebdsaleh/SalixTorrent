@@ -99,6 +99,7 @@ class FrameworkPackagingTests(unittest.TestCase):
                 assert "portable_framework.designer_structure" in imported
                 assert "portable_framework.designer_preview" in imported
                 assert "portable_framework.designer_preview_host" in imported
+                assert "portable_framework.designer_project" in imported
                 assert "portable_framework.designer_selection" in imported
                 assert "portable_framework.geometry" in imported
                 assert "portable_framework.components.regions" in imported
@@ -133,6 +134,7 @@ class FrameworkPackagingTests(unittest.TestCase):
             probe = textwrap.dedent(
                 f"""
                 import sys
+                from pathlib import Path
                 sys.path.insert(0, {str(temp_root)!r})
 
                 from portable_framework.command_menu import CommandMenu, CommandMenuBinding
@@ -164,6 +166,7 @@ class FrameworkPackagingTests(unittest.TestCase):
                 from portable_framework.designer_structure import locate_designer_node
                 from portable_framework.designer_preview import reconstruct_designer_snapshot
                 from portable_framework.designer_preview_host import DesignerPreviewHost
+                from portable_framework.designer_project import DesignerProjectFile
                 from portable_framework.designer_selection import DesignerSelectionModel
                 from portable_framework.documentation import DocPage, DocumentationTheme
                 from portable_framework.geometry import ContentMetrics, content_bounds, split_sizes
@@ -212,7 +215,14 @@ class FrameworkPackagingTests(unittest.TestCase):
                 designer_preview = reconstruct_designer_snapshot(restored_designer_snapshot)
                 assert designer_preview.component("portable-root") is designer_preview.root
                 assert designer_preview.recapture().to_descriptor() == restored_designer_snapshot.to_descriptor()
-                designer_session = DesignerEditSession(restored_designer_snapshot)
+                portable_project_path = Path({str(temp_root / "portable-designer.project")!r})
+                portable_project = DesignerProjectFile.create(restored_designer_snapshot)
+                assert portable_project.is_dirty is True
+                portable_project.save(portable_project_path)
+                assert portable_project.is_dirty is False
+                portable_loaded = DesignerProjectFile.open(portable_project_path)
+                assert portable_loaded.session.snapshot == restored_designer_snapshot
+                designer_session = portable_loaded.session
                 designer_button = next(
                     node for node in designer_session.snapshot.root.walk()
                     if node.type_key == "control.button"

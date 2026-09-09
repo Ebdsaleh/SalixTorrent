@@ -4,7 +4,9 @@ import ast
 import gc
 import subprocess
 import sys
+import tempfile
 import unittest
+from pathlib import Path
 
 from tests.helpers import PROJECT_ROOT
 
@@ -50,6 +52,7 @@ from app.framework.command_menu import CommandMenu, CommandMenuHost
 from app.framework.designer_editing import DesignerEditSession
 from app.framework.designer_preview import DesignerPreviewContext, reconstruct_designer_snapshot
 from app.framework.designer_preview_host import DesignerPreviewHost
+from app.framework.designer_project import DesignerProjectFile
 from app.framework.interactions import CommandSet, CommandSpec
 from app.framework.live_data import (
     LiveTable,
@@ -208,6 +211,38 @@ class TkinterBackendLiveTests(unittest.TestCase):
         self.assertEqual("Actions", preview_host.component(actions.node_id).label)
         self.assertEqual(3, preview_host.generation)
         preview_host.close()
+
+    def test_saved_designer_project_reopens_into_real_tkinter_preview(self):
+        from app.engine.presentation_backends import create_dearpygui_backend
+        from examples.ecosystem_blank_app import DemoView
+
+        class SnapshotHost:
+            presentation = create_dearpygui_backend()
+
+        snapshot = DemoView(SnapshotHost()).capture_designer_snapshot()
+        actions = next(
+            node
+            for node in snapshot.root.walk()
+            if node.type_key == "control.button" and node.properties.get("label") == "Actions"
+        )
+        with tempfile.TemporaryDirectory() as td:
+            project_path = Path(td) / "blank-designer.project"
+            project = DesignerProjectFile.create(snapshot)
+            project.save(project_path)
+            reopened = DesignerProjectFile.open(project_path)
+            preview_host = DesignerPreviewHost(
+                reopened.session,
+                context=DesignerPreviewContext(
+                    layout_coordinator=LayoutCoordinator(TkinterLayoutHost(self.renderer))
+                ),
+                renderer=self.renderer,
+            )
+            self.root.update_idletasks()
+            self.assertTrue(preview_host.preview.root.exists())
+            self.assertTrue(preview_host.component(actions.node_id).exists())
+            self.assertEqual("Actions", preview_host.component(actions.node_id).label)
+            self.assertFalse(reopened.is_dirty)
+            preview_host.close()
 
     def test_preview_host_selection_survives_real_tkinter_replacement_by_stable_id(self):
         from app.engine.presentation_backends import create_dearpygui_backend
