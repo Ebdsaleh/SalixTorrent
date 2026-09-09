@@ -4,7 +4,15 @@ Notable SalixTorrent changes are recorded here.
 
 ## Unreleased
 
-No changes recorded after v0.5.1 yet.
+### Ecosystem Extraction — Designer Command-Menu Surface (post-v0.5.1 Tranche 1)
+
+- Added framework-only `app/framework/designer_shell_menu.py` as the first concrete presentation bridge over the v0.5.1 designer semantic core. `DesignerShellMenu` binds `DesignerShellCommands` to the existing renderer-neutral `CommandMenu` / `CommandMenuHost` contract without importing Dear PyGui, Tkinter or SalixTorrent product layers.
+- The menu surface refreshes labels and enablement from current workspace state immediately before presentation and revalidates every selected command through `DesignerShellCommands`; it never becomes another owner of project, history, selection, clipboard, hierarchy, inspector or preview state.
+- New/Open/Save-As/Paste-placement requests remain explicit shell policy. An optional request callback lets a concrete editor shell handle those requests without freezing file-dialog, template or paste-placement behavior inside the framework.
+- Added `examples/ecosystem_designer_shell.py` as a visible Dear PyGui/Tkinter proof that renders a reconstructed semantic preview and exposes the same designer command surface on both presentation backends.
+- Added focused presenter tests, copied/renamed framework relocation coverage and a real Tkinter menu-dispatch regression where Copy remains preview-neutral while Duplicate and Undo still flow through the established checked preview transaction.
+- Real-Windows acceptance passes 12 / 12 command-surface tests, 175 / 175 combined designer/relocation tests, 64 / 64 GUI-component tests, 32 / 32 Tkinter tests and both complete discovery forms at 772 / 772 with one expected skip. Localization extraction remains current (1,337 entries), the headless blank app reports 3 updates, compileall/Git checks and manual visual smoke pass, and `pre_commit_check.bat` passes.
+- This tranche does not add a hierarchy tree widget, property-editor controls, file dialogs/templates, pointer hit-testing, drag/drop/reparent gestures, resize handles, multi-document ownership, autosave/recovery or final public API/schema naming. Code-first composition remains first-class and independent.
 
 ## v0.5.1 - 2026-09-09
 

@@ -60,6 +60,7 @@ from app.framework.designer_shell import (
     DESIGNER_UNDO_COMMAND,
     DesignerShellCommands,
 )
+from app.framework.designer_shell_menu import DesignerShellMenu
 from app.framework.interactions import CommandSet, CommandSpec
 from app.framework.live_data import (
     LiveTable,
@@ -513,6 +514,54 @@ class TkinterBackendLiveTests(unittest.TestCase):
         with self.assertRaisesRegex(KeyError, "designer preview node not found"):
             workspace.preview_host.component(clone_id)
         self.assertTrue(workspace.preview_host.component(actions.node_id).exists())
+        self.assertTrue(workspace.close())
+
+    def test_designer_shell_menu_presents_and_dispatches_real_tkinter_commands(self):
+        from app.engine.presentation_backends import create_dearpygui_backend
+        from examples.ecosystem_blank_app import DemoView
+
+        class SnapshotHost:
+            presentation = create_dearpygui_backend()
+
+        snapshot = DemoView(SnapshotHost()).capture_designer_snapshot()
+        actions = next(
+            node
+            for node in snapshot.root.walk()
+            if node.type_key == "control.button" and node.properties.get("label") == "Actions"
+        )
+        workspace = DesignerWorkspace(
+            DesignerProjectFile.create(snapshot),
+            context=DesignerPreviewContext(
+                layout_coordinator=LayoutCoordinator(TkinterLayoutHost(self.renderer))
+            ),
+            renderer=self.renderer,
+        )
+        workspace.select_and_focus_node(actions.node_id)
+        shell = DesignerShellCommands(workspace)
+        presenter = DesignerShellMenu(shell, TkinterCommandMenuHost(self.root))
+        binding = presenter.build()
+        generation = workspace.state.preview_generation
+
+        copy_item = binding.items[DESIGNER_COPY_COMMAND]
+        copy_item.menu.invoke(copy_item.index)
+        self.assertTrue(workspace.state.has_clipboard)
+        self.assertEqual(generation, workspace.state.preview_generation)
+
+        duplicate_item = binding.items[DESIGNER_DUPLICATE_COMMAND]
+        duplicate_item.menu.invoke(duplicate_item.index)
+        self.root.update_idletasks()
+        clone_id = actions.node_id + "-copy"
+        self.assertTrue(workspace.preview_host.component(clone_id).exists())
+        self.assertEqual(generation + 1, workspace.state.preview_generation)
+
+        undo_item = binding.items[DESIGNER_UNDO_COMMAND]
+        self.assertTrue(undo_item.menu.entrycget(undo_item.index, "label").startswith("Undo "))
+        undo_item.menu.invoke(undo_item.index)
+        self.root.update_idletasks()
+        with self.assertRaisesRegex(KeyError, "designer preview node not found"):
+            workspace.preview_host.component(clone_id)
+
+        self.assertTrue(presenter.dispose())
         self.assertTrue(workspace.close())
 
     def test_preview_host_duplicate_rebuilds_real_tkinter_tree_with_fresh_identity(self):

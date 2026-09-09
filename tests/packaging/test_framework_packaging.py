@@ -104,6 +104,7 @@ class FrameworkPackagingTests(unittest.TestCase):
                 assert "portable_framework.designer_inspector" in imported
                 assert "portable_framework.designer_workspace" in imported
                 assert "portable_framework.designer_shell" in imported
+                assert "portable_framework.designer_shell_menu" in imported
                 assert "portable_framework.designer_navigation" in imported
                 assert "portable_framework.designer_selection" in imported
                 assert "portable_framework.geometry" in imported
@@ -189,6 +190,7 @@ class FrameworkPackagingTests(unittest.TestCase):
                     DESIGNER_UNDO_COMMAND,
                     DesignerShellCommands,
                 )
+                from portable_framework.designer_shell_menu import DesignerShellMenu
                 from portable_framework.documentation import DocPage, DocumentationTheme
                 from portable_framework.geometry import ContentMetrics, content_bounds, split_sizes
                 from portable_framework.data_view import DataRecord, DataView, SortDirection, SortTerm
@@ -319,14 +321,38 @@ class FrameworkPackagingTests(unittest.TestCase):
                 assert preview_host.component(designer_button.node_id).label == "Run"
                 portable_shell = DesignerShellCommands(portable_workspace)
                 assert portable_shell.command(DESIGNER_COPY_COMMAND).enabled is True
+
+                class PortableMenuHost:
+                    def __init__(self):
+                        self.callback = None
+                        self.updated = 0
+                    def build(self, commands, *, title="", on_command=None):
+                        self.callback = on_command
+                        return CommandMenuBinding(menu={{"alive": True}}, items={{}})
+                    def update(self, binding, commands):
+                        self.updated += 1
+                    def show(self, binding):
+                        return None
+                    def hide(self, binding):
+                        return None
+                    def exists(self, binding):
+                        return bool(binding.menu["alive"])
+                    def dispose(self, binding):
+                        binding.menu["alive"] = False
+
+                portable_menu_host = PortableMenuHost()
+                portable_menu = DesignerShellMenu(portable_shell, portable_menu_host)
+                portable_menu.build()
                 shell_generation = preview_host.generation
-                assert portable_shell.dispatch(DESIGNER_COPY_COMMAND).root.node_id == designer_button.node_id
+                assert portable_menu_host.callback(DESIGNER_COPY_COMMAND).root.node_id == designer_button.node_id
                 assert preview_host.generation == shell_generation
+                assert portable_menu_host.updated >= 1
                 assert portable_shell.command(DESIGNER_DUPLICATE_COMMAND).enabled is True
-                assert portable_shell.dispatch(DESIGNER_DUPLICATE_COMMAND) is True
+                assert portable_menu_host.callback(DESIGNER_DUPLICATE_COMMAND) is True
                 assert preview_host.component(designer_button.node_id + "-copy").label == "Run"
                 assert portable_shell.command(DESIGNER_UNDO_COMMAND).enabled is True
-                assert portable_shell.dispatch(DESIGNER_UNDO_COMMAND) is True
+                assert portable_menu_host.callback(DESIGNER_UNDO_COMMAND) is True
+                assert portable_menu.dispose() is True
                 portable_payload = copy_designer_subtree(
                     designer_session.snapshot, designer_button.node_id
                 )

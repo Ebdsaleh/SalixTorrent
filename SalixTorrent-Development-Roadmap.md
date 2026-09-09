@@ -1,9 +1,9 @@
 # SalixTorrent Development Roadmap
 
 **Current application version string:** `0.5.1`
-**Roadmap status:** v0.5.1 release checkpoint prepared from the accepted post-v0.5.0 ecosystem extraction on `dev`; annotated tag targets the accepted release commit
-**Current implementation checkpoint:** Tranche 21 backend-neutral designer editor-shell commands are accepted/published and complete the designer semantic-core prerequisite sequence; the v0.5.1 release closure is now the current `dev` checkpoint
-**Current real Windows regression baseline:** 759 / 759 in both accepted Tranche-21 discovery forms with one expected non-Windows shell-behavior skip; editor-shell commands 12 / 12, designer/relocation 163 / 163, GUI components 64 / 64 and Tkinter 31 / 31; localization remains 1,337/current, manual visual smoke and pre-commit passed.
+**Roadmap status:** v0.5.1 is released/tagged at `8212ac7cc26e4b781d2e5aa0aa3d5981c27022d0`; the post-v0.5.1 tranche sequence restarts at Tranche 1
+**Current implementation checkpoint:** post-v0.5.1 Tranche 1 designer command-menu surface is real-Windows accepted and is the current `dev` extraction checkpoint
+**Current real Windows regression baseline:** 772 / 772 in both post-v0.5.1 Tranche-1 discovery forms with one expected non-Windows shell-behavior skip; designer command-menu surface 12 / 12, designer/relocation 175 / 175, GUI components 64 / 64 and Tkinter 32 / 32; localization remains 1,337/current, headless reports 3 updates, manual visual smoke and pre-commit passed.
 **Accepted Tranche 12 baseline:** 643 / 643 in both real-Windows discovery forms with one expected skip; preview 12 / 12, designer/relocation 56 / 56, GUI components 64 / 64, Tkinter 22 / 22, visuals and pre-commit passed; closure/push checkpoint `8d05ca8b059cef0ba386f324c215f2e80a9bfa83`
 **Accepted Tranche 13 baseline:** 655 / 655 in both real-Windows discovery forms with one expected skip; preview host 11 / 11, designer/relocation 67 / 67, GUI components 64 / 64, Tkinter 23 / 23, localization current, visuals and pre-commit passed; implementation `ddfb3ef2269acb33484cd6fe2f99af47fa40140f`, closure/push checkpoint `4b0968bfdf91ce040eeefd641b1e315244a325e6`
 **Accepted Tranche 14 baseline:** 668 / 668 in both real-Windows discovery forms with one expected skip; clipboard 12 / 12, designer/relocation 79 / 79, GUI components 64 / 64, Tkinter 24 / 24, localization current, visuals and pre-commit passed; implementation `450c12a`, closure/push checkpoint `f59a9a392bf64820f59787b9449d6b7ca9b3e634`
@@ -14,7 +14,8 @@
 **Accepted Tranche 19 baseline:** 733 / 733 in both real-Windows discovery forms with one expected skip; property inspector 12 / 12, designer/relocation 139 / 139, GUI components 64 / 64, Tkinter 29 / 29, localization current, manual visual smoke and pre-commit passed; implementation and acceptance documentation are published together at `35d0d4c0966aa9a3a6aafbe263edfbe8b383d7aa` under `Add designer property inspector presentation`
 **Accepted Tranche 20 baseline:** 746 / 746 in both real-Windows discovery forms with one expected skip; designer workspace 12 / 12, designer/relocation 151 / 151, GUI components 64 / 64, Tkinter 30 / 30, localization current, manual visual smoke and pre-commit passed; implementation and acceptance documentation are published together at `f3a96420a6267089198f62662ab0761475ad962a` under `Add designer workspace coordination`
 **Accepted Tranche 21 baseline:** 759 / 759 in both real-Windows discovery forms with one expected skip; editor-shell commands 12 / 12, designer/relocation 163 / 163, GUI components 64 / 64, Tkinter 31 / 31, localization current, manual visual smoke and pre-commit passed; implementation and acceptance documentation are published together under `Add designer editor-shell commands`
-**v0.5.1 release target:** backend-neutral designer/RAD semantic core complete through Tranche 21; code-first composition remains first-class; concrete toolkit editor shells and pointer-driven authoring remain post-tag work.
+**v0.5.1 release checkpoint:** tagged at `8212ac7cc26e4b781d2e5aa0aa3d5981c27022d0`; backend-neutral designer/RAD semantic core is complete through pre-release Tranche 21, code-first composition remains first-class, and concrete editor surfaces are post-tag work.
+**Accepted post-v0.5.1 Tranche 1 baseline:** designer command-menu surface 12 / 12, designer/relocation 175 / 175, GUI components 64 / 64, Tkinter 32 / 32 and both complete discovery forms 772 / 772 with one expected skip; localization current, headless/compileall/Git checks, manual visual smoke and pre-commit passed; implementation and acceptance documentation are published together under `Add designer command-menu surface`.
 
 This roadmap records intended engineering direction rather than promising dates or release numbers. Changes should remain incremental, testable, reviewable, and compatible with SalixTorrent's existing protocol, persistence, packaging, localization, and cross-platform boundaries.
 
@@ -930,6 +931,16 @@ These should not interrupt Priority A merely because they are easier to ship.
 1. local supervisory API/service mode;
 2. scheduling/rules;
 3. documentation timed media/layout inspector.
+
+### A25. Concrete designer command-menu surface — post-v0.5.1 Tranche 1 Windows-accepted
+
+`app/framework/designer_shell_menu.py` is the first concrete presentation bridge after the v0.5.1 semantic-core checkpoint. `DesignerShellMenu` binds one existing `DesignerShellCommands` instance to the renderer-neutral `CommandMenu` / `CommandMenuHost` contract already implemented by Dear PyGui and Tkinter adapters. The presenter owns no project, history, selection, clipboard, hierarchy, inspector or preview state. `show()` refreshes command labels/availability from the current workspace before presenting the menu, and item activation is revalidated through the semantic shell before any action executes.
+
+New/Open/Save-As/Paste placement remain explicit `DesignerShellCommandRequest` values. A concrete editor shell may supply a request callback, but the framework still does not guess file-dialog paths, new-project templates or hierarchy placement. Completed Copy/Duplicate/Undo/Redo/Save/Reveal/navigation actions continue to use the v0.5.1 ownership and checked-transaction boundaries.
+
+`examples/ecosystem_designer_shell.py` provides a visible proof on both Dear PyGui and Tkinter: it renders a reconstructed semantic preview and exposes the same command tree through each backend's existing command-menu host. Relocation tests exercise the presenter after package copy/rename, and the real Tkinter regression invokes actual Tk menu entries to prove Copy remains preview-neutral while Duplicate and Undo still replace/reconcile preview state through the established transaction. Real-Windows acceptance passes 12 / 12 command-surface tests, 175 / 175 combined designer/relocation tests, 64 / 64 GUI-component tests and 32 / 32 Tkinter tests; both complete discovery forms pass **772 / 772** with one expected skip. Localization remains 1,337/current, headless reports 3 updates, compileall/Git checks pass, the manual visual smoke passed, and `pre_commit_check.bat` passes.
+
+This tranche deliberately stops before persistent menu bars/toolbars, hierarchy tree widgets, concrete property editors, file-dialog/template policy, paste-placement UI, pointer hit-testing/click-to-select, visual selection overlays, drag/drop/reparent gestures, resize handles, multi-document ownership, autosave/recovery, mixed-value multi-selection or final project/package/API naming. Code-first applications remain independent of all designer surface tooling.
 
 ---
 
