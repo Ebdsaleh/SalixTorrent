@@ -21,7 +21,7 @@ from typing import Iterable, Sequence, TextIO
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DISCOVERY_TEST_COUNT = 746
+DISCOVERY_TEST_COUNT = 759
 
 
 @dataclass(frozen=True)
@@ -34,7 +34,7 @@ class ValidationCommand:
 
 
 def validation_commands(python_executable: str | Path) -> tuple[ValidationCommand, ...]:
-    """Return the ordered Tranche-20 non-visual validation sequence."""
+    """Return the ordered Tranche-21 non-visual validation sequence."""
 
     python = str(python_executable)
     return (
@@ -43,8 +43,8 @@ def validation_commands(python_executable: str | Path) -> tuple[ValidationComman
         ValidationCommand("Published dev", ("git", "rev-parse", "origin/dev")),
         ValidationCommand("Application version", (python, "main.py", "--version")),
         ValidationCommand(
-            "Tranche 20 designer workspace coordination",
-            (python, "-m", "unittest", "tests.presentation.test_designer_workspace", "-v"),
+            "Tranche 21 designer editor-shell commands",
+            (python, "-m", "unittest", "tests.presentation.test_designer_shell", "-v"),
             expected_test_count=12,
         ),
         ValidationCommand(
@@ -65,11 +65,12 @@ def validation_commands(python_executable: str | Path) -> tuple[ValidationComman
                 "tests.presentation.test_designer_hierarchy",
                 "tests.presentation.test_designer_inspector",
                 "tests.presentation.test_designer_workspace",
+                "tests.presentation.test_designer_shell",
                 "tests.packaging.test_framework_packaging",
                 "tests.packaging.test_tranche_validation",
                 "-v",
             ),
-            expected_test_count=151,
+            expected_test_count=163,
         ),
         ValidationCommand(
             "GUI component regression",
@@ -79,7 +80,7 @@ def validation_commands(python_executable: str | Path) -> tuple[ValidationComman
         ValidationCommand(
             "Tkinter live backend regression",
             (python, "-m", "unittest", "tests.presentation.test_tkinter_backend", "-v"),
-            expected_test_count=30,
+            expected_test_count=31,
         ),
         ValidationCommand(
             "Localization extraction check",

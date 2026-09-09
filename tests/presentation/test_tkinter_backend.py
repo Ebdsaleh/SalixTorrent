@@ -54,6 +54,12 @@ from app.framework.designer_preview import DesignerPreviewContext, reconstruct_d
 from app.framework.designer_preview_host import DesignerPreviewHost
 from app.framework.designer_project import DesignerProjectFile
 from app.framework.designer_workspace import DesignerWorkspace
+from app.framework.designer_shell import (
+    DESIGNER_COPY_COMMAND,
+    DESIGNER_DUPLICATE_COMMAND,
+    DESIGNER_UNDO_COMMAND,
+    DesignerShellCommands,
+)
 from app.framework.interactions import CommandSet, CommandSpec
 from app.framework.live_data import (
     LiveTable,
@@ -462,6 +468,51 @@ class TkinterBackendLiveTests(unittest.TestCase):
             self.assertEqual(target.absolute(), saved.path)
             self.assertEqual(edited.preview_generation, saved.preview_generation)
 
+        self.assertTrue(workspace.close())
+
+    def test_designer_shell_commands_drive_real_tkinter_workspace_without_owning_backend(self):
+        from app.engine.presentation_backends import create_dearpygui_backend
+        from examples.ecosystem_blank_app import DemoView
+
+        class SnapshotHost:
+            presentation = create_dearpygui_backend()
+
+        snapshot = DemoView(SnapshotHost()).capture_designer_snapshot()
+        actions = next(
+            node
+            for node in snapshot.root.walk()
+            if node.type_key == "control.button" and node.properties.get("label") == "Actions"
+        )
+        workspace = DesignerWorkspace(
+            DesignerProjectFile.create(snapshot),
+            context=DesignerPreviewContext(
+                layout_coordinator=LayoutCoordinator(TkinterLayoutHost(self.renderer))
+            ),
+            renderer=self.renderer,
+        )
+        self.root.update_idletasks()
+        workspace.select_and_focus_node(actions.node_id)
+        shell = DesignerShellCommands(workspace)
+        generation = workspace.state.preview_generation
+        old_actions = workspace.preview_host.selected_component
+        self.assertTrue(old_actions.exists())
+
+        payload = shell.dispatch(DESIGNER_COPY_COMMAND)
+        self.assertEqual(actions.node_id, payload.root.node_id)
+        self.assertEqual(generation, workspace.state.preview_generation)
+        self.assertTrue(shell.command(DESIGNER_DUPLICATE_COMMAND).enabled)
+        self.assertTrue(shell.dispatch(DESIGNER_DUPLICATE_COMMAND))
+        self.root.update_idletasks()
+        clone_id = actions.node_id + "-copy"
+        clone = workspace.preview_host.component(clone_id)
+        self.assertTrue(clone.exists())
+        self.assertEqual(generation + 1, workspace.state.preview_generation)
+        self.assertTrue(shell.command(DESIGNER_UNDO_COMMAND).enabled)
+        self.assertTrue(shell.dispatch(DESIGNER_UNDO_COMMAND))
+        self.root.update_idletasks()
+        with self.assertRaisesRegex(KeyError, "designer preview node not found"):
+            workspace.preview_host.component(clone_id)
+        self.assertTrue(workspace.preview_host.component(actions.node_id).exists())
         self.assertTrue(workspace.close())
 
     def test_preview_host_duplicate_rebuilds_real_tkinter_tree_with_fresh_identity(self):

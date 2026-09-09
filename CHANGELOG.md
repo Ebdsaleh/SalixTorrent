@@ -4,6 +4,17 @@ Notable SalixTorrent changes are recorded here.
 
 ## Unreleased
 
+### Ecosystem Extraction — Designer Editor-Shell Commands
+
+- Added standard-library/framework-only `app/framework/designer_shell.py` as the backend-neutral command/presentation layer above `DesignerWorkspace`. It projects stable File/Edit/Navigate command trees from current workspace state without owning project, history, selection, clipboard, hierarchy, inspector or preview state.
+- Added immutable `DesignerShellCommandState` plus JSON-safe descriptors so future menu bars, toolbars, command palettes and keyboard adapters can render one semantic command tree. Dynamic labels reuse existing undo/redo history labels; navigation availability is calculated from current stable-ID hierarchy targets rather than toolkit focus.
+- New/Open/Save-As and Paste deliberately return immutable `DesignerShellCommandRequest` values when shell-owned input is still required. The framework does not guess file-dialog paths, new-project templates or paste-placement policy. Direct Save, Undo/Redo, Copy, Duplicate, Reveal and hierarchy-navigation commands delegate to the existing workspace/project/session/preview owners.
+- Reused the existing generic `CommandSpec` / `CommandSet` contracts rather than inventing a designer-only menu abstraction. Selection navigation through shell commands couples focus explicitly and reveals the resulting stable ID while remaining document/history/preview neutral.
+- Added copied/renamed framework relocation coverage plus a real Tkinter regression where shell Copy is preview-neutral, Duplicate performs the existing checked preview transaction, and shell Undo removes the rendered duplicate through the same semantic command tree. The code-first blank application remains descriptor-identical.
+- Tranche 20 workspace coordination is published at `f3a96420a6267089198f62662ab0761475ad962a`; Tranche 21 is real-Windows accepted on top of that clean `dev` checkpoint as the final backend-neutral designer-core tranche before the planned v0.5.1 release closure.
+- Real-Windows acceptance passes 12 / 12 editor-shell command tests, 163 / 163 combined designer/relocation tests, 64 / 64 GUI-component tests and 31 / 31 Tkinter tests. Both complete discovery forms pass **759 / 759** with one expected skip; localization remains 1,337/current, headless reports 3 updates, compileall/Git checks pass, the manual Dear PyGui/Tkinter/SalixTorrent smoke passed, and `pre_commit_check.bat` passes.
+- This tranche still does not add concrete Dear PyGui/Tkinter editor-shell widgets, file dialogs/templates, paste-placement UI, multi-document/autosave policy, pointer hit-testing, visual selection overlays, drag/drop/resize gestures, mixed-value multi-selection, callback/service/binding serialization or final public package/API naming. Code-first Python composition remains first-class and independent.
+
 ### Ecosystem Extraction — Designer Workspace Coordination
 
 - Added standard-library/framework-only `app/framework/designer_workspace.py` as a backend-neutral coordinator over the already-authoritative designer project, edit-session, preview-host, hierarchy, selection and inspector models. `DesignerWorkspace` does not introduce a second document/history/selection/preview owner; it composes those owners for a future editor shell.
