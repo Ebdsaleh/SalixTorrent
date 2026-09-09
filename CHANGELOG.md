@@ -4,6 +4,12 @@ Notable SalixTorrent changes are recorded here.
 
 ## Unreleased
 
+No changes recorded after v0.5.1 yet.
+
+## v0.5.1 - 2026-09-09
+
+The v0.5.1 checkpoint closes the backend-neutral post-v0.5.0 designer/RAD semantic-core milestone through Tranche 21 while keeping code-first Python composition first-class and deferring concrete editor-shell widgets and final public API naming.
+
 ### Ecosystem Extraction — Designer Editor-Shell Commands
 
 - Added standard-library/framework-only `app/framework/designer_shell.py` as the backend-neutral command/presentation layer above `DesignerWorkspace`. It projects stable File/Edit/Navigate command trees from current workspace state without owning project, history, selection, clipboard, hierarchy, inspector or preview state.

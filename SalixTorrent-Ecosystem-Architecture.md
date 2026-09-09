@@ -1,7 +1,7 @@
 # SalixTorrent Ecosystem Architecture Direction
 
-**Status:** post-v0.5.0 development direction
-**Reference release:** SalixTorrent v0.5.0
+**Status:** v0.5.1 release checkpoint — backend-neutral designer semantic core complete
+**Reference release:** SalixTorrent v0.5.1
 **Development branch:** `dev`
 **Purpose:** guide reverse-pyramid extraction from the working SalixTorrent application into a modular application ecosystem without freezing names or public APIs before the boundaries are proven.
 
@@ -948,3 +948,9 @@ The relocation probe imports and exercises the coordinator after package rename,
 `DesignerShellCommands` delegates fully-specified actions to the existing owners. Direct Save remains project-file owned; Undo/Redo and Duplicate retain checked preview transactions; Copy/Reveal/navigation remain ephemeral. New/Open/Save-As and Paste deliberately return immutable shell requests because template creation, file-dialog paths and paste placement have not been defined as framework policy. This avoids turning a convenience command layer into a second project lifecycle or hierarchy-placement model.
 
 The relocation probe exercises the shell command tree after package rename, and a real Tkinter regression proves the same commands can drive a rendered workspace without importing or owning Tkinter semantics: Copy does not rebuild, Duplicate rebuilds through the existing transaction, and Undo removes the duplicate through the same stable command ID. Real-Windows acceptance passes 12 / 12 command tests, 163 / 163 combined designer/relocation tests, 64 / 64 GUI-component tests and 31 / 31 Tkinter tests; both complete discovery forms pass **759 / 759** with one expected skip. Localization remains 1,337/current, headless/compileall/Git checks pass, the manual visual smoke passed, and `pre_commit_check.bat` passes. After this tranche is published, the planned next step is a dedicated v0.5.1 release closure/tag checkpoint before concrete editor surfaces begin.
+
+### v0.5.1 release checkpoint
+
+The v0.5.1 checkpoint marks completion of the backend-neutral semantic prerequisites needed before concrete RAD/editor shells are introduced. The accepted chain now spans designer metadata and stable identity, validated immutable editing/history, structural hierarchy mutation, snapshot reconstruction, transactional preview ownership, clipboard/duplicate, selection/focus, project-file ownership, stable-ID navigation and visible hierarchy projection, property-inspector presentation, workspace coordination and shell-command projection.
+
+This release does **not** collapse the permanent dual-entry architecture: code-first Python composition and designer/RAD authoring remain equal first-class inputs to the same semantic `Component` / runtime / backend contracts. SalixTorrent remains the code-first reference application. The v0.5.1 tag therefore records a proven internal architecture milestone rather than a final public package/API freeze. Concrete editor-shell widgets, pointer interaction, multi-document/autosave policy and final project/package naming remain subsequent work.
