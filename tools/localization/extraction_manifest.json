@@ -16,7 +16,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 657,
+              "line": 658,
               "column": 17,
               "kind": "python-tr"
             }
@@ -30,13 +30,13 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 310,
+              "line": 311,
               "column": 23,
               "kind": "python-tr"
             },
             {
               "path": "app/views/application_menu.py",
-              "line": 646,
+              "line": 647,
               "column": 19,
               "kind": "python-tr"
             }
@@ -422,19 +422,19 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 615,
+              "line": 616,
               "column": 23,
               "kind": "python-tr"
             },
             {
               "path": "app/views/application_menu.py",
-              "line": 678,
+              "line": 679,
               "column": 23,
               "kind": "python-tr"
             },
             {
               "path": "app/views/application_menu.py",
-              "line": 641,
+              "line": 642,
               "column": 27,
               "kind": "python-tr"
             }
@@ -452,7 +452,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 791,
+              "line": 792,
               "column": 16,
               "kind": "python-tr"
             }
@@ -470,7 +470,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 792,
+              "line": 793,
               "column": 16,
               "kind": "python-tr"
             }
@@ -488,7 +488,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 795,
+              "line": 796,
               "column": 16,
               "kind": "python-tr"
             }
@@ -506,7 +506,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 798,
+              "line": 799,
               "column": 16,
               "kind": "python-tr"
             }
@@ -520,7 +520,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 633,
+              "line": 634,
               "column": 27,
               "kind": "python-tr"
             }
@@ -538,7 +538,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 796,
+              "line": 797,
               "column": 16,
               "kind": "python-tr"
             }
@@ -556,7 +556,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 797,
+              "line": 798,
               "column": 16,
               "kind": "python-tr"
             }
@@ -570,7 +570,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 627,
+              "line": 628,
               "column": 26,
               "kind": "python-tr"
             }
@@ -584,7 +584,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 794,
+              "line": 795,
               "column": 16,
               "kind": "python-tr"
             }
@@ -602,7 +602,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 793,
+              "line": 794,
               "column": 16,
               "kind": "python-tr"
             }
@@ -616,7 +616,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 732,
+              "line": 733,
               "column": 25,
               "kind": "python-tr"
             }
@@ -630,7 +630,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 735,
+              "line": 736,
               "column": 67,
               "kind": "python-tr"
             }
@@ -644,7 +644,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 789,
+              "line": 790,
               "column": 16,
               "kind": "python-tr"
             }
@@ -658,7 +658,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 637,
+              "line": 638,
               "column": 27,
               "kind": "python-tr"
             }
@@ -676,7 +676,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 790,
+              "line": 791,
               "column": 16,
               "kind": "python-tr"
             }
@@ -690,7 +690,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 620,
+              "line": 621,
               "column": 19,
               "kind": "python-tr"
             }
@@ -704,7 +704,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 740,
+              "line": 741,
               "column": 13,
               "kind": "python-tr"
             }
@@ -718,7 +718,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 742,
+              "line": 743,
               "column": 18,
               "kind": "python-tr"
             }
@@ -1254,7 +1254,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 280,
+              "line": 281,
               "column": 29,
               "kind": "python-tr"
             }
@@ -1282,7 +1282,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 304,
+              "line": 305,
               "column": 23,
               "kind": "python-tr"
             }
@@ -1296,7 +1296,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 291,
+              "line": 292,
               "column": 23,
               "kind": "python-tr"
             }
@@ -1310,13 +1310,13 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 300,
+              "line": 301,
               "column": 23,
               "kind": "python-tr"
             },
             {
               "path": "app/views/application_menu.py",
-              "line": 587,
+              "line": 588,
               "column": 19,
               "kind": "python-tr"
             }
@@ -1330,7 +1330,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 282,
+              "line": 283,
               "column": 23,
               "kind": "python-tr"
             }
@@ -1344,7 +1344,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 260,
+              "line": 261,
               "column": 29,
               "kind": "python-tr"
             }
@@ -1358,7 +1358,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 274,
+              "line": 275,
               "column": 23,
               "kind": "python-tr"
             }
@@ -1372,7 +1372,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 262,
+              "line": 263,
               "column": 23,
               "kind": "python-tr"
             }
@@ -1386,7 +1386,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 269,
+              "line": 270,
               "column": 23,
               "kind": "python-tr"
             }
@@ -1400,7 +1400,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 188,
+              "line": 189,
               "column": 29,
               "kind": "python-tr"
             }
@@ -1414,7 +1414,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 226,
+              "line": 227,
               "column": 23,
               "kind": "python-tr"
             }
@@ -1428,7 +1428,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 213,
+              "line": 214,
               "column": 29,
               "kind": "python-tr"
             }
@@ -1442,7 +1442,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 215,
+              "line": 216,
               "column": 28,
               "kind": "python-tr"
             }
@@ -1456,7 +1456,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 214,
+              "line": 215,
               "column": 31,
               "kind": "python-tr"
             }
@@ -1470,7 +1470,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 234,
+              "line": 235,
               "column": 23,
               "kind": "python-tr"
             }
@@ -1484,7 +1484,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 194,
+              "line": 195,
               "column": 23,
               "kind": "python-tr"
             }
@@ -1498,7 +1498,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 254,
+              "line": 255,
               "column": 54,
               "kind": "python-tr"
             }
@@ -1512,7 +1512,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 211,
+              "line": 212,
               "column": 33,
               "kind": "python-tr"
             }
@@ -1526,7 +1526,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 238,
+              "line": 239,
               "column": 23,
               "kind": "python-tr"
             }
@@ -1540,7 +1540,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 230,
+              "line": 231,
               "column": 23,
               "kind": "python-tr"
             }
@@ -1554,7 +1554,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 198,
+              "line": 199,
               "column": 23,
               "kind": "python-tr"
             }
@@ -1568,7 +1568,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 255,
+              "line": 256,
               "column": 55,
               "kind": "python-tr"
             }
@@ -1582,7 +1582,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 206,
+              "line": 207,
               "column": 23,
               "kind": "python-tr"
             }
@@ -1596,7 +1596,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 190,
+              "line": 191,
               "column": 23,
               "kind": "python-tr"
             }
@@ -1610,7 +1610,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 202,
+              "line": 203,
               "column": 23,
               "kind": "python-tr"
             }
@@ -3290,7 +3290,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 277,
+              "line": 278,
               "column": 45,
               "kind": "python-tr"
             }
@@ -3304,7 +3304,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 666,
+              "line": 667,
               "column": 17,
               "kind": "python-tr"
             }
@@ -3318,7 +3318,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 597,
+              "line": 598,
               "column": 17,
               "kind": "python-tr"
             }
@@ -3332,7 +3332,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 296,
+              "line": 297,
               "column": 17,
               "kind": "python-tr"
             }
@@ -3346,7 +3346,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 288,
+              "line": 289,
               "column": 17,
               "kind": "python-tr"
             }
@@ -3360,7 +3360,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 594,
+              "line": 595,
               "column": 26,
               "kind": "python-tr"
             }
@@ -3374,7 +3374,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 256,
+              "line": 257,
               "column": 46,
               "kind": "python-tr"
             }
@@ -3388,7 +3388,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 257,
+              "line": 258,
               "column": 47,
               "kind": "python-tr"
             }
@@ -3402,7 +3402,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 653,
+              "line": 654,
               "column": 26,
               "kind": "python-tr"
             }
@@ -3420,7 +3420,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 654,
+              "line": 655,
               "column": 26,
               "kind": "python-tr"
             }
@@ -3434,7 +3434,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 609,
+              "line": 610,
               "column": 17,
               "kind": "python-tr"
             }
@@ -3454,7 +3454,7 @@
           "occurrences": [
             {
               "path": "app/views/application_menu.py",
-              "line": 185,
+              "line": 186,
               "column": 40,
               "kind": "python-tr"
             }
@@ -20172,13 +20172,13 @@
       "about.title": [
         {
           "path": "app/views/application_menu.py",
-          "line": 310,
+          "line": 311,
           "column": 23,
           "kind": "python-tr"
         },
         {
           "path": "app/views/application_menu.py",
-          "line": 646,
+          "line": 647,
           "column": 19,
           "kind": "python-tr"
         }
@@ -20200,19 +20200,19 @@
       "common.close": [
         {
           "path": "app/views/application_menu.py",
-          "line": 615,
+          "line": 616,
           "column": 23,
           "kind": "python-tr"
         },
         {
           "path": "app/views/application_menu.py",
-          "line": 678,
+          "line": 679,
           "column": 23,
           "kind": "python-tr"
         },
         {
           "path": "app/views/application_menu.py",
-          "line": 641,
+          "line": 642,
           "column": 27,
           "kind": "python-tr"
         }
@@ -20220,13 +20220,13 @@
       "menu.help.shortcuts": [
         {
           "path": "app/views/application_menu.py",
-          "line": 300,
+          "line": 301,
           "column": 23,
           "kind": "python-tr"
         },
         {
           "path": "app/views/application_menu.py",
-          "line": 587,
+          "line": 588,
           "column": 19,
           "kind": "python-tr"
         }

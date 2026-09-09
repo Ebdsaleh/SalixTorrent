@@ -1,6 +1,6 @@
 # SalixTorrent Ecosystem Architecture Direction
 
-**Status:** v0.5.1 released; post-v0.5.1 Tranches 1 through 3 published and Tranche 4 clickable-preview selection is the current full-commit Windows-acceptance boundary on `dev`
+**Status:** v0.5.1 released; post-v0.5.1 Tranches 1 through 4 published and Tranche 5 component-palette requests are the current full-commit Windows-acceptance boundary on `dev`
 **Reference release:** SalixTorrent v0.5.1
 **Development branch:** `dev`
 **Purpose:** guide reverse-pyramid extraction from the working SalixTorrent application into a modular application ecosystem without freezing names or public APIs before the boundaries are proven.
@@ -983,7 +983,7 @@ The hierarchy presenter gains an optional presentation-only change callback so d
 
 This surface still does not define multi-selection/mixed-value editing, specialized callback/service/binding editors, drag/drop/reparent/resize gestures, file-dialog/template/paste policy, multi-document/autosave/recovery, incremental native-widget mutation or final public package/project-schema naming. Code-first applications remain independent of designer modules and continue to use the same semantic component/runtime/backend contracts.
 
-### Clickable designer preview selection and visual reveal — post-v0.5.1 Tranche 4 full-commit gate
+### Clickable designer preview selection and visual reveal — post-v0.5.1 Tranche 4 Windows-accepted / published
 
 The fourth post-v0.5.1 surface tranche makes the reconstructed preview itself an editor selection surface without moving stable identity or selection semantics into a GUI backend. `DesignerPreviewSelectionSurface` in `app/framework/designer_preview_selection.py` derives ephemeral targets from the current `DesignerPreviewHost` stable-ID/component map, revalidates a clicked ID against the current snapshot, then delegates selection/focus and hierarchy reveal through `DesignerWorkspace`. Merely selecting a preview control therefore remains dirty-neutral, history-neutral and preview-generation-neutral.
 
@@ -991,6 +991,16 @@ Concrete hosts are isolated under `app/engine/designer_preview_selection_hosts/`
 
 The three-pane designer-shell proof now supports two equivalent selection entry points: hierarchy-row selection and direct preview click. Either route converges on the same `DesignerWorkspace` selection/focus state, reveals the selected path in the hierarchy and retargets the same property inspector. The command surface and all document-changing operations retain their previously accepted ownership and checked preview-replacement semantics.
 
-Preparation passes 12 / 12 preview-selection tests, 218 / 218 designer/relocation tests, 64 / 64 GUI-component tests, 38 / 38 live Tkinter tests under Xvfb and complete discovery at **821 / 821**. The tranche is distributed as a full-commit bundle rather than a separate implementation/acceptance-doc pair: before commit, real Windows must pass the tracked validator at the same counts, dual-backend designer/blank-app visual smoke, the normal SalixTorrent smoke and `pre_commit_check.bat`. Any failure keeps the tranche uncommitted.
+Real-Windows acceptance passes 12 / 12 preview-selection tests, 218 / 218 designer/relocation tests, 64 / 64 GUI-component tests, 38 / 38 Tkinter tests and both complete discovery forms at **821 / 821** with one expected skip. Localization/headless/compile/Git, dual-backend designer/blank-app smoke, the normal SalixTorrent smoke and pre-commit all passed. The full-commit boundary is published at `31d0d4207c12ffd226bddd29a2a81d26c92e98dd` (`Add designer preview click-selection surface`).
 
 Drag/drop/reparent/resize gestures, multi-selection/mixed-value editing, specialized callback/service/binding editors, file-dialog/template/paste policy, multi-document/autosave/recovery, incremental native-widget mutation and final public package/project-schema naming remain deferred. The permanent architecture remains dual-entry: code-first Python composition and designer/RAD authoring continue to converge on the same semantic component/runtime/backend contracts.
+
+### Designer component palette and explicit placement requests — post-v0.5.1 Tranche 5 full-commit gate
+
+The next surface adds a renderer-neutral component/tool palette over the already accepted `DesignerCatalog`. `DesignerComponentPalette` projects stable catalog metadata into `DesignerComponentPaletteState`; activating a tool produces a `DesignerComponentInsertRequest` carrying the requested component type plus the current selection as a non-authoritative hint. It does not allocate a designer node, infer a parent, choose a child slot, create relationship metadata, dirty the project, add history or rebuild the preview. This keeps insertion placement as an explicit future editor interaction rather than hidden policy.
+
+Dear PyGui and Tkinter hosts are isolated under `app/engine/designer_component_palette_hosts/` and own only disposable palette widgets. The shell proof now presents Components + Hierarchy in the left region, Preview in the centre and Inspector on the right. Selection, property editing, preview click-selection and Designer Commands retain their previous owners.
+
+Tranche 5 also includes a narrow SalixTorrent product maintenance repair: the `View -> Torrent Details` submenu now carries each semantic tab key through Dear PyGui `user_data`, fixing the empty-key exception reproduced on Windows while preserving the generic `TabContainer.select(...)` route. The tracked validation adds an explicit structural/menu-routing gate. Preparation passes 14 / 14 palette tests, 6 / 6 menu/structural tests, 232 / 232 designer/relocation tests, 64 / 64 GUI-component tests, 39 / 39 Tkinter tests and complete discovery at **837 / 837**.
+
+The next designer step should resolve one `DesignerComponentInsertRequest` through an explicit placement chooser/contract before introducing drag/drop. This keeps parent/slot/relationship decisions visible, testable and backend-neutral.

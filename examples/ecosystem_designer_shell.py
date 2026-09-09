@@ -2,9 +2,11 @@
 
 This is intentionally a compact editor-shell proof rather than a full RAD IDE.
 It renders one reconstructed semantic component document, exposes the accepted
-semantic command tree, presents the stable-ID hierarchy and property inspector, and now makes the
-reconstructed preview itself selectable with a transient visual outline through
-the same workspace ownership on Dear PyGui and Tkinter.
+semantic command tree, presents a catalog-backed component palette, the stable-ID hierarchy and property
+inspector, and keeps the reconstructed preview selectable with a transient visual
+outline through the same workspace ownership on Dear PyGui and Tkinter. Palette
+activation is intentionally request-only: this proof does not guess insertion
+parent/slot/relationship policy.
 """
 
 from __future__ import annotations
@@ -28,6 +30,7 @@ from app.framework.components import (
     SplitPanel,
 )
 from app.framework.designer import DesignerIdentityMap, capture_component_tree
+from app.framework.designer_component_palette import DesignerComponentPalette
 from app.framework.designer_hierarchy_panel import DesignerHierarchyPanel
 from app.framework.designer_inspector_panel import DesignerInspectorPanel
 from app.framework.designer_preview import DesignerPreviewContext
@@ -76,8 +79,10 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
 
     layout_coordinator = LayoutCoordinator(host.presentation.layout_host)
     holder = {}
-    status = Label("Select a hierarchy row or click the preview, edit properties, or open Designer Commands.")
+    status = Label("Select/click the preview, edit properties, or activate a Component tool to request placement.")
+    palette_parent = ControlColumn(layout=ControlLayout(width=FILL, height=190))
     hierarchy_parent = ControlColumn(layout=ControlLayout(width=FILL, height=FILL))
+    left_sidebar = ControlColumn((palette_parent, hierarchy_parent), layout=ControlLayout(width=FILL, height=FILL))
     preview_parent = ControlColumn(layout=ControlLayout(width=FILL, height=FILL))
     inspector_parent = ControlColumn(layout=ControlLayout(width=FILL, height=FILL))
 
@@ -88,15 +93,15 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
         (
             SplitPane(
                 "hierarchy",
-                hierarchy_parent,
-                weight=0.25,
-                minimum=250,
+                left_sidebar,
+                weight=0.27,
+                minimum=270,
                 border=False,
             ),
             SplitPane(
                 "preview",
                 ControlColumn((Label("Preview"), preview_parent)),
-                weight=0.46,
+                weight=0.44,
                 minimum=380,
                 border=False,
             ),
@@ -113,7 +118,7 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
         layout=ControlLayout(width=FILL, height=520),
     )
     chrome = ControlColumn((
-        Label("Designer Shell Surface — post-v0.5.1 Tranche 4"),
+        Label("Designer Shell Surface — post-v0.5.1 Tranche 5"),
         Button("Designer Commands", callback=show_commands),
         status,
         workspace_split,
@@ -135,6 +140,9 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
     workspace.reveal_selected_in_hierarchy()
 
     if backend_name == "dearpygui":
+        from app.engine.designer_component_palette_hosts import (
+            DearPyGuiDesignerComponentPaletteHost,
+        )
         from app.engine.designer_hierarchy_panel_hosts import (
             DearPyGuiDesignerHierarchyPanelHost,
         )
@@ -145,10 +153,14 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
             DearPyGuiDesignerPreviewSelectionHost,
         )
 
-        hierarchy_host = DearPyGuiDesignerHierarchyPanelHost(height=500)
+        palette_host = DearPyGuiDesignerComponentPaletteHost(height=180)
+        hierarchy_host = DearPyGuiDesignerHierarchyPanelHost(height=300)
         inspector_host = DearPyGuiDesignerInspectorPanelHost(height=500)
         preview_selection_host = DearPyGuiDesignerPreviewSelectionHost()
     else:
+        from app.engine.designer_component_palette_hosts import (
+            TkinterDesignerComponentPaletteHost,
+        )
         from app.engine.designer_hierarchy_panel_hosts import (
             TkinterDesignerHierarchyPanelHost,
         )
@@ -159,9 +171,13 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
             TkinterDesignerPreviewSelectionHost,
         )
 
+        palette_host = TkinterDesignerComponentPaletteHost(
+            host.presentation.component_renderer,
+            height_rows=7,
+        )
         hierarchy_host = TkinterDesignerHierarchyPanelHost(
             host.presentation.component_renderer,
-            height_rows=20,
+            height_rows=12,
         )
         inspector_host = TkinterDesignerInspectorPanelHost(
             host.presentation.component_renderer,
@@ -170,6 +186,22 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
         preview_selection_host = TkinterDesignerPreviewSelectionHost(
             host.presentation.component_renderer
         )
+
+    def on_palette_request(request):
+        target = request.target_hint or "(no selection)"
+        status.set_text(
+            f"Insert request: {request.label} -> {target} (placement required)"
+        )
+        return request
+
+    palette = DesignerComponentPalette(
+        workspace,
+        palette_host,
+        title="Components",
+        on_request=on_palette_request,
+    )
+    palette.build(parent=palette_parent.require_item())
+    holder["palette"] = palette
 
     def on_inspector_change(state):
         preview_selection = holder.get("preview_selection")
@@ -245,6 +277,7 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
             on_stop=lambda: (
                 menu.dispose(),
                 preview_selection.dispose(),
+                palette.dispose(),
                 hierarchy_panel.dispose(),
                 inspector_panel.dispose(),
                 workspace.close(),

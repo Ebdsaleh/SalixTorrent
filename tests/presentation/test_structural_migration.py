@@ -31,6 +31,17 @@ class StructuralMigrationTests(unittest.TestCase):
         self.assertIn("tabs.select(tab_name, notify=True)", method)
         self.assertNotIn("dpg.set_value", method)
 
+    def test_application_menu_detail_callbacks_preserve_tab_name_as_user_data(self):
+        source = (PROJECT_ROOT / "app" / "views" / "application_menu.py").read_text(encoding="utf-8")
+        block = source[source.index('with dpg.menu(label=tr("menu.view.torrent_details"'):]
+        block = block[: block.index("            detail_help =")]
+        self.assertIn("user_data=name", block)
+        self.assertIn(
+            "callback=lambda _s, _a, tab_name: self._show_detail_tab(tab_name)",
+            block,
+        )
+        self.assertNotIn("u=name", block)
+
     def test_help_index_uses_generic_split_and_tabs(self):
         source = (PROJECT_ROOT / "app" / "views" / "help_topics_view.py").read_text(encoding="utf-8")
         self.assertIn("self.help_split = SplitPanel", source)

@@ -100,6 +100,7 @@ class FrameworkPackagingTests(unittest.TestCase):
                 assert "portable_framework.designer_preview" in imported
                 assert "portable_framework.designer_preview_host" in imported
                 assert "portable_framework.designer_preview_selection" in imported
+                assert "portable_framework.designer_component_palette" in imported
                 assert "portable_framework.designer_project" in imported
                 assert "portable_framework.designer_hierarchy" in imported
                 assert "portable_framework.designer_inspector" in imported
@@ -171,6 +172,10 @@ class FrameworkPackagingTests(unittest.TestCase):
                     capture_component_tree,
                 )
                 from portable_framework.designer_clipboard import copy_designer_subtree
+                from portable_framework.designer_component_palette import (
+                    DesignerComponentPalette,
+                    DesignerComponentPaletteBinding,
+                )
                 from portable_framework.designer_editing import DesignerEditSession
                 from portable_framework.designer_structure import locate_designer_node
                 from portable_framework.designer_preview import reconstruct_designer_snapshot
@@ -316,6 +321,39 @@ class FrameworkPackagingTests(unittest.TestCase):
                 portable_workspace = DesignerWorkspace(
                     portable_loaded, preview_host=preview_host
                 )
+
+                class PortablePaletteHost:
+                    def __init__(self):
+                        self.on_activate = None
+                    def build(self, state, *, parent, title="", on_activate=None):
+                        self.on_activate = on_activate
+                        return DesignerComponentPaletteBinding(
+                            panel={{"alive": True, "parent": parent, "title": title}},
+                            items={{entry.component_type_key: entry.component_type_key for entry in state.entries}},
+                        )
+                    def update(self, binding, state):
+                        binding.items.clear()
+                        binding.items.update({{entry.component_type_key: entry.component_type_key for entry in state.entries}})
+                    def exists(self, binding):
+                        return bool(binding.panel["alive"])
+                    def dispose(self, binding):
+                        binding.panel["alive"] = False
+
+                portable_palette_host = PortablePaletteHost()
+                portable_palette = DesignerComponentPalette(
+                    portable_workspace,
+                    portable_palette_host,
+                    component_keys=("control.label", "control.button"),
+                )
+                portable_palette_binding = portable_palette.build(parent="palette")
+                assert tuple(portable_palette_binding.items) == ("control.label", "control.button")
+                palette_generation = preview_host.generation
+                palette_request = portable_palette_host.on_activate("control.button")
+                assert palette_request.component_type_key == "control.button"
+                assert palette_request.target_hint == designer_button.node_id
+                assert palette_request.requires_placement is True
+                assert preview_host.generation == palette_generation
+
                 workspace_state = portable_workspace.state
                 assert workspace_state.selected_id == designer_button.node_id
                 assert workspace_state.inspector.row("label").value == "Run"

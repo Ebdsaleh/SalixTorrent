@@ -171,7 +171,8 @@ class ApplicationMenu:
                     self._detail_items[name] = dpg.add_menu_item(
                         label=name,
                         check=True,
-                        callback=lambda s, a, u=name: self._show_detail_tab(u),
+                        user_data=name,
+                        callback=lambda _s, _a, tab_name: self._show_detail_tab(tab_name),
                     )
             detail_help = {
                 "General": "Overall transfer, swarm, connectivity and torrent metadata for the selected torrent.",
