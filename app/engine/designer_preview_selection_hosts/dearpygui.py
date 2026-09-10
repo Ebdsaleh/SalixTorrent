@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from app.engine.designer_preview_pointer_arbiter import DearPyGuiDesignerPreviewPointerArbiter
 from app.framework.designer_preview_selection import (
     DesignerPreviewSelectionBinding,
     DesignerPreviewSelectionTarget,
@@ -11,7 +12,7 @@ from app.framework.designer_preview_selection import (
 
 
 class DearPyGuiDesignerPreviewSelectionHost:
-    """Bind one global click handler to current rendered preview items.
+    """Bind one global pointer-down handler to current rendered preview items.
 
     Hit-testing is deliberately adapter-owned.  When several nested preview
     items report hover state, the deepest semantic target wins.  The visual
@@ -19,11 +20,22 @@ class DearPyGuiDesignerPreviewSelectionHost:
     becomes part of the designer document or preview component tree.
     """
 
+    def __init__(self, *, pointer_arbiter: DearPyGuiDesignerPreviewPointerArbiter | None = None):
+        self.pointer_arbiter = pointer_arbiter
+
     @staticmethod
     def _dpg():
         import dearpygui.dearpygui as dpg
 
         return dpg
+
+    @staticmethod
+    def _mouse_position(dpg):
+        try:
+            position = dpg.get_mouse_pos(local=False)
+        except TypeError:
+            position = dpg.get_mouse_pos()
+        return float(position[0]), float(position[1])
 
     @staticmethod
     def _target_item(target: DesignerPreviewSelectionTarget):
@@ -106,7 +118,14 @@ class DearPyGuiDesignerPreviewSelectionHost:
         }
         binding = DesignerPreviewSelectionBinding(parent, mapping, metadata)
 
-        def clicked(_sender=None, _app_data=None, _user_data=None):
+        def pressed(_sender=None, _app_data=None, _user_data=None):
+            # Selection happens on pointer-down, never on release.  When the
+            # pointer is inside the active resize handle, that gesture owns the
+            # press and selection must remain unchanged.
+            if self.pointer_arbiter is not None:
+                x, y = self._mouse_position(dpg)
+                if self.pointer_arbiter.blocks_selection(x, y):
+                    return
             for _depth, node_id, item, _selected in tuple(metadata.get("ordered", ())):
                 if item is None:
                     continue
@@ -117,9 +136,9 @@ class DearPyGuiDesignerPreviewSelectionHost:
                 except Exception:
                     continue
 
-        dpg.add_mouse_click_handler(
+        dpg.add_mouse_down_handler(
             button=dpg.mvMouseButton_Left,
-            callback=clicked,
+            callback=pressed,
             parent=handler_registry,
         )
         self._draw_selection(binding)

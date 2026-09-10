@@ -144,22 +144,31 @@ class TkinterDesignerInspectorPanelHost:
 
             defer(perform)
 
+        # Keep the editor column useful even in a narrow inspector, but put
+        # actions on a second row instead of a third horizontal column.  The
+        # earlier three-column form could place Apply/None/Default beyond the
+        # visible canvas width even though the editor itself was correctly
+        # stabilized after refresh.
         inner.columnconfigure(0, minsize=92)
         inner.columnconfigure(1, weight=1, minsize=140)
         for index, row in enumerate(state.rows):
+            field_row = index * 2
+            action_row = field_row + 1
             label = row.label
             if not row.is_set:
                 label += "  · default"
             elif row.value is None:
                 label += "  · None"
-            ttk.Label(inner, text=label).grid(row=index, column=0, sticky="nw", padx=(4, 8), pady=3)
+            ttk.Label(inner, text=label).grid(
+                row=field_row, column=0, sticky="nw", padx=(4, 8), pady=(3, 1)
+            )
 
             actions = ttk.Frame(inner)
-            actions.grid(row=index, column=2, sticky="e", padx=(6, 4), pady=2)
+            has_actions = False
 
             if not row.can_edit:
                 item = ttk.Label(inner, text=self._display_value(row))
-                item.grid(row=index, column=1, sticky="ew", pady=3)
+                item.grid(row=field_row, column=1, sticky="ew", pady=(3, 1))
             elif row.editor is DesignerInspectorEditorKind.TOGGLE:
                 variable = tk.BooleanVar(
                     value=bool(row.value) if row.is_set and row.value is not None else False
@@ -169,7 +178,7 @@ class TkinterDesignerInspectorPanelHost:
                     variable=variable,
                     command=lambda r=row, n=state.node_id, v=variable: commit_toggle(r, n, v),
                 )
-                item.grid(row=index, column=1, sticky="w", pady=3)
+                item.grid(row=field_row, column=1, sticky="w", pady=(3, 1))
                 metadata["variables"][row.key] = variable
             elif row.editor is DesignerInspectorEditorKind.CHOICE:
                 choices, values = self._choice_items(row)
@@ -179,7 +188,7 @@ class TkinterDesignerInspectorPanelHost:
                     current = next((label for label, value in values.items() if value == row.value), "")
                 variable = tk.StringVar(value=current)
                 item = ttk.Combobox(inner, textvariable=variable, values=choices, state="readonly")
-                item.grid(row=index, column=1, sticky="ew", pady=3)
+                item.grid(row=field_row, column=1, sticky="ew", pady=(3, 1))
                 item.bind(
                     "<<ComboboxSelected>>",
                     lambda _event, r=row, n=state.node_id, v=variable, vals=values: commit_choice(r, n, v, vals),
@@ -189,7 +198,7 @@ class TkinterDesignerInspectorPanelHost:
             else:
                 variable = tk.StringVar(value=str(format_inspector_editor_value(row)))
                 item = ttk.Entry(inner, textvariable=variable)
-                item.grid(row=index, column=1, sticky="ew", pady=3)
+                item.grid(row=field_row, column=1, sticky="ew", pady=(3, 1))
                 item.bind(
                     "<Return>",
                     lambda _event, r=row, n=state.node_id, v=variable: commit_text(r, n, v),
@@ -203,6 +212,7 @@ class TkinterDesignerInspectorPanelHost:
                 apply_button.pack(side="left", padx=(0, 3))
                 metadata["apply_buttons"][row.key] = apply_button
                 metadata["variables"][row.key] = variable
+                has_actions = True
 
             binding.rows[row.key] = item
 
@@ -214,6 +224,7 @@ class TkinterDesignerInspectorPanelHost:
                 )
                 none_button.pack(side="left", padx=(0, 3))
                 metadata["none_buttons"][row.key] = none_button
+                has_actions = True
             if row.can_clear:
                 clear_button = ttk.Button(
                     actions,
@@ -222,6 +233,18 @@ class TkinterDesignerInspectorPanelHost:
                 )
                 clear_button.pack(side="left")
                 metadata["clear_buttons"][row.key] = clear_button
+                has_actions = True
+
+            if has_actions:
+                actions.grid(
+                    row=action_row,
+                    column=1,
+                    sticky="w",
+                    padx=(0, 4),
+                    pady=(0, 3),
+                )
+            else:
+                actions.destroy()
 
         # Reassert width asynchronously after every rebuild. Do not force a
         # nested update_idletasks() here: refresh can run from a deferred native

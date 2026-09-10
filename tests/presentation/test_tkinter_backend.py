@@ -18,6 +18,7 @@ from app.engine.designer_component_placement_hosts import TkinterDesignerCompone
 from app.engine.designer_hierarchy_panel_hosts import TkinterDesignerHierarchyPanelHost
 from app.engine.designer_inspector_panel_hosts import TkinterDesignerInspectorPanelHost
 from app.engine.designer_preview_selection_hosts import TkinterDesignerPreviewSelectionHost
+from app.engine.designer_preview_resize_hosts import TkinterDesignerPreviewResizeHost
 from app.engine.designer_shell_shortcut_hosts import TkinterDesignerShellShortcutHost
 from app.engine.layout_hosts import TkinterLayoutHost
 from app.engine.plot_hosts import TkinterPlotHost
@@ -64,6 +65,10 @@ from app.framework.designer_preview import DesignerPreviewContext, reconstruct_d
 from app.framework.designer_preview_selection import (
     DesignerPreviewSelectionHost,
     DesignerPreviewSelectionSurface,
+)
+from app.framework.designer_preview_resize import (
+    DesignerPreviewResizeHost,
+    DesignerPreviewResizeSurface,
 )
 from app.framework.designer_preview_host import DesignerPreviewHost
 from app.framework.designer_project import DesignerProjectFile
@@ -186,6 +191,7 @@ class TkinterBackendLiveTests(unittest.TestCase):
         hierarchy_panel_host = TkinterDesignerHierarchyPanelHost(self.renderer)
         inspector_panel_host = TkinterDesignerInspectorPanelHost(self.renderer)
         preview_selection_host = TkinterDesignerPreviewSelectionHost(self.renderer)
+        preview_resize_host = TkinterDesignerPreviewResizeHost(self.renderer)
         self.assertIsInstance(self.renderer, ComponentRenderer)
         self.assertIsInstance(layout_host, LayoutHost)
         self.assertIsInstance(scene_host, SceneHost)
@@ -198,6 +204,7 @@ class TkinterBackendLiveTests(unittest.TestCase):
         self.assertIsInstance(hierarchy_panel_host, DesignerHierarchyPanelHost)
         self.assertIsInstance(inspector_panel_host, DesignerInspectorPanelHost)
         self.assertIsInstance(preview_selection_host, DesignerPreviewSelectionHost)
+        self.assertIsInstance(preview_resize_host, DesignerPreviewResizeHost)
 
     def test_backend_factory_exposes_common_capabilities(self):
         backend = create_tkinter_backend(self.root)
@@ -1013,6 +1020,114 @@ class TkinterBackendLiveTests(unittest.TestCase):
         self.assertNotIn("text", inspector_binding.rows)
         self.assertTrue(hierarchy.dispose())
         self.assertTrue(inspector.dispose())
+        self.assertTrue(workspace.close())
+
+    def test_designer_inspector_actions_remain_inside_narrow_panel_after_refresh(self):
+        from app.framework.designer import DesignerIdentityMap, capture_component_tree
+
+        action = Button("Run", layout=ControlLayout(width=120, height=30, spacing=4))
+        source = ControlColumn((action,))
+        identities = DesignerIdentityMap(prefix="tk-inspector-narrow")
+        identities.bind(source, "root")
+        identities.bind(action, "action")
+        snapshot = capture_component_tree(source, identities=identities)
+        workspace = DesignerWorkspace(
+            DesignerProjectFile.create(snapshot),
+            context=DesignerPreviewContext(
+                layout_coordinator=LayoutCoordinator(TkinterLayoutHost(self.renderer))
+            ),
+            renderer=self.renderer,
+        )
+        workspace.select_and_focus_node("action")
+        parent = ControlColumn(layout=ControlLayout(width=320, height=300))
+        parent.build(renderer=self.renderer)
+        panel = DesignerInspectorPanel(
+            workspace,
+            TkinterDesignerInspectorPanelHost(self.renderer, height=260),
+        )
+        binding = panel.build(parent=parent.require_item())
+        self.root.deiconify()
+        self.root.update()
+
+        def assert_actions_visible():
+            canvas = binding.metadata["canvas"]
+            self.root.update_idletasks()
+            right_edge = canvas.winfo_rootx() + canvas.winfo_width()
+            for buttons in (
+                binding.metadata["apply_buttons"],
+                binding.metadata["none_buttons"],
+                binding.metadata["clear_buttons"],
+            ):
+                for button in buttons.values():
+                    self.assertLessEqual(
+                        button.winfo_rootx() + button.winfo_width(),
+                        right_edge + 1,
+                    )
+
+        assert_actions_visible()
+        binding.metadata["clear_buttons"]["layout.width"].invoke()
+        self.root.update()
+        assert_actions_visible()
+        binding.metadata["clear_buttons"]["layout.height"].invoke()
+        self.root.update()
+        assert_actions_visible()
+        binding.metadata["clear_buttons"]["layout.spacing"].invoke()
+        self.root.update()
+        assert_actions_visible()
+        self.assertTrue(panel.dispose())
+        self.assertTrue(workspace.close())
+
+    def test_designer_preview_resize_sizegrip_commits_one_real_tkinter_edit(self):
+        from app.engine.designer_preview_resize_hosts import TkinterDesignerPreviewResizeHost
+        from app.framework.components import SectionPanel
+        from app.framework.designer import DesignerIdentityMap, capture_component_tree
+        from app.framework.designer_preview_resize import DesignerPreviewResizeSurface
+
+        action = Button("Run")
+        source = ControlColumn((action,))
+        identities = DesignerIdentityMap(prefix="tk-resize")
+        identities.bind(source, "root")
+        identities.bind(action, "action")
+        snapshot = capture_component_tree(source, identities=identities)
+        preview_parent = SectionPanel(
+            "Preview",
+            (),
+            separated=False,
+            border=False,
+            layout=ControlLayout(width=360, height=220),
+        )
+        preview_parent.build(renderer=self.renderer)
+        workspace = DesignerWorkspace.create(
+            snapshot,
+            context=DesignerPreviewContext(
+                layout_coordinator=LayoutCoordinator(TkinterLayoutHost(self.renderer))
+            ),
+            renderer=self.renderer,
+            parent=preview_parent.require_item(),
+        )
+        workspace.select_and_focus_node("action")
+        surface = DesignerPreviewResizeSurface(
+            workspace,
+            TkinterDesignerPreviewResizeHost(self.renderer),
+        )
+        binding = surface.build(parent=preview_parent.require_item())
+        self.root.update()
+        handle = binding.metadata["handle"]
+        self.assertTrue(handle.winfo_manager())
+        start_width = int(surface.target.width)
+        start_height = int(surface.target.height)
+        handle.event_generate("<ButtonPress-1>", x=4, y=4)
+        self.root.update()
+        handle.event_generate("<B1-Motion>", x=44, y=24)
+        self.root.update()
+        handle.event_generate("<ButtonRelease-1>", x=44, y=24)
+        self.root.update()
+        self.assertEqual(1, workspace.session.undo_depth)
+        self.assertEqual("Resize component", workspace.state.undo_label)
+        self.assertGreaterEqual(workspace.session.node("action").properties["layout.width"], start_width + 30)
+        self.assertGreaterEqual(workspace.session.node("action").properties["layout.height"], start_height + 10)
+        self.assertEqual("action", workspace.state.selected_id)
+        self.assertTrue(surface.dispose())
         self.assertTrue(workspace.close())
 
     def test_designer_shell_example_runs_tkinter_backend_and_auto_closes(self):

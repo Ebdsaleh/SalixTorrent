@@ -100,6 +100,7 @@ class FrameworkPackagingTests(unittest.TestCase):
                 assert "portable_framework.designer_preview" in imported
                 assert "portable_framework.designer_preview_host" in imported
                 assert "portable_framework.designer_preview_selection" in imported
+                assert "portable_framework.designer_preview_resize" in imported
                 assert "portable_framework.designer_component_palette" in imported
                 assert "portable_framework.designer_component_placement" in imported
                 assert "portable_framework.designer_project" in imported
@@ -189,6 +190,10 @@ class FrameworkPackagingTests(unittest.TestCase):
                 from portable_framework.designer_preview_selection import (
                     DesignerPreviewSelectionBinding,
                     DesignerPreviewSelectionSurface,
+                )
+                from portable_framework.designer_preview_resize import (
+                    DesignerPreviewResizeBinding,
+                    DesignerPreviewResizeSurface,
                 )
                 from portable_framework.designer_project import DesignerProjectFile
                 from portable_framework.designer_hierarchy import DesignerHierarchyProjection
