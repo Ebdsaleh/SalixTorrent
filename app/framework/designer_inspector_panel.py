@@ -25,6 +25,8 @@ from .designer_inspector import (
     DesignerInspectorState,
 )
 from .designer_workspace import DesignerWorkspace
+from .designer_preview import DESIGNER_PREVIEW_LAYOUT_DEFAULTS
+from .designer_editing import ClearDesignerProperty, CompositeDesignerEdit
 
 
 DesignerInspectorPanelChangeHandler = Callable[[DesignerInspectorState], object]
@@ -55,6 +57,8 @@ class DesignerInspectorPanelHost(Protocol):
         on_set: Callable[[str, str, object], object],
         on_clear: Callable[[str, str], object],
         on_error: Callable[[str, str, Exception], object],
+        on_reset: Callable[[str], object],
+        on_scrub_base: Callable[[str, str], float],
     ) -> DesignerInspectorPanelBinding:
         ...
 
@@ -210,6 +214,8 @@ class DesignerInspectorPanel:
             on_set=self._host_set,
             on_clear=self._host_clear,
             on_error=self._host_error,
+            on_reset=self._host_reset,
+            on_scrub_base=self._host_scrub_base,
         )
         if not isinstance(binding, DesignerInspectorPanelBinding):
             raise TypeError(
@@ -326,6 +332,61 @@ class DesignerInspectorPanel:
         except Exception as exc:
             return self._report_error(property_key, exc)
 
+
+    def _reset_for_target(self, node_id: object) -> bool:
+        state = self.state
+        expected = _node_id(node_id)
+        if not state.has_target or state.node_id != expected:
+            raise KeyError("designer inspector reset target is stale")
+        commands = [
+            ClearDesignerProperty(state.node_id, row.key)
+            for row in state.rows
+            if row.can_clear
+        ]
+        if not commands:
+            self.refresh()
+            return False
+        changed = self._workspace.execute(
+            CompositeDesignerEdit(commands, label="Reset component to defaults")
+        )
+        self.refresh()
+        self._notify_change()
+        return changed
+
+    def _scrub_base_for_target(self, node_id: object, property_key: object) -> float:
+        row = self._current_row(property_key, expected_node_id=node_id)
+        if row.is_set and isinstance(row.value, (int, float)) and not isinstance(row.value, bool):
+            return float(row.value)
+        # Width/height Defaults have meaningful rendered preview dimensions; use
+        # those so the first scrub begins from what the user can actually see.
+        if row.key in {"layout.width", "layout.height"}:
+            component = self._workspace.preview_host.component(row.node_id)
+            resolved = component.resolved_layout
+            value = None
+            if resolved is not None:
+                value = resolved.width if row.key == "layout.width" else resolved.height
+            if isinstance(value, int):
+                return float(value)
+            profile_row = self.state.row("profile_key")
+            profile_key = str(profile_row.value).strip() if profile_row and profile_row.is_set else ""
+            defaults = DESIGNER_PREVIEW_LAYOUT_DEFAULTS.get(profile_key)
+            if defaults is not None:
+                fallback = defaults.width if row.key == "layout.width" else defaults.height
+                if isinstance(fallback, int):
+                    return float(fallback)
+        if row.minimum is not None:
+            return float(row.minimum)
+        return 0.0
+
+    def _host_reset(self, node_id: str) -> bool:
+        try:
+            return self._reset_for_target(node_id)
+        except Exception as exc:
+            return self._report_error("reset", exc)
+
+    def _host_scrub_base(self, node_id: str, property_key: str) -> float:
+        return self._scrub_base_for_target(node_id, property_key)
+
     def _host_error(self, _node_id: str, property_key: str, exc: Exception) -> bool:
         if not isinstance(exc, Exception):
             exc = ValueError(str(exc))
@@ -338,6 +399,14 @@ class DesignerInspectorPanel:
         if not state.has_target:
             raise RuntimeError("designer inspector panel has no selected target")
         return self._set_for_target(state.node_id, property_key, value)
+
+    def reset_to_defaults(self) -> bool:
+        """Clear every currently explicit resettable property in one history step."""
+
+        state = self.state
+        if not state.has_target:
+            raise RuntimeError("designer inspector panel has no selected target")
+        return self._reset_for_target(state.node_id)
 
     def clear_value(self, property_key: object) -> bool:
         """Clear one current selected-node property through existing semantics."""

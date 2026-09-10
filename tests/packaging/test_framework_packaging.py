@@ -101,6 +101,7 @@ class FrameworkPackagingTests(unittest.TestCase):
                 assert "portable_framework.designer_preview_host" in imported
                 assert "portable_framework.designer_preview_selection" in imported
                 assert "portable_framework.designer_preview_resize" in imported
+                assert "portable_framework.designer_numeric_drag" in imported
                 assert "portable_framework.designer_component_palette" in imported
                 assert "portable_framework.designer_component_placement" in imported
                 assert "portable_framework.designer_project" in imported
@@ -194,6 +195,10 @@ class FrameworkPackagingTests(unittest.TestCase):
                 from portable_framework.designer_preview_resize import (
                     DesignerPreviewResizeBinding,
                     DesignerPreviewResizeSurface,
+                )
+                from portable_framework.designer_numeric_drag import (
+                    DesignerDragModifiers,
+                    translate_numeric_drag,
                 )
                 from portable_framework.designer_project import DesignerProjectFile
                 from portable_framework.designer_hierarchy import DesignerHierarchyProjection
@@ -437,10 +442,17 @@ class FrameworkPackagingTests(unittest.TestCase):
                         self.on_set = None
                         self.on_clear = None
                         self.on_error = None
-                    def build(self, state, *, parent, title="", on_set=None, on_clear=None, on_error=None):
+                        self.on_reset = None
+                        self.on_scrub_base = None
+                    def build(
+                        self, state, *, parent, title="", on_set=None, on_clear=None,
+                        on_error=None, on_reset=None, on_scrub_base=None
+                    ):
                         self.on_set = on_set
                         self.on_clear = on_clear
                         self.on_error = on_error
+                        self.on_reset = on_reset
+                        self.on_scrub_base = on_scrub_base
                         return DesignerInspectorPanelBinding(
                             panel={{"alive": True, "parent": parent, "title": title}},
                             rows={{row.key: row.key for row in state.rows}},

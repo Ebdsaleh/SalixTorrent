@@ -1,6 +1,6 @@
 # SalixTorrent Ecosystem Architecture Direction
 
-**Status:** v0.5.1 released; post-v0.5.1 Tranches 1 through 8 are published and Tranche 9 selected-component pointer resizing is the current full-commit Windows-acceptance boundary on `dev`, with its Dear PyGui handle/selection arbitration repaired after the first visual pass
+**Status:** v0.5.1 released; post-v0.5.1 Tranches 1 through 9 are published and Tranche 10 component reset/numeric scrubbing plus modifier-sensitive resize is the current full-commit Windows-acceptance boundary on `dev`
 **Reference release:** SalixTorrent v0.5.1
 **Development branch:** `dev`
 **Purpose:** guide reverse-pyramid extraction from the working SalixTorrent application into a modular application ecosystem without freezing names or public APIs before the boundaries are proven.
@@ -1044,4 +1044,16 @@ The same tranche fixes the remaining Tkinter Inspector width failure observed af
 
 The first Windows automated pass was green at 15 / 15 pointer resize, 292 / 292 designer/relocation, 44 / 44 Tkinter and 902 / 902 on both discovery forms, but visual acceptance exposed a Dear PyGui-only input arbitration defect before commit. The original handle straddled the selected component edge; its outer half could therefore hit the surrounding semantic parent/root, and the ordinary selection callback could refresh the resize surface onto that new target. The repaired DPG adapters share a presentation-only pointer arbiter: the full handle lives inside the selected component, selection occurs on pointer-down and is suppressed for handle-owned presses, and resize drag state freezes the starting stable ID/native item until release. Refresh cannot retarget an active drag.
 
-Three new focused regressions raise the pointer-resize gate to 18 / 18, designer/relocation to 295 / 295 and complete discovery to 905 / 905; live Tkinter remains 44 / 44. The real-Windows visual gate must independently resize the first and second preview Buttons without promoting selection to the root/container, verify one semantic commit/undo per drag, and confirm the Tkinter Inspector action-row repair remains visible. Hierarchy drag/reparent, palette drag/drop, richer composite creation templates, snapping/alignment guides and multi-selection remain separate later stages.
+Three new focused regressions raise the pointer-resize gate to 18 / 18, designer/relocation to 295 / 295 and complete discovery to 905 / 905; live Tkinter remains 44 / 44. Real-Windows acceptance independently resized the first and second preview Buttons without promoting selection to the root/container, verified one semantic commit/undo per drag, and published Tranche 9 at `1870e053c444e2ca390543cb62a721b162f5ff61`. Hierarchy drag/reparent, palette drag/drop, richer composite creation templates, snapping/alignment guides and multi-selection remain separate later stages.
+
+### Designer component reset and shared numeric scrubbing — post-v0.5.1 Tranche 10 full-commit gate
+
+Tranche 10 adds one common manipulation vocabulary rather than separate numeric behaviors per toolkit. Framework-only `designer_numeric_drag.py` maps pointer displacement plus normalized Shift/Ctrl state to a candidate semantic value. Normal motion is 1x, Shift is coarse 10x, Ctrl is fine 0.1x; metadata bounds are applied before the concrete host commits. This helper contains no toolkit or product imports.
+
+The Inspector presenter now exposes two additional host callbacks while retaining workspace ownership. Reset gathers only properties whose current metadata says they can be cleared to Default and executes those clears as one composite checked edit. Numeric scrub hosts ask the presenter for a semantic starting value, use the rendered preview width/height when an unset dimension needs a visible baseline, update only disposable editor feedback during movement, and commit once on release. Required/non-unsettable content is intentionally not fabricated into a default value.
+
+Dear PyGui and Tkinter Inspector adapters expose `<>` handles for integer, number and dimension fields. The same `DesignerDragModifiers` scale is consumed by both selected-component resize adapters, so Inspector scrubbing and direct Preview resizing cannot drift into different modifier conventions.
+
+Tkinter's native `ttk.Sizegrip` is removed from designer resizing. On Windows that widget can participate in toplevel resizing, which is wrong for a component editor. The replacement is a dark ordinary child Frame over the selected component and therefore has no native authority over the application window. Native gesture state remains disposable adapter state; release still resolves into the existing renderer-neutral checked width/height transaction.
+
+The accepted architecture remains `native pointer -> shared numeric translation -> existing semantic property/resize command -> one history step -> preview rebuild`. No separate sizing model, toolkit-owned defaults or product-layer dependency is introduced.

@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from app.engine.designer_preview_pointer_arbiter import DearPyGuiDesignerPreviewPointerArbiter
+from app.framework.designer_numeric_drag import DesignerDragModifiers
 from app.framework.designer_preview_resize import (
     DesignerPreviewResizeBinding,
     DesignerPreviewResizeTarget,
@@ -49,6 +50,22 @@ class DearPyGuiDesignerPreviewResizeHost:
         except TypeError:
             position = dpg.get_mouse_pos()
         return float(position[0]), float(position[1])
+
+    @staticmethod
+    def _modifiers(dpg) -> DesignerDragModifiers:
+        def down(*names):
+            for name in names:
+                key = getattr(dpg, name, None)
+                try:
+                    if key is not None and dpg.is_key_down(key):
+                        return True
+                except Exception:
+                    pass
+            return False
+        return DesignerDragModifiers(
+            shift=down("mvKey_LShift", "mvKey_RShift"),
+            ctrl=down("mvKey_LControl", "mvKey_RControl", "mvKey_Control"),
+        )
 
     @staticmethod
     def _rect(dpg, item):
@@ -190,8 +207,9 @@ class DearPyGuiDesignerPreviewResizeHost:
             if item is None or start_mouse is None or start_size is None:
                 return
             x, y = self._mouse_position(dpg)
-            width = max(self.minimum_width, int(round(start_size[0] + x - start_mouse[0])))
-            height = max(self.minimum_height, int(round(start_size[1] + y - start_mouse[1])))
+            scale = self._modifiers(dpg).scale
+            width = max(self.minimum_width, int(round(start_size[0] + (x - start_mouse[0]) * scale)))
+            height = max(self.minimum_height, int(round(start_size[1] + (y - start_mouse[1]) * scale)))
             try:
                 if dpg.does_item_exist(item):
                     dpg.configure_item(item, width=width, height=height)

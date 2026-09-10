@@ -8,6 +8,11 @@ from app.framework.designer_inspector_panel import (
     format_inspector_editor_value,
     parse_inspector_editor_text,
 )
+from app.framework.designer_numeric_drag import (
+    DesignerDragModifiers,
+    is_scrubbable_row,
+    translate_numeric_drag,
+)
 
 
 class DearPyGuiDesignerInspectorPanelHost:
@@ -78,6 +83,8 @@ class DearPyGuiDesignerInspectorPanelHost:
         metadata["clear_buttons"] = {}
         metadata["none_buttons"] = {}
         metadata["choice_values"] = {}
+        metadata["scrub_handles"] = {}
+        metadata["scrub_rows"] = {}
 
         if not state.has_target:
             dpg.add_text("Select a hierarchy row to inspect its properties.", parent=body)
@@ -86,6 +93,8 @@ class DearPyGuiDesignerInspectorPanelHost:
         on_set = metadata["on_set"]
         on_clear = metadata["on_clear"]
         on_error = metadata["on_error"]
+        on_reset = metadata["on_reset"]
+        on_scrub_base = metadata["on_scrub_base"]
 
         def commit_text(_sender, app_data, user_data):
             row, node_id = user_data
@@ -115,6 +124,17 @@ class DearPyGuiDesignerInspectorPanelHost:
             except Exception as exc:
                 return on_error(node_id, row.key, exc)
             return on_set(node_id, row.key, value)
+
+        reset_enabled = any(row.can_clear for row in state.rows)
+        reset_button = dpg.add_button(
+            label="Reset all to defaults",
+            parent=body,
+            enabled=reset_enabled,
+            user_data=state.node_id,
+            callback=lambda _s, _a, node_id: on_reset(node_id),
+        )
+        metadata["reset_button"] = reset_button
+        dpg.add_separator(parent=body)
 
         with dpg.table(
             parent=body,
@@ -161,13 +181,26 @@ class DearPyGuiDesignerInspectorPanelHost:
                                 callback=commit_choice,
                             )
                         else:
-                            item = dpg.add_input_text(
-                                default_value=str(format_inspector_editor_value(row)),
-                                width=self.editor_width,
-                                on_enter=True,
-                                user_data=(row, state.node_id),
-                                callback=commit_text,
-                            )
+                            if is_scrubbable_row(row):
+                                with dpg.group(horizontal=True):
+                                    item = dpg.add_input_text(
+                                        default_value=str(format_inspector_editor_value(row)),
+                                        width=max(96, self.editor_width - 34),
+                                        on_enter=True,
+                                        user_data=(row, state.node_id),
+                                        callback=commit_text,
+                                    )
+                                    scrub = dpg.add_button(label="<>", width=28)
+                                    metadata["scrub_handles"][row.key] = scrub
+                                    metadata["scrub_rows"][scrub] = (row, state.node_id, item)
+                            else:
+                                item = dpg.add_input_text(
+                                    default_value=str(format_inspector_editor_value(row)),
+                                    width=self.editor_width,
+                                    on_enter=True,
+                                    user_data=(row, state.node_id),
+                                    callback=commit_text,
+                                )
 
                         binding.rows[row.key] = item
 
@@ -215,9 +248,12 @@ class DearPyGuiDesignerInspectorPanelHost:
         on_set,
         on_clear,
         on_error,
+        on_reset,
+        on_scrub_base,
     ) -> DesignerInspectorPanelBinding:
         dpg = self._dpg()
         panel = dpg.add_child_window(parent=parent, border=True, height=self.height)
+        handler_registry = dpg.add_handler_registry()
         title_item = None
         if title:
             title_item = dpg.add_text(str(title), parent=panel)
@@ -234,12 +270,80 @@ class DearPyGuiDesignerInspectorPanelHost:
                 "on_set": on_set,
                 "on_clear": on_clear,
                 "on_error": on_error,
+                "on_reset": on_reset,
+                "on_scrub_base": on_scrub_base,
+                "handler_registry": handler_registry,
+                "scrub_drag": None,
                 "apply_buttons": {},
                 "clear_buttons": {},
                 "none_buttons": {},
                 "choice_values": {},
             },
         )
+        def _mouse_x():
+            try:
+                return float(dpg.get_mouse_pos(local=False)[0])
+            except TypeError:
+                return float(dpg.get_mouse_pos()[0])
+
+        def _mods():
+            def down(name):
+                key = getattr(dpg, name, None)
+                return bool(key is not None and dpg.is_key_down(key))
+            return DesignerDragModifiers(
+                shift=down("mvKey_LShift") or down("mvKey_RShift"),
+                ctrl=down("mvKey_LControl") or down("mvKey_RControl") or down("mvKey_Control"),
+            )
+
+        def scrub_down(_sender=None, _app_data=None, _user_data=None):
+            rows = binding.metadata.get("scrub_rows", {})
+            for handle, data in list(rows.items()):
+                try:
+                    hovered = dpg.does_item_exist(handle) and dpg.is_item_hovered(handle)
+                except Exception:
+                    hovered = False
+                if not hovered:
+                    continue
+                row, node_id, editor = data
+                try:
+                    base = float(on_scrub_base(node_id, row.key))
+                except Exception as exc:
+                    on_error(node_id, row.key, exc)
+                    return
+                binding.metadata["scrub_drag"] = {
+                    "row": row, "node_id": node_id, "editor": editor,
+                    "start_x": _mouse_x(), "base": base, "value": base,
+                }
+                return
+
+        def scrub_move(_sender=None, _app_data=None, _user_data=None):
+            drag = binding.metadata.get("scrub_drag")
+            if not isinstance(drag, dict):
+                return
+            row = drag["row"]
+            value = translate_numeric_drag(row, drag["base"], _mouse_x() - drag["start_x"], _mods())
+            drag["value"] = value
+            text = str(int(value)) if isinstance(value, int) else f"{float(value):g}"
+            try:
+                if dpg.does_item_exist(drag["editor"]):
+                    dpg.set_value(drag["editor"], text)
+            except Exception:
+                pass
+
+        def scrub_release(_sender=None, _app_data=None, _user_data=None):
+            drag = binding.metadata.get("scrub_drag")
+            binding.metadata["scrub_drag"] = None
+            if not isinstance(drag, dict):
+                return
+            try:
+                on_set(drag["node_id"], drag["row"].key, drag["value"])
+            except Exception as exc:
+                on_error(drag["node_id"], drag["row"].key, exc)
+
+        dpg.add_mouse_down_handler(button=dpg.mvMouseButton_Left, callback=scrub_down, parent=handler_registry)
+        dpg.add_mouse_move_handler(callback=scrub_move, parent=handler_registry)
+        dpg.add_mouse_release_handler(button=dpg.mvMouseButton_Left, callback=scrub_release, parent=handler_registry)
+
         self._populate(binding, state)
         return binding
 
@@ -260,6 +364,10 @@ class DearPyGuiDesignerInspectorPanelHost:
         dpg = self._dpg()
         if dpg.does_item_exist(binding.panel):
             dpg.delete_item(binding.panel)
+        if isinstance(binding.metadata, dict):
+            registry = binding.metadata.get("handler_registry")
+            if registry is not None and dpg.does_item_exist(registry):
+                dpg.delete_item(registry)
         binding.rows.clear()
         if isinstance(binding.metadata, dict):
             binding.metadata.clear()

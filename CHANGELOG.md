@@ -4,6 +4,16 @@ Notable SalixTorrent changes are recorded here.
 
 ## Unreleased
 
+### Ecosystem Extraction — Designer Reset + Numeric Scrubbing (post-v0.5.1 Tranche 10)
+
+- Published Tranche 9 at `1870e053c444e2ca390543cb62a721b162f5ff61` after the repaired Dear PyGui handle arbitration passed real-Windows acceptance. The accepted boundary is 18 files / 1,596 insertions / 36 deletions.
+- Added framework-only `app/framework/designer_numeric_drag.py` as a shared sensitivity/translation contract for direct numeric manipulation. Normal drag uses 1x translation, Shift is coarse at 10x, and Ctrl is fine at 0.1x. Integer/dimension fields accumulate fractional fine motion from the drag origin before rounding, while numeric metadata bounds remain authoritative.
+- Added Inspector numeric scrub handles for integer, number and dimension rows. Dragging the `<>` handle updates the editor value horizontally and commits once on release through the existing checked property transaction, so one scrub is one undoable edit rather than a stream of history entries. Default Width/Height scrubs start from the rendered preview size instead of zero.
+- Added a one-click `Reset all to defaults` Inspector action. It clears all currently explicit properties that already expose semantic Default/unset behavior as one `Reset component to defaults` composite history step and one preview rebuild; required/non-unsettable content remains intact because the designer metadata does not define a portable default for it.
+- Reused the same normal/Shift/Ctrl sensitivity contract for the physical preview resize handle on both desktop adapters. Dear PyGui retains the repaired pointer arbitration from Tranche 9.
+- Replaced Tkinter's native `ttk.Sizegrip` with a darker ordinary child `Frame` resize handle positioned inside the selected component. This prevents Windows from treating the designer affordance as a toplevel-window resize grip while preserving the same semantic resize commit path.
+- Added/strengthened regressions for numeric translation, bounds, modifier sensitivity, atomic reset/undo, rendered-default scrub bases, framework relocation, DPG resize sensitivity and Tkinter outer-window geometry stability.
+
 ### Ecosystem Extraction — Designer Pointer Resize Surface (post-v0.5.1 Tranche 9)
 
 - Added framework-only `app/framework/designer_preview_resize.py` as the first direct-manipulation resize coordinator. It projects the currently selected rendered component plus width/height edit capability and commits a completed resize as one checked `Resize component` history transaction through the existing `layout.width` / `layout.height` property contract. Pointer drag state is ephemeral and never enters project persistence.

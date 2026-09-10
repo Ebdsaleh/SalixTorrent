@@ -26,6 +26,8 @@ class FakeInspectorPanelHost:
         self.on_set = None
         self.on_clear = None
         self.on_error = None
+        self.on_reset = None
+        self.on_scrub_base = None
         self.built = []
         self.updated = []
         self.disposed = 0
@@ -34,10 +36,15 @@ class FakeInspectorPanelHost:
     def _row_items(state):
         return {row.key: {"row": row, "alive": True} for row in state.rows}
 
-    def build(self, state, *, parent, title="", on_set=None, on_clear=None, on_error=None):
+    def build(
+        self, state, *, parent, title="", on_set=None, on_clear=None, on_error=None,
+        on_reset=None, on_scrub_base=None,
+    ):
         self.on_set = on_set
         self.on_clear = on_clear
         self.on_error = on_error
+        self.on_reset = on_reset
+        self.on_scrub_base = on_scrub_base
         self.built.append(state)
         self.binding = DesignerInspectorPanelBinding(
             panel={"alive": True, "parent": parent, "title": str(title)},
@@ -384,6 +391,60 @@ class DesignerInspectorPanelTests(unittest.TestCase):
         panel.dispose()
         workspace.close()
 
+
+    def test_reset_to_defaults_clears_all_explicit_resettable_properties_once(self):
+        _, snapshot = self._fixture()
+        workspace = DesignerWorkspace.create(snapshot)
+        workspace.select_and_focus_node("action")
+        host = FakeInspectorPanelHost()
+        panel = DesignerInspectorPanel(workspace, host)
+        panel.build(parent="right")
+        before_depth = workspace.session.undo_depth
+        self.assertTrue(host.on_reset("action"))
+        state = workspace.inspector_state()
+        for key in ("layout.width", "layout.height", "layout.spacing"):
+            self.assertFalse(state.row(key).is_set)
+        self.assertEqual(before_depth + 1, workspace.session.undo_depth)
+        self.assertEqual("Reset component to defaults", workspace.state.undo_label)
+        self.assertTrue(workspace.undo())
+        self.assertEqual(120, workspace.inspector_state().row("layout.width").value)
+        panel.dispose()
+        workspace.close()
+
+    def test_reset_noop_when_selected_component_already_uses_defaults(self):
+        root = ControlColumn((Button("Run"),))
+        ids = DesignerIdentityMap(prefix="reset-default")
+        ids.bind(root, "root")
+        ids.bind(root.children[0], "action")
+        workspace = DesignerWorkspace.create(capture_component_tree(root, identities=ids))
+        workspace.select_and_focus_node("action")
+        host = FakeInspectorPanelHost()
+        panel = DesignerInspectorPanel(workspace, host)
+        panel.build(parent="right")
+        # Label is explicit constructor data, so clear it first; subsequent reset is a no-op.
+        if workspace.inspector_state().row("label").can_clear:
+            panel.clear_value("label")
+        depth = workspace.session.undo_depth
+        self.assertFalse(panel.reset_to_defaults())
+        self.assertEqual(depth, workspace.session.undo_depth)
+        panel.dispose()
+        workspace.close()
+
+    def test_scrub_base_uses_rendered_default_dimensions_and_explicit_values(self):
+        root = ControlColumn((Button("Run"),))
+        ids = DesignerIdentityMap(prefix="scrub-base")
+        ids.bind(root, "root")
+        ids.bind(root.children[0], "action")
+        workspace = DesignerWorkspace.create(capture_component_tree(root, identities=ids))
+        workspace.select_and_focus_node("action")
+        host = FakeInspectorPanelHost()
+        panel = DesignerInspectorPanel(workspace, host)
+        panel.build(parent="right")
+        self.assertEqual(120.0, host.on_scrub_base("action", "layout.width"))
+        panel.set_value("layout.width", 196)
+        self.assertEqual(196.0, host.on_scrub_base("action", "layout.width"))
+        panel.dispose()
+        workspace.close()
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

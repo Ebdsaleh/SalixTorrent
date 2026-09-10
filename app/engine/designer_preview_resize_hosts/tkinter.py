@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from app.engine.component_renderers.tkinter import TkinterRenderer
+from app.framework.designer_numeric_drag import DesignerDragModifiers
 from app.framework.designer_preview_resize import (
     DesignerPreviewResizeBinding,
     DesignerPreviewResizeTarget,
@@ -12,7 +13,7 @@ from app.framework.designer_preview_resize import (
 
 
 class TkinterDesignerPreviewResizeHost:
-    """Place one native ``ttk.Sizegrip`` over the selected component."""
+    """Place one designer-owned dark resize handle over the selected component."""
 
     def __init__(self, renderer: TkinterRenderer, *, handle_size: int = 12, minimum_width: int = 24, minimum_height: int = 20):
         if not isinstance(renderer, TkinterRenderer):
@@ -55,8 +56,8 @@ class TkinterDesignerPreviewResizeHost:
             return
         try:
             target.update_idletasks()
-            x = int(target.winfo_rootx() - parent.winfo_rootx() + target.winfo_width() - self.handle_size // 2)
-            y = int(target.winfo_rooty() - parent.winfo_rooty() + target.winfo_height() - self.handle_size // 2)
+            x = int(target.winfo_rootx() - parent.winfo_rootx() + target.winfo_width() - self.handle_size - 1)
+            y = int(target.winfo_rooty() - parent.winfo_rooty() + target.winfo_height() - self.handle_size - 1)
             handle.place(x=max(0, x), y=max(0, y), width=self.handle_size, height=self.handle_size)
             handle.lift()
         except Exception:
@@ -74,12 +75,21 @@ class TkinterDesignerPreviewResizeHost:
     ) -> DesignerPreviewResizeBinding:
         if not callable(on_resize):
             raise TypeError("designer preview resize on_resize callback must be callable")
-        from tkinter import ttk
+        import tkinter as tk
 
         parent_widget = self.renderer.content_widget(parent)
         if parent_widget is None:
             raise RuntimeError("Tkinter designer preview resize parent has no widget")
-        handle = ttk.Sizegrip(parent_widget)
+        # A ttk.Sizegrip participates in native toplevel resizing on Windows.
+        # The designer handle must be an ordinary child widget so it can only
+        # manipulate the selected semantic component.
+        handle = tk.Frame(
+            parent_widget,
+            background="#555555",
+            highlightbackground="#2f2f2f",
+            highlightthickness=1,
+            cursor="sizing",
+        )
         metadata = {
             "target": target,
             "item": self._target_item(target),
@@ -88,6 +98,7 @@ class TkinterDesignerPreviewResizeHost:
             "on_resize": on_resize,
             "dragging": False,
             "start_mouse": None,
+            "start_local": None,
             "start_size": None,
             "draft_size": None,
         }
@@ -103,6 +114,7 @@ class TkinterDesignerPreviewResizeHost:
                 return
             metadata["dragging"] = True
             metadata["start_mouse"] = (int(event.x_root), int(event.y_root))
+            metadata["start_local"] = (int(event.x), int(event.y))
             metadata["start_size"] = (int(width), int(height))
             metadata["draft_size"] = (int(width), int(height))
 
@@ -112,10 +124,27 @@ class TkinterDesignerPreviewResizeHost:
             item = metadata.get("item")
             start_mouse = metadata.get("start_mouse")
             start_size = metadata.get("start_size")
+            start_local = metadata.get("start_local")
             if item is None or start_mouse is None or start_size is None:
                 return
-            width = max(self.minimum_width, int(start_size[0] + int(event.x_root) - start_mouse[0]))
-            height = max(self.minimum_height, int(start_size[1] + int(event.y_root) - start_mouse[1]))
+            mods = DesignerDragModifiers(
+                shift=bool(int(event.state) & 0x0001),
+                ctrl=bool(int(event.state) & 0x0004),
+            )
+            scale = mods.scale
+            dx = int(event.x_root) - start_mouse[0]
+            dy = int(event.y_root) - start_mouse[1]
+            # Tk synthetic events used by tests may not advance x_root/y_root;
+            # local coordinates still model the same pointer displacement.
+            if start_local is not None:
+                local_dx = int(event.x) - start_local[0]
+                local_dy = int(event.y) - start_local[1]
+                if dx == 0 and local_dx != 0:
+                    dx = local_dx
+                if dy == 0 and local_dy != 0:
+                    dy = local_dy
+            width = max(self.minimum_width, int(round(start_size[0] + dx * scale)))
+            height = max(self.minimum_height, int(round(start_size[1] + dy * scale)))
             self.renderer.configure(item, width=width, height=height)
             metadata["draft_size"] = (width, height)
             self._position_handle(binding)
@@ -129,6 +158,7 @@ class TkinterDesignerPreviewResizeHost:
             draft_size = metadata.get("draft_size") or start_size
             metadata["dragging"] = False
             metadata["start_mouse"] = None
+            metadata["start_local"] = None
             metadata["start_size"] = None
             metadata["draft_size"] = None
             if current is None or draft_size is None:
@@ -163,6 +193,7 @@ class TkinterDesignerPreviewResizeHost:
         binding.metadata["item"] = self._target_item(target)
         binding.metadata["dragging"] = False
         binding.metadata["start_mouse"] = None
+        binding.metadata["start_local"] = None
         binding.metadata["start_size"] = None
         binding.metadata["draft_size"] = None
         binding.target = binding.metadata["item"]

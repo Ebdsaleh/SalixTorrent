@@ -63,6 +63,10 @@ class _NativePreviewComponent:
 
 class _FakeDearPyGui:
     mvMouseButton_Left = 0
+    mvKey_LShift = 1
+    mvKey_RShift = 2
+    mvKey_LControl = 3
+    mvKey_RControl = 4
 
     def __init__(self):
         self._next = 100
@@ -75,6 +79,7 @@ class _FakeDearPyGui:
         self.mouse_release = []
         self.drawn = {}
         self.configured = []
+        self.keys_down = set()
 
     def _id(self):
         self._next += 1
@@ -122,6 +127,9 @@ class _FakeDearPyGui:
 
     def is_item_hovered(self, item):
         return item in self.hovered
+
+    def is_key_down(self, key):
+        return key in self.keys_down
 
     def configure_item(self, item, **kwargs):
         self.configured.append((item, dict(kwargs)))
@@ -435,6 +443,44 @@ class DesignerPreviewResizeTests(unittest.TestCase):
         self.assertIn("DearPyGuiDesignerPreviewPointerArbiter", example)
         self.assertIn("pointer_arbiter=preview_pointer_arbiter", example)
 
+    def test_dpg_resize_drag_respects_shift_and_ctrl_sensitivity(self):
+        dpg = _FakeDearPyGui()
+        item = 2
+        dpg.rects[item] = ((0.0, 0.0), (120.0, 28.0))
+        host = DearPyGuiDesignerPreviewResizeHost()
+        host._dpg = lambda: dpg
+        resized = []
+        binding = host.build(
+            DesignerPreviewResizeTarget(
+                "action", _NativePreviewComponent(item), 120, 28, True, True
+            ),
+            parent="preview",
+            on_resize=lambda node_id, width, height: resized.append((node_id, width, height)) or True,
+        )
+        left, top, right, bottom = binding.metadata["handle_bounds"]
+        dpg.mouse = ((left + right) / 2.0, (top + bottom) / 2.0)
+        dpg.mouse_down[0]()
+        dpg.keys_down = {dpg.mvKey_LShift}
+        dpg.mouse = (dpg.mouse[0] + 2.0, dpg.mouse[1] + 1.0)
+        dpg.mouse_move[0]()
+        self.assertEqual((140.0, 38.0), (dpg.rects[item][1][0], dpg.rects[item][1][1]))
+        dpg.keys_down.clear()
+        dpg.mouse_release[0]()
+        self.assertEqual(("action", 140, 38), resized[-1])
+
+        # A fresh drag with Ctrl translates ten pointer pixels into one pixel.
+        dpg.rects[item] = ((0.0, 0.0), (120.0, 28.0))
+        host.update(binding, DesignerPreviewResizeTarget(
+            "action", _NativePreviewComponent(item), 120, 28, True, True
+        ))
+        left, top, right, bottom = binding.metadata["handle_bounds"]
+        dpg.mouse = ((left + right) / 2.0, (top + bottom) / 2.0)
+        dpg.mouse_down[0]()
+        dpg.keys_down = {dpg.mvKey_LControl}
+        dpg.mouse = (dpg.mouse[0] + 10.0, dpg.mouse[1])
+        dpg.mouse_move[0]()
+        self.assertEqual(121.0, dpg.rects[item][1][0])
+
     def test_concrete_hosts_keep_pointer_mechanics_outside_framework(self):
         dpg = (
             PROJECT_ROOT / "app" / "engine" / "designer_preview_resize_hosts" / "dearpygui.py"
@@ -446,7 +492,8 @@ class DesignerPreviewResizeTests(unittest.TestCase):
         self.assertIn("add_mouse_move_handler", dpg)
         self.assertIn("add_mouse_release_handler", dpg)
         self.assertIn("draw_rectangle", dpg)
-        self.assertIn("ttk.Sizegrip", tkinter)
+        self.assertIn("tk.Frame", tkinter)
+        self.assertNotIn("ttk.Sizegrip(", tkinter)
         self.assertIn('"<B1-Motion>"', tkinter)
         self.assertNotIn("SetDesignerProperty", dpg)
         self.assertNotIn("SetDesignerProperty", tkinter)

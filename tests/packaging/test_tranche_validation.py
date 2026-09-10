@@ -34,6 +34,7 @@ class TrancheValidationScriptTests(unittest.TestCase):
         self.assertIn("tests.presentation.test_designer_shell_shortcuts", self.runner_source)
         self.assertIn("tests.presentation.test_designer_preview_sizing", self.runner_source)
         self.assertIn("tests.presentation.test_designer_preview_resize", self.runner_source)
+        self.assertIn("tests.presentation.test_designer_numeric_drag", self.runner_source)
         self.assertIn("tests.presentation.test_structural_migration", self.runner_source)
         self.assertIn("tests.presentation.test_designer_clipboard", self.runner_source)
         self.assertIn("tests.presentation.test_designer_selection", self.runner_source)
@@ -55,7 +56,7 @@ class TrancheValidationScriptTests(unittest.TestCase):
         self.assertIn('"compileall", "-q", "app", "tests", "examples"', self.runner_source)
         self.assertIn('("git", "rev-parse", "origin/dev")', self.runner_source)
         self.assertIn('("git", "diff", "--check")', self.runner_source)
-        self.assertIn("DISCOVERY_TEST_COUNT = 905", self.runner_source)
+        self.assertIn("DISCOVERY_TEST_COUNT = 921", self.runner_source)
         self.assertIn("TRANCHE VALIDATION PASSED", self.runner_source)
         self.assertIn("TRANCHE VALIDATION FAILED", self.runner_source)
 

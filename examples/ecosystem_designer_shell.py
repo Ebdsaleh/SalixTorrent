@@ -172,7 +172,7 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
         layout=ControlLayout(width=FILL, height=520),
     )
     chrome = ControlColumn((
-        Label("Designer Shell Surface — post-v0.5.1 Tranche 9"),
+        Label("Designer Shell Surface — post-v0.5.1 Tranche 10"),
         Button("Designer Commands", callback=show_commands),
         status,
         workspace_split,

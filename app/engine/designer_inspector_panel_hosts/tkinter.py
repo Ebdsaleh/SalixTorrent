@@ -9,6 +9,11 @@ from app.framework.designer_inspector_panel import (
     format_inspector_editor_value,
     parse_inspector_editor_text,
 )
+from app.framework.designer_numeric_drag import (
+    DesignerDragModifiers,
+    is_scrubbable_row,
+    translate_numeric_drag,
+)
 
 
 class TkinterDesignerInspectorPanelHost:
@@ -104,6 +109,7 @@ class TkinterDesignerInspectorPanelHost:
         metadata["clear_buttons"] = {}
         metadata["none_buttons"] = {}
         metadata["choice_values"] = {}
+        metadata["scrub_handles"] = {}
 
         if not state.has_target:
             ttk.Label(inner, text="Select a hierarchy row to inspect its properties.").grid(
@@ -115,6 +121,8 @@ class TkinterDesignerInspectorPanelHost:
         on_set = metadata["on_set"]
         on_clear = metadata["on_clear"]
         on_error = metadata["on_error"]
+        on_reset = metadata["on_reset"]
+        on_scrub_base = metadata["on_scrub_base"]
 
         def defer(callback):
             self.renderer.root.after_idle(callback)
@@ -144,15 +152,26 @@ class TkinterDesignerInspectorPanelHost:
 
             defer(perform)
 
+        reset_enabled = any(row.can_clear for row in state.rows)
+        reset_button = ttk.Button(
+            inner,
+            text="Reset all to defaults",
+            command=lambda n=state.node_id: defer(lambda: on_reset(n)),
+        )
+        if not reset_enabled:
+            reset_button.state(["disabled"])
+        reset_button.grid(row=0, column=0, columnspan=2, sticky="w", padx=4, pady=(2, 4))
+        metadata["reset_button"] = reset_button
+
         # Keep the editor column useful even in a narrow inspector, but put
         # actions on a second row instead of a third horizontal column.  The
         # earlier three-column form could place Apply/None/Default beyond the
         # visible canvas width even though the editor itself was correctly
         # stabilized after refresh.
         inner.columnconfigure(0, minsize=92)
-        inner.columnconfigure(1, weight=1, minsize=140)
+        inner.columnconfigure(1, weight=1, minsize=180)
         for index, row in enumerate(state.rows):
-            field_row = index * 2
+            field_row = 2 + index * 2
             action_row = field_row + 1
             label = row.label
             if not row.is_set:
@@ -197,13 +216,55 @@ class TkinterDesignerInspectorPanelHost:
                 metadata["variables"][row.key] = variable
             else:
                 variable = tk.StringVar(value=str(format_inspector_editor_value(row)))
-                item = ttk.Entry(inner, textvariable=variable)
-                item.grid(row=field_row, column=1, sticky="ew", pady=(3, 1))
+                editor_frame = ttk.Frame(inner)
+                editor_frame.grid(row=field_row, column=1, sticky="ew", pady=(3, 1))
+                editor_frame.columnconfigure(0, weight=1)
+                item = ttk.Entry(editor_frame, textvariable=variable)
+                item.grid(row=0, column=0, sticky="ew")
                 item.bind(
                     "<Return>",
                     lambda _event, r=row, n=state.node_id, v=variable: commit_text(r, n, v),
                     add="+",
                 )
+                if is_scrubbable_row(row):
+                    scrub = tk.Label(
+                        editor_frame, text="<>", width=3, relief="raised",
+                        background="#555555", foreground="#f0f0f0", cursor="sb_h_double_arrow",
+                    )
+                    scrub.grid(row=0, column=1, padx=(4, 0))
+                    metadata["scrub_handles"][row.key] = scrub
+                    drag = {"start_x": None, "base": None, "value": None}
+
+                    def scrub_press(event, r=row, n=state.node_id, d=drag):
+                        try:
+                            d["base"] = float(on_scrub_base(n, r.key))
+                            d["value"] = d["base"]
+                            d["start_x"] = int(event.x_root)
+                        except Exception as exc:
+                            on_error(n, r.key, exc)
+
+                    def scrub_move(event, r=row, v=variable, d=drag):
+                        if d.get("start_x") is None or d.get("base") is None:
+                            return
+                        mods = DesignerDragModifiers(
+                            shift=bool(int(event.state) & 0x0001),
+                            ctrl=bool(int(event.state) & 0x0004),
+                        )
+                        value = translate_numeric_drag(
+                            r, d["base"], int(event.x_root) - d["start_x"], mods
+                        )
+                        d["value"] = value
+                        v.set(str(int(value)) if isinstance(value, int) else f"{float(value):g}")
+
+                    def scrub_release(_event, r=row, n=state.node_id, d=drag):
+                        value = d.get("value")
+                        d["start_x"] = d["base"] = d["value"] = None
+                        if value is not None:
+                            defer(lambda: on_set(n, r.key, value))
+
+                    scrub.bind("<ButtonPress-1>", scrub_press, add="+")
+                    scrub.bind("<B1-Motion>", scrub_move, add="+")
+                    scrub.bind("<ButtonRelease-1>", scrub_release, add="+")
                 apply_button = ttk.Button(
                     actions,
                     text="Apply",
@@ -261,6 +322,8 @@ class TkinterDesignerInspectorPanelHost:
         on_set,
         on_clear,
         on_error,
+        on_reset,
+        on_scrub_base,
     ) -> DesignerInspectorPanelBinding:
         import tkinter as tk
         from tkinter import ttk
@@ -315,6 +378,8 @@ class TkinterDesignerInspectorPanelHost:
                 "on_set": on_set,
                 "on_clear": on_clear,
                 "on_error": on_error,
+                "on_reset": on_reset,
+                "on_scrub_base": on_scrub_base,
                 "variables": {},
                 "apply_buttons": {},
                 "clear_buttons": {},

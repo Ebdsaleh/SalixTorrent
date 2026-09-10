@@ -1111,8 +1111,15 @@ class TkinterBackendLiveTests(unittest.TestCase):
             TkinterDesignerPreviewResizeHost(self.renderer),
         )
         binding = surface.build(parent=preview_parent.require_item())
+        # The replacement designer handle is an ordinary child widget rather
+        # than ttk.Sizegrip. Map the test window so synthetic pointer events are
+        # delivered, and prove the outer window geometry remains unchanged.
+        self.root.deiconify()
         self.root.update()
+        root_size = (self.root.winfo_width(), self.root.winfo_height())
         handle = binding.metadata["handle"]
+        self.assertEqual("Frame", handle.winfo_class())
+        self.assertEqual("#555555", handle.cget("background"))
         self.assertTrue(handle.winfo_manager())
         start_width = int(surface.target.width)
         start_height = int(surface.target.height)
@@ -1127,6 +1134,7 @@ class TkinterBackendLiveTests(unittest.TestCase):
         self.assertGreaterEqual(workspace.session.node("action").properties["layout.width"], start_width + 30)
         self.assertGreaterEqual(workspace.session.node("action").properties["layout.height"], start_height + 10)
         self.assertEqual("action", workspace.state.selected_id)
+        self.assertEqual(root_size, (self.root.winfo_width(), self.root.winfo_height()))
         self.assertTrue(surface.dispose())
         self.assertTrue(workspace.close())
 
