@@ -13,9 +13,16 @@ from app.framework.designer_inspector_panel import (
 class DearPyGuiDesignerInspectorPanelHost:
     """Render inspector rows as disposable Dear PyGui editor bindings."""
 
-    def __init__(self, *, height: int = 420, label_width: int = 118):
+    def __init__(
+        self,
+        *,
+        height: int = 420,
+        label_width: int = 118,
+        editor_width: int = 170,
+    ):
         self.height = max(100, int(height))
         self.label_width = max(72, int(label_width))
+        self.editor_width = max(120, int(editor_width))
 
     @staticmethod
     def _dpg():
@@ -131,7 +138,7 @@ class DearPyGuiDesignerInspectorPanelHost:
                         label += "  · None"
                     dpg.add_text(label)
 
-                    with dpg.group(horizontal=True):
+                    with dpg.group(horizontal=False):
                         if not row.can_edit:
                             item = dpg.add_text(self._display_value(row))
                         elif row.editor is DesignerInspectorEditorKind.TOGGLE:
@@ -149,41 +156,55 @@ class DearPyGuiDesignerInspectorPanelHost:
                             item = dpg.add_combo(
                                 choices,
                                 default_value=current,
-                                width=-1,
+                                width=self.editor_width,
                                 user_data=(row, state.node_id, values),
                                 callback=commit_choice,
                             )
                         else:
                             item = dpg.add_input_text(
                                 default_value=str(format_inspector_editor_value(row)),
-                                width=-1,
+                                width=self.editor_width,
                                 on_enter=True,
                                 user_data=(row, state.node_id),
                                 callback=commit_text,
                             )
-                            apply_button = dpg.add_button(
-                                label="Apply",
-                                user_data=(row, state.node_id, item),
-                                callback=apply_text,
-                            )
-                            metadata["apply_buttons"][row.key] = apply_button
 
                         binding.rows[row.key] = item
 
-                        if row.nullable and row.can_edit:
-                            none_button = dpg.add_button(
-                                label="None",
-                                user_data=(state.node_id, row.key),
-                                callback=lambda _s, _a, data: on_set(data[0], data[1], None),
-                            )
-                            metadata["none_buttons"][row.key] = none_button
-                        if row.can_clear:
-                            clear_button = dpg.add_button(
-                                label="Default",
-                                user_data=(state.node_id, row.key),
-                                callback=lambda _s, _a, data: on_clear(data[0], data[1]),
-                            )
-                            metadata["clear_buttons"][row.key] = clear_button
+                        if row.can_edit and (
+                            row.editor not in {
+                                DesignerInspectorEditorKind.TOGGLE,
+                                DesignerInspectorEditorKind.CHOICE,
+                            }
+                            or row.nullable
+                            or row.can_clear
+                        ):
+                            with dpg.group(horizontal=True):
+                                if row.editor not in {
+                                    DesignerInspectorEditorKind.TOGGLE,
+                                    DesignerInspectorEditorKind.CHOICE,
+                                }:
+                                    apply_button = dpg.add_button(
+                                        label="Apply",
+                                        user_data=(row, state.node_id, item),
+                                        callback=apply_text,
+                                    )
+                                    metadata["apply_buttons"][row.key] = apply_button
+
+                                if row.nullable:
+                                    none_button = dpg.add_button(
+                                        label="None",
+                                        user_data=(state.node_id, row.key),
+                                        callback=lambda _s, _a, data: on_set(data[0], data[1], None),
+                                    )
+                                    metadata["none_buttons"][row.key] = none_button
+                                if row.can_clear:
+                                    clear_button = dpg.add_button(
+                                        label="Default",
+                                        user_data=(state.node_id, row.key),
+                                        callback=lambda _s, _a, data: on_clear(data[0], data[1]),
+                                    )
+                                    metadata["clear_buttons"][row.key] = clear_button
 
     def build(
         self,

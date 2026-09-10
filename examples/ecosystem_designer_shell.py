@@ -27,6 +27,7 @@ from app.framework.components import (
     ControlLayout,
     FILL,
     Label,
+    SectionPanel,
     SplitOrientation,
     SplitPane,
     SplitPanel,
@@ -83,7 +84,7 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
 
     layout_coordinator = LayoutCoordinator(host.presentation.layout_host)
     holder = {}
-    status = Label("Select/click the preview, edit properties, place components, or use structural commands/shortcuts.")
+    status = Label("Select/click the preview, edit properties/sizes, place components, or use structural commands/shortcuts.")
     palette_parent = ControlColumn(layout=ControlLayout(width=FILL, height=FILL))
     placement_parent = ControlColumn(layout=ControlLayout(width=FILL, height=FILL))
     hierarchy_parent = ControlColumn(layout=ControlLayout(width=FILL, height=FILL))
@@ -124,7 +125,18 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
         coordinator=layout_coordinator,
         layout=ControlLayout(width=FILL, height=FILL),
     )
-    preview_parent = ControlColumn(layout=ControlLayout(width=FILL, height=FILL))
+    # Use a structural child-window-backed preview mount rather than a fill-sized
+    # ControlColumn/group. Dear PyGui groups propagate their width policy to
+    # descendants, so a FILL group can make otherwise explicitly sized preview
+    # controls consume the entire pane. SectionPanel keeps the pane extent
+    # separate from child-control sizing on both desktop backends.
+    preview_parent = SectionPanel(
+        "Preview",
+        (),
+        separated=False,
+        border=False,
+        layout=ControlLayout(width=FILL, height=FILL),
+    )
     inspector_parent = ControlColumn(layout=ControlLayout(width=FILL, height=FILL))
 
     def show_commands(_event=None):
@@ -141,7 +153,7 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
             ),
             SplitPane(
                 "preview",
-                ControlColumn((Label("Preview"), preview_parent)),
+                preview_parent,
                 weight=0.44,
                 minimum=380,
                 border=False,
@@ -159,7 +171,7 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
         layout=ControlLayout(width=FILL, height=520),
     )
     chrome = ControlColumn((
-        Label("Designer Shell Surface — post-v0.5.1 Tranche 7"),
+        Label("Designer Shell Surface — post-v0.5.1 Tranche 8"),
         Button("Designer Commands", callback=show_commands),
         status,
         workspace_split,

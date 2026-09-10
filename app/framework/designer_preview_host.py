@@ -48,6 +48,7 @@ from .designer_preview import (
     DesignerPreviewCatalog,
     DesignerPreviewContext,
     FRAMEWORK_DESIGNER_PREVIEW_CATALOG,
+    designer_preview_component_profile,
     reconstruct_designer_snapshot,
 )
 from .designer_structure import (
@@ -63,6 +64,62 @@ if TYPE_CHECKING:
 
 class DesignerPreviewHostError(RuntimeError):
     """Raised when a preview host cannot complete a replacement transaction."""
+
+
+class _DesignerPreviewRenderer:
+    """Delegate rendering while carrying a preview-only component profile.
+
+    Components bind this small renderer view, so later ``dispose``/``measure``/
+    ``configure`` operations continue to reach the concrete backend without
+    mutating its application-level profile.
+    """
+
+    def __init__(self, renderer: ComponentRenderer):
+        self._renderer = renderer
+        self.component_profile = designer_preview_component_profile(
+            renderer.component_profile
+        )
+
+    def set_component_profile(self, profile) -> None:
+        self.component_profile = profile
+
+    def create(self, kind: str, **kwargs):
+        return self._renderer.create(kind, **kwargs)
+
+    def container(self, kind: str, **kwargs):
+        return self._renderer.container(kind, **kwargs)
+
+    def get_value(self, item):
+        return self._renderer.get_value(item)
+
+    def set_value(self, item, value) -> None:
+        self._renderer.set_value(item, value)
+
+    def configure(self, item, **kwargs) -> None:
+        self._renderer.configure(item, **kwargs)
+
+    def place(self, item, x: int, y: int) -> None:
+        self._renderer.place(item, x, y)
+
+    def measure(self, item):
+        return self._renderer.measure(item)
+
+    def exists(self, item) -> bool:
+        return self._renderer.exists(item)
+
+    def destroy(self, item) -> None:
+        self._renderer.destroy(item)
+
+    def event_callback(self, source, event_type, callback, *, data=None):
+        return self._renderer.event_callback(
+            source, event_type, callback, data=data
+        )
+
+    def center(self, item, *, fallback_size=None) -> None:
+        self._renderer.center(item, fallback_size=fallback_size)
+
+    def attach_tooltip(self, item, text: str, *, wrap: int = 450):
+        return self._renderer.attach_tooltip(item, text, wrap=wrap)
 
 
 @dataclass(frozen=True)
@@ -304,7 +361,10 @@ class DesignerPreviewHost:
         if self.renderer is None:
             return candidate
         try:
-            candidate.root.build(renderer=self.renderer, parent=self.parent)
+            build_renderer = self.renderer
+            if self.context.use_preview_control_defaults:
+                build_renderer = _DesignerPreviewRenderer(self.renderer)
+            candidate.root.build(renderer=build_renderer, parent=self.parent)
             return candidate
         except Exception:
             # Container roots own their rendered descendants, so disposing a

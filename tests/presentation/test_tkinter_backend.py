@@ -865,6 +865,42 @@ class TkinterBackendLiveTests(unittest.TestCase):
         self.assertTrue(surface.dispose())
         self.assertTrue(workspace.close())
 
+    def test_designer_preview_defaults_and_explicit_resize_render_real_tkinter(self):
+        from app.framework.designer import DesignerIdentityMap, capture_component_tree
+
+        action = Button("Run")
+        root = ControlColumn((action,))
+        identities = DesignerIdentityMap(prefix="tk-preview-size")
+        identities.bind(root, "root")
+        identities.bind(action, "action")
+        workspace = DesignerWorkspace(
+            DesignerProjectFile.create(capture_component_tree(root, identities=identities)),
+            context=DesignerPreviewContext(
+                layout_coordinator=LayoutCoordinator(TkinterLayoutHost(self.renderer))
+            ),
+            renderer=self.renderer,
+        )
+        workspace.select_and_focus_node("action")
+        self.root.update_idletasks()
+        item = workspace.preview_host.selected_component.require_item()
+        self.assertEqual(120, int(item.mount.cget("width")))
+        self.assertEqual(28, int(item.mount.cget("height")))
+
+        self.assertTrue(workspace.set_selected_property("layout.width", 196))
+        self.assertTrue(workspace.set_selected_property("layout.height", 36))
+        self.root.update_idletasks()
+        item = workspace.preview_host.selected_component.require_item()
+        self.assertEqual(196, int(item.mount.cget("width")))
+        self.assertEqual(36, int(item.mount.cget("height")))
+
+        self.assertTrue(workspace.clear_selected_property("layout.width"))
+        self.assertTrue(workspace.clear_selected_property("layout.height"))
+        self.root.update_idletasks()
+        item = workspace.preview_host.selected_component.require_item()
+        self.assertEqual(120, int(item.mount.cget("width")))
+        self.assertEqual(28, int(item.mount.cget("height")))
+        self.assertTrue(workspace.close())
+
     def test_designer_inspector_panel_presents_real_tkinter_editors_and_dispatches(self):
         from app.framework.designer import DesignerIdentityMap, capture_component_tree
 
@@ -905,6 +941,17 @@ class TkinterBackendLiveTests(unittest.TestCase):
         binding.metadata["clear_buttons"]["layout.width"].invoke()
         self.root.update()
         self.assertFalse(workspace.state.inspector.row("layout.width").is_set)
+        self.assertGreaterEqual(binding.rows["layout.height"].winfo_width(), 120)
+
+        binding.metadata["clear_buttons"]["layout.height"].invoke()
+        self.root.update()
+        self.assertFalse(workspace.state.inspector.row("layout.height").is_set)
+        self.assertGreaterEqual(binding.rows["layout.spacing"].winfo_width(), 120)
+
+        binding.metadata["clear_buttons"]["layout.spacing"].invoke()
+        self.root.update()
+        self.assertFalse(workspace.state.inspector.row("layout.spacing").is_set)
+        self.assertGreaterEqual(binding.rows["label"].winfo_width(), 120)
 
         enabled_var = binding.metadata["variables"]["enabled"]
         self.assertTrue(bool(enabled_var.get()))

@@ -1,6 +1,6 @@
 # SalixTorrent Ecosystem Architecture Direction
 
-**Status:** v0.5.1 released; post-v0.5.1 Tranches 1 through 6 are published and Tranche 7 selected-node structural commands/shortcuts are the current full-commit Windows-acceptance boundary on `dev`
+**Status:** v0.5.1 released; post-v0.5.1 Tranches 1 through 7 are published and Tranche 8 designer preview sizing/explicit resize controls are the current full-commit Windows-acceptance boundary on `dev`
 **Reference release:** SalixTorrent v0.5.1
 **Development branch:** `dev`
 **Purpose:** guide reverse-pyramid extraction from the working SalixTorrent application into a modular application ecosystem without freezing names or public APIs before the boundaries are proven.
@@ -1022,4 +1022,14 @@ The next surface makes existing structural semantics easier to exercise without 
 
 The designer-shell proof also treats Components / Placement / Hierarchy as a nested vertical `SplitPanel`. That gives those surfaces explicit non-overlapping extents on Dear PyGui rather than relying on a flow group to clip independently scrollable children, while preserving the same backend-neutral composition on Tkinter. Within the Dear PyGui Placement host, field captions and editors use explicit horizontal rows with conservative fixed editor widths. This avoids both Dear PyGui's trailing-label geometry and Windows table-cell fill-width behavior from placing Placement content outside the bounded pane.
 
-Preparation passes 16 / 16 focused tests, 264 / 264 designer/relocation tests, 64 / 64 GUI components and complete discovery at **871 / 871**. Real-Windows Tkinter 41 / 41 plus Dear PyGui/Tkinter designer smoke remain authoritative before the full-commit publication. Drag/drop itself is still deferred deliberately.
+Real-Windows acceptance passed 16 / 16 focused tests, 264 / 264 designer/relocation tests, 64 / 64 GUI components, 41 / 41 Tkinter and both complete discovery forms at **871 / 871** with one expected skip. The corrected Dear PyGui sidebar/Placement geometry was accepted and the tranche is published at `8d1d241538e6beb2849994e4187bc940b1d17f20`. Drag/drop itself is still deferred deliberately.
+
+### Designer preview sizing and explicit resize controls — post-v0.5.1 Tranche 8 full-commit gate
+
+Visual preview sizing is now treated as editor presentation policy rather than accidental backend behavior. `DesignerPreviewHost` layers a preview-only `ComponentLayoutProfile` over the renderer's active profile while it builds reconstructed components. Generic controls receive deterministic human-scale defaults in the preview, but the renderer's application profile remains untouched, custom named profile keys continue to resolve through the parent profile, and explicit snapshot `layout.width` / `layout.height` values — including `fill` — remain authoritative. Because the defaults live only in the renderer view, recapture/project serialization does not invent size properties or dirty/history entries.
+
+The Inspector remains the semantic resize owner. Dear PyGui's concrete inspector host now keeps its editors bounded and places Apply / None / Default controls on a separate action line, avoiding the same constrained-cell fill geometry seen earlier in Placement. A width or height edit still routes `Inspector -> DesignerWorkspace -> DesignerPreviewHost checked edit -> immutable snapshot/history -> reconstructed preview`; clearing the property returns to the preview default. This creates a usable explicit resize path before pointer handles exist.
+
+Windows visual acceptance additionally proved that semantic sizing alone is insufficient if the toolkit mount itself leaks sizing policy. The designer proof therefore uses a child-window-backed preview mount instead of a fill-sized Dear PyGui group, so container extent cannot override reconstructed control size. Tkinter inspector refreshes explicitly preserve the canvas-window width and a minimum editor column across Default/None rebuilds.
+
+Tranche 8 adds 13 focused sizing regressions and raises the designer/relocation, live Tkinter and complete-discovery expectations to 277, 42 and 885 respectively. Mouse resize handles are intentionally deferred until Windows proves these defaults and explicit edits. When added, a handle must be gesture/presentation state only and must commit through this same width/height contract.

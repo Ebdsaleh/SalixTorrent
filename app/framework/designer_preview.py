@@ -41,7 +41,8 @@ from .components.controls import (
     TextInput,
 )
 from .components.fields import LabeledField
-from .components.layout import ControlLayout
+from .components.layout import ControlLayout, ControlLayoutDefaults
+from .components.profile import ComponentLayoutProfile, FRAMEWORK_COMPONENT_PROFILE
 from .components.placement import (
     AnchoredChild,
     AnchoredPlacement,
@@ -78,17 +79,55 @@ class DesignerPreviewUnsupportedTypeError(DesignerPreviewError):
         super().__init__(f"designer preview does not support component type(s): {joined}")
 
 
+# Designer previews need deterministic, human-scale control defaults.  Ordinary
+# applications retain the framework/application renderer profile unchanged; this
+# overlay is used only while a DesignerPreviewHost renders reconstructed nodes.
+# Explicit document width/height properties still win through the normal
+# profile -> theme -> instance layout cascade.
+DESIGNER_PREVIEW_LAYOUT_DEFAULTS = {
+    "button": ControlLayoutDefaults(width=120, height=28),
+    "combo_box": ControlLayoutDefaults(width=180),
+    "text_input": ControlLayoutDefaults(width=220),
+    "numeric_stepper": ControlLayoutDefaults(width=160),
+    "progress_bar": ControlLayoutDefaults(width=220, height=22),
+    "spacer": ControlLayoutDefaults(width=8, height=8),
+}
+
+
+def designer_preview_component_profile(
+    parent: ComponentLayoutProfile | None = None,
+) -> ComponentLayoutProfile:
+    """Return the renderer-neutral component profile used by visual previews.
+
+    ``parent`` preserves an application's named profile slots while the generic
+    control keys above receive predictable editor-preview defaults.  The helper
+    returns a fresh immutable profile so a preview never mutates the renderer's
+    installed profile.
+    """
+
+    if parent is not None and not isinstance(parent, ComponentLayoutProfile):
+        raise TypeError("designer preview profile parent must be ComponentLayoutProfile or None")
+    return ComponentLayoutProfile(
+        name="designer-preview",
+        parent=parent or FRAMEWORK_COMPONENT_PROFILE,
+        layouts=DESIGNER_PREVIEW_LAYOUT_DEFAULTS,
+    )
+
+
 @dataclass(frozen=True)
 class DesignerPreviewContext:
     """Runtime-neutral dependencies used while reconstructing a preview tree."""
 
     layout_coordinator: LayoutCoordinator | None = None
+    use_preview_control_defaults: bool = True
 
     def __post_init__(self) -> None:
         if self.layout_coordinator is not None and not isinstance(
             self.layout_coordinator, LayoutCoordinator
         ):
             raise TypeError("designer preview layout_coordinator must be LayoutCoordinator or None")
+        if not isinstance(self.use_preview_control_defaults, bool):
+            raise TypeError("designer preview use_preview_control_defaults must be bool")
 
 
 @dataclass(frozen=True)
@@ -660,6 +699,7 @@ FRAMEWORK_DESIGNER_PREVIEW_CATALOG = _preview_catalog()
 
 
 __all__ = [
+    "DESIGNER_PREVIEW_LAYOUT_DEFAULTS",
     "DesignerPreviewBuild",
     "DesignerPreviewCatalog",
     "DesignerPreviewChild",
@@ -668,6 +708,7 @@ __all__ = [
     "DesignerPreviewSpec",
     "DesignerPreviewUnsupportedTypeError",
     "FRAMEWORK_DESIGNER_PREVIEW_CATALOG",
+    "designer_preview_component_profile",
     "reconstruct_designer_snapshot",
     "unsupported_preview_type_keys",
 ]

@@ -59,9 +59,36 @@ class TkinterDesignerInspectorPanelHost:
 
         metadata = binding.metadata if isinstance(binding.metadata, dict) else {}
         inner = metadata.get("inner")
+        canvas = metadata.get("canvas")
+        window = metadata.get("window")
         target_var = metadata.get("target_var")
         if inner is None or not self._exists_widget(inner):
             raise RuntimeError("Tkinter inspector panel body is unavailable")
+
+        def stabilize_geometry():
+            # Inspector refresh destroys/recreates the grid while the canvas itself
+            # often keeps the same size, so <Configure> is not guaranteed to fire.
+            # Reassert the canvas-window width after the callback returns; otherwise
+            # a row of empty/default editors can temporarily collapse the stretch
+            # column to a few pixels until some unrelated geometry event occurs.
+            if canvas is None or window is None:
+                return
+            try:
+                if not self._exists_widget(canvas):
+                    return
+                width = max(1, int(canvas.winfo_width()))
+                canvas.itemconfigure(window, width=width)
+                region = canvas.bbox("all")
+                if region is not None:
+                    canvas.configure(scrollregion=region)
+            except Exception:
+                pass
+
+        def schedule_geometry_stabilization():
+            try:
+                self.renderer.root.after_idle(stabilize_geometry)
+            except Exception:
+                pass
 
         if target_var is not None:
             if state.has_target:
@@ -82,6 +109,7 @@ class TkinterDesignerInspectorPanelHost:
             ttk.Label(inner, text="Select a hierarchy row to inspect its properties.").grid(
                 row=0, column=0, columnspan=3, sticky="w", padx=4, pady=6
             )
+            schedule_geometry_stabilization()
             return
 
         on_set = metadata["on_set"]
@@ -116,7 +144,8 @@ class TkinterDesignerInspectorPanelHost:
 
             defer(perform)
 
-        inner.columnconfigure(1, weight=1)
+        inner.columnconfigure(0, minsize=92)
+        inner.columnconfigure(1, weight=1, minsize=140)
         for index, row in enumerate(state.rows):
             label = row.label
             if not row.is_set:
@@ -194,10 +223,11 @@ class TkinterDesignerInspectorPanelHost:
                 clear_button.pack(side="left")
                 metadata["clear_buttons"][row.key] = clear_button
 
-        # Geometry/scrollregion updates are driven by the existing Configure
-        # bindings.  Do not force a nested update_idletasks() here: refresh can
-        # run from a deferred native event callback, and recursively draining
-        # Tk's idle queue from inside that callback can starve the outer loop.
+        # Reassert width asynchronously after every rebuild. Do not force a
+        # nested update_idletasks() here: refresh can run from a deferred native
+        # event callback, and recursively draining Tk's idle queue from inside
+        # that callback can starve the outer loop.
+        schedule_geometry_stabilization()
 
     def build(
         self,
