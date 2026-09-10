@@ -18,6 +18,7 @@ from app.engine.designer_component_placement_hosts import TkinterDesignerCompone
 from app.engine.designer_hierarchy_panel_hosts import TkinterDesignerHierarchyPanelHost
 from app.engine.designer_inspector_panel_hosts import TkinterDesignerInspectorPanelHost
 from app.engine.designer_preview_selection_hosts import TkinterDesignerPreviewSelectionHost
+from app.engine.designer_shell_shortcut_hosts import TkinterDesignerShellShortcutHost
 from app.engine.layout_hosts import TkinterLayoutHost
 from app.engine.plot_hosts import TkinterPlotHost
 from app.engine.presentation_backends import create_tkinter_backend
@@ -70,10 +71,13 @@ from app.framework.designer_workspace import DesignerWorkspace
 from app.framework.designer_shell import (
     DESIGNER_COPY_COMMAND,
     DESIGNER_DUPLICATE_COMMAND,
+    DESIGNER_MOVE_DOWN_COMMAND,
+    DESIGNER_REMOVE_COMMAND,
     DESIGNER_UNDO_COMMAND,
     DesignerShellCommands,
 )
 from app.framework.designer_shell_menu import DesignerShellMenu
+from app.framework.designer_shell_shortcuts import DesignerShellShortcuts
 from app.framework.interactions import CommandSet, CommandSpec
 from app.framework.live_data import (
     LiveTable,
@@ -118,6 +122,7 @@ class TkinterSourceBoundaryTests(unittest.TestCase):
             PROJECT_ROOT / "app" / "engine" / "designer_hierarchy_panel_hosts" / "tkinter.py",
             PROJECT_ROOT / "app" / "engine" / "designer_inspector_panel_hosts" / "tkinter.py",
             PROJECT_ROOT / "app" / "engine" / "designer_preview_selection_hosts" / "tkinter.py",
+            PROJECT_ROOT / "app" / "engine" / "designer_shell_shortcut_hosts" / "tkinter.py",
         )
         forbidden = ("dearpygui", "app.logic", "app.views", "app.localization")
         for path in paths:
@@ -590,6 +595,47 @@ class TkinterBackendLiveTests(unittest.TestCase):
             workspace.preview_host.component(clone_id)
 
         self.assertTrue(presenter.dispose())
+        self.assertTrue(workspace.close())
+
+    def test_designer_shell_shortcuts_dispatch_real_tkinter_structural_commands(self):
+        from app.framework.designer import DesignerIdentityMap, capture_component_tree
+
+        source = ControlColumn((Button("One"), Button("Two"), Button("Three")))
+        identities = DesignerIdentityMap(prefix="tk-shortcuts")
+        identities.bind(source, "root")
+        identities.bind(source.children[0], "one")
+        identities.bind(source.children[1], "two")
+        identities.bind(source.children[2], "three")
+        workspace = DesignerWorkspace(
+            DesignerProjectFile.create(capture_component_tree(source, identities=identities)),
+            context=DesignerPreviewContext(
+                layout_coordinator=LayoutCoordinator(TkinterLayoutHost(self.renderer))
+            ),
+            renderer=self.renderer,
+        )
+        workspace.select_and_focus_node("two")
+        shell = DesignerShellCommands(workspace)
+        shortcuts = DesignerShellShortcuts(
+            shell,
+            TkinterDesignerShellShortcutHost(self.root),
+        )
+        binding = shortcuts.build()
+        callbacks = {sequence: callback for sequence, _funcid, callback in binding.metadata["registrations"]}
+
+        self.assertEqual("break", callbacks["<Alt-Down>"]())
+        self.root.update_idletasks()
+        self.assertEqual(("one", "three", "two"), tuple(child.node.node_id for child in workspace.session.snapshot.root.children))
+        self.assertFalse(shell.command(DESIGNER_MOVE_DOWN_COMMAND).enabled)
+
+        self.assertEqual("break", callbacks["<Control-Delete>"]())
+        self.root.update_idletasks()
+        with self.assertRaises(KeyError):
+            workspace.session.node("two")
+        self.assertEqual("root", workspace.state.selected_id)
+        self.assertFalse(shell.command(DESIGNER_REMOVE_COMMAND).enabled)
+
+        self.assertTrue(shortcuts.dispose())
+        self.assertEqual([], binding.metadata["registrations"])
         self.assertTrue(workspace.close())
 
     def test_designer_component_palette_presents_real_tkinter_entries_and_requests(self):

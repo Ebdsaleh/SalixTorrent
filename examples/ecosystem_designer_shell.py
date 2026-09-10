@@ -27,6 +27,7 @@ from app.framework.components import (
     ControlLayout,
     FILL,
     Label,
+    SplitOrientation,
     SplitPane,
     SplitPanel,
 )
@@ -39,6 +40,7 @@ from app.framework.designer_preview import DesignerPreviewContext
 from app.framework.designer_preview_selection import DesignerPreviewSelectionSurface
 from app.framework.designer_shell import DesignerShellCommands
 from app.framework.designer_shell_menu import DesignerShellMenu
+from app.framework.designer_shell_shortcuts import DesignerShellShortcuts
 from app.framework.designer_workspace import DesignerWorkspace
 from app.framework.responsive import LayoutCoordinator
 from app.runtime.application import ApplicationSpec
@@ -81,11 +83,47 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
 
     layout_coordinator = LayoutCoordinator(host.presentation.layout_host)
     holder = {}
-    status = Label("Select/click the preview, edit properties, or activate a Component tool and confirm Placement.")
-    palette_parent = ControlColumn(layout=ControlLayout(width=FILL, height=155))
-    placement_parent = ControlColumn(layout=ControlLayout(width=FILL, height=220))
+    status = Label("Select/click the preview, edit properties, place components, or use structural commands/shortcuts.")
+    palette_parent = ControlColumn(layout=ControlLayout(width=FILL, height=FILL))
+    placement_parent = ControlColumn(layout=ControlLayout(width=FILL, height=FILL))
     hierarchy_parent = ControlColumn(layout=ControlLayout(width=FILL, height=FILL))
-    left_sidebar = ControlColumn((palette_parent, placement_parent, hierarchy_parent), layout=ControlLayout(width=FILL, height=FILL))
+    # Use the same framework-owned split geometry vertically as the main editor
+    # row. Dear PyGui groups are flow containers rather than clipping layout
+    # regions, so stacking fixed-height group wrappers allowed the palette's
+    # scrollable child to consume the whole left pane and hide Placement /
+    # Hierarchy. Separate split panes give every editor surface an explicit,
+    # non-overlapping viewport on both desktop backends.
+    left_sidebar = SplitPanel(
+        (
+            SplitPane(
+                "components",
+                palette_parent,
+                weight=0.30,
+                minimum=150,
+                maximum=180,
+                border=False,
+            ),
+            SplitPane(
+                "placement",
+                placement_parent,
+                weight=0.40,
+                minimum=190,
+                maximum=220,
+                border=False,
+            ),
+            SplitPane(
+                "hierarchy",
+                hierarchy_parent,
+                weight=0.30,
+                minimum=120,
+                border=False,
+            ),
+        ),
+        orientation=SplitOrientation.VERTICAL,
+        gap=6,
+        coordinator=layout_coordinator,
+        layout=ControlLayout(width=FILL, height=FILL),
+    )
     preview_parent = ControlColumn(layout=ControlLayout(width=FILL, height=FILL))
     inspector_parent = ControlColumn(layout=ControlLayout(width=FILL, height=FILL))
 
@@ -121,7 +159,7 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
         layout=ControlLayout(width=FILL, height=520),
     )
     chrome = ControlColumn((
-        Label("Designer Shell Surface — post-v0.5.1 Tranche 6"),
+        Label("Designer Shell Surface — post-v0.5.1 Tranche 7"),
         Button("Designer Commands", callback=show_commands),
         status,
         workspace_split,
@@ -158,12 +196,16 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
         from app.engine.designer_preview_selection_hosts import (
             DearPyGuiDesignerPreviewSelectionHost,
         )
+        from app.engine.designer_shell_shortcut_hosts import (
+            DearPyGuiDesignerShellShortcutHost,
+        )
 
-        palette_host = DearPyGuiDesignerComponentPaletteHost(height=145)
-        placement_host = DearPyGuiDesignerComponentPlacementHost(height=210)
-        hierarchy_host = DearPyGuiDesignerHierarchyPanelHost(height=190)
+        palette_host = DearPyGuiDesignerComponentPaletteHost(height=150)
+        placement_host = DearPyGuiDesignerComponentPlacementHost(height=195)
+        hierarchy_host = DearPyGuiDesignerHierarchyPanelHost(height=120)
         inspector_host = DearPyGuiDesignerInspectorPanelHost(height=500)
         preview_selection_host = DearPyGuiDesignerPreviewSelectionHost()
+        shortcut_host = DearPyGuiDesignerShellShortcutHost()
     else:
         from app.engine.designer_component_palette_hosts import (
             TkinterDesignerComponentPaletteHost,
@@ -180,6 +222,9 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
         from app.engine.designer_preview_selection_hosts import (
             TkinterDesignerPreviewSelectionHost,
         )
+        from app.engine.designer_shell_shortcut_hosts import (
+            TkinterDesignerShellShortcutHost,
+        )
 
         palette_host = TkinterDesignerComponentPaletteHost(
             host.presentation.component_renderer,
@@ -190,7 +235,7 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
         )
         hierarchy_host = TkinterDesignerHierarchyPanelHost(
             host.presentation.component_renderer,
-            height_rows=12,
+            height_rows=6,
         )
         inspector_host = TkinterDesignerInspectorPanelHost(
             host.presentation.component_renderer,
@@ -199,6 +244,7 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
         preview_selection_host = TkinterDesignerPreviewSelectionHost(
             host.presentation.component_renderer
         )
+        shortcut_host = TkinterDesignerShellShortcutHost(host.root)
 
     placement_activity = {"was_active": False}
 
@@ -319,8 +365,9 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
         if result is not None and not hasattr(result, "kind"):
             status.set_text(f"Command: {key}")
 
+    shell = DesignerShellCommands(workspace)
     menu = DesignerShellMenu(
-        DesignerShellCommands(workspace),
+        shell,
         host.presentation.command_menu_host,
         title="Designer",
         on_request=on_request,
@@ -329,10 +376,20 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
     menu.build()
     holder["menu"] = menu
 
+    shortcuts = DesignerShellShortcuts(
+        shell,
+        shortcut_host,
+        on_request=on_request,
+        on_result=on_result,
+    )
+    shortcuts.build()
+    holder["shortcuts"] = shortcuts
+
     runtime.services.register(
         "designer shell cleanup",
         CallbackService(
             on_stop=lambda: (
+                shortcuts.dispose(),
                 menu.dispose(),
                 preview_selection.dispose(),
                 placement.dispose(),

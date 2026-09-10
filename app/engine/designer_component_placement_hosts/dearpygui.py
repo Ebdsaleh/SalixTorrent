@@ -11,8 +11,9 @@ from app.framework.designer_component_placement import (
 class DearPyGuiDesignerComponentPlacementHost:
     """Render one explicit placement form without owning insertion semantics."""
 
-    def __init__(self, *, height: int = 215):
+    def __init__(self, *, height: int = 215, editor_width: int = 150):
         self.height = max(170, int(height))
+        self.editor_width = max(120, int(editor_width))
 
     @staticmethod
     def _dpg():
@@ -53,10 +54,41 @@ class DearPyGuiDesignerComponentPlacementHost:
         title_item = dpg.add_text(str(title or "Placement"), parent=panel)
         dpg.add_separator(parent=panel)
         request_item = dpg.add_text("No pending component request", parent=panel, wrap=0)
-        parent_combo = dpg.add_combo(parent=panel, label="Parent", width=-1)
-        slot_combo = dpg.add_combo(parent=panel, label="Slot", width=-1)
-        index_input = dpg.add_input_text(parent=panel, label="Index", width=-1, hint="blank = append")
-        metadata_input = dpg.add_input_text(parent=panel, label="Metadata JSON", width=-1)
+
+        # Dear PyGui renders an item's native ``label`` after the widget.
+        # It also treats the fill-width sentinel inside a table cell as wider than the bounded
+        # sidebar cell on some Windows builds, which can still push neighbouring
+        # content past the pane edge.  Use explicit horizontal field rows with a
+        # conservative fixed editor width instead of relying on table-cell fill
+        # sizing.  The padded captions keep the familiar label-left/editor-right
+        # arrangement while remaining fully inside the narrowest supported pane.
+        # This is presentation geometry only; placement semantics remain in
+        # DesignerComponentPlacementSurface.
+        def add_field_row(caption: str, builder):
+            with dpg.group(parent=panel, horizontal=True, horizontal_spacing=8):
+                dpg.add_text(f"{caption:<13}")
+                return builder()
+
+        parent_combo = add_field_row(
+            "Parent",
+            lambda: dpg.add_combo(width=self.editor_width),
+        )
+        slot_combo = add_field_row(
+            "Slot",
+            lambda: dpg.add_combo(width=self.editor_width),
+        )
+        index_input = add_field_row(
+            "Index",
+            lambda: dpg.add_input_text(
+                width=self.editor_width,
+                hint="blank = append",
+            ),
+        )
+        metadata_input = add_field_row(
+            "Metadata JSON",
+            lambda: dpg.add_input_text(width=self.editor_width),
+        )
+
         error_item = dpg.add_text("", parent=panel, wrap=0)
         with dpg.group(parent=panel, horizontal=True):
             commit_button = dpg.add_button(label="Insert", width=90)

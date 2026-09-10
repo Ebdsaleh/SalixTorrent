@@ -365,6 +365,42 @@ class DesignerWorkspace:
             index=index,
         )
 
+    def remove_selected(self) -> bool:
+        """Remove the selected non-root node through checked preview validation."""
+
+        self._require_open()
+        node_id = self.session.selected_node_id
+        if not node_id:
+            raise RuntimeError("designer workspace has no selected node to remove")
+        return self._preview.remove_node(node_id)
+
+    def move_selected_up(self) -> bool:
+        """Move the selected node one sibling earlier, preserving stable identity."""
+
+        self._require_open()
+        location = self.session.selected_location()
+        if location is None:
+            raise RuntimeError("designer workspace has no selected node to move")
+        if location.parent_id is None or location.index is None:
+            raise ValueError("designer snapshot root cannot be moved")
+        if location.index <= 0:
+            return False
+        return self._preview.move_node(location.node_id, location.index - 1)
+
+    def move_selected_down(self) -> bool:
+        """Move the selected node one sibling later, preserving stable identity."""
+
+        self._require_open()
+        location = self.session.selected_location()
+        if location is None:
+            raise RuntimeError("designer workspace has no selected node to move")
+        if location.parent_id is None or location.index is None:
+            raise ValueError("designer snapshot root cannot be moved")
+        parent = self.session.node(location.parent_id)
+        if location.index >= len(parent.children) - 1:
+            return False
+        return self._preview.move_node(location.node_id, location.index + 1)
+
     # History / clipboard ---------------------------------------------------
     def undo(self) -> bool:
         self._require_open()

@@ -1,6 +1,6 @@
 # SalixTorrent Ecosystem Architecture Direction
 
-**Status:** v0.5.1 released; post-v0.5.1 Tranches 1 through 5 are published and Tranche 6 explicit component placement is the current full-commit Windows-acceptance boundary on `dev`
+**Status:** v0.5.1 released; post-v0.5.1 Tranches 1 through 6 are published and Tranche 7 selected-node structural commands/shortcuts are the current full-commit Windows-acceptance boundary on `dev`
 **Reference release:** SalixTorrent v0.5.1
 **Development branch:** `dev`
 **Purpose:** guide reverse-pyramid extraction from the working SalixTorrent application into a modular application ecosystem without freezing names or public APIs before the boundaries are proven.
@@ -1012,4 +1012,14 @@ The sixth post-v0.5.1 surface tranche consumes `DesignerComponentInsertRequest` 
 
 Creation is intentionally sparse and conservative. Primitive controls and empty containers that the preview bridge can reconstruct are insertable; types requiring mandatory nested children/templates are reported as not yet directly creatable. Relationship metadata suggestions are backend-neutral conveniences, never validation bypasses. Dear PyGui/Tkinter placement hosts only render and dispatch the form. The accepted ownership remains `palette request -> placement resolver -> DesignerWorkspace/DesignerPreviewHost checked command -> immutable snapshot/history -> reconstructed preview`.
 
-The designer-shell proof now stacks Components / Placement / Hierarchy beside Preview and Inspector. Preparation passes 16 / 16 placement tests, 248 / 248 designer/relocation tests, 64 / 64 GUI-component tests, 40 / 40 Tkinter tests and complete discovery at **854 / 854**. Drag/drop, resize handles, richer creation templates, multi-selection/mixed values, callback/service/binding editors and final public package/schema naming remain deferred.
+The designer-shell proof now stacks Components / Placement / Hierarchy beside Preview and Inspector. Real-Windows acceptance passed 16 / 16 placement tests, 248 / 248 designer/relocation tests, 64 / 64 GUI-component tests, 40 / 40 Tkinter tests and both complete discovery forms at **854 / 854** with one expected skip. The tranche is published at `9b61c6f61c8c7eb451a52b12283873d8a96555c0` (`Add explicit designer component placement`). Drag/drop, resize handles, richer creation templates, multi-selection/mixed values, callback/service/binding editors and final public package/schema naming remain deferred.
+
+### Selected-node structural commands and shortcut bridge — post-v0.5.1 Tranche 7 full-commit gate
+
+The next surface makes existing structural semantics easier to exercise without introducing pointer-gesture policy. `DesignerShellCommands` now projects Move Up, Move Down and Remove for the current selection, with enablement derived from the selected node's current parent/index. `DesignerWorkspace` delegates those operations to the already-proven checked preview transaction, so stable IDs, undo/redo, dirty state, selection fallback and preview reconstruction stay authoritative.
+
+`DesignerShellShortcuts` is a separate renderer-neutral bridge from normalized gestures to the same semantic command keys. Dear PyGui/Tkinter shortcut hosts own only native registrations; they do not own command enablement or document mutation. Default structural bindings are Ctrl+D Duplicate, Ctrl+Delete Remove, Alt+Up Move Up and Alt+Down Move Down. This establishes a familiar verification path for inserted components before drag/drop and ensures any later drag/reparent adapter can resolve into the same structural owners instead of creating a parallel editing model.
+
+The designer-shell proof also treats Components / Placement / Hierarchy as a nested vertical `SplitPanel`. That gives those surfaces explicit non-overlapping extents on Dear PyGui rather than relying on a flow group to clip independently scrollable children, while preserving the same backend-neutral composition on Tkinter. Within the Dear PyGui Placement host, field captions and editors use explicit horizontal rows with conservative fixed editor widths. This avoids both Dear PyGui's trailing-label geometry and Windows table-cell fill-width behavior from placing Placement content outside the bounded pane.
+
+Preparation passes 16 / 16 focused tests, 264 / 264 designer/relocation tests, 64 / 64 GUI components and complete discovery at **871 / 871**. Real-Windows Tkinter 41 / 41 plus Dear PyGui/Tkinter designer smoke remain authoritative before the full-commit publication. Drag/drop itself is still deferred deliberately.

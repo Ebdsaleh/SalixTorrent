@@ -37,6 +37,9 @@ DESIGNER_SAVE_AS_COMMAND = "designer.project.save_as"
 DESIGNER_COPY_COMMAND = "designer.copy"
 DESIGNER_PASTE_COMMAND = "designer.paste"
 DESIGNER_DUPLICATE_COMMAND = "designer.duplicate"
+DESIGNER_REMOVE_COMMAND = "designer.structure.remove"
+DESIGNER_MOVE_UP_COMMAND = "designer.structure.move_up"
+DESIGNER_MOVE_DOWN_COMMAND = "designer.structure.move_down"
 DESIGNER_REVEAL_SELECTION_COMMAND = "designer.hierarchy.reveal_selection"
 
 
@@ -173,8 +176,22 @@ class DesignerShellCommands:
         session = workspace.session
         active = not state.closed
         selected_location = session.selected_location() if active else None
-        duplicate_enabled = bool(
-            active and selected_location is not None and selected_location.parent_id is not None
+        structural_parent = None
+        if active and selected_location is not None and selected_location.parent_id is not None:
+            structural_parent = session.node(selected_location.parent_id)
+        duplicate_enabled = bool(structural_parent is not None)
+        remove_enabled = bool(structural_parent is not None)
+        move_up_enabled = bool(
+            structural_parent is not None
+            and selected_location is not None
+            and selected_location.index is not None
+            and selected_location.index > 0
+        )
+        move_down_enabled = bool(
+            structural_parent is not None
+            and selected_location is not None
+            and selected_location.index is not None
+            and selected_location.index < len(structural_parent.children) - 1
         )
 
         undo_label = "Undo" if not state.undo_label else f"Undo {state.undo_label}"
@@ -226,6 +243,21 @@ class DesignerShellCommands:
                         DESIGNER_DUPLICATE_COMMAND,
                         "Duplicate",
                         enabled=duplicate_enabled,
+                    ),
+                    CommandSpec(
+                        DESIGNER_MOVE_UP_COMMAND,
+                        "Move Up",
+                        enabled=move_up_enabled,
+                    ),
+                    CommandSpec(
+                        DESIGNER_MOVE_DOWN_COMMAND,
+                        "Move Down",
+                        enabled=move_down_enabled,
+                    ),
+                    CommandSpec(
+                        DESIGNER_REMOVE_COMMAND,
+                        "Remove",
+                        enabled=remove_enabled,
                     ),
                 ),
             ),
@@ -313,6 +345,21 @@ class DesignerShellCommands:
                 )
             if command_key == DESIGNER_DUPLICATE_COMMAND:
                 return workspace.duplicate_selected()
+            if command_key == DESIGNER_MOVE_UP_COMMAND:
+                changed = workspace.move_selected_up()
+                if changed:
+                    workspace.reveal_selected_in_hierarchy()
+                return changed
+            if command_key == DESIGNER_MOVE_DOWN_COMMAND:
+                changed = workspace.move_selected_down()
+                if changed:
+                    workspace.reveal_selected_in_hierarchy()
+                return changed
+            if command_key == DESIGNER_REMOVE_COMMAND:
+                changed = workspace.remove_selected()
+                if changed and workspace.state.has_selection:
+                    workspace.reveal_selected_in_hierarchy()
+                return changed
             if command_key == DESIGNER_REVEAL_SELECTION_COMMAND:
                 return workspace.reveal_selected_in_hierarchy()
             if command_key in _NAVIGATION_BY_COMMAND:
@@ -331,6 +378,9 @@ class DesignerShellCommands:
 __all__ = [
     "DESIGNER_COPY_COMMAND",
     "DESIGNER_DUPLICATE_COMMAND",
+    "DESIGNER_MOVE_DOWN_COMMAND",
+    "DESIGNER_MOVE_UP_COMMAND",
+    "DESIGNER_REMOVE_COMMAND",
     "DESIGNER_EDIT_MENU_COMMAND",
     "DESIGNER_FILE_MENU_COMMAND",
     "DESIGNER_NAVIGATE_MENU_COMMAND",

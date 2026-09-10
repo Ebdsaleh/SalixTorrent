@@ -108,6 +108,7 @@ class FrameworkPackagingTests(unittest.TestCase):
                 assert "portable_framework.designer_workspace" in imported
                 assert "portable_framework.designer_shell" in imported
                 assert "portable_framework.designer_shell_menu" in imported
+                assert "portable_framework.designer_shell_shortcuts" in imported
                 assert "portable_framework.designer_hierarchy_panel" in imported
                 assert "portable_framework.designer_inspector_panel" in imported
                 assert "portable_framework.designer_navigation" in imported
@@ -208,6 +209,10 @@ class FrameworkPackagingTests(unittest.TestCase):
                     DesignerShellCommands,
                 )
                 from portable_framework.designer_shell_menu import DesignerShellMenu
+                from portable_framework.designer_shell_shortcuts import (
+                    DesignerShellShortcutBinding,
+                    DesignerShellShortcuts,
+                )
                 from portable_framework.designer_hierarchy_panel import (
                     DesignerHierarchyPanel,
                     DesignerHierarchyPanelBinding,
@@ -556,6 +561,31 @@ class FrameworkPackagingTests(unittest.TestCase):
                 assert preview_host.component(designer_button.node_id + "-copy").label == "Run"
                 assert portable_shell.command(DESIGNER_UNDO_COMMAND).enabled is True
                 assert portable_menu_host.callback(DESIGNER_UNDO_COMMAND) is True
+
+                class PortableShortcutHost:
+                    def __init__(self):
+                        self.callback = None
+                    def build(self, shortcuts, *, on_gesture=None):
+                        self.callback = on_gesture
+                        return DesignerShellShortcutBinding(
+                            handle={{"alive": True}},
+                            gestures=tuple(spec.gesture for spec in shortcuts),
+                        )
+                    def exists(self, binding):
+                        return bool(binding.handle["alive"])
+                    def dispose(self, binding):
+                        binding.handle["alive"] = False
+
+                portable_workspace.select_and_focus_node(designer_button.node_id)
+                portable_shortcut_host = PortableShortcutHost()
+                portable_shortcuts = DesignerShellShortcuts(
+                    portable_shell, portable_shortcut_host
+                )
+                portable_shortcuts.build()
+                assert portable_shortcut_host.callback("Ctrl+D") is True
+                assert preview_host.component(designer_button.node_id + "-copy").label == "Run"
+                assert portable_shell.dispatch(DESIGNER_UNDO_COMMAND) is True
+                assert portable_shortcuts.dispose() is True
                 assert portable_menu.dispose() is True
                 assert portable_preview_selection.dispose() is True
                 assert portable_hierarchy_panel.dispose() is True
