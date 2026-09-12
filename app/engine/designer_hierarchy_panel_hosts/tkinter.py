@@ -101,6 +101,7 @@ class TkinterDesignerHierarchyPanelHost:
         title: str = "",
         on_select,
         on_toggle,
+        on_reparent,
     ) -> DesignerHierarchyPanelBinding:
         from tkinter import ttk
 
@@ -124,9 +125,13 @@ class TkinterDesignerHierarchyPanelHost:
                 "scrollbar": scrollbar,
                 "on_select": on_select,
                 "on_toggle": on_toggle,
+                "on_reparent": on_reparent,
                 "reverse": {},
                 "suppress": False,
                 "population_generation": 0,
+                "drag_source": "",
+                "drag_start": (0, 0),
+                "drag_active": False,
             },
         )
 
@@ -161,9 +166,48 @@ class TkinterDesignerHierarchyPanelHost:
                 self.renderer.root.after_idle(lambda value=node_id: on_toggle(value))
             return None
 
+        def handle_drag_press(event):
+            metadata = binding.metadata if isinstance(binding.metadata, dict) else {}
+            iid = str(tree.identify_row(event.y) or "")
+            source_id = str(metadata.get("reverse", {}).get(iid, ""))
+            metadata["drag_source"] = source_id
+            metadata["drag_start"] = (int(event.x), int(event.y))
+            metadata["drag_active"] = False
+            return None
+
+        def handle_drag_motion(event):
+            metadata = binding.metadata if isinstance(binding.metadata, dict) else {}
+            if not metadata.get("drag_source"):
+                return None
+            start_x, start_y = metadata.get("drag_start", (event.x, event.y))
+            if abs(int(event.x) - int(start_x)) + abs(int(event.y) - int(start_y)) >= 6:
+                metadata["drag_active"] = True
+            return None
+
+        def handle_drag_release(event):
+            metadata = binding.metadata if isinstance(binding.metadata, dict) else {}
+            source_id = str(metadata.get("drag_source", ""))
+            active = bool(metadata.get("drag_active"))
+            metadata["drag_source"] = ""
+            metadata["drag_active"] = False
+            if not source_id or not active:
+                return None
+            target_iid = str(tree.identify_row(event.y) or "")
+            target_id = str(metadata.get("reverse", {}).get(target_iid, ""))
+            if target_id and target_id != source_id:
+                # Defer until the native button-release dispatch unwinds; the
+                # presenter may rebuild the complete tree after the edit.
+                self.renderer.root.after_idle(
+                    lambda source=source_id, target=target_id: on_reparent(source, target)
+                )
+            return None
+
         tree.bind("<<TreeviewSelect>>", handle_select, add="+")
         tree.bind("<<TreeviewOpen>>", handle_toggle, add="+")
         tree.bind("<<TreeviewClose>>", handle_toggle, add="+")
+        tree.bind("<ButtonPress-1>", handle_drag_press, add="+")
+        tree.bind("<B1-Motion>", handle_drag_motion, add="+")
+        tree.bind("<ButtonRelease-1>", handle_drag_release, add="+")
         self._populate(binding, rows)
         return binding
 

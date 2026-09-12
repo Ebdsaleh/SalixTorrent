@@ -21,6 +21,7 @@ class FakeHierarchyPanelHost:
         self.binding = None
         self.on_select = None
         self.on_toggle = None
+        self.on_reparent = None
         self.built = []
         self.updated = []
         self.disposed = 0
@@ -29,9 +30,12 @@ class FakeHierarchyPanelHost:
     def _row_items(rows):
         return {row.node_id: {"row": row, "alive": True} for row in rows}
 
-    def build(self, rows, *, parent, title="", on_select=None, on_toggle=None):
+    def build(
+        self, rows, *, parent, title="", on_select=None, on_toggle=None, on_reparent=None
+    ):
         self.on_select = on_select
         self.on_toggle = on_toggle
+        self.on_reparent = on_reparent
         self.built.append(tuple(rows))
         self.binding = DesignerHierarchyPanelBinding(
             panel={"alive": True, "parent": parent, "title": str(title)},

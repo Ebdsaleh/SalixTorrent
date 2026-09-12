@@ -48,6 +48,7 @@ from app.framework.components import (
     SizeConstraints,
     SplitPane,
     SplitPanel,
+    STRETCH,
     TabContainer,
     TabPage,
     anchored,
@@ -1311,6 +1312,40 @@ class TkinterBackendLiveTests(unittest.TestCase):
         tooltip = self.renderer.attach_tooltip(label.require_item(), "Details", wrap=220)
         self.assertIsNotNone(tooltip)
         tooltip.destroy()
+
+    def test_control_column_natural_cross_axis_preserves_independent_child_widths(self):
+        wide = Button("Wide", layout=ControlLayout(width=220, height=28))
+        narrow = Button("Narrow", layout=ControlLayout(width=100, height=28))
+        column = ControlColumn(
+            (wide, narrow),
+            layout=ControlLayout(width=300, height=100),
+        )
+        column.build(renderer=self.renderer)
+        self.root.deiconify()
+        self.root.update_idletasks()
+
+        wide_width = wide.require_item().mount.winfo_width()
+        narrow_width = narrow.require_item().mount.winfo_width()
+        self.assertGreater(wide_width, narrow_width)
+        self.assertGreaterEqual(wide_width, 200)
+        self.assertLessEqual(narrow_width, 120)
+
+    def test_control_column_cross_axis_stretch_is_explicit_opt_in(self):
+        first = Button("One", layout=ControlLayout(width=220, height=28))
+        second = Button("Two", layout=ControlLayout(width=100, height=28))
+        column = ControlColumn(
+            (first, second),
+            cross_axis=STRETCH,
+            layout=ControlLayout(width=300, height=100),
+        )
+        column.build(renderer=self.renderer)
+        self.root.deiconify()
+        self.root.update_idletasks()
+
+        first_width = first.require_item().mount.winfo_width()
+        second_width = second.require_item().mount.winfo_width()
+        self.assertGreater(first_width, 250)
+        self.assertEqual(first_width, second_width)
 
     def test_layout_coordinator_uses_tkinter_host_without_framework_changes(self):
         column = ControlColumn((Label("Sized"),), layout=ControlLayout(width=FILL))

@@ -106,6 +106,7 @@ class FrameworkPackagingTests(unittest.TestCase):
                 assert "portable_framework.designer_component_placement" in imported
                 assert "portable_framework.designer_project" in imported
                 assert "portable_framework.designer_hierarchy" in imported
+                assert "portable_framework.designer_hierarchy_drag" in imported
                 assert "portable_framework.designer_inspector" in imported
                 assert "portable_framework.designer_workspace" in imported
                 assert "portable_framework.designer_shell" in imported
@@ -202,6 +203,7 @@ class FrameworkPackagingTests(unittest.TestCase):
                 )
                 from portable_framework.designer_project import DesignerProjectFile
                 from portable_framework.designer_hierarchy import DesignerHierarchyProjection
+                from portable_framework.designer_hierarchy_drag import plan_hierarchy_reparent
                 from portable_framework.designer_inspector import (
                     DesignerInspectorEditorKind,
                     DesignerPropertyInspector,
@@ -485,9 +487,14 @@ class FrameworkPackagingTests(unittest.TestCase):
                     def __init__(self):
                         self.on_select = None
                         self.on_toggle = None
-                    def build(self, rows, *, parent, title="", on_select=None, on_toggle=None):
+                        self.on_reparent = None
+                    def build(
+                        self, rows, *, parent, title="", on_select=None,
+                        on_toggle=None, on_reparent=None
+                    ):
                         self.on_select = on_select
                         self.on_toggle = on_toggle
+                        self.on_reparent = on_reparent
                         return DesignerHierarchyPanelBinding(
                             panel={{"alive": True, "parent": parent, "title": title}},
                             rows={{row.node_id: row.node_id for row in rows}},

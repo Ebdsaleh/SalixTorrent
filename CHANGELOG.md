@@ -4,6 +4,15 @@ Notable SalixTorrent changes are recorded here.
 
 ## Unreleased
 
+### Ecosystem Extraction — Layout Autonomy + Hierarchy Drag/Reparent (post-v0.5.1 Tranche 11)
+
+- Published Tranche 10 at `176aa7e52c4607094bc7f95c56de2cdbabfd216e` after the exact 19-file / 687-insertion / 41-deletion boundary passed real-Windows acceptance and `HEAD == origin/dev` was verified clean.
+- Added backend-neutral linear-container cross-axis policy. `ControlRow` / `ControlColumn` default to `natural`, preserving each child's own resolved cross-axis size; `stretch` is an explicit parent opt-in. Explicit child `fill` requests remain authoritative. This removes implicit sibling width/height coupling while retaining deliberate equal-fill layouts.
+- Added `cross_axis` to designer metadata/reconstruction as a `natural` / `stretch` choice. Older snapshots without the property reconstruct as `natural`, so the change does not require a project-schema migration.
+- Added framework-only `designer_hierarchy_drag.py` as a conservative stable-ID drop planner plus a hierarchy-panel reparent callback. The first gesture means “append this node under that target” and is accepted only for one unambiguous child slot that needs no relationship metadata. Complex grid/tab/split/positioned targets are rejected and continue through explicit Placement.
+- Added Dear PyGui drag payload/drop targets and a Tkinter thresholded tree drag adapter. Concrete hosts forward only source/target IDs; slot validation, stable identity, checked structural mutation, selection/focus/reveal and undo/redo remain framework/workspace owned.
+- Added 23 focused Tranche-11 regressions, two live Tkinter geometry tests and copied/renamed framework coverage. Preparation passes 334 / 334 designer+relocation, 64 / 64 GUI components, 46 / 46 Tkinter, complete discovery **946 / 946** display-less and **946 / 946** under Xvfb.
+
 ### Ecosystem Extraction — Designer Reset + Numeric Scrubbing (post-v0.5.1 Tranche 10)
 
 - Published Tranche 9 at `1870e053c444e2ca390543cb62a721b162f5ff61` after the repaired Dear PyGui handle arbitration passed real-Windows acceptance. The accepted boundary is 18 files / 1,596 insertions / 36 deletions.
@@ -13,6 +22,7 @@ Notable SalixTorrent changes are recorded here.
 - Reused the same normal/Shift/Ctrl sensitivity contract for the physical preview resize handle on both desktop adapters. Dear PyGui retains the repaired pointer arbitration from Tranche 9.
 - Replaced Tkinter's native `ttk.Sizegrip` with a darker ordinary child `Frame` resize handle positioned inside the selected component. This prevents Windows from treating the designer affordance as a toplevel-window resize grip while preserving the same semantic resize commit path.
 - Added/strengthened regressions for numeric translation, bounds, modifier sensitivity, atomic reset/undo, rendered-default scrub bases, framework relocation, DPG resize sensitivity and Tkinter outer-window geometry stability.
+- Real-Windows acceptance passed the 33 / 33 reset/scrub gate, 19 / 19 pointer-resize regressions, 311 / 311 designer+relocation, 64 / 64 GUI components, 44 / 44 Tkinter and both complete discovery forms at 921 / 921 with one expected skip. The tranche was committed/pushed as `176aa7e52c4607094bc7f95c56de2cdbabfd216e` (`Add designer numeric scrubbing and reset controls`). A follow-up visual concern about implicit sibling stretching is addressed by Tranche 11 as an explicit layout-policy problem rather than by coupling child dimensions.
 
 ### Ecosystem Extraction — Designer Pointer Resize Surface (post-v0.5.1 Tranche 9)
 

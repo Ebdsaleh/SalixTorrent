@@ -401,6 +401,34 @@ class DesignerWorkspace:
             return False
         return self._preview.move_node(location.node_id, location.index + 1)
 
+    def move_node(self, node_id: object, index: object) -> bool:
+        """Move one stable node within its current parent through checked preview validation."""
+
+        self._require_open()
+        return self._preview.move_node(node_id, index)
+
+    def reparent_node(
+        self,
+        node_id: object,
+        parent_id: object,
+        *,
+        index: int | None = None,
+        slot: object | None = None,
+        metadata: Mapping[str, object] | None | object = None,
+        preserve_metadata: bool = True,
+    ) -> bool:
+        """Reparent one stable subtree through the existing checked transaction."""
+
+        self._require_open()
+        return self._preview.reparent_node(
+            node_id,
+            parent_id,
+            index=index,
+            slot=slot,
+            metadata=metadata,
+            preserve_metadata=preserve_metadata,
+        )
+
     # History / clipboard ---------------------------------------------------
     def undo(self) -> bool:
         self._require_open()

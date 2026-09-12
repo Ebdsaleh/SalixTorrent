@@ -17,11 +17,13 @@ from dataclasses import dataclass
 from typing import Callable, Protocol, runtime_checkable
 
 from .designer_hierarchy import DesignerHierarchyRow
+from .designer_hierarchy_drag import plan_hierarchy_reparent
 from .designer_navigation import DesignerHierarchyReveal
 from .designer_workspace import DesignerWorkspace
 
 
 DesignerHierarchyPanelChangeHandler = Callable[[], object]
+DesignerHierarchyPanelErrorHandler = Callable[[Exception], object]
 
 
 @dataclass
@@ -46,6 +48,7 @@ class DesignerHierarchyPanelHost(Protocol):
         title: str = "",
         on_select: Callable[[str], object],
         on_toggle: Callable[[str], object],
+        on_reparent: Callable[[str, str], object],
     ) -> DesignerHierarchyPanelBinding:
         ...
 
@@ -91,6 +94,7 @@ class DesignerHierarchyPanel:
         *,
         title: str = "Hierarchy",
         on_change: DesignerHierarchyPanelChangeHandler | None = None,
+        on_error: DesignerHierarchyPanelErrorHandler | None = None,
     ):
         if not isinstance(workspace, DesignerWorkspace):
             raise TypeError("designer hierarchy panel requires DesignerWorkspace")
@@ -102,10 +106,13 @@ class DesignerHierarchyPanel:
             )
         if on_change is not None and not callable(on_change):
             raise TypeError("designer hierarchy panel change handler must be callable")
+        if on_error is not None and not callable(on_error):
+            raise TypeError("designer hierarchy panel error handler must be callable")
         self._workspace = workspace
         self._host = host
         self._title = str(title)
         self._on_change = on_change
+        self._on_error = on_error
         self._parent: object | None = None
         self._binding: DesignerHierarchyPanelBinding | None = None
 
@@ -135,6 +142,7 @@ class DesignerHierarchyPanel:
             title=self._title,
             on_select=self.select,
             on_toggle=self.toggle,
+            on_reparent=self.reparent,
         )
         if not isinstance(binding, DesignerHierarchyPanelBinding):
             raise TypeError(
@@ -208,6 +216,42 @@ class DesignerHierarchyPanel:
         self._notify_change()
         return changed
 
+    def reparent(self, node_id: object, parent_id: object) -> bool:
+        """Append one dragged node beneath an unambiguous simple container.
+
+        Native hosts report stable IDs only.  Slot/relationship policy is
+        resolved here from the immutable designer snapshot before the existing
+        checked reparent transaction runs.
+        """
+
+        try:
+            plan = plan_hierarchy_reparent(
+                self._workspace.session.snapshot,
+                node_id,
+                parent_id,
+            )
+            changed = self._workspace.reparent_node(
+                plan.node_id,
+                plan.parent_id,
+                index=plan.index,
+                slot=plan.slot,
+                metadata=None,
+                preserve_metadata=False,
+            )
+            if not changed:
+                return False
+            self._workspace.select_and_focus_node(plan.node_id)
+            self._workspace.expand_hierarchy_node(plan.parent_id)
+            self._workspace.reveal_selected_in_hierarchy()
+            self.refresh()
+            self._notify_change()
+            return True
+        except (KeyError, TypeError, ValueError, RuntimeError) as exc:
+            if self._on_error is not None:
+                self._on_error(exc)
+                return False
+            raise
+
     def reveal_selected(self) -> DesignerHierarchyReveal | None:
         """Reveal the current selection using existing hierarchy semantics."""
 
@@ -232,6 +276,7 @@ class DesignerHierarchyPanel:
 __all__ = [
     "DesignerHierarchyPanel",
     "DesignerHierarchyPanelChangeHandler",
+    "DesignerHierarchyPanelErrorHandler",
     "DesignerHierarchyPanelBinding",
     "DesignerHierarchyPanelHost",
 ]

@@ -33,6 +33,7 @@ class DearPyGuiDesignerHierarchyPanelHost:
         toggles: dict[str, object] = {}
         on_select = metadata["on_select"]
         on_toggle = metadata["on_toggle"]
+        on_reparent = metadata["on_reparent"]
 
         for row in rows:
             with dpg.group(parent=body, horizontal=True):
@@ -57,8 +58,22 @@ class DearPyGuiDesignerHierarchyPanelHost:
                     default_value=bool(row.selected),
                     user_data=row.node_id,
                     callback=lambda _s, _a, node_id: on_select(node_id),
+                    payload_type="salix_designer_hierarchy_node",
+                    drop_callback=lambda _s, source_id, target_id: on_reparent(
+                        source_id, target_id
+                    ),
                 )
                 binding.rows[row.node_id] = item
+                if row.parent_id is not None:
+                    # Native DPG drag payloads carry only the stable node ID.
+                    # Reparent/slot/history policy remains in the framework
+                    # presenter and immutable snapshot model.
+                    with dpg.drag_payload(
+                        parent=item,
+                        drag_data=row.node_id,
+                        payload_type="salix_designer_hierarchy_node",
+                    ):
+                        dpg.add_text(f"Move {row.type_key}")
 
         metadata["toggles"] = toggles
 
@@ -70,6 +85,7 @@ class DearPyGuiDesignerHierarchyPanelHost:
         title: str = "",
         on_select,
         on_toggle,
+        on_reparent,
     ) -> DesignerHierarchyPanelBinding:
         dpg = self._dpg()
         panel = dpg.add_child_window(parent=parent, border=True, height=self.height)
@@ -86,6 +102,7 @@ class DearPyGuiDesignerHierarchyPanelHost:
                 "body": body,
                 "on_select": on_select,
                 "on_toggle": on_toggle,
+                "on_reparent": on_reparent,
                 "toggles": {},
             },
         )

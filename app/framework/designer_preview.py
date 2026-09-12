@@ -484,11 +484,13 @@ def _linear(node: DesignerNode, children, context, component_type: type[Componen
 
 
 def _row(node: DesignerNode, children, context) -> Component:
-    return _linear(node, children, context, ControlRow)
+    values = tuple(child.component for child in _slot_children(children, "children", exact=True))
+    return ControlRow(values, cross_axis=_value(node, "cross_axis", "natural"))
 
 
 def _column(node: DesignerNode, children, context) -> Component:
-    return _linear(node, children, context, ControlColumn)
+    values = tuple(child.component for child in _slot_children(children, "children", exact=True))
+    return ControlColumn(values, cross_axis=_value(node, "cross_axis", "natural"))
 
 
 def _grid(node: DesignerNode, children, context) -> Component:

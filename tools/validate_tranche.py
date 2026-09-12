@@ -21,7 +21,7 @@ from typing import Iterable, Sequence, TextIO
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DISCOVERY_TEST_COUNT = 921
+DISCOVERY_TEST_COUNT = 946
 
 
 @dataclass(frozen=True)
@@ -34,7 +34,7 @@ class ValidationCommand:
 
 
 def validation_commands(python_executable: str | Path) -> tuple[ValidationCommand, ...]:
-    """Return the ordered post-v0.5.1 Tranche-10 validation sequence."""
+    """Return the ordered post-v0.5.1 Tranche-11 validation sequence."""
 
     python = str(python_executable)
     return (
@@ -78,6 +78,16 @@ def validation_commands(python_executable: str | Path) -> tuple[ValidationComman
             expected_test_count=33,
         ),
         ValidationCommand(
+            "Post-v0.5.1 Tranche 11 layout autonomy and hierarchy drag/reparent",
+            (
+                python, "-m", "unittest",
+                "tests.presentation.test_designer_layout_autonomy",
+                "tests.presentation.test_designer_hierarchy_drag",
+                "-v",
+            ),
+            expected_test_count=23,
+        ),
+        ValidationCommand(
             "Torrent detail-menu routing regression",
             (python, "-m", "unittest", "tests.presentation.test_structural_migration", "-v"),
             expected_test_count=6,
@@ -100,6 +110,8 @@ def validation_commands(python_executable: str | Path) -> tuple[ValidationComman
                 "tests.presentation.test_designer_preview_sizing",
                 "tests.presentation.test_designer_preview_resize",
                 "tests.presentation.test_designer_numeric_drag",
+                "tests.presentation.test_designer_layout_autonomy",
+                "tests.presentation.test_designer_hierarchy_drag",
                 "tests.presentation.test_designer_clipboard",
                 "tests.presentation.test_designer_selection",
                 "tests.presentation.test_designer_project",
@@ -115,7 +127,7 @@ def validation_commands(python_executable: str | Path) -> tuple[ValidationComman
                 "tests.packaging.test_tranche_validation",
                 "-v",
             ),
-            expected_test_count=311,
+            expected_test_count=334,
         ),
         ValidationCommand(
             "GUI component regression",
@@ -125,7 +137,7 @@ def validation_commands(python_executable: str | Path) -> tuple[ValidationComman
         ValidationCommand(
             "Tkinter live backend regression",
             (python, "-m", "unittest", "tests.presentation.test_tkinter_backend", "-v"),
-            expected_test_count=44,
+            expected_test_count=46,
         ),
         ValidationCommand(
             "Localization extraction check",
@@ -258,9 +270,9 @@ def run_validation(report_path: Path) -> int:
         _write_line(report, r"  python examples\ecosystem_blank_app.py --ui-backend dearpygui")
         _write_line(report, "Tkinter blank app:")
         _write_line(report, r"  python examples\ecosystem_blank_app.py --ui-backend tkinter")
-        _write_line(report, "Designer shell + palette + placement + structural commands/shortcuts + preview sizing + pointer resize + numeric scrub/reset + hierarchy + inspector + clickable preview Dear PyGui smoke:")
+        _write_line(report, "Designer shell + palette + placement + structural commands/shortcuts + preview sizing + pointer resize + numeric scrub/reset + independent child sizing + hierarchy drag/reparent + inspector + clickable preview Dear PyGui smoke:")
         _write_line(report, r"  python examples\ecosystem_designer_shell.py --ui-backend dearpygui")
-        _write_line(report, "Designer shell + palette + placement + structural commands/shortcuts + preview sizing + pointer resize + numeric scrub/reset + hierarchy + inspector + clickable preview Tkinter smoke:")
+        _write_line(report, "Designer shell + palette + placement + structural commands/shortcuts + preview sizing + pointer resize + numeric scrub/reset + independent child sizing + hierarchy drag/reparent + inspector + clickable preview Tkinter smoke:")
         _write_line(report, r"  python examples\ecosystem_designer_shell.py --ui-backend tkinter")
         _write_line(report, "SalixTorrent Dear PyGui smoke:")
         _write_line(report, "  python main.py")

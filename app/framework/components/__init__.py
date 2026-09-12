@@ -3,11 +3,15 @@
 from .layout import (
     AUTO,
     FILL,
+    NATURAL,
+    STRETCH,
     ControlLayout,
     ControlLayoutDefaults,
     ControlLayoutTheme,
+    CrossAxisMode,
     DimensionMode,
     ResolvedControlLayout,
+    cross_axis_mode,
     resolve_control_layout,
 )
 from .attachments import Tooltip
@@ -79,6 +83,8 @@ from .renderer import (
 __all__ = [
     "AUTO",
     "FILL",
+    "NATURAL",
+    "STRETCH",
     "AnchoredChild",
     "AnchoredPlacement",
     "AxisAnchor",
@@ -99,6 +105,7 @@ __all__ = [
     "ControlLayoutDefaults",
     "ControlLayoutTheme",
     "ControlRow",
+    "CrossAxisMode",
     "Dialog",
     "DimensionMode",
     "DurationEditor",
@@ -137,6 +144,7 @@ __all__ = [
     "overlay",
     "placement_from_descriptor",
     "positioned",
+    "cross_axis_mode",
     "resolve_control_layout",
     "set_default_renderer",
 ]

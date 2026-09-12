@@ -85,7 +85,10 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
 
     layout_coordinator = LayoutCoordinator(host.presentation.layout_host)
     holder = {}
-    status = Label("Select/click the preview, drag the selected resize handle, edit properties/sizes, place components, or use structural commands/shortcuts.")
+    status = Label(
+        "Select/click the preview, resize/scrub properties, or drag hierarchy nodes "
+        "onto simple containers to reparent them."
+    )
     palette_parent = ControlColumn(layout=ControlLayout(width=FILL, height=FILL))
     placement_parent = ControlColumn(layout=ControlLayout(width=FILL, height=FILL))
     hierarchy_parent = ControlColumn(layout=ControlLayout(width=FILL, height=FILL))
@@ -172,7 +175,7 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
         layout=ControlLayout(width=FILL, height=520),
     )
     chrome = ControlColumn((
-        Label("Designer Shell Surface — post-v0.5.1 Tranche 10"),
+        Label("Designer Shell Surface — post-v0.5.1 Tranche 11"),
         Button("Designer Commands", callback=show_commands),
         status,
         workspace_split,
@@ -371,12 +374,17 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
             preview_selection.refresh()
         if preview_resize is not None:
             preview_resize.refresh()
+        status.set_text(f"Hierarchy: {workspace.state.selected_id or '(no selection)'}")
+
+    def on_hierarchy_error(exc):
+        status.set_text(f"Hierarchy drop unavailable: {exc}")
 
     hierarchy_panel = DesignerHierarchyPanel(
         workspace,
         hierarchy_host,
         title="Hierarchy",
         on_change=on_hierarchy_change,
+        on_error=on_hierarchy_error,
     )
     hierarchy_panel.build(parent=hierarchy_parent.require_item())
     holder["hierarchy"] = hierarchy_panel

@@ -15,6 +15,10 @@ class DearPyGuiRenderer:
 
     def __init__(self, *, component_profile: ComponentLayoutProfile | None = None):
         self.component_profile = component_profile or FRAMEWORK_COMPONENT_PROFILE
+        # Transient renderer-only linear-layout context.  The framework owns
+        # the semantic policy; this stack merely translates an explicit
+        # cross-axis stretch request into Dear PyGui's fill dimension.
+        self._linear_layout_stack: list[tuple[str, str]] = []
 
     def set_component_profile(self, profile: ComponentLayoutProfile) -> None:
         if not isinstance(profile, ComponentLayoutProfile):
@@ -31,9 +35,30 @@ class DearPyGuiRenderer:
     def _clean_kwargs(kwargs: dict) -> dict:
         return {key: value for key, value in kwargs.items() if value is not None}
 
+    def _apply_parent_cross_axis(self, item_kind: str, kwargs: dict) -> dict:
+        """Apply the active linear parent's explicit cross-axis policy.
+
+        Dear PyGui text/checkbox primitives do not expose generic size keywords;
+        leave those natural rather than manufacturing unsupported arguments.
+        Common resizable controls and structural containers still honour the
+        explicit stretch contract.
+        """
+
+        if not self._linear_layout_stack or "parent" in kwargs:
+            return kwargs
+        kind, mode = self._linear_layout_stack[-1]
+        if mode != "stretch" or item_kind in {"label", "checkbox"}:
+            return kwargs
+        if kind == "column":
+            kwargs["width"] = -1
+        elif kind == "row":
+            kwargs["height"] = -1
+        return kwargs
+
     def create(self, kind: str, **kwargs) -> object:
         dpg = self._dpg()
         kwargs = self._clean_kwargs(dict(kwargs))
+        kwargs = self._apply_parent_cross_axis(kind, kwargs)
 
         if kind == "label":
             text = kwargs.pop("text")
@@ -64,14 +89,25 @@ class DearPyGuiRenderer:
     def container(self, kind: str, **kwargs) -> Iterator[object]:
         dpg = self._dpg()
         kwargs = self._clean_kwargs(dict(kwargs))
+        kwargs = self._apply_parent_cross_axis(kind, kwargs)
 
         if kind == "row":
+            cross_axis = str(kwargs.pop("cross_axis", "natural"))
             with dpg.group(horizontal=True, **kwargs) as item:
-                yield item
+                self._linear_layout_stack.append(("row", cross_axis))
+                try:
+                    yield item
+                finally:
+                    self._linear_layout_stack.pop()
             return
         if kind == "column":
+            cross_axis = str(kwargs.pop("cross_axis", "natural"))
             with dpg.group(horizontal=False, **kwargs) as item:
-                yield item
+                self._linear_layout_stack.append(("column", cross_axis))
+                try:
+                    yield item
+                finally:
+                    self._linear_layout_stack.pop()
             return
         if kind == "grid":
             policy = kwargs.pop("policy", None)

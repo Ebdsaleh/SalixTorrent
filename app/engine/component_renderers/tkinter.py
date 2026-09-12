@@ -42,6 +42,7 @@ class _ContainerState:
     row: int = 0
     column: int = 0
     horizontal_spacing: int = 0
+    cross_axis: str = "natural"
 
 
 class _TkTooltip:
@@ -286,13 +287,44 @@ class TkinterRenderer:
 
         side = "left" if state is not None and state.kind == "row" and not parent_explicit else "top"
         options = {"side": side}
-        if fill_x and fill_y:
+
+        if state is not None and state.kind == "column" and not parent_explicit:
+            # A column owns vertical flow only.  Cross-axis stretching is now an
+            # explicit container policy instead of an implicit side effect of
+            # the widest sibling.  Explicit FILL still wins on either axis.
+            stretch_x = fill_x or state.cross_axis == "stretch"
+            if fill_y:
+                options.update(
+                    fill="both" if stretch_x else "y",
+                    expand=True,
+                    anchor="w",
+                )
+            elif stretch_x:
+                options.update(fill="x", expand=False, anchor="w")
+            else:
+                options.update(anchor="w")
+        elif state is not None and state.kind == "row" and not parent_explicit:
+            # A row owns horizontal flow only.  Natural child heights stay
+            # autonomous unless the parent explicitly requests cross-axis
+            # stretching or the child explicitly asks for FILL height.
+            stretch_y = fill_y or state.cross_axis == "stretch"
+            if fill_x:
+                options.update(
+                    fill="both" if stretch_y else "x",
+                    expand=True,
+                    anchor="n",
+                )
+            elif stretch_y:
+                options.update(fill="y", expand=False, anchor="n")
+            else:
+                options.update(anchor="n")
+        elif fill_x and fill_y:
             options.update(fill="both", expand=True)
         elif fill_x:
             options.update(fill="x", expand=True)
         elif fill_y:
             options.update(fill="y", expand=True)
-        elif state is not None and state.kind in {"column", "panel"}:
+        elif state is not None and state.kind == "panel":
             options.update(fill="x")
 
         if state is not None and state.kind == "row" and state.horizontal_spacing:
@@ -790,7 +822,16 @@ class TkinterRenderer:
             show=True,
         )
         spacing = max(0, int(kwargs.pop("horizontal_spacing", 0) or 0))
-        state = _ContainerState(kind=kind, item=item, widget=widget, horizontal_spacing=spacing)
+        cross_axis = str(kwargs.pop("cross_axis", "natural")).strip().lower()
+        if cross_axis not in {"natural", "stretch"}:
+            raise ValueError("Tkinter linear container cross_axis must be 'natural' or 'stretch'")
+        state = _ContainerState(
+            kind=kind,
+            item=item,
+            widget=widget,
+            horizontal_spacing=spacing,
+            cross_axis=cross_axis,
+        )
         self._stack.append(state)
         try:
             yield item

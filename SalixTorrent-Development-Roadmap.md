@@ -1,9 +1,9 @@
 # SalixTorrent Development Roadmap
 
 **Current application version string:** `0.5.1`
-**Roadmap status:** v0.5.1 is released/tagged at `8212ac7cc26e4b781d2e5aa0aa3d5981c27022d0`; post-v0.5.1 Tranches 1 through 9 are published and Tranche 10 designer reset/numeric scrubbing uses the full-commit Windows-acceptance workflow
-**Current implementation checkpoint:** post-v0.5.1 Tranche 10 Reset all to defaults, Inspector numeric scrubbing and modifier-sensitive resize are the current implementation/docs boundary over published Tranche 9 at `1870e053c444e2ca390543cb62a721b162f5ff61`; publication is valid only after the real-Windows validator, direct-manipulation visual smoke and pre-commit gate pass
-**Current real Windows regression baseline:** 905 / 905 in both accepted post-v0.5.1 Tranche-9 discovery forms with one expected non-Windows shell-behavior skip; pointer resize 18 / 18, designer/relocation 295 / 295, GUI components 64 / 64 and Tkinter 44 / 44; localization remains 1,337/current, repaired Dear PyGui pointer behavior/Tkinter/SalixTorrent visual smoke and pre-commit passed; Tranche 9 is published at `1870e053c444e2ca390543cb62a721b162f5ff61`.
+**Roadmap status:** v0.5.1 is released/tagged at `8212ac7cc26e4b781d2e5aa0aa3d5981c27022d0`; post-v0.5.1 Tranches 1 through 10 are published and Tranche 11 layout autonomy + first hierarchy drag/reparent uses the full-commit Windows-acceptance workflow
+**Current implementation checkpoint:** post-v0.5.1 Tranche 11 makes linear-container cross-axis sizing explicit (`natural` by default, `stretch` opt-in) and adds conservative hierarchy drag/reparent over existing immutable structural transactions; it is prepared over published Tranche 10 at `176aa7e52c4607094bc7f95c56de2cdbabfd216e`
+**Current real Windows regression baseline:** 921 / 921 in both accepted post-v0.5.1 Tranche-10 discovery forms with one expected non-Windows shell-behavior skip; reset/scrub 33 / 33, pointer resize 19 / 19, designer/relocation 311 / 311, GUI components 64 / 64 and Tkinter 44 / 44; visual smoke and pre-commit passed; Tranche 10 is published at `176aa7e52c4607094bc7f95c56de2cdbabfd216e`.
 **Accepted Tranche 12 baseline:** 643 / 643 in both real-Windows discovery forms with one expected skip; preview 12 / 12, designer/relocation 56 / 56, GUI components 64 / 64, Tkinter 22 / 22, visuals and pre-commit passed; closure/push checkpoint `8d05ca8b059cef0ba386f324c215f2e80a9bfa83`
 **Accepted Tranche 13 baseline:** 655 / 655 in both real-Windows discovery forms with one expected skip; preview host 11 / 11, designer/relocation 67 / 67, GUI components 64 / 64, Tkinter 23 / 23, localization current, visuals and pre-commit passed; implementation `ddfb3ef2269acb33484cd6fe2f99af47fa40140f`, closure/push checkpoint `4b0968bfdf91ce040eeefd641b1e315244a325e6`
 **Accepted Tranche 14 baseline:** 668 / 668 in both real-Windows discovery forms with one expected skip; clipboard 12 / 12, designer/relocation 79 / 79, GUI components 64 / 64, Tkinter 24 / 24, localization current, visuals and pre-commit passed; implementation `450c12a`, closure/push checkpoint `f59a9a392bf64820f59787b9449d6b7ca9b3e634`
@@ -21,6 +21,7 @@
 **Accepted post-v0.5.1 Tranche 4 baseline:** preview click-selection 12 / 12, designer/relocation 218 / 218, GUI components 64 / 64, Tkinter 38 / 38 and both complete discovery forms 821 / 821 with one expected skip; localization/headless/compileall/Git, dual-backend designer/blank-app/product visual smoke and pre-commit passed; published at `31d0d4207c12ffd226bddd29a2a81d26c92e98dd` under `Add designer preview click-selection surface`.
 **Accepted post-v0.5.1 Tranche 5 baseline:** component palette 14 / 14, structural/menu routing 6 / 6, designer/relocation 232 / 232, GUI components 64 / 64, Tkinter 39 / 39 and both complete discovery forms 837 / 837 with one expected skip; localization/headless/compileall/Git, dual-backend designer/blank-app/product visual smoke and pre-commit passed; published at `0b821dd1ec9e7b59ba6838ca8ede2dfdd4e1e323` under `Add designer component palette and fix detail menu`.
 **Accepted post-v0.5.1 Tranche 6 baseline:** component placement 16 / 16, designer/relocation 248 / 248, GUI components 64 / 64, Tkinter 40 / 40 and both complete discovery forms 854 / 854 with one expected Windows skip; published at `9b61c6f61c8c7eb451a52b12283873d8a96555c0`.
+**Accepted post-v0.5.1 Tranche 10 baseline:** reset/scrub 33 / 33, pointer-resize regression 19 / 19, designer/relocation 311 / 311, GUI components 64 / 64, Tkinter 44 / 44 and both complete discovery forms 921 / 921 with one expected Windows skip; published at `176aa7e52c4607094bc7f95c56de2cdbabfd216e` under `Add designer numeric scrubbing and reset controls`.
 
 **Post-v0.5.1 Tranche 7 full-commit gate:** structural commands/shortcuts 16 / 16, designer/relocation 264 / 264, GUI components 64 / 64, Tkinter 41 / 41 and both complete discovery forms 871 / 871; localization/headless/compileall/Git must remain clean, both designer backends plus blank-app/product smoke must pass, and `pre_commit_check.bat` must pass before the single Tranche-7 commit.
 
@@ -1044,6 +1045,20 @@ The selected-component resize hosts consume the same modifier sensitivity. Dear 
 Preparation adds a 12-test numeric-drag module and three inspector-panel reset/scrub-base regressions, raises pointer-resize regressions to 19, the combined reset/scrub focused gate to 33, designer/relocation to 311 and complete discovery to **921 / 921**. Real-Windows acceptance must exercise Reset/Undo, numeric scrubbing with normal/Shift/Ctrl, physical resize with the same modifiers, and verify Tkinter's outer window dimensions remain unchanged.
 
 Hierarchy drag/reparent remains the strongest next direct-manipulation candidate once this common manipulation vocabulary is accepted.
+
+
+### A35. Independent linear child geometry and hierarchy drag/reparent — post-v0.5.1 Tranche 11 full-commit gate
+
+Tranche 11 separates a linear container's available cross-axis capacity from each child's own requested geometry. `ControlRow` and `ControlColumn` now expose one backend-neutral `cross_axis` policy with two deliberately narrow values: `natural` preserves each child's resolved width/height and is the default; `stretch` is an explicit opt-in for equal/fill-style presentation. An explicitly `fill` child remains authoritative. This removes the Tkinter behavior where widening one child implicitly made narrower siblings look equally wide while preserving intentional stretch layouts as a parent choice.
+
+The designer catalog captures `cross_axis` as an editable choice on row/column containers, preview reconstruction preserves it, and older sparse snapshots that do not contain the property reconstruct as `natural`. Dear PyGui and Tkinter translate the same semantic policy rather than independently deciding whether siblings stretch.
+
+The same tranche adds the first hierarchy drag/reparent gesture. Toolkit hosts report only stable source/target node IDs. Framework-only `designer_hierarchy_drag.py` resolves the gesture against the current immutable snapshot and accepts only an unambiguous metadata-free child slot. A successful drop delegates to `DesignerWorkspace.reparent_node(...)`, preserves the dragged stable ID, updates selection/focus/reveal and creates one existing structural history operation. Grids, tab pages, split panes, positioned/anchored relationships and other targets requiring explicit relationship metadata are rejected rather than guessed; the Placement surface remains authoritative for those cases.
+
+Preparation passes the 23 / 23 Tranche-11 focused gate, 334 / 334 designer/relocation, 64 / 64 GUI components, 46 / 46 live Tkinter under Xvfb, display-less complete discovery at **946 / 946** and full Xvfb discovery at **946 / 946**. Real-Windows acceptance must verify independent sibling widths on both desktop backends, explicit stretch behavior, hierarchy drag into simple columns, one-step Undo, stable selection, and safe rejection of unsupported complex targets before publication.
+
+Palette drag/drop, arbitrary insertion-between-row indicators, relationship-metadata authoring during drag, multi-selection, snapping/alignment guides and richer transform handles remain later work.
+
 
 ---
 

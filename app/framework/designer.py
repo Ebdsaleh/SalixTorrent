@@ -1004,6 +1004,14 @@ def _framework_catalog() -> DesignerCatalog:
             "Row",
             ControlRow,
             category="container",
+            properties=(
+                DesignerPropertySpec(
+                    "cross_axis",
+                    "Cross-axis sizing",
+                    DesignerValueKind.CHOICE,
+                    choices=("natural", "stretch"),
+                ),
+            ),
             child_reader=_linear_children,
             child_slots=(_CHILDREN_SLOT,),
         ),
@@ -1012,6 +1020,14 @@ def _framework_catalog() -> DesignerCatalog:
             "Column",
             ControlColumn,
             category="container",
+            properties=(
+                DesignerPropertySpec(
+                    "cross_axis",
+                    "Cross-axis sizing",
+                    DesignerValueKind.CHOICE,
+                    choices=("natural", "stretch"),
+                ),
+            ),
             child_reader=_linear_children,
             child_slots=(_CHILDREN_SLOT,),
         ),

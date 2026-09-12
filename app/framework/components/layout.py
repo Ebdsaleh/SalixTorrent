@@ -32,6 +32,35 @@ AUTO = DimensionMode.AUTO
 FILL = DimensionMode.FILL
 
 
+class CrossAxisMode(str, Enum):
+    """How a linear container treats children on its non-flow axis.
+
+    ``NATURAL`` preserves each child's own resolved width/height. ``STRETCH``
+    asks the backend to fill the container on the cross axis.  Keeping this
+    choice container-local avoids the old implicit "widest sibling stretches
+    every child" behavior while still making equal-width/equal-height layouts
+    an explicit option.
+    """
+
+    NATURAL = "natural"
+    STRETCH = "stretch"
+
+
+NATURAL = CrossAxisMode.NATURAL
+STRETCH = CrossAxisMode.STRETCH
+
+
+def cross_axis_mode(value: CrossAxisMode | str) -> CrossAxisMode:
+    """Validate/normalise one linear-container cross-axis policy."""
+
+    if isinstance(value, CrossAxisMode):
+        return value
+    try:
+        return CrossAxisMode(str(value).strip().lower())
+    except ValueError as exc:
+        raise ValueError("cross-axis mode must be 'natural' or 'stretch'") from exc
+
+
 @dataclass(frozen=True)
 class ControlLayoutDefaults:
     """Safe framework-owned layout defaults."""

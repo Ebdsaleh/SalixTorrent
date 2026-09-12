@@ -7,7 +7,15 @@ from contextlib import contextmanager
 
 from .base import Component
 from .controls import Label, Separator
-from .layout import AUTO, FILL, ControlLayout, ControlLayoutTheme
+from .layout import (
+    AUTO,
+    FILL,
+    NATURAL,
+    ControlLayout,
+    ControlLayoutTheme,
+    CrossAxisMode,
+    cross_axis_mode,
+)
 from .placement import (
     AnchoredChild,
     AxisAnchor,
@@ -415,12 +423,14 @@ class ControlRow(Component):
         self,
         children: Iterable[Component] = (),
         *,
+        cross_axis: CrossAxisMode | str = NATURAL,
         theme: ControlLayoutTheme | None = None,
         layout: ControlLayout | None = None,
         profile_key: str | None = None,
     ):
         super().__init__(theme=theme, layout=layout, profile_key=profile_key)
         self.children = list(children)
+        self.cross_axis = cross_axis_mode(cross_axis)
 
     def add(self, component: Component) -> Component:
         self.children.append(component)
@@ -433,6 +443,7 @@ class ControlRow(Component):
         kwargs = self._layout_kwargs(resolved)
         if resolved.spacing is not None:
             kwargs["horizontal_spacing"] = resolved.spacing
+        kwargs["cross_axis"] = self.cross_axis.value
         self._with_parent(kwargs, parent)
 
         with renderer.container("row", **kwargs) as item:
@@ -456,12 +467,14 @@ class ControlColumn(Component):
         self,
         children: Iterable[Component] = (),
         *,
+        cross_axis: CrossAxisMode | str = NATURAL,
         theme: ControlLayoutTheme | None = None,
         layout: ControlLayout | None = None,
         profile_key: str | None = None,
     ):
         super().__init__(theme=theme, layout=layout, profile_key=profile_key)
         self.children = list(children)
+        self.cross_axis = cross_axis_mode(cross_axis)
 
     def add(self, component: Component) -> Component:
         self.children.append(component)
@@ -477,6 +490,7 @@ class ControlColumn(Component):
             # spacing argument. Keep the resolved value available for backend
             # implementations that do; the DPG bridge simply uses theme spacing.
             pass
+        kwargs["cross_axis"] = self.cross_axis.value
         self._with_parent(kwargs, parent)
 
         with renderer.container("column", **kwargs) as item:
