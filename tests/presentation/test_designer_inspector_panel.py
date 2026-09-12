@@ -28,6 +28,7 @@ class FakeInspectorPanelHost:
         self.on_error = None
         self.on_reset = None
         self.on_scrub_base = None
+        self.on_scrub_preview = None
         self.built = []
         self.updated = []
         self.disposed = 0
@@ -38,13 +39,14 @@ class FakeInspectorPanelHost:
 
     def build(
         self, state, *, parent, title="", on_set=None, on_clear=None, on_error=None,
-        on_reset=None, on_scrub_base=None,
+        on_reset=None, on_scrub_base=None, on_scrub_preview=None,
     ):
         self.on_set = on_set
         self.on_clear = on_clear
         self.on_error = on_error
         self.on_reset = on_reset
         self.on_scrub_base = on_scrub_base
+        self.on_scrub_preview = on_scrub_preview
         self.built.append(state)
         self.binding = DesignerInspectorPanelBinding(
             panel={"alive": True, "parent": parent, "title": str(title)},
@@ -106,6 +108,8 @@ class DesignerInspectorPanelTests(unittest.TestCase):
             DesignerInspectorPanel(workspace, FakeInspectorPanelHost(), on_change=object())
         with self.assertRaisesRegex(TypeError, "error handler"):
             DesignerInspectorPanel(workspace, FakeInspectorPanelHost(), on_error=object())
+        with self.assertRaisesRegex(TypeError, "preview handler"):
+            DesignerInspectorPanel(workspace, FakeInspectorPanelHost(), on_preview=object())
         workspace.close()
 
     def test_build_without_selection_projects_empty_panel(self):

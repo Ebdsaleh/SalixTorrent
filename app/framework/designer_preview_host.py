@@ -398,6 +398,58 @@ class DesignerPreviewHost:
         self._generation += 1
         return candidate
 
+    @property
+    def has_preview_draft(self) -> bool:
+        """Whether the rendered preview is an ephemeral draft of session state.
+
+        Draft previews are used by direct-manipulation surfaces that need live
+        visual feedback before one final checked/history-bearing commit.  They
+        never change the authoritative edit-session snapshot or history.
+        """
+
+        return bool(
+            self._preview is not None
+            and self._preview.source_snapshot != self.session.snapshot
+        )
+
+    def preview_edit(self, command: DesignerEditCommand) -> bool:
+        """Install one ephemeral candidate preview without editing history.
+
+        The command is always applied to the authoritative session snapshot,
+        not to the previous draft.  This makes pointer translation stable: a
+        drag can repeatedly submit absolute candidate values while the document
+        remains unchanged until release.
+        """
+
+        self._require_open()
+        if not callable(getattr(command, "apply", None)):
+            raise TypeError("designer preview draft requires an edit command")
+        snapshot = command.apply(self.session.snapshot)
+        if not isinstance(snapshot, DesignerSnapshot):
+            raise TypeError("designer edit command must return DesignerSnapshot")
+        if snapshot == self.session.snapshot:
+            return self.cancel_preview_draft()
+        candidate = self._prepare(snapshot)
+        self._retire_previous(candidate)
+        self._install(candidate)
+        return True
+
+    def preview_property(self, node_id: object, property_key: object, value: object) -> bool:
+        """Preview one property value ephemerally without mutating the document."""
+
+        return self.preview_edit(SetDesignerProperty(node_id, property_key, value))
+
+    def cancel_preview_draft(self) -> bool:
+        """Restore the authoritative session snapshot after a live draft."""
+
+        self._require_open()
+        if not self.has_preview_draft:
+            return False
+        candidate = self._prepare(self.session.snapshot)
+        self._retire_previous(candidate)
+        self._install(candidate)
+        return True
+
     def rebuild(self, *, force: bool = False) -> bool:
         """Replace the preview with the session's current snapshot.
 
@@ -435,6 +487,10 @@ class DesignerPreviewHost:
         holder: list[DesignerPreviewBuild] = []
         changed = self.session.execute_checked(command, self._checked_candidate(holder))
         if not changed:
+            # A direct-manipulation surface may have installed a transient
+            # candidate before release.  A semantic no-op must still restore
+            # the accepted session preview so no draft can leak past commit.
+            self.cancel_preview_draft()
             return False
         self._install(holder[0])
         return True

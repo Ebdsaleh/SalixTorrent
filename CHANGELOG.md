@@ -4,6 +4,14 @@ Notable SalixTorrent changes are recorded here.
 
 ## Unreleased
 
+### Ecosystem Extraction — Live Inspector Scrub Preview (post-v0.5.1 Tranche 12)
+
+- Published Tranche 11 at `7bc5192ccbd486483967351e016a066d3e94d9ce` (`Add designer layout autonomy and hierarchy reparenting`) after the exact 25-file / 909-insertion / 25-deletion boundary passed real-Windows acceptance, was pushed to `dev`, and `HEAD == origin/dev` was verified clean.
+- Added an ephemeral preview-draft path to `DesignerPreviewHost`. Numeric Inspector scrubs can now reconstruct and install a candidate preview from the authoritative session snapshot during pointer motion without changing the document snapshot, dirty/history state, or stable selection. Repeated drag samples remain absolute against the committed snapshot instead of compounding from previous draft frames.
+- Dear PyGui and Tkinter Inspector `<>` handles now request a live preview on every drag movement while continuing to commit only once on release. The typed editor still updates during the gesture, and normal/Shift/Ctrl translation continues to use the shared Tranche-10 numeric-drag contract.
+- A semantic no-op release automatically retires any transient candidate, while a real release replaces the draft through the existing checked property transaction and therefore remains one undoable history step. The designer example refreshes preview selection/resize bindings after each transient replacement so the selected component stays visually coherent during live scrubbing.
+- Added 10 focused Tranche-12 regressions covering document/history neutrality, absolute repeated drafts, draft cancellation, one-step final commit/undo, stale-target rejection, host motion wiring and framework/toolkit separation. Preparation passes 344 / 344 designer+relocation, 64 / 64 GUI components, 46 / 46 Tkinter under Xvfb and complete discovery **956 / 956** display-less.
+
 ### Ecosystem Extraction — Layout Autonomy + Hierarchy Drag/Reparent (post-v0.5.1 Tranche 11)
 
 - Published Tranche 10 at `176aa7e52c4607094bc7f95c56de2cdbabfd216e` after the exact 19-file / 687-insertion / 41-deletion boundary passed real-Windows acceptance and `HEAD == origin/dev` was verified clean.
@@ -11,7 +19,7 @@ Notable SalixTorrent changes are recorded here.
 - Added `cross_axis` to designer metadata/reconstruction as a `natural` / `stretch` choice. Older snapshots without the property reconstruct as `natural`, so the change does not require a project-schema migration.
 - Added framework-only `designer_hierarchy_drag.py` as a conservative stable-ID drop planner plus a hierarchy-panel reparent callback. The first gesture means “append this node under that target” and is accepted only for one unambiguous child slot that needs no relationship metadata. Complex grid/tab/split/positioned targets are rejected and continue through explicit Placement.
 - Added Dear PyGui drag payload/drop targets and a Tkinter thresholded tree drag adapter. Concrete hosts forward only source/target IDs; slot validation, stable identity, checked structural mutation, selection/focus/reveal and undo/redo remain framework/workspace owned.
-- Added 23 focused Tranche-11 regressions, two live Tkinter geometry tests and copied/renamed framework coverage. Preparation passes 334 / 334 designer+relocation, 64 / 64 GUI components, 46 / 46 Tkinter, complete discovery **946 / 946** display-less and **946 / 946** under Xvfb.
+- Added 23 focused Tranche-11 regressions, two live Tkinter geometry tests and copied/renamed framework coverage. Real-Windows acceptance passed 23 / 23 focused tests, 334 / 334 designer+relocation, 64 / 64 GUI components, 46 / 46 Tkinter and both complete discovery forms at **946 / 946** with one expected skip. The tranche was committed/pushed as `7bc5192ccbd486483967351e016a066d3e94d9ce`.
 
 ### Ecosystem Extraction — Designer Reset + Numeric Scrubbing (post-v0.5.1 Tranche 10)
 
@@ -477,7 +485,7 @@ v0.5.0 completes the reusable GUI component/framework foundation developed after
 - Migrated the seeding-goal controls in Torrent Properties, `Configure targets...`, and Preferences new-torrent defaults onto the new component layer while preserving the existing GUI behavior, localized strings, durable policy semantics, and legacy item-id aliases used by the surrounding views.
 - Added headless component regressions covering layout provenance/fallback, semantic sizing, arbitrary `ControlRow` composition, integer/float numeric dispatch, value/configuration access, grid validation, and the three-part duration editor.
 - Regenerated deterministic localization extraction metadata after the view-level component migration; no canonical UI/Help/Glossary strings changed.
-- Validated the first component tranche on the real Windows checkout at 343/343 tests in both canonical and plain discovery, with one expected non-Windows skip; live GUI smoke confirmed parity in Torrent Properties, `Configure targets...`, and Preferences.
+- Validated the first component tranche on the real Windows checkout at 344/344 tests in both canonical and plain discovery, with one expected non-Windows skip; live GUI smoke confirmed parity in Torrent Properties, `Configure targets...`, and Preferences.
 
 ### Preferences Component Composition Expansion
 

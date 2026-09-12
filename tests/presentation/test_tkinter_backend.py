@@ -946,6 +946,35 @@ class TkinterBackendLiveTests(unittest.TestCase):
         self.assertEqual(generation + 1, workspace.state.preview_generation)
         self.assertEqual("Tk Inspector", workspace.preview_host.selected_component.label)
 
+        # Tranche-12 live scrub preview: drive the real Tkinter <> handle so
+        # the motion callback must carry the selected stable node ID.  This
+        # guards against late-bound/missing closure state that only appears
+        # during native B1-Motion delivery on Windows.
+        self.root.deiconify()
+        self.root.update()
+        width_handle = binding.metadata["scrub_handles"]["layout.width"]
+        before_width = int(workspace.state.inspector.row("layout.width").value)
+        before_undo = workspace.session.undo_depth
+        width_handle.event_generate("<ButtonPress-1>", x=4, y=4)
+        self.root.update()
+        width_handle.event_generate("<B1-Motion>", x=34, y=4)
+        self.root.update()
+        self.assertTrue(workspace.preview_host.has_preview_draft)
+        self.assertGreater(
+            int(workspace.preview_host.selected_component.layout.width),
+            before_width,
+        )
+        self.assertEqual(before_width, workspace.state.inspector.row("layout.width").value)
+        self.assertEqual(before_undo, workspace.session.undo_depth)
+        width_handle.event_generate("<ButtonRelease-1>", x=34, y=4)
+        self.root.update()
+        self.assertFalse(workspace.preview_host.has_preview_draft)
+        self.assertGreater(
+            int(workspace.state.inspector.row("layout.width").value),
+            before_width,
+        )
+        self.assertEqual(before_undo + 1, workspace.session.undo_depth)
+
         binding.metadata["clear_buttons"]["layout.width"].invoke()
         self.root.update()
         self.assertFalse(workspace.state.inspector.row("layout.width").is_set)

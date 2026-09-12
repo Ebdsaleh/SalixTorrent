@@ -95,6 +95,7 @@ class DearPyGuiDesignerInspectorPanelHost:
         on_error = metadata["on_error"]
         on_reset = metadata["on_reset"]
         on_scrub_base = metadata["on_scrub_base"]
+        on_scrub_preview = metadata["on_scrub_preview"]
 
         def commit_text(_sender, app_data, user_data):
             row, node_id = user_data
@@ -250,6 +251,7 @@ class DearPyGuiDesignerInspectorPanelHost:
         on_error,
         on_reset,
         on_scrub_base,
+        on_scrub_preview,
     ) -> DesignerInspectorPanelBinding:
         dpg = self._dpg()
         panel = dpg.add_child_window(parent=parent, border=True, height=self.height)
@@ -272,6 +274,7 @@ class DearPyGuiDesignerInspectorPanelHost:
                 "on_error": on_error,
                 "on_reset": on_reset,
                 "on_scrub_base": on_scrub_base,
+                "on_scrub_preview": on_scrub_preview,
                 "handler_registry": handler_registry,
                 "scrub_drag": None,
                 "apply_buttons": {},
@@ -327,8 +330,9 @@ class DearPyGuiDesignerInspectorPanelHost:
             try:
                 if dpg.does_item_exist(drag["editor"]):
                     dpg.set_value(drag["editor"], text)
-            except Exception:
-                pass
+                on_scrub_preview(drag["node_id"], row.key, value)
+            except Exception as exc:
+                on_error(drag["node_id"], row.key, exc)
 
         def scrub_release(_sender=None, _app_data=None, _user_data=None):
             drag = binding.metadata.get("scrub_drag")

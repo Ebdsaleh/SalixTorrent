@@ -123,6 +123,7 @@ class TkinterDesignerInspectorPanelHost:
         on_error = metadata["on_error"]
         on_reset = metadata["on_reset"]
         on_scrub_base = metadata["on_scrub_base"]
+        on_scrub_preview = metadata["on_scrub_preview"]
 
         def defer(callback):
             self.renderer.root.after_idle(callback)
@@ -243,7 +244,7 @@ class TkinterDesignerInspectorPanelHost:
                         except Exception as exc:
                             on_error(n, r.key, exc)
 
-                    def scrub_move(event, r=row, v=variable, d=drag):
+                    def scrub_move(event, r=row, n=state.node_id, v=variable, d=drag):
                         if d.get("start_x") is None or d.get("base") is None:
                             return
                         mods = DesignerDragModifiers(
@@ -255,6 +256,10 @@ class TkinterDesignerInspectorPanelHost:
                         )
                         d["value"] = value
                         v.set(str(int(value)) if isinstance(value, int) else f"{float(value):g}")
+                        try:
+                            on_scrub_preview(n, r.key, value)
+                        except Exception as exc:
+                            on_error(n, r.key, exc)
 
                     def scrub_release(_event, r=row, n=state.node_id, d=drag):
                         value = d.get("value")
@@ -324,6 +329,7 @@ class TkinterDesignerInspectorPanelHost:
         on_error,
         on_reset,
         on_scrub_base,
+        on_scrub_preview,
     ) -> DesignerInspectorPanelBinding:
         import tkinter as tk
         from tkinter import ttk
@@ -380,6 +386,7 @@ class TkinterDesignerInspectorPanelHost:
                 "on_error": on_error,
                 "on_reset": on_reset,
                 "on_scrub_base": on_scrub_base,
+                "on_scrub_preview": on_scrub_preview,
                 "variables": {},
                 "apply_buttons": {},
                 "clear_buttons": {},

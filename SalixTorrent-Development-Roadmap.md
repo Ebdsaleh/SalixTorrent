@@ -1,9 +1,9 @@
 # SalixTorrent Development Roadmap
 
 **Current application version string:** `0.5.1`
-**Roadmap status:** v0.5.1 is released/tagged at `8212ac7cc26e4b781d2e5aa0aa3d5981c27022d0`; post-v0.5.1 Tranches 1 through 10 are published and Tranche 11 layout autonomy + first hierarchy drag/reparent uses the full-commit Windows-acceptance workflow
-**Current implementation checkpoint:** post-v0.5.1 Tranche 11 makes linear-container cross-axis sizing explicit (`natural` by default, `stretch` opt-in) and adds conservative hierarchy drag/reparent over existing immutable structural transactions; it is prepared over published Tranche 10 at `176aa7e52c4607094bc7f95c56de2cdbabfd216e`
-**Current real Windows regression baseline:** 921 / 921 in both accepted post-v0.5.1 Tranche-10 discovery forms with one expected non-Windows shell-behavior skip; reset/scrub 33 / 33, pointer resize 19 / 19, designer/relocation 311 / 311, GUI components 64 / 64 and Tkinter 44 / 44; visual smoke and pre-commit passed; Tranche 10 is published at `176aa7e52c4607094bc7f95c56de2cdbabfd216e`.
+**Roadmap status:** v0.5.1 is released/tagged at `8212ac7cc26e4b781d2e5aa0aa3d5981c27022d0`; post-v0.5.1 Tranches 1 through 11 are published and Tranche 12 live Inspector scrub preview uses the full-commit Windows-acceptance workflow
+**Current implementation checkpoint:** post-v0.5.1 Tranche 12 gives the existing Inspector `<>` numeric scrub gesture an ephemeral live Preview path while preserving one checked commit on release; it is prepared over published Tranche 11 at `7bc5192ccbd486483967351e016a066d3e94d9ce`
+**Current real Windows regression baseline:** 946 / 946 in both accepted post-v0.5.1 Tranche-11 discovery forms with one expected non-Windows shell-behavior skip; layout/drag 23 / 23, designer/relocation 334 / 334, GUI components 64 / 64 and Tkinter 46 / 46; visual smoke and pre-commit passed; Tranche 11 is published at `7bc5192ccbd486483967351e016a066d3e94d9ce`.
 **Accepted Tranche 12 baseline:** 643 / 643 in both real-Windows discovery forms with one expected skip; preview 12 / 12, designer/relocation 56 / 56, GUI components 64 / 64, Tkinter 22 / 22, visuals and pre-commit passed; closure/push checkpoint `8d05ca8b059cef0ba386f324c215f2e80a9bfa83`
 **Accepted Tranche 13 baseline:** 655 / 655 in both real-Windows discovery forms with one expected skip; preview host 11 / 11, designer/relocation 67 / 67, GUI components 64 / 64, Tkinter 23 / 23, localization current, visuals and pre-commit passed; implementation `ddfb3ef2269acb33484cd6fe2f99af47fa40140f`, closure/push checkpoint `4b0968bfdf91ce040eeefd641b1e315244a325e6`
 **Accepted Tranche 14 baseline:** 668 / 668 in both real-Windows discovery forms with one expected skip; clipboard 12 / 12, designer/relocation 79 / 79, GUI components 64 / 64, Tkinter 24 / 24, localization current, visuals and pre-commit passed; implementation `450c12a`, closure/push checkpoint `f59a9a392bf64820f59787b9449d6b7ca9b3e634`
@@ -1058,6 +1058,18 @@ The same tranche adds the first hierarchy drag/reparent gesture. Toolkit hosts r
 Preparation passes the 23 / 23 Tranche-11 focused gate, 334 / 334 designer/relocation, 64 / 64 GUI components, 46 / 46 live Tkinter under Xvfb, display-less complete discovery at **946 / 946** and full Xvfb discovery at **946 / 946**. Real-Windows acceptance must verify independent sibling widths on both desktop backends, explicit stretch behavior, hierarchy drag into simple columns, one-step Undo, stable selection, and safe rejection of unsupported complex targets before publication.
 
 Palette drag/drop, arbitrary insertion-between-row indicators, relationship-metadata authoring during drag, multi-selection, snapping/alignment guides and richer transform handles remain later work.
+
+### A36. Live Inspector numeric-scrub preview — post-v0.5.1 Tranche 12 full-commit gate
+
+Tranche 12 makes the already accepted Inspector `<>` scrub control visually immediate without converting pointer motion into document edits. Each movement translates the pointer delta through the existing normal/Shift/Ctrl numeric policy, then asks the preview owner to reconstruct an **ephemeral candidate** from the authoritative session snapshot. The document snapshot, dirty flag, selection and undo/redo history remain unchanged while the mouse is held.
+
+Candidate samples are absolute against the committed snapshot rather than compounded from the previous draft frame. Returning the scrub to its original semantic value automatically restores the accepted preview. On release, the existing checked `SetDesignerProperty` path commits only the final value, retires the draft and creates at most one history entry; a semantic no-op release cannot leave a transient preview behind.
+
+Dear PyGui and Tkinter remain thin pointer adapters. Both update the Inspector editor text and request the same live candidate during motion. The designer shell refreshes preview selection/resize bindings after each transient replacement so the selected control and resize affordance follow the new native preview object. No toolkit types enter `app/framework`, and no second property model is introduced.
+
+Preparation passes 10 / 10 focused live-preview tests, 344 / 344 designer+relocation, 64 / 64 GUI components, 46 / 46 Tkinter under Xvfb and complete discovery at **956 / 956** display-less. Real-Windows acceptance must visibly confirm that dragging Width/Height/Spacing `<>` updates Preview continuously, normal/Shift/Ctrl sensitivity remains consistent, release creates one undo step, and returning to the start value does not leave a stale draft.
+
+Hierarchy insertion indicators, palette drag-to-preview, multi-selection/mixed-value Inspector state, snapping/guides and incremental renderer mutation remain later work.
 
 
 ---

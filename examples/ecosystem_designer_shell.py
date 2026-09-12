@@ -86,7 +86,7 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
     layout_coordinator = LayoutCoordinator(host.presentation.layout_host)
     holder = {}
     status = Label(
-        "Select/click the preview, resize/scrub properties, or drag hierarchy nodes "
+        "Select/click the preview, live-scrub properties, resize components, or drag hierarchy nodes "
         "onto simple containers to reparent them."
     )
     palette_parent = ControlColumn(layout=ControlLayout(width=FILL, height=FILL))
@@ -175,7 +175,7 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
         layout=ControlLayout(width=FILL, height=520),
     )
     chrome = ControlColumn((
-        Label("Designer Shell Surface — post-v0.5.1 Tranche 11"),
+        Label("Designer Shell Surface — post-v0.5.1 Tranche 12"),
         Button("Designer Commands", callback=show_commands),
         status,
         workspace_split,
@@ -356,12 +356,22 @@ def _run(backend_name: str, *, smoke_seconds: float = 0.0) -> int:
     def on_inspector_error(property_key, exc):
         status.set_text(f"Inspector error ({property_key}): {exc}")
 
+    def on_inspector_preview(node_id, property_key, value):
+        preview_selection = holder.get("preview_selection")
+        preview_resize = holder.get("preview_resize")
+        if preview_selection is not None:
+            preview_selection.refresh()
+        if preview_resize is not None:
+            preview_resize.refresh()
+        status.set_text(f"Live property preview: {node_id} {property_key} -> {value}")
+
     inspector_panel = DesignerInspectorPanel(
         workspace,
         inspector_host,
         title="Inspector",
         on_change=on_inspector_change,
         on_error=on_inspector_error,
+        on_preview=on_inspector_preview,
     )
     inspector_panel.build(parent=inspector_parent.require_item())
     holder["inspector"] = inspector_panel

@@ -31,6 +31,7 @@ from .designer_editing import ClearDesignerProperty, CompositeDesignerEdit
 
 DesignerInspectorPanelChangeHandler = Callable[[DesignerInspectorState], object]
 DesignerInspectorPanelErrorHandler = Callable[[str, Exception], object]
+DesignerInspectorPanelPreviewHandler = Callable[[str, str, object], object]
 
 
 @dataclass
@@ -59,6 +60,7 @@ class DesignerInspectorPanelHost(Protocol):
         on_error: Callable[[str, str, Exception], object],
         on_reset: Callable[[str], object],
         on_scrub_base: Callable[[str, str], float],
+        on_scrub_preview: Callable[[str, str, object], object],
     ) -> DesignerInspectorPanelBinding:
         ...
 
@@ -166,6 +168,7 @@ class DesignerInspectorPanel:
         title: str = "Inspector",
         on_change: DesignerInspectorPanelChangeHandler | None = None,
         on_error: DesignerInspectorPanelErrorHandler | None = None,
+        on_preview: DesignerInspectorPanelPreviewHandler | None = None,
     ):
         if not isinstance(workspace, DesignerWorkspace):
             raise TypeError("designer inspector panel requires DesignerWorkspace")
@@ -179,11 +182,14 @@ class DesignerInspectorPanel:
             raise TypeError("designer inspector panel change handler must be callable")
         if on_error is not None and not callable(on_error):
             raise TypeError("designer inspector panel error handler must be callable")
+        if on_preview is not None and not callable(on_preview):
+            raise TypeError("designer inspector panel preview handler must be callable")
         self._workspace = workspace
         self._host = host
         self._title = str(title)
         self._on_change = on_change
         self._on_error = on_error
+        self._on_preview = on_preview
         self._parent: object | None = None
         self._binding: DesignerInspectorPanelBinding | None = None
 
@@ -216,6 +222,7 @@ class DesignerInspectorPanel:
             on_error=self._host_error,
             on_reset=self._host_reset,
             on_scrub_base=self._host_scrub_base,
+            on_scrub_preview=self._host_scrub_preview,
         )
         if not isinstance(binding, DesignerInspectorPanelBinding):
             raise TypeError(
@@ -324,6 +331,12 @@ class DesignerInspectorPanel:
         try:
             return self._set_for_target(node_id, property_key, value)
         except Exception as exc:
+            # A stale/invalid release must never leave an earlier live scrub
+            # candidate installed after the gesture has failed to commit.
+            try:
+                self._workspace.cancel_preview_draft()
+            except Exception:
+                pass
             return self._report_error(property_key, exc)
 
     def _host_clear(self, node_id: str, property_key: str) -> bool:
@@ -384,8 +397,31 @@ class DesignerInspectorPanel:
         except Exception as exc:
             return self._report_error("reset", exc)
 
+    def _preview_scrub_for_target(
+        self, node_id: object, property_key: object, value: object
+    ) -> bool:
+        row = self._current_row(property_key, expected_node_id=node_id)
+        if not row.can_edit:
+            raise ValueError(f"designer inspector property {row.key!r} is not editable")
+        changed = self._workspace.preview_selected_property(row.key, value)
+        if self._on_preview is not None:
+            self._on_preview(row.node_id, row.key, value)
+        return changed
+
     def _host_scrub_base(self, node_id: str, property_key: str) -> float:
         return self._scrub_base_for_target(node_id, property_key)
+
+    def _host_scrub_preview(self, node_id: str, property_key: str, value: object) -> bool:
+        try:
+            return self._preview_scrub_for_target(node_id, property_key, value)
+        except Exception as exc:
+            # Retire any prior successful sample when a later motion sample is
+            # rejected.  The authoritative document remains unchanged.
+            try:
+                self._workspace.cancel_preview_draft()
+            except Exception:
+                pass
+            return self._report_error(property_key, exc)
 
     def _host_error(self, _node_id: str, property_key: str, exc: Exception) -> bool:
         if not isinstance(exc, Exception):
@@ -434,6 +470,7 @@ __all__ = [
     "DesignerInspectorPanelBinding",
     "DesignerInspectorPanelChangeHandler",
     "DesignerInspectorPanelErrorHandler",
+    "DesignerInspectorPanelPreviewHandler",
     "DesignerInspectorPanelHost",
     "format_inspector_editor_value",
     "parse_inspector_editor_text",

@@ -446,15 +446,18 @@ class FrameworkPackagingTests(unittest.TestCase):
                         self.on_error = None
                         self.on_reset = None
                         self.on_scrub_base = None
+                        self.on_scrub_preview = None
                     def build(
                         self, state, *, parent, title="", on_set=None, on_clear=None,
-                        on_error=None, on_reset=None, on_scrub_base=None
+                        on_error=None, on_reset=None, on_scrub_base=None,
+                        on_scrub_preview=None
                     ):
                         self.on_set = on_set
                         self.on_clear = on_clear
                         self.on_error = on_error
                         self.on_reset = on_reset
                         self.on_scrub_base = on_scrub_base
+                        self.on_scrub_preview = on_scrub_preview
                         return DesignerInspectorPanelBinding(
                             panel={{"alive": True, "parent": parent, "title": title}},
                             rows={{row.key: row.key for row in state.rows}},

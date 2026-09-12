@@ -339,6 +339,21 @@ class DesignerWorkspace:
         self._require_open()
         return self._preview.clear_selected_property(property_key)
 
+    def preview_selected_property(self, property_key: object, value: object) -> bool:
+        """Render a transient selected-property candidate without history."""
+
+        self._require_open()
+        node_id = self.session.selected_node_id
+        if not node_id:
+            raise RuntimeError("designer property inspector has no selected node")
+        return self._preview.preview_property(node_id, property_key, value)
+
+    def cancel_preview_draft(self) -> bool:
+        """Restore the authoritative document preview after transient feedback."""
+
+        self._require_open()
+        return self._preview.cancel_preview_draft()
+
     # Generic checked editing ----------------------------------------------
     def execute(self, command) -> bool:
         """Execute one backend-neutral designer command through preview validation."""
